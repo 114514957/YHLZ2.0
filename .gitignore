@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Logs
+logs/
+*.log
+backend.log
+
+# Cache & models
+cache/
+checkpoints/
+sensevoice-finetuned/
+whisper-finetuned-openai/
+index-tts/
+backend/models/
+models/
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.bin
+*.gguf
+*.whl
+
+# Build artifacts
+ffmpeg.zip
+*.zip
+
+# Environment & secrets
+.env
+vts_auth_token.txt
+
+# User-specific config
+gui_config.json
+
+# Database
+backend/data/*.db
+backend/data/memories.json
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Node (deprecated desktop_avatar)
+desktop_avatar/node_modules/
+desktop_avatar/package-lock.json

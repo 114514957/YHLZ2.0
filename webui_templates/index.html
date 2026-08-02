@@ -1,0 +1,2454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YHLZ 2.0 智能语音助手</title>
+<style>
+:root {
+    --primary: #00D4FF;
+    --primary-dark: #00A8CC;
+    --secondary: #80E5FF;
+    --accent: #00FF88;
+    --accent-dark: #00CC6A;
+    --danger: #FF4757;
+    --danger-dark: #CC3947;
+    --warning: #FFD93D;
+    --warning-dark: #CCB032;
+    --purple: #A855F7;
+    --bg: #FFFFFF;
+    --bg-dark: #F8F9FA;
+    --bg-hover: #E9ECEF;
+    --bg-selected: rgba(0, 123, 255, 0.12);
+    --text: #1A1A2E;
+    --text-secondary: #4A4A5E;
+    --text-disabled: #A0A0B0;
+    --border: #DEE2E6;
+    --border-light: #E9ECEF;
+    --radius: 8px;
+    --radius-large: 12px;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.10);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg-dark);
+    height: 100vh;
+    overflow: hidden;
+}
+#app { display: flex; height: 100vh; }
+
+/* ===== 侧边栏 ===== */
+#sidebar {
+    width: 250px;
+    min-width: 250px;
+    background: var(--bg-dark);
+    border-right: 2px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#logo {
+    text-align: center;
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--primary);
+    padding: 20px;
+    background: linear-gradient(180deg, rgba(0, 212, 255, 0.08) 0%, transparent 100%);
+}
+#module-list { flex: 1; overflow-y: auto; padding: 8px; }
+.module-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    margin-bottom: 2px;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+}
+.module-item:hover { background: var(--bg-hover); }
+.module-item.active {
+    background: var(--bg-selected);
+    border-color: var(--primary);
+}
+.module-icon { font-size: 18px; margin-right: 10px; width: 24px; text-align: center; }
+.module-title { font-weight: 600; font-size: 14px; flex: 1; }
+.module-desc { display: block; font-size: 11px; color: var(--text-secondary); font-weight: normal; margin-top: 2px; }
+.module-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+}
+.module-badge.online { background: rgba(0, 255, 136, 0.15); color: var(--accent-dark); }
+.module-badge.offline { background: rgba(255, 71, 87, 0.10); color: var(--danger); }
+
+#sidebar-bottom { padding: 12px; border-top: 1px solid var(--border-light); }
+#service-status-label {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--bg);
+    padding: 8px;
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    border: 1px solid var(--border-light);
+}
+.sidebar-btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 6px;
+    font-family: inherit;
+    transition: opacity 0.15s;
+}
+.sidebar-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.sidebar-btn.success { background: var(--accent); color: #003322; }
+.sidebar-btn.danger { background: var(--danger); color: #fff; }
+
+/* 服务卡片 */
+.service-cards { padding: 8px 0; }
+.service-card {
+    background: var(--bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+}
+.service-card.starting { border-color: var(--warning); }
+.service-card.running { border-color: var(--accent); }
+.service-card.error { border-color: var(--danger); }
+.service-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+}
+.service-card-name { font-size: 13px; font-weight: 600; }
+.service-card-status {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600;
+}
+.service-card-status.stopped { background: var(--bg-hover); color: var(--text-secondary); }
+.service-card-status.starting { background: rgba(255,217,61,0.15); color: var(--warning-dark); }
+.service-card-status.running { background: rgba(0,255,136,0.15); color: var(--accent-dark); }
+.service-card-status.error { background: rgba(255,71,87,0.10); color: var(--danger); }
+.service-card .mini-progress {
+    height: 4px; background: var(--bg-hover); border-radius: 2px;
+    overflow: hidden; margin-bottom: 6px; display: none;
+}
+.service-card .mini-progress.show { display: block; }
+.service-card .mini-progress > div {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--warning), var(--accent));
+    transition: width 0.3s;
+    animation: progressPulse 1.5s ease-in-out infinite;
+}
+@keyframes progressPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+.service-card-btn {
+    width: 100%; padding: 5px 0; border: none; border-radius: 4px;
+    font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: opacity 0.15s;
+}
+.service-card-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.service-card-btn.start { background: var(--accent); color: #003322; }
+.service-card-btn.stop { background: var(--danger); color: #fff; }
+
+/* ===== 主内容区 ===== */
+#content {
+    flex: 1;
+    background: var(--bg);
+    overflow-y: auto;
+    padding: 24px;
+}
+.page { display: none; max-width: 1100px; margin: 0 auto; }
+.page.active { display: block; }
+.page-title { font-size: 20px; font-weight: bold; margin-bottom: 4px; }
+.page-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+
+/* ===== 通用组件 ===== */
+.card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+}
+.card-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--primary-dark);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-light);
+}
+.form-row { display: flex; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.form-label { width: 120px; font-size: 13px; color: var(--text-secondary); flex-shrink: 0; }
+.form-label-mini { font-size: 12px; color: var(--text-secondary); margin: 6px 0 4px; }
+input[type="text"], input[type="password"], input[type="number"], select, textarea {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+select { cursor: pointer; }
+textarea { resize: vertical; line-height: 1.5; }
+.btn {
+    padding: 8px 18px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s, transform 0.05s;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn-primary { background: var(--primary); color: #002B38; }
+.btn-accent { background: var(--accent); color: #003322; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-warning { background: var(--warning); color: #3a2e00; }
+.btn-default { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
+.btn-small { padding: 5px 12px; font-size: 12px; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; cursor: pointer; font-size: 13px; }
+.checkbox-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+
+.slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.slider-row input[type="range"] { flex: 1; accent-color: var(--primary); }
+.slider-value { font-size: 12px; color: var(--text-secondary); min-width: 40px; text-align: right; }
+
+.status-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.status-pill.active { background: rgba(0, 255, 136, 0.15); color: var(--accent-dark); }
+.status-pill.inactive { background: rgba(255, 71, 87, 0.10); color: var(--danger); }
+.status-pill.pending { background: rgba(255, 217, 61, 0.15); color: var(--warning-dark); }
+
+.tab-bar { display: flex; gap: 4px; border-bottom: 2px solid var(--border-light); margin-bottom: 16px; }
+.tab-btn {
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: inherit;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+.tab-btn.active { color: var(--primary-dark); border-bottom-color: var(--primary); }
+
+/* ===== 表格 ===== */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+    background: var(--bg);
+    color: var(--text);
+    padding: 10px 8px;
+    text-align: left;
+    font-weight: bold;
+    border: 1px solid var(--border);
+    font-size: 13px;
+}
+td { padding: 8px; border: 1px solid var(--border-light); vertical-align: middle; }
+tr:hover td { background: var(--bg-dark); }
+
+/* ===== 聊天 ===== */
+#chat-messages {
+    height: 420px;
+    overflow-y: auto;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+}
+.message { display: flex; margin-bottom: 12px; }
+.message-user { flex-direction: row-reverse; }
+.message-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    margin: 0 10px;
+}
+.avatar-user { background: rgba(0, 123, 255, 0.15); }
+.avatar-ai { background: rgba(168, 85, 247, 0.15); }
+.avatar-sys { background: var(--bg-hover); }
+.message-content {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.content-user { background: var(--primary); color: #002B38; }
+.content-ai { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+.content-sys { background: var(--bg-hover); color: var(--text-secondary); font-size: 12px; }
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input-row input { flex: 1; }
+
+/* ===== 日志 ===== */
+#log-container {
+    height: 460px;
+    overflow-y: auto;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+}
+.log-line { padding: 2px 0; border-bottom: 1px solid rgba(0,0,0,0.04); }
+.log-error { color: var(--danger); }
+.log-warning { color: var(--warning-dark); }
+.log-success { color: var(--accent-dark); }
+.log-info { color: var(--text-secondary); }
+
+/* ===== 仪表信息格 ===== */
+.info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.info-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.info-card-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.info-card-value { font-size: 20px; font-weight: bold; color: var(--text); }
+
+.progress-bar {
+    height: 8px;
+    background: var(--bg-hover);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 8px 0;
+}
+.progress-bar > div { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 4px; transition: width 0.5s; }
+
+/* ===== 视觉 ===== */
+#vision-frame {
+    width: 100%;
+    height: 360px;
+    background: var(--bg-dark);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    object-fit: contain;
+    display: block;
+}
+.split { display: flex; gap: 16px; }
+.split > *:first-child { flex: 3; }
+.split > *:last-child { flex: 1; min-width: 280px; }
+
+/* ===== 2D形象 ===== */
+#live2d-frame {
+    width: 100%;
+    height: 420px;
+    background: var(--bg-dark);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+}
+.action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+
+/* ===== 工具 ===== */
+#tools-list-box {
+    height: 220px;
+    overflow-y: auto;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+}
+#tool-result-box {
+    min-height: 120px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+}
+
+/* ===== 顶部状态条 ===== */
+#topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 20px;
+}
+#topbar .title { font-weight: bold; font-size: 15px; color: var(--primary-dark); }
+#topbar .spacer { flex: 1; }
+#topbar .item { font-size: 12px; color: var(--text-secondary); }
+#uptime { font-family: Consolas, monospace; }
+
+/* ===== 滚动条 ===== */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-disabled); }
+
+@media (max-width: 900px) {
+    #sidebar { width: 200px; min-width: 200px; }
+    .split { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+    <!-- ===== 侧边栏 ===== -->
+    <div id="sidebar">
+        <div id="logo">YHLZ 2.0</div>
+        <div id="module-list"></div>
+        <div id="sidebar-bottom">
+            <div class="service-cards" id="service-cards">
+                <div class="service-card" id="card-backend">
+                    <div class="service-card-header">
+                        <span class="service-card-name">后端服务</span>
+                        <span class="service-card-status stopped">未启动</span>
+                    </div>
+                    <div class="mini-progress"><div style="width:0%"></div></div>
+                    <button class="service-card-btn start" onclick="toggleService('backend')">启动</button>
+                </div>
+                <div class="service-card" id="card-live2d">
+                    <div class="service-card-header">
+                        <span class="service-card-name">桌宠形象</span>
+                        <span class="service-card-status stopped">未启动</span>
+                    </div>
+                    <div class="mini-progress"><div style="width:0%"></div></div>
+                    <button class="service-card-btn start" onclick="toggleService('live2d')">启动</button>
+                </div>
+                <div class="service-card" id="card-voice_chat">
+                    <div class="service-card-header">
+                        <span class="service-card-name">语音对话</span>
+                        <span class="service-card-status stopped">未启动</span>
+                    </div>
+                    <div class="mini-progress"><div style="width:0%"></div></div>
+                    <button class="service-card-btn start" onclick="toggleService('voice_chat')">启动</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 主内容 ===== -->
+    <div id="content">
+        <div id="topbar">
+            <span class="title">YHLZ 2.0 智能语音助手</span>
+            <span class="spacer"></span>
+            <span class="item" id="topbar-backend">后端: <span class="status-pill inactive" id="topbar-backend-status">未连接</span></span>
+            <span class="item" id="topbar-avatar">桌宠: <span class="status-pill inactive" id="topbar-avatar-status">未运行</span></span>
+            <span class="item">运行时长: <span id="uptime">00:00:00</span></span>
+        </div>
+
+        <!-- ===== 服务设置 ===== -->
+        <div class="page" id="page-service">
+            <div class="page-title">服务设置</div>
+            <div class="page-desc">端口、绑定地址、日志设置</div>
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="service-basic">基础设置</button>
+                <button class="tab-btn" data-tab="service-advanced">高级设置</button>
+            </div>
+            <div id="service-basic">
+                <div class="card">
+                    <div class="card-title">基础设置</div>
+                    <div class="form-row"><label class="form-label">服务端口:</label><input type="number" id="cfg-port" value="8000" min="1" max="65535" style="width:120px"></div>
+                    <div class="form-row"><label class="form-label">绑定地址:</label><input type="text" id="cfg-host" value="0.0.0.0" style="width:180px"></div>
+                </div>
+            </div>
+            <div id="service-advanced" style="display:none">
+                <div class="card">
+                    <div class="card-title">日志设置</div>
+                    <div class="form-row">
+                        <label class="form-label">日志级别:</label>
+                        <select id="cfg-log-level" style="width:150px">
+                            <option>DEBUG</option><option selected>INFO</option><option>WARNING</option><option>ERROR</option>
+                        </select>
+                    </div>
+                    <label class="checkbox-row"><input type="checkbox" id="cfg-log-file" checked> 输出日志到文件</label>
+                </div>
+                <div class="card">
+                    <div class="card-title">自动重启</div>
+                    <label class="checkbox-row"><input type="checkbox" id="cfg-auto-restart"> 启用自动重启</label>
+                    <div class="form-row">
+                        <label class="form-label">重启延迟(秒):</label>
+                        <input type="number" id="cfg-restart-delay" value="10" min="1" max="60" style="width:100px">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">启动参数</div>
+                    <label class="checkbox-row"><input type="checkbox" id="cfg-direct-gpu" checked> 直接加载到GPU</label>
+                    <label class="checkbox-row"><input type="checkbox" id="cfg-debug"> 调试模式</label>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="saveServiceConfig()">保存配置</button>
+                <span id="cfg-save-msg" style="font-size:12px;color:var(--accent-dark);align-self:center"></span>
+            </div>
+        </div>
+
+        <!-- ===== ASR语音识别 ===== -->
+        <div class="page" id="page-asr">
+            <div class="page-title">ASR 语音识别</div>
+            <div class="page-desc">语音识别模型、精度、降噪设置 &nbsp;|&nbsp; 状态: <span class="status-pill inactive" id="asr-status-pill">未启动</span></div>
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="asr-model">模型设置</button>
+                <button class="tab-btn" data-tab="asr-advanced">高级设置</button>
+            </div>
+            <div id="asr-model">
+                <div class="card">
+                    <div class="card-title">模型设置</div>
+                    <div class="form-row">
+                        <label class="form-label">ASR模型:</label>
+                        <select id="asr-model" style="width:280px">
+                            <option value="openai-whisper-tiny">openai-whisper-tiny (最快)</option>
+                            <option value="openai-whisper-base">openai-whisper-base</option>
+                            <option value="openai-whisper-small">openai-whisper-small (均衡)</option>
+                            <option value="openai-whisper-medium">openai-whisper-medium</option>
+                            <option value="openai-whisper-large">openai-whisper-large (最高精度)</option>
+                            <option value="funasr-sensevoice-small">funasr-sensevoice-small (中文推荐)</option>
+                            <option value="funasr-sensevoice-medium">funasr-sensevoice-medium</option>
+                            <option value="funasr-sensevoice-large">funasr-sensevoice-large</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">运行模式:</label>
+                        <select id="asr-mode" style="width:200px">
+                            <option value="accuracy">accuracy (高精度)</option>
+                            <option value="speed">speed (快速)</option>
+                            <option value="balanced">balanced (平衡)</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">识别语言:</label>
+                        <select id="asr-language" style="width:150px">
+                            <option>中文</option><option>英文</option><option>日文</option><option>韩文</option><option>自动</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">降噪设置</div>
+                    <label class="checkbox-row"><input type="checkbox" id="asr-noise" checked> 启用降噪</label>
+                    <div class="slider-row">
+                        <label class="form-label-mini" style="width:70px">降噪强度:</label>
+                        <input type="range" id="asr-noise-level" min="0" max="100" value="60">
+                        <span class="slider-value" id="asr-noise-level-v">60%</span>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">VAD 语音活动检测</div>
+                    <label class="checkbox-row"><input type="checkbox" id="asr-vad" checked> 启用VAD</label>
+                    <div class="slider-row">
+                        <label class="form-label-mini" style="width:70px">VAD灵敏度:</label>
+                        <input type="range" id="asr-vad-level" min="0" max="100" value="50">
+                        <span class="slider-value" id="asr-vad-level-v">50%</span>
+                    </div>
+                </div>
+            </div>
+            <div id="asr-advanced" style="display:none">
+                <div class="card">
+                    <div class="card-title">热词设置</div>
+                    <textarea id="asr-hotwords" placeholder="每行一个热词" rows="4" style="width:100%"></textarea>
+                </div>
+                <div class="card">
+                    <div class="card-title">识别参数</div>
+                    <div class="slider-row">
+                        <label class="form-label-mini" style="width:70px">置信度阈值:</label>
+                        <input type="range" id="asr-confidence" min="0" max="100" value="50">
+                        <span class="slider-value" id="asr-confidence-v">0.5</span>
+                    </div>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="saveASRConfig()">保存配置</button>
+                <button class="btn btn-accent" id="asr-start-btn" onclick="startASR()">启动ASR</button>
+                <button class="btn btn-danger" id="asr-stop-btn" onclick="stopASR()" disabled>停止ASR</button>
+                <span id="asr-msg" style="font-size:12px;color:var(--accent-dark);align-self:center"></span>
+            </div>
+        </div>
+
+        <!-- ===== TTS语音合成 ===== -->
+        <div class="page" id="page-tts">
+            <div class="page-title">TTS 语音合成</div>
+            <div class="page-desc">语音合成引擎、音色、情绪设置 &nbsp;|&nbsp; 状态: <span class="status-pill inactive" id="tts-status-pill">未启动</span></div>
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="tts-basic">基础设置</button>
+                <button class="tab-btn" data-tab="tts-audio">音频参数</button>
+            </div>
+            <div id="tts-basic">
+                <div class="card">
+                    <div class="card-title">基本设置</div>
+                    <div class="form-row">
+                        <label class="form-label">TTS引擎:</label>
+                        <select id="tts-engine" style="width:200px"><option>Qwen3-TTS CustomVoice</option><option>Edge-TTS</option></select>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">语言:</label>
+                        <select id="tts-language" style="width:150px" onchange="updateVoices()">
+                            <option>中文</option><option>英文</option><option>日文</option><option>韩文</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">音色:</label>
+                        <select id="tts-voice" style="width:200px"></select>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">情绪设置</div>
+                    <div class="form-row">
+                        <label class="form-label">情绪:</label>
+                        <select id="tts-emotion" style="width:150px">
+                            <option>标准</option><option>开心</option><option>悲伤</option><option>愤怒</option><option>平静</option><option>惊讶</option>
+                        </select>
+                    </div>
+                    <div class="slider-row">
+                        <label class="form-label-mini" style="width:70px">情绪强度:</label>
+                        <input type="range" id="tts-emotion-level" min="0" max="100" value="80">
+                        <span class="slider-value" id="tts-emotion-level-v">80%</span>
+                    </div>
+                </div>
+            </div>
+            <div id="tts-audio" style="display:none">
+                <div class="card">
+                    <div class="card-title">音频参数</div>
+                    <div class="slider-row">
+                        <label class="form-label-mini" style="width:70px">语速:</label>
+                        <input type="range" id="tts-rate" min="-50" max="50" value="0">
+                        <span class="slider-value" id="tts-rate-v">0%</span>
+                    </div>
+                    <div class="slider-row">
+                        <label class="form-label-mini" style="width:70px">音量:</label>
+                        <input type="range" id="tts-volume" min="0" max="100" value="100">
+                        <span class="slider-value" id="tts-volume-v">100%</span>
+                    </div>
+                    <div class="slider-row">
+                        <label class="form-label-mini" style="width:70px">音调:</label>
+                        <input type="range" id="tts-pitch" min="-20" max="20" value="0">
+                        <span class="slider-value" id="tts-pitch-v">0</span>
+                    </div>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="saveTTSConfig()">保存配置</button>
+                <button class="btn btn-accent" id="tts-start-btn" onclick="startTTS()">启动TTS</button>
+                <button class="btn btn-danger" id="tts-stop-btn" onclick="stopTTS()" disabled>停止TTS</button>
+                <button class="btn btn-default" onclick="testTTS()">🔊 试听</button>
+                <span id="tts-msg" style="font-size:12px;color:var(--accent-dark);align-self:center"></span>
+            </div>
+        </div>
+
+        <!-- ===== LLM设置 ===== -->
+        <div class="page" id="page-llm">
+            <div class="page-title">LLM 设置</div>
+            <div class="page-desc">模型提供商、参数配置</div>
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="llm-basic">基础设置</button>
+                <button class="tab-btn" data-tab="llm-param">参数设置</button>
+            </div>
+            <div id="llm-basic">
+                <div class="card">
+                    <div class="card-title">基础设置</div>
+                    <div class="form-row">
+                        <label class="form-label">LLM提供商:</label>
+                        <select id="llm-provider" style="width:220px" onchange="updateModels()">
+                            <option>阿里云通义千问</option><option>百度文心一言</option><option>腾讯混元</option>
+                            <option>OpenAI</option><option>字节豆包</option><option>自定义API</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">模型:</label>
+                        <select id="llm-model" style="width:220px"></select>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">API Key:</label>
+                        <input type="password" id="llm-api-key" placeholder="API Key" style="width:320px">
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">API地址:</label>
+                        <input type="text" id="llm-base-url" placeholder="API Base URL" style="width:320px">
+                    </div>
+                </div>
+            </div>
+            <div id="llm-param" style="display:none">
+                <div class="card">
+                    <div class="card-title">参数设置</div>
+                    <div class="slider-row">
+                        <label class="form-label-mini" style="width:70px">温度:</label>
+                        <input type="range" id="llm-temp" min="0" max="100" value="70">
+                        <span class="slider-value" id="llm-temp-v">0.70</span>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">最大Token:</label>
+                        <input type="number" id="llm-max-tokens" value="4000" min="100" max="10000" style="width:140px">
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">上下文窗口:</label>
+                        <input type="number" id="llm-context" value="8000" min="1000" max="16000" style="width:140px">
+                    </div>
+                    <div class="slider-row">
+                        <label class="form-label-mini" style="width:70px">Top P:</label>
+                        <input type="range" id="llm-top-p" min="0" max="100" value="95">
+                        <span class="slider-value" id="llm-top-p-v">0.95</span>
+                    </div>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="saveLLMConfig()">保存配置</button>
+                <span id="llm-msg" style="font-size:12px;color:var(--accent-dark);align-self:center"></span>
+            </div>
+        </div>
+
+        <!-- ===== GPU设置 ===== -->
+        <div class="page" id="page-gpu">
+            <div class="page-title">GPU 设置</div>
+            <div class="page-desc">显存检测、运行模式、资源管理</div>
+            <div class="card">
+                <div class="card-title">GPU 状态</div>
+                <div class="info-grid">
+                    <div class="info-card"><div class="info-card-label">GPU名称</div><div class="info-card-value" id="gpu-name" style="font-size:15px">未检测到GPU</div></div>
+                    <div class="info-card"><div class="info-card-label">显存总量</div><div class="info-card-value" id="gpu-total">0 GB</div></div>
+                    <div class="info-card"><div class="info-card-label">已使用</div><div class="info-card-value" id="gpu-used" style="color:var(--danger)">0 GB</div></div>
+                    <div class="info-card"><div class="info-card-label">可用显存</div><div class="info-card-value" id="gpu-free" style="color:var(--accent-dark)">0 GB</div></div>
+                </div>
+                <div class="progress-bar"><div id="gpu-bar" style="width:0%"></div></div>
+                <div class="form-label-mini" id="gpu-percent-label">显存使用率: 0%</div>
+            </div>
+            <div class="card">
+                <div class="card-title">运行模式</div>
+                <div class="form-row">
+                    <label class="form-label">运行模式:</label>
+                    <select id="gpu-mode" style="width:220px">
+                        <option>GPU加速模式</option><option>CPU兼容模式</option><option>混合模式</option>
+                    </select>
+                </div>
+                <label class="checkbox-row"><input type="checkbox" id="gpu-direct" checked> 直接加载模型到GPU</label>
+                <label class="checkbox-row"><input type="checkbox" id="gpu-fallback" checked> GPU不足时自动降级到CPU</label>
+            </div>
+            <div class="card">
+                <div class="card-title">资源监控</div>
+                <div class="form-row">
+                    <label class="form-label">监控间隔(秒):</label>
+                    <input type="number" id="gpu-interval" value="5" min="1" max="30" style="width:100px">
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-default" onclick="refreshGPU()">刷新状态</button>
+                    <button class="btn btn-primary" onclick="saveGPUConfig()">保存配置</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 记忆管理 ===== -->
+        <div class="page" id="page-memory">
+            <div class="page-title">记忆管理</div>
+            <div class="page-desc">添加、删除、搜索记忆条目 &nbsp;|&nbsp; 统计: <span id="memory-stats" style="color:var(--text-secondary)">-</span></div>
+            <div class="card">
+                <div class="btn-row" style="margin-top:0">
+                    <input type="text" id="memory-search" placeholder="搜索记忆..." style="flex:1;min-width:200px">
+                    <button class="btn btn-default" onclick="loadMemories()">搜索</button>
+                    <select id="memory-filter" style="width:140px" onchange="loadMemories()">
+                        <option>全部</option><option>高优先级</option><option>中优先级</option><option>低优先级</option>
+                    </select>
+                </div>
+                <div style="overflow-x:auto">
+                    <table>
+                        <thead><tr><th style="width:45%">内容</th><th style="width:15%">优先级</th><th style="width:25%">创建时间</th><th style="width:15%">操作</th></tr></thead>
+                        <tbody id="memory-table"><tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:30px">加载中...</td></tr></tbody>
+                    </table>
+                </div>
+                <div class="btn-row">
+                    <input type="text" id="memory-input" placeholder="输入要记忆的内容..." style="flex:1;min-width:200px">
+                    <select id="memory-priority" style="width:120px">
+                        <option value="2">中优先级</option><option value="1">低优先级</option><option value="3">高优先级</option>
+                    </select>
+                    <button class="btn btn-accent" onclick="addMemory()">添加</button>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-default" onclick="loadMemories()">刷新</button>
+                    <button class="btn btn-danger" onclick="deleteSelectedMemory()">删除选中</button>
+                    <button class="btn btn-danger" onclick="clearAllMemory()">清空所有</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 角色设定 ===== -->
+        <div class="page" id="page-personality">
+            <div class="page-title">角色设定</div>
+            <div class="page-desc">AI角色性格、说话风格设置</div>
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="persona-template">模板选择</button>
+                <button class="tab-btn" data-tab="persona-custom">自定义设定</button>
+            </div>
+            <div id="persona-template">
+                <div class="card">
+                    <div class="card-title">角色模板</div>
+                    <div class="form-row">
+                        <label class="form-label">角色模板:</label>
+                        <select id="persona-template-select" style="width:180px" onchange="previewPersona()"></select>
+                    </div>
+                    <div class="form-label-mini">角色预览:</div>
+                    <textarea id="persona-preview" rows="5" readonly style="width:100%;background:var(--bg-dark)"></textarea>
+                    <div class="btn-row"><button class="btn btn-primary" onclick="applyPersona()">应用模板</button></div>
+                </div>
+            </div>
+            <div id="persona-custom" style="display:none">
+                <div class="card">
+                    <div class="card-title">自定义角色设定</div>
+                    <div class="form-label-mini">角色设定描述:</div>
+                    <textarea id="persona-custom-text" placeholder="在此输入详细的角色设定描述..." rows="6" style="width:100%"></textarea>
+                    <div class="form-row" style="margin-top:12px">
+                        <label class="form-label">角色名称:</label>
+                        <input type="text" id="persona-name" placeholder="角色名称" style="width:200px">
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">性别:</label>
+                        <select id="persona-gender" style="width:120px"><option>中性</option><option>男性</option><option>女性</option></select>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">年龄:</label>
+                        <input type="number" id="persona-age" value="25" min="0" max="100" style="width:100px">
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">语气风格:</label>
+                        <select id="persona-tone" style="width:120px">
+                            <option>正式</option><option>亲切</option><option>幽默</option><option>专业</option><option>活泼</option><option>沉稳</option>
+                        </select>
+                    </div>
+                    <div class="btn-row"><button class="btn btn-primary" onclick="applyCustomPersona()">应用自定义设定</button></div>
+                </div>
+            </div>
+            <div id="persona-msg" style="font-size:12px;color:var(--accent-dark);margin-top:8px"></div>
+        </div>
+
+        <!-- ===== 视觉功能 ===== -->
+        <div class="page" id="page-vision">
+            <div class="page-title">视觉功能</div>
+            <div class="page-desc">摄像头、屏幕捕获、视觉识别</div>
+            <div class="split">
+                <div>
+                    <div class="card">
+                        <div class="card-title">实时画面</div>
+                        <img id="vision-frame" src="" alt="暂无画面">
+                        <div style="display:flex;gap:12px;margin-top:8px;font-size:12px;color:var(--text-secondary)">
+                            <span>状态: <span id="vision-status" style="color:var(--warning-dark)">等待启动</span></span>
+                            <span id="vision-mode">模式: 未选择</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="card">
+                        <div class="card-title">捕获模式</div>
+                        <label class="checkbox-row"><input type="radio" name="vision-mode-radio" id="vision-camera-radio" checked onclick="toggleVisionMode()"> 摄像头</label>
+                        <label class="checkbox-row"><input type="radio" name="vision-mode-radio" id="vision-screen-radio" onclick="toggleVisionMode()"> 屏幕</label>
+                    </div>
+                    <div class="card" id="vision-camera-box">
+                        <div class="card-title">摄像头设置</div>
+                        <select id="vision-cameras" style="width:100%;margin-bottom:8px"></select>
+                        <button class="btn btn-primary" style="width:100%" onclick="startVisionCamera()">启动摄像头</button>
+                    </div>
+                    <div class="card" id="vision-screen-box" style="display:none">
+                        <div class="card-title">屏幕设置</div>
+                        <select id="vision-monitors" style="width:100%;margin-bottom:8px"></select>
+                        <button class="btn btn-primary" style="width:100%" onclick="startVisionScreen()">启动屏幕捕获</button>
+                    </div>
+                    <button class="btn btn-danger" style="width:100%;margin-bottom:16px" id="vision-stop-btn" onclick="stopVision()" disabled>停止捕获</button>
+                    <div class="card">
+                        <div class="card-title">图像优化</div>
+                        <select id="vision-optimization" style="width:100%;margin-bottom:8px">
+                            <option value="none">无</option><option value="denoised">去噪</option>
+                            <option value="enhanced">增强</option><option value="sharpened">锐化</option><option value="contrast">对比度</option>
+                        </select>
+                        <button class="btn btn-default" style="width:100%" onclick="applyVisionOptimization()">应用优化</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">场景分析</div>
+                        <button class="btn btn-default" style="width:100%" onclick="analyzeVision()">分析当前画面</button>
+                        <div class="form-label-mini" id="vision-analysis">分析结果将显示在这里...</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">物体检测</div>
+                        <label class="checkbox-row"><input type="checkbox" id="vision-detect" onchange="toggleVisionDetect()"> 启用实时检测</label>
+                        <div class="form-label-mini" id="vision-object-count">检测到: 0 个物体</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">截图保存</div>
+                        <button class="btn btn-default" style="width:100%" onclick="captureVision()">截取当前画面</button>
+                        <div class="form-label-mini" id="vision-capture-path"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 2D形象 ===== -->
+        <div class="page" id="page-avatar">
+            <div class="page-title">2D 虚拟形象</div>
+            <div class="page-desc">虚拟形象、表情动画、VTube Studio</div>
+            <div class="split">
+                <div>
+                    <div class="card">
+                        <div class="card-title">Hiyori Live2D 虚拟形象</div>
+                        <iframe id="live2d-frame" src="" frameborder="0"></iframe>
+                        <div style="display:flex;gap:12px;margin-top:8px;font-size:12px;color:var(--text-secondary)">
+                            <span>状态: <span id="avatar-vts-status" style="color:var(--warning-dark)">未连接</span></span>
+                            <span id="avatar-model-name">模型: -</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="card">
+                        <div class="card-title">模型选择</div>
+                        <select id="avatar-model" style="width:100%;margin-bottom:8px"><option>Hiyori VTS (默认)</option></select>
+                        <div class="btn-row">
+                            <button class="btn btn-primary" style="flex:1" onclick="loadAvatarModel()">加载模型</button>
+                            <button class="btn btn-accent" style="flex:1" onclick="connectVTS()">连接VTS</button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">窗口控制</div>
+                        <div class="btn-row">
+                            <button class="btn btn-default btn-small" onclick="avatarWindow('show')">显示</button>
+                            <button class="btn btn-default btn-small" onclick="avatarWindow('hide')">隐藏</button>
+                            <button class="btn btn-default btn-small" onclick="avatarWindow('toggle')">切换</button>
+                            <button class="btn btn-default btn-small" onclick="avatarWindow('chat')">对话窗口</button>
+                            <button class="btn btn-default btn-small" onclick="avatarWindow('set_topmost', {topmost:true})">置顶</button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">情绪控制</div>
+                        <select id="avatar-emotion" style="width:100%;margin-bottom:8px">
+                            <option>默认</option><option>开心</option><option>悲伤</option><option>愤怒</option>
+                            <option>平静</option><option>惊讶</option><option>害羞</option>
+                        </select>
+                        <button class="btn btn-default" style="width:100%" onclick="applyAvatarEmotion()">应用情绪</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">动作控制</div>
+                        <div class="action-grid" id="avatar-actions"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">显示设置</div>
+                        <div class="slider-row">
+                            <label class="form-label-mini" style="width:70px">形象大小:</label>
+                            <input type="range" id="avatar-size" min="50" max="150" value="100">
+                            <span class="slider-value" id="avatar-size-v">100%</span>
+                        </div>
+                        <label class="checkbox-row"><input type="checkbox" id="avatar-lip" checked> 说话时显示口型动画</label>
+                        <label class="checkbox-row"><input type="checkbox" id="avatar-animate" checked> 启用情绪动画</label>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">屏幕识别</div>
+                        <label class="checkbox-row"><input type="checkbox" id="avatar-screen" checked> 启用屏幕识别反应</label>
+                        <div class="form-label-mini">屏幕内容: <span id="avatar-screen-info">未检测</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 文本对话 ===== -->
+        <div class="page" id="page-text_chat">
+            <div class="page-title">文本对话</div>
+            <div class="page-desc">纯文本对话交互</div>
+            <div class="card">
+                <div class="card-title">对话</div>
+                <div id="chat-messages">
+                    <div class="message message-sys">
+                        <div class="message-avatar avatar-sys">⚙</div>
+                        <div class="message-content content-sys">欢迎使用 YHLZ 2.0 智能文本助手。</div>
+                    </div>
+                </div>
+                <div class="chat-input-row">
+                    <input type="text" id="chat-input" placeholder="输入消息... (Enter发送)">
+                    <button class="btn btn-primary" onclick="sendMessage()">发送</button>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-default btn-small" onclick="clearChat()">清空</button>
+                    <button class="btn btn-default btn-small" onclick="saveChat()">保存记录</button>
+                    <button class="btn btn-accent btn-small" onclick="speakLastResponse()">🔊 朗读</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 语音聊天 ===== -->
+        <div class="page" id="page-voice_chat">
+            <div class="page-title">语音聊天</div>
+            <div class="page-desc">语音对话、TTS朗读</div>
+            <div class="card">
+                <div class="card-title">语音对话</div>
+                <div id="voice-chat-messages" style="height:260px;overflow-y:auto;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px">
+                    <div class="message message-sys">
+                        <div class="message-avatar avatar-sys">⚙</div>
+                        <div class="message-content content-sys">欢迎使用 YHLZ 2.0 智能语音助手。点击「开始对话」说话。</div>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-accent" id="voice-start-btn" onclick="startVoiceChat()">🎤 开始对话</button>
+                    <button class="btn btn-danger" id="voice-stop-btn" onclick="stopVoiceChat()" disabled>结束对话</button>
+                </div>
+                <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)">
+                    <div class="card-title" style="border:none;padding:0;margin-bottom:8px">TTS设置</div>
+                    <label class="checkbox-row"><input type="checkbox" id="voice-tts" checked> 自动朗读回复</label>
+                    <div class="form-row">
+                        <label class="form-label">语速:</label>
+                        <select id="voice-rate" style="width:120px">
+                            <option value="-20%">慢</option><option value="0%" selected>正常</option><option value="+20%">快</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">音色:</label>
+                        <select id="voice-voice" style="width:140px">
+                            <option>Vivian</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="chat-input-row" style="margin-top:12px">
+                    <input type="text" id="voice-chat-input" placeholder="或输入文本...">
+                    <button class="btn btn-primary" onclick="sendVoiceText()">发送</button>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-default btn-small" onclick="clearVoiceChat()">清空</button>
+                    <button class="btn btn-default btn-small" onclick="saveVoiceChat()">保存记录</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 工具调用 ===== -->
+        <div class="page" id="page-tools">
+            <div class="page-title">工具调用</div>
+            <div class="page-desc">查看所有工具及中文说明</div>
+            <div class="card">
+                <div class="card-title">工具列表</div>
+                <div class="btn-row" style="margin-top:0">
+                    <button class="btn btn-default" onclick="loadTools()">刷新工具列表</button>
+                    <span id="tools-count" style="font-size:12px;color:var(--text-secondary);align-self:center"></span>
+                </div>
+                <div id="tools-list-box">正在加载工具列表，请稍候...</div>
+            </div>
+            <div class="card">
+                <div class="card-title">调用工具</div>
+                <div class="form-row">
+                    <label class="form-label">工具名称:</label>
+                    <input type="text" id="tool-name" placeholder="例如: calculator" style="width:240px">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">参数(JSON):</label>
+                    <input type="text" id="tool-params" placeholder='{"expression": "2 + 3"}' style="width:320px">
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-primary" onclick="callTool()">调用工具</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">调用结果</div>
+                <div id="tool-result-box">等待调用...</div>
+            </div>
+        </div>
+
+        <!-- ===== 日志 ===== -->
+        <div class="page" id="page-logs">
+            <div class="page-title">日志</div>
+            <div class="page-desc">系统与后端运行日志</div>
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="logs-webui">系统日志</button>
+                <button class="tab-btn" data-tab="logs-backend">后端日志</button>
+            </div>
+            <div id="logs-webui">
+                <div class="card">
+                    <div class="btn-row" style="margin-top:0">
+                        <button class="btn btn-default btn-small" onclick="refreshLogs()">刷新</button>
+                        <button class="btn btn-danger btn-small" onclick="clearLogs()">清空日志</button>
+                        <label class="checkbox-row" style="margin:0 0 0 12px"><input type="checkbox" id="logs-auto" checked> 自动刷新</label>
+                    </div>
+                    <div id="log-container">加载中...</div>
+                </div>
+            </div>
+            <div id="logs-backend" style="display:none">
+                <div class="card">
+                    <div class="btn-row" style="margin-top:0">
+                        <button class="btn btn-default btn-small" onclick="refreshBackendLogs()">刷新</button>
+                    </div>
+                    <div id="backend-log-container">加载中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 系统信息 ===== -->
+        <div class="page" id="page-system">
+            <div class="page-title">系统信息</div>
+            <div class="page-desc">硬件与运行环境信息</div>
+            <div class="info-grid">
+                <div class="info-card"><div class="info-card-label">操作系统</div><div class="info-card-value" id="sys-os" style="font-size:13px">--</div></div>
+                <div class="info-card"><div class="info-card-label">Python版本</div><div class="info-card-value" id="sys-python" style="font-size:13px">--</div></div>
+                <div class="info-card"><div class="info-card-label">CPU核心</div><div class="info-card-value" id="sys-cpu-cores">--</div></div>
+                <div class="info-card"><div class="info-card-label">CPU使用率</div><div class="info-card-value" id="sys-cpu">--</div></div>
+                <div class="info-card"><div class="info-card-label">内存总量</div><div class="info-card-value" id="mem-total">--</div></div>
+                <div class="info-card"><div class="info-card-label">内存已用</div><div class="info-card-value" id="mem-used">--</div></div>
+                <div class="info-card"><div class="info-card-label">内存使用率</div><div class="info-card-value" id="mem-percent">--</div></div>
+                <div class="info-card"><div class="info-card-label">磁盘使用率</div><div class="info-card-value" id="disk-percent">--</div></div>
+            </div>
+            <div class="card">
+                <div class="card-title">GPU信息</div>
+                <div id="gpu-info">未检测到GPU</div>
+            </div>
+            <div class="card">
+                <div class="card-title">性能测试 (PCM延迟)</div>
+                <div class="btn-row">
+                    <button class="btn btn-default" onclick="runBenchmark('all')">全项测试</button>
+                    <button class="btn btn-default" onclick="runBenchmark('asr')">ASR测试</button>
+                    <button class="btn btn-default" onclick="runBenchmark('llm')">LLM首字延迟</button>
+                    <button class="btn btn-default" onclick="runBenchmark('tts')">TTS测试</button>
+                </div>
+                <div id="benchmark-result" class="form-label-mini" style="margin-top:8px;white-space:pre-wrap">点击按钮运行测试</div>
+            </div>
+        </div>
+
+        <!-- ===== 关于 ===== -->
+        <div class="page" id="page-about">
+            <div class="page-title">关于</div>
+            <div class="page-desc">YHLZ 2.0 智能语音助手</div>
+            <div class="card">
+                <div class="card-title">版本信息</div>
+                <div class="form-row"><label class="form-label">版本:</label><span>YHLZ 2.0</span></div>
+                <div class="form-row"><label class="form-label">WebUI端口:</label><span>5000</span></div>
+                <div class="form-row"><label class="form-label">后端API:</label><span>8000</span></div>
+                <div class="form-row"><label class="form-label">Live2D:</label><span>8081</span></div>
+                <div class="form-row"><label class="form-label">Python:</label><span id="about-python">--</span></div>
+                <div class="form-row"><label class="form-label">技术栈:</label><span>Flask + FastAPI + PyQt5 + Live2D + Edge-TTS + Whisper/SenseVoice</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+'use strict';
+const startTime = Date.now();
+const $ = id => document.getElementById(id);
+
+// ===== 模块列表 (与GUI一致) =====
+const MODULES = [
+    { id: 'service',     icon: '⚙️',  title: '服务设置',   desc: '端口、绑定地址、日志设置' },
+    { id: 'asr',         icon: '🎤',  title: 'ASR语音识别', desc: '语音识别模型、精度、降噪设置' },
+    { id: 'tts',         icon: '🔊',  title: 'TTS语音合成', desc: '语音合成引擎、音色、情绪设置' },
+    { id: 'llm',         icon: '🤖',  title: 'LLM设置',    desc: '模型提供商、参数配置' },
+    { id: 'gpu',         icon: '🖥️', title: 'GPU设置',    desc: '显存检测、运行模式、资源管理' },
+    { id: 'memory',      icon: '📝',  title: '记忆管理',   desc: '添加、删除、搜索记忆条目' },
+    { id: 'personality', icon: '👤',  title: '角色设定',   desc: 'AI角色性格、说话风格设置' },
+    { id: 'vision',      icon: '👁️', title: '视觉功能',   desc: '摄像头、视觉识别' },
+    { id: 'avatar',      icon: '🎭',  title: '2D形象',     desc: '虚拟形象、表情动画' },
+    { id: 'text_chat',   icon: '📄',  title: '文本对话',   desc: '纯文本对话交互' },
+    { id: 'voice_chat',  icon: '💬',  title: '语音聊天',   desc: '语音对话、TTS朗读' },
+    { id: 'tools',       icon: '🔧',  title: '工具调用',   desc: '查看所有工具及中文说明' },
+    { id: 'logs',        icon: '📋',  title: '日志',       desc: '系统与后端运行日志' },
+    { id: 'system',      icon: '💻',  title: '系统信息',   desc: '硬件与运行环境信息' },
+    { id: 'about',       icon: 'ℹ️',  title: '关于',       desc: '版本与技术栈' },
+];
+
+const STATUS_FIELDS = {
+    backend: '后端', live2d: 'Live2D', asr: 'ASR', tts: 'TTS', avatar: '桌宠'
+};
+
+function buildSidebar() {
+    const list = $('module-list');
+    MODULES.forEach(mod => {
+        const item = document.createElement('div');
+        item.className = 'module-item' + (mod.id === 'service' ? ' active' : '');
+        item.dataset.module = mod.id;
+        item.innerHTML = '<span class="module-icon">' + mod.icon + '</span>' +
+            '<div style="flex:1"><span class="module-title">' + mod.title + '</span>' +
+            '<span class="module-desc">' + mod.desc + '</span></div>' +
+            '<span class="module-badge" id="badge-' + mod.id + '"></span>';
+        item.onclick = () => switchPage(mod.id);
+        list.appendChild(item);
+    });
+}
+
+function switchPage(moduleId) {
+    document.querySelectorAll('.module-item').forEach(el => el.classList.toggle('active', el.dataset.module === moduleId));
+    document.querySelectorAll('.page').forEach(el => el.classList.toggle('active', el.id === 'page-' + moduleId));
+    if (moduleId === 'memory') loadMemories();
+    if (moduleId === 'personality') loadPersonality();
+    if (moduleId === 'tools') loadTools();
+    if (moduleId === 'logs') refreshLogs();
+    if (moduleId === 'system') loadSystemInfo();
+    if (moduleId === 'gpu') refreshGPU();
+    if (moduleId === 'vision') { refreshVisionDevices(); refreshVisionFrame(); }
+    if (moduleId === 'avatar') setupAvatarPage();
+}
+
+// ===== Tab切换 =====
+document.addEventListener('click', e => {
+    if (e.target.classList.contains('tab-btn')) {
+        const tabBar = e.target.parentElement;
+        const group = e.target.dataset.tab;
+        tabBar.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === e.target));
+        const pageId = group.replace(/^logs-/, 'logs').replace(/^service-/, 'service')
+                            .replace(/^asr-/, 'asr').replace(/^tts-/, 'tts')
+                            .replace(/^llm-/, 'llm').replace(/^persona-/, 'personality');
+        const contentIds = [];
+        tabBar.parentElement.querySelectorAll('[id]').forEach(el => {
+            if (el.id.startsWith(group.slice(0, group.indexOf('-')) + '-') || el.id === group || el.id.startsWith(group)) {
+                // 简单处理：显示目标组
+            }
+        });
+        document.querySelectorAll('#' + pageId + ' [id^="' + group.split('-')[0] + '-"], #' + pageId + ' #' + group).forEach(() => {});
+        tabBar.parentElement.querySelectorAll('div[id]').forEach(el => {
+            const id = el.id;
+            const prefix = group.split('-')[0];
+            if (id.startsWith(prefix + '-') && !id.includes('page') && el !== tabBar.parentElement) {
+                el.style.display = (id === group) ? 'block' : 'none';
+            }
+        });
+        if (group === 'logs-webui') refreshLogs();
+        if (group === 'logs-backend') refreshBackendLogs();
+    }
+});
+
+// ===== 服务状态 =====
+async function fetchJSON(url, options) {
+    const resp = await fetch(url, options);
+    return resp.json();
+}
+
+async function checkHealth() {
+    try {
+        const data = await fetchJSON('/api/health');
+        const ok = data && data.status === 'ok';
+        $('topbar-backend-status').textContent = ok ? '已连接' : '异常';
+        $('topbar-backend-status').className = 'status-pill ' + (ok ? 'active' : 'inactive');
+    } catch (e) {
+        $('topbar-backend-status').textContent = '未连接';
+        $('topbar-backend-status').className = 'status-pill inactive';
+    }
+}
+
+async function updateStatus() {
+    try {
+        const data = await fetchJSON('/api/status');
+        // 更新侧边栏徽章
+        const badgeMap = { backend: 'service', live2d: 'service', asr: 'asr', tts: 'tts', avatar: 'avatar' };
+        const runningCount = [];
+        Object.keys(STATUS_FIELDS).forEach(key => {
+            const svc = data[key];
+            const running = svc && svc.status === 'running';
+            const badgeId = badgeMap[key] || key;
+            const badge = $('badge-' + badgeId);
+            if (badge) {
+                if (key === 'backend' || key === 'live2d') {
+                    if (key === 'backend') {
+                        badge.textContent = running ? '√' : '';
+                        badge.className = 'module-badge ' + (running ? 'online' : 'offline');
+                    }
+                } else {
+                    badge.textContent = running ? '运行中' : '';
+                    badge.className = 'module-badge ' + (running ? 'online' : 'offline');
+                }
+            }
+            if (running) runningCount.push(STATUS_FIELDS[key]);
+        });
+        
+        // 更新顶部栏
+        if (data.avatar) {
+            const running = data.avatar.status === 'running';
+            $('topbar-avatar-status').textContent = running ? '运行中' : '未运行';
+            $('topbar-avatar-status').className = 'status-pill ' + (running ? 'active' : 'inactive');
+        }
+        if (data.backend) {
+            const running = data.backend.status === 'running';
+            $('topbar-backend-status').textContent = running ? '已连接' : '未连接';
+            $('topbar-backend-status').className = 'status-pill ' + (running ? 'active' : 'inactive');
+        }
+        
+        // 更新侧边栏服务卡片
+        ['backend', 'live2d', 'asr', 'tts'].forEach(name => {
+            const svc = data[name];
+            const running = svc && svc.status === 'running';
+            const card = getCard(name);
+            if (!card) return;
+            const statusEl = card.querySelector('.service-card-status');
+            const isStarting = statusEl && statusEl.classList.contains('starting');
+            // 不覆盖正在启动中的状态
+            if (!isStarting) {
+                updateCardUI(name, running ? 'running' : 'stopped',
+                    running ? '运行中' : '未启动',
+                    running ? '停止' : '启动',
+                    running ? 'stop' : 'start', false);
+            }
+            if (running && serviceProgress[name] > 0) {
+                hideProgress(name);
+            }
+        });
+        
+        const ttsRunning = data.tts && data.tts.status === 'running';
+        const asrRunning = data.asr && data.asr.status === 'running';
+        syncServiceButtons('tts', ttsRunning);
+        syncServiceButtons('asr', asrRunning);
+    } catch (e) { /* 忽略 */ }
+}
+
+function syncServiceButtons(name, running) {
+    const pill = $(name + '-status-pill');
+    if (pill) {
+        pill.textContent = running ? '运行中' : '未启动';
+        pill.className = 'status-pill ' + (running ? 'active' : 'inactive');
+    }
+    const startBtn = $(name + '-start-btn');
+    const stopBtn = $(name + '-stop-btn');
+    if (startBtn) { startBtn.disabled = running; }
+    if (stopBtn) { stopBtn.disabled = !running; }
+}
+
+function startService(name) {
+    return fetchJSON('/api/services/' + name + '/start', { method: 'POST' });
+}
+function stopService(name) {
+    return fetchJSON('/api/services/' + name + '/stop', { method: 'POST' });
+}
+
+// ===== 服务卡片：独立启动 + 进度条 =====
+
+const SERVICE_LABELS = {
+    backend: '后端服务', live2d: '桌宠形象', voice_chat: '语音对话'
+};
+
+const START_DEPENDENCIES = {
+    backend: [],
+    live2d: ['backend'],
+    voice_chat: ['backend']
+};
+
+const serviceProgress = { backend: 0, live2d: 0, voice_chat: 0 };
+const serviceTimers = { backend: null, live2d: null, voice_chat: null };
+
+function getCard(name) {
+    return document.getElementById('card-' + name);
+}
+
+function updateCardUI(name, statusClass, statusText, btnText, btnClass, btnDisabled) {
+    const card = getCard(name);
+    if (!card) return;
+    card.className = 'service-card ' + statusClass;
+    const statusEl = card.querySelector('.service-card-status');
+    if (statusEl) {
+        statusEl.textContent = statusText;
+        statusEl.className = 'service-card-status ' + statusClass;
+    }
+    const btn = card.querySelector('.service-card-btn');
+    if (btn) {
+        btn.textContent = btnText;
+        btn.className = 'service-card-btn ' + btnClass;
+        btn.disabled = btnDisabled;
+    }
+}
+
+function animateProgress(name, targetPercent, duration) {
+    const card = getCard(name);
+    if (!card) return;
+    const progressBar = card.querySelector('.mini-progress');
+    const progressFill = progressBar ? progressBar.querySelector('div') : null;
+    if (!progressBar || !progressFill) return;
+    
+    progressBar.classList.add('show');
+    const start = serviceProgress[name] || 0;
+    const startTime = Date.now();
+    
+    if (serviceTimers[name]) cancelAnimationFrame(serviceTimers[name]);
+    
+    function step() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(targetPercent, start + (targetPercent - start) * (elapsed / duration));
+        progressFill.style.width = progress + '%';
+        serviceProgress[name] = progress;
+        
+        if (progress < targetPercent) {
+            serviceTimers[name] = requestAnimationFrame(step);
+        }
+    }
+    requestAnimationFrame(step);
+}
+
+function hideProgress(name) {
+    const card = getCard(name);
+    if (!card) return;
+    const progressBar = card.querySelector('.mini-progress');
+    if (progressBar) progressBar.classList.remove('show');
+    serviceProgress[name] = 0;
+    if (serviceTimers[name]) {
+        cancelAnimationFrame(serviceTimers[name]);
+        serviceTimers[name] = null;
+    }
+}
+
+async function checkDependency(name) {
+    const deps = START_DEPENDENCIES[name] || [];
+    for (const dep of deps) {
+        try {
+            const data = await fetchJSON('/api/status');
+            if (!data[dep] || data[dep].status !== 'running') {
+                return dep;  // 返回缺失的依赖
+            }
+        } catch (e) {
+            return dep;
+        }
+    }
+    return null;
+}
+
+async function toggleService(name) {
+    // 判断当前状态
+    const card = getCard(name);
+    if (!card) return;
+    const statusEl = card.querySelector('.service-card-status');
+    const isRunning = statusEl && statusEl.classList.contains('running');
+    
+    if (isRunning) {
+        // 停止服务
+        updateCardUI(name, 'stopped', '停止中...', '停止中...', 'stop', true);
+        // 停止语音对话录音
+        if (name === 'voice_chat') stopVoiceChat();
+        const result = await stopService(name);
+        if (result.success) {
+            updateCardUI(name, 'stopped', '未启动', '启动', 'start', false);
+        } else {
+            updateCardUI(name, 'error', '停止失败', '重试', 'stop', false);
+        }
+        updateStatus();
+        return;
+    }
+    
+    // 检查依赖
+    const missingDep = await checkDependency(name);
+    if (missingDep) {
+        const depLabel = SERVICE_LABELS[missingDep] || missingDep;
+        updateCardUI(name, 'error', '需先启动' + depLabel, '启动', 'start', false);
+        setTimeout(() => updateCardUI(name, 'stopped', '未启动', '启动', 'start', false), 3000);
+        return;
+    }
+    
+    // 启动服务
+    updateCardUI(name, 'starting', '启动中...', '启动中...', 'start', true);
+    animateProgress(name, 60, 2000);
+    
+    const result = await startService(name);
+    
+    if (result.success) {
+        animateProgress(name, 90, 500);
+        updateCardUI(name, 'starting', '启动中...', '启动中...', 'start', true);
+        
+        // 轮询等服务就绪
+        let attempts = 0;
+        const maxAttempts = name === 'backend' ? 30 : 15;
+        const pollInterval = setInterval(async () => {
+            attempts++;
+            try {
+                const data = await fetchJSON('/api/status');
+                const svc = data[name];
+                if (svc && svc.status === 'running') {
+                    clearInterval(pollInterval);
+                    animateProgress(name, 100, 300);
+                    setTimeout(() => {
+                        updateCardUI(name, 'running', '运行中', '停止', 'stop', false);
+                        hideProgress(name);
+                        // 语音对话启动后自动跳转并开始录音
+                        if (name === 'voice_chat') {
+                            switchPage('voice_chat');
+                            setTimeout(() => startVoiceChat(), 500);
+                        }
+                    }, 300);
+                    updateStatus();
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(pollInterval);
+                    updateCardUI(name, 'error', '启动超时', '重试', 'start', false);
+                    hideProgress(name);
+                } else {
+                    const pct = 60 + Math.min(30, (attempts / maxAttempts) * 30);
+                    animateProgress(name, pct, 1000);
+                }
+            } catch (e) {
+                if (attempts >= maxAttempts) {
+                    clearInterval(pollInterval);
+                    updateCardUI(name, 'error', '连接失败', '重试', 'start', false);
+                    hideProgress(name);
+                }
+            }
+        }, 1500);
+        
+    } else {
+        updateCardUI(name, 'error', '启动失败', '重试', 'start', false);
+        hideProgress(name);
+    }
+    
+    updateStatus();
+}
+
+function startASR() { toggleService('voice_chat'); }
+function stopASR() { toggleService('voice_chat'); }
+function startTTS() { toggleService('voice_chat'); }
+function stopTTS() { toggleService('voice_chat'); }
+
+function setMsg(id, text, ok) {
+    const el = $(id);
+    if (el) { el.textContent = text || ''; el.style.color = ok ? 'var(--accent-dark)' : 'var(--danger)'; }
+}
+
+// ===== 配置保存 =====
+function collectConfig() {
+    return {
+        port: parseInt($('cfg-port').value) || 8000,
+        host: $('cfg-host').value,
+        log_level: $('cfg-log-level').value,
+        log_to_file: $('cfg-log-file').checked,
+        auto_restart: $('cfg-auto-restart').checked,
+        restart_delay: parseInt($('cfg-restart-delay').value) || 10,
+        direct_gpu: $('cfg-direct-gpu').checked,
+        debug: $('cfg-debug').checked
+    };
+}
+function saveServiceConfig() {
+    fetchJSON('/api/config/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service: collectConfig() })
+    }).then(d => setMsg('cfg-save-msg', d.message, d.success));
+}
+function saveASRConfig() {
+    fetchJSON('/api/config/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asr: {
+            model: $('asr-model').value, mode: $('asr-mode').value, language: $('asr-language').value,
+            noise_suppression: $('asr-noise').checked, noise_level: parseInt($('asr-noise-level').value),
+            vad_enabled: $('asr-vad').checked, vad_sensitivity: parseInt($('asr-vad-level').value),
+            hotwords: $('asr-hotwords').value.split('\n').map(s => s.trim()).filter(Boolean),
+            confidence_threshold: parseInt($('asr-confidence').value) / 100
+        }})
+    }).then(d => setMsg('asr-msg', d.message, d.success));
+}
+function saveTTSConfig() {
+    fetchJSON('/api/config/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tts: {
+            engine: $('tts-engine').value.toLowerCase().replace(/-/g, ''),
+            language: $('tts-language').value, voice: $('tts-voice').value,
+            emotion: $('tts-emotion').value, emotion_intensity: parseInt($('tts-emotion-level').value),
+            rate: parseInt($('tts-rate').value), volume: parseInt($('tts-volume').value),
+            pitch: parseInt($('tts-pitch').value)
+        }})
+    }).then(d => setMsg('tts-msg', d.message, d.success));
+}
+function saveLLMConfig() {
+    fetchJSON('/api/config/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ llm: {
+            provider: $('llm-provider').value, model: $('llm-model').value,
+            api_key: $('llm-api-key').value, base_url: $('llm-base-url').value,
+            temperature: parseInt($('llm-temp').value) / 100,
+            max_tokens: parseInt($('llm-max-tokens').value),
+            context_window: parseInt($('llm-context').value),
+            top_p: parseInt($('llm-top-p').value) / 100
+        }})
+    }).then(d => setMsg('llm-msg', d.message, d.success));
+}
+function saveGPUConfig() {
+    fetchJSON('/api/config/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gpu: {
+            mode: $('gpu-mode').value, direct_gpu: $('gpu-direct').checked,
+            auto_fallback: $('gpu-fallback').checked, monitor_interval: parseInt($('gpu-interval').value)
+        }})
+    }).then(d => setMsg('gpu-config-msg', d.message, d.success));
+}
+
+// ===== 滑块联动 =====
+function bindSlider(sliderId, labelId, fmt) {
+    const slider = $(sliderId);
+    if (slider) slider.oninput = () => { $(labelId).textContent = fmt(slider.value); };
+}
+bindSlider('asr-noise-level', 'asr-noise-level-v', v => v + '%');
+bindSlider('asr-vad-level', 'asr-vad-level-v', v => v + '%');
+bindSlider('asr-confidence', 'asr-confidence-v', v => (v / 100).toFixed(1));
+bindSlider('tts-emotion-level', 'tts-emotion-level-v', v => v + '%');
+bindSlider('tts-rate', 'tts-rate-v', v => v + '%');
+bindSlider('tts-volume', 'tts-volume-v', v => v + '%');
+bindSlider('tts-pitch', 'tts-pitch-v', v => v);
+bindSlider('llm-temp', 'llm-temp-v', v => (v / 100).toFixed(2));
+bindSlider('llm-top-p', 'llm-top-p-v', v => (v / 100).toFixed(2));
+bindSlider('avatar-size', 'avatar-size-v', v => v + '%');
+
+// ===== TTS音色 =====
+const VOICES = {
+    '中文': ['Vivian'],
+    '英文': ['Vivian'],
+    '日文': ['Vivian'],
+    '韩文': ['Vivian']
+};
+function updateVoices() {
+    const lang = $('tts-language').value;
+    const voiceSel = $('tts-voice');
+    voiceSel.innerHTML = '';
+    (VOICES[lang] || VOICES['中文']).forEach(v => {
+        const opt = document.createElement('option');
+        opt.textContent = v;
+        voiceSel.appendChild(opt);
+    });
+}
+updateVoices();
+
+async function testTTS() {
+    try {
+        const data = await fetchJSON('/api/tts/synthesize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: '你好，我是你的智能语音助手，很高兴见到你！',
+                voice: $('tts-voice').value,
+                rate: parseInt($('tts-rate').value) + '%'
+            })
+        });
+        if (data && data.audio && data.audio.length > 0) {
+            playPCM(data.audio, data.sample_rate || 24000);
+        } else {
+            alert('TTS未生成语音');
+        }
+    } catch (e) {
+        alert('试听失败: ' + e.message + ' (请先启动后端服务)');
+    }
+}
+
+// ===== PCM播放 (Float32 → AudioBuffer) =====
+let audioCtx = null;
+function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+}
+function playPCM(floatArray, sampleRate) {
+    const ctx = getAudioCtx();
+    const buffer = ctx.createBuffer(1, floatArray.length, sampleRate);
+    buffer.copyToChannel(floatArray, 0);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(ctx.destination);
+    src.start();
+    return src;
+}
+
+// ===== LLM模型列表 =====
+const LLM_MODELS = {
+    '阿里云通义千问': ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-2.5-turbo'],
+    '百度文心一言': ['ernie-turbo', 'ernie-3.5', 'ernie-4.0'],
+    '腾讯混元': ['hunyuan-pro', 'hunyuan-lite'],
+    'OpenAI': ['gpt-4o', 'gpt-4', 'gpt-3.5-turbo'],
+    '字节豆包': ['doubao-pro', 'doubao-lite'],
+    '自定义API': ['自定义模型']
+};
+function updateModels() {
+    const provider = $('llm-provider').value;
+    const modelSel = $('llm-model');
+    modelSel.innerHTML = '';
+    (LLM_MODELS[provider] || LLM_MODELS['阿里云通义千问']).forEach(m => {
+        const opt = document.createElement('option');
+        opt.textContent = m;
+        modelSel.appendChild(opt);
+    });
+}
+updateModels();
+
+// ===== GPU =====
+async function refreshGPU() {
+    try {
+        const data = await fetchJSON('/api/system/info');
+        const gpu = data.gpu && data.gpu[0];
+        if (gpu) {
+            $('gpu-name').textContent = gpu.name;
+            $('gpu-total').textContent = gpu.memory_total_gb.toFixed(2) + ' GB';
+            $('gpu-used').textContent = gpu.memory_used_gb.toFixed(2) + ' GB';
+            $('gpu-free').textContent = (gpu.memory_total_gb - gpu.memory_used_gb).toFixed(2) + ' GB';
+            const pct = Math.round((gpu.memory_used_gb / gpu.memory_total_gb) * 100);
+            $('gpu-bar').style.width = pct + '%';
+            $('gpu-percent-label').textContent = '显存使用率: ' + pct + '%';
+        }
+    } catch (e) { /* 忽略 */ }
+}
+
+// ===== 记忆管理 =====
+async function loadMemories() {
+    const tbody = $('memory-table');
+    try {
+        const data = await fetchJSON('/api/memory/list');
+        const memories = data.memories || [];
+        $('memory-stats').textContent = '共 ' + memories.length + ' 条';
+        const search = ($('memory-search').value || '').toLowerCase();
+        const filter = $('memory-filter').value;
+        const filtered = memories.filter(m => {
+            const content = (m.content || '').toLowerCase();
+            if (search && !content.includes(search)) return false;
+            const prio = (m.importance || 1);
+            const prioText = prio === 3 ? '高优先级' : (prio === 2 ? '中优先级' : '低优先级');
+            if (filter !== '全部' && filter !== prioText) return false;
+            return true;
+        });
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:30px">暂无记忆</td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        filtered.forEach(m => {
+            const tr = document.createElement('tr');
+            const prio = (m.importance || 1);
+            const prioText = prio === 3 ? '高优先级' : (prio === 2 ? '中优先级' : '低优先级');
+            const color = prio === 3 ? 'var(--danger)' : (prio === 2 ? 'var(--warning-dark)' : 'var(--text-secondary)');
+            const content = (m.content || '').length > 50 ? m.content.slice(0, 50) + '...' : (m.content || '');
+            tr.innerHTML = '<td>' + escapeHtml(content) + '</td>' +
+                '<td style="color:' + color + '">' + prioText + '</td>' +
+                '<td>' + escapeHtml(m.created_at || '') + '</td>' +
+                '<td><button class="btn btn-danger btn-small" data-mid="' + m.id + '">删除</button></td>';
+            tr.querySelector('button').onclick = () => deleteMemory(m.id);
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--danger);padding:30px">后端服务未运行，无法加载记忆</td></tr>';
+    }
+}
+
+async function addMemory() {
+    const content = $('memory-input').value.trim();
+    if (!content) { alert('请输入记忆内容'); return; }
+    const importance = parseInt($('memory-priority').value);
+    const data = await fetchJSON('/api/memory/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, importance })
+    });
+    if (data.success) { $('memory-input').value = ''; loadMemories(); }
+    else alert(data.message || '添加失败');
+}
+
+async function deleteMemory(id) {
+    const data = await fetchJSON('/api/memory/delete/' + id, { method: 'DELETE' });
+    loadMemories();
+}
+function deleteSelectedMemory() {
+    alert('请在表格中点击对应行的「删除」按钮');
+}
+async function clearAllMemory() {
+    if (!confirm('确定要清空所有记忆吗？此操作不可撤销。')) return;
+    const data = await fetchJSON('/api/memory/clear', { method: 'POST' });
+    alert(data.message || '记忆已清空');
+    loadMemories();
+}
+
+// ===== 角色设定 =====
+const PERSONAS = {
+    '默认': '你是一个有帮助的AI助手。',
+    '助手': '你是一个专业的AI助手，擅长提供实用帮助。',
+    '朋友': '你是一位友善的朋友，可以进行轻松愉快的对话。',
+    '老师': '你是一位知识渊博的老师，擅长解释概念。',
+    '顾问': '你是一位专业顾问，提供专业建议和解决方案。',
+    '专家': '你是一位领域专家，能够提供深入专业的见解。',
+    '伴侣': '你是一位温柔体贴的伴侣，善于倾听和陪伴。',
+    '秘书': '你是一位高效的秘书，擅长安排日程和处理事务。',
+    '导游': '你是一位热情的导游，熟悉各地风土人情。',
+    '客服': '你是一位耐心的客服，致力于解决用户问题。',
+    '医生': '你是一位专业的医生，提供健康咨询和建议。',
+    '律师': '你是一位专业的律师，提供法律相关的咨询。',
+    '教练': '你是一位专业的教练，激励并指导他人成长。',
+    '作家': '你是一位富有创造力的作家，擅长创作各种体裁的作品。'
+};
+function initPersonaSelect() {
+    const sel = $('persona-template-select');
+    sel.innerHTML = '';
+    Object.keys(PERSONAS).forEach(p => {
+        const opt = document.createElement('option');
+        opt.textContent = p;
+        sel.appendChild(opt);
+    });
+    sel.value = '默认';
+    previewPersona();
+}
+function previewPersona() {
+    $('persona-preview').value = PERSONAS[$('persona-template-select').value] || '';
+}
+async function loadPersonality() {
+    try {
+        const data = await fetchJSON('/api/personality');
+        if (data.description) $('persona-custom-text').value = data.description;
+    } catch (e) { /* 忽略 */ }
+}
+async function applyPersona() {
+    const desc = $('persona-preview').value;
+    const data = await fetchJSON('/api/personality', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: desc })
+    });
+    setMsg('persona-msg', data.success ? '角色设定已应用' : '应用失败', data.success);
+}
+async function applyCustomPersona() {
+    const desc = $('persona-custom-text').value.trim();
+    if (!desc) { alert('请输入角色设定描述'); return; }
+    const name = $('persona-name').value.trim();
+    const gender = $('persona-gender').value;
+    const age = $('persona-age').value;
+    const tone = $('persona-tone').value;
+    const text = '角色名称: ' + name + '\n性别: ' + gender + '\n年龄: ' + age + '\n语气风格: ' + tone + '\n\n' + desc;
+    const data = await fetchJSON('/api/personality', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: text })
+    });
+    setMsg('persona-msg', data.success ? '自定义角色设定已应用' : '应用失败', data.success);
+}
+
+// ===== 视觉 =====
+let visionCaptureTimer = null;
+async function refreshVisionDevices() {
+    try {
+        const cams = await fetchJSON('/api/vision/cameras');
+        const camSel = $('vision-cameras');
+        camSel.innerHTML = '';
+        (cams.cameras || []).forEach(c => {
+            const opt = document.createElement('option');
+            opt.textContent = '摄像头' + c.index + ' (' + c.width + 'x' + c.height + ')';
+            opt.value = c.index;
+            camSel.appendChild(opt);
+        });
+        if (camSel.options.length === 0) {
+            camSel.innerHTML = '<option value="0">摄像头0</option><option value="1">摄像头1</option><option value="2">摄像头2</option>';
+        }
+        const mons = await fetchJSON('/api/vision/monitors');
+        const monSel = $('vision-monitors');
+        monSel.innerHTML = '';
+        (mons.monitors || []).forEach(m => {
+            const opt = document.createElement('option');
+            opt.textContent = '显示器' + m.index + ' (' + m.width + 'x' + m.height + ')';
+            opt.value = m.index;
+            monSel.appendChild(opt);
+        });
+    } catch (e) { /* 后端未运行 */ }
+}
+function toggleVisionMode() {
+    const cam = $('vision-camera-radio').checked;
+    $('vision-camera-box').style.display = cam ? 'block' : 'none';
+    $('vision-screen-box').style.display = cam ? 'none' : 'block';
+}
+async function startVisionCamera() {
+    const data = await fetchJSON('/api/vision/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ camera_index: parseInt($('vision-cameras').value || '0') })
+    });
+    visionStarted(data);
+}
+async function startVisionScreen() {
+    const data = await fetchJSON('/api/vision/start-screen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monitor_index: parseInt($('vision-monitors').value || '1') + 1 })
+    });
+    visionStarted(data);
+}
+function visionStarted(data) {
+    if (data.success) {
+        $('vision-status').textContent = '运行中';
+        $('vision-status').style.color = 'var(--accent-dark)';
+        $('vision-stop-btn').disabled = false;
+        startVisionFrameLoop();
+    } else {
+        $('vision-status').textContent = data.message || '启动失败';
+        $('vision-status').style.color = 'var(--danger)';
+    }
+}
+function startVisionFrameLoop() {
+    if (visionCaptureTimer) clearInterval(visionCaptureTimer);
+    visionCaptureTimer = setInterval(refreshVisionFrame, 1000);
+}
+async function refreshVisionFrame() {
+    try {
+        const data = await fetchJSON('/api/vision/capture');
+        if (data && data.image) {
+            $('vision-frame').src = 'data:image/jpeg;base64,' + data.image;
+            $('vision-mode').textContent = '模式: 捕获中';
+        }
+    } catch (e) { /* 忽略 */ }
+}
+async function stopVision() {
+    await fetchJSON('/api/vision/stop', { method: 'POST' });
+    if (visionCaptureTimer) { clearInterval(visionCaptureTimer); visionCaptureTimer = null; }
+    $('vision-frame').src = '';
+    $('vision-status').textContent = '已停止';
+    $('vision-status').style.color = 'var(--warning-dark)';
+    $('vision-stop-btn').disabled = true;
+}
+async function applyVisionOptimization() {
+    const data = await fetchJSON('/api/vision/optimization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ optimization: $('vision-optimization').value })
+    });
+    if (data.success) { $('vision-status').textContent = '已应用优化: ' + $('vision-optimization').value; }
+}
+async function analyzeVision() {
+    $('vision-analysis').textContent = '分析中...';
+    try {
+        const data = await fetchJSON('/api/vision/analyze', { method: 'POST' });
+        if (data.success) {
+            const a = data.analysis || {};
+            $('vision-analysis').textContent = (data.description || '') +
+                '\n亮度: ' + (a.brightness || 0).toFixed(2) +
+                ' | 对比度: ' + (a.contrast || 0).toFixed(2) +
+                ' | 物体: ' + (a.object_count || 0) + ' 个';
+            $('vision-object-count').textContent = '检测到: ' + (a.object_count || 0) + ' 个物体';
+        } else {
+            $('vision-analysis').textContent = data.message || '分析失败';
+        }
+    } catch (e) {
+        $('vision-analysis').textContent = '分析失败: ' + e.message;
+    }
+}
+function toggleVisionDetect() {
+    $('vision-object-count').textContent = $('vision-detect').checked ? '实时检测已启用' : '检测到: 0 个物体';
+}
+async function captureVision() {
+    try {
+        const data = await fetchJSON('/api/vision/capture');
+        if (data && data.image) {
+            const a = document.createElement('a');
+            a.href = 'data:image/jpeg;base64,' + data.image;
+            a.download = 'vision_capture_' + new Date().toISOString().replace(/[:.]/g, '-') + '.jpg';
+            a.click();
+            $('vision-capture-path').textContent = '已保存截图';
+        }
+    } catch (e) {
+        $('vision-capture-path').textContent = '截图失败: ' + e.message;
+    }
+}
+
+// ===== 2D形象 =====
+const AVATAR_ACTIONS = [
+    ['hiyori_m01', '空闲动作'], ['hiyori_m02', '开心'], ['hiyori_m03', '兴奋'],
+    ['hiyori_m04', '思考'], ['hiyori_m05', '惊讶'], ['hiyori_m06', '害羞'],
+    ['hiyori_m07', '眨眼'], ['hiyori_m08', '微笑'], ['hiyori_m09', '疑惑'],
+    ['hiyori_m10', '生气']
+];
+function buildAvatarActions() {
+    const box = $('avatar-actions');
+    box.innerHTML = '';
+    AVATAR_ACTIONS.forEach(([id, label]) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-default btn-small';
+        btn.textContent = label;
+        btn.onclick = () => triggerAvatarAction(id);
+        box.appendChild(btn);
+    });
+}
+async function setupAvatarPage() {
+    $('live2d-frame').src = 'http://localhost:8081/live2d_viewer.html';
+    buildAvatarActions();
+    refreshAvatarModels();
+    refreshAvatarStatus();
+}
+async function refreshAvatarModels() {
+    try {
+        const data = await fetchJSON('/api/live2d/models');
+        const models = data.models || [];
+        const sel = $('avatar-model');
+        sel.innerHTML = '';
+        if (models.length > 0) {
+            models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.textContent = m.modelName || m.name || '模型';
+                opt.value = m.modelID || m.name || m.modelName || '';
+                sel.appendChild(opt);
+            });
+        } else {
+            sel.innerHTML = '<option>Hiyori VTS (默认)</option>';
+        }
+    } catch (e) {
+        $('avatar-model').innerHTML = '<option>Hiyori VTS (默认)</option>';
+    }
+}
+async function refreshAvatarStatus() {
+    try {
+        const data = await fetchJSON('/api/live2d/status');
+        const running = data.status === 'running' || data.running;
+        $('avatar-vts-status').textContent = running ? '已连接' : '未连接';
+        $('avatar-vts-status').style.color = running ? 'var(--accent-dark)' : 'var(--warning-dark)';
+        if (data.model_name) $('avatar-model-name').textContent = '模型: ' + data.model_name;
+    } catch (e) { /* 忽略 */ }
+}
+async function loadAvatarModel() {
+    const name = $('avatar-model').value || 'Hiyori VTS (默认)';
+    const data = await fetchJSON('/api/live2d/load', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: name })
+    });
+    $('avatar-model-name').textContent = '模型: ' + name;
+    if (data.success) $('avatar-vts-status').textContent = '已加载';
+}
+async function connectVTS() {
+    $('avatar-vts-status').textContent = '正在连接...';
+    try {
+        const data = await fetchJSON('/api/avatar/control', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'status' })
+        });
+        $('avatar-vts-status').textContent = '已连接';
+        $('avatar-vts-status').style.color = 'var(--accent-dark)';
+    } catch (e) {
+        $('avatar-vts-status').textContent = '连接失败';
+        $('avatar-vts-status').style.color = 'var(--danger)';
+    }
+}
+async function applyAvatarEmotion() {
+    const emotion = $('avatar-emotion').value;
+    const map = { '开心': 'happy', '悲伤': 'sad', '愤怒': 'angry', '平静': 'idle', '惊讶': 'surprised', '害羞': 'shy', '默认': 'idle' };
+    const data = await fetchJSON('/api/live2d/emotion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emotion: map[emotion] || 'idle' })
+    });
+    if (data.success) $('avatar-vts-status').textContent = '情绪: ' + emotion;
+}
+async function triggerAvatarAction(actionId) {
+    const data = await fetchJSON('/api/live2d/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: actionId })
+    });
+    if (data.success) $('avatar-vts-status').textContent = '动作: ' + actionId;
+}
+async function avatarWindow(action, extra) {
+    const body = Object.assign({ action }, extra || {});
+    const data = await fetchJSON('/api/avatar/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    if (data.message) $('avatar-vts-status').textContent = data.message;
+}
+
+// ===== 文本对话 (SSE流式) =====
+const chatMessages = $('chat-messages');
+let lastAIReply = '';
+
+function appendChat(container, role, content) {
+    const div = document.createElement('div');
+    div.className = 'message message-' + role;
+    const icons = { user: '🧑', ai: '🤖', sys: '⚙' };
+    div.innerHTML = '<div class="message-avatar avatar-' + role + '">' + (icons[role] || '') + '</div>' +
+        '<div class="message-content content-' + role + '"></div>';
+    div.querySelector('.message-content').textContent = content;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return div;
+}
+function appendChatNode(container, role) {
+    const div = document.createElement('div');
+    div.className = 'message message-' + role;
+    const icons = { user: '🧑', ai: '🤖', sys: '⚙' };
+    div.innerHTML = '<div class="message-avatar avatar-' + role + '">' + (icons[role] || '') + '</div>' +
+        '<div class="message-content content-' + role + '"></div>';
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return div;
+}
+
+async function sendMessage() {
+    const input = $('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    appendChat(chatMessages, 'user', text);
+    input.value = '';
+    const aiNode = appendChatNode(chatMessages, 'ai');
+    aiNode.querySelector('.message-content').textContent = '思考中...';
+    let full = '';
+    try {
+        const resp = await fetch('/api/chat/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, tts_enabled: false })
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            let idx;
+            while ((idx = buffer.indexOf('\n\n')) >= 0) {
+                const line = buffer.slice(0, idx).trim();
+                buffer = buffer.slice(idx + 2);
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        if (data.content) { full += data.content; aiNode.querySelector('.message-content').textContent = full; }
+                        if (data.is_done && data.full_content) { full = data.full_content; aiNode.querySelector('.message-content').textContent = full; }
+                    } catch (e) { /* 忽略解析错误 */ }
+                }
+            }
+        }
+        if (!full) aiNode.querySelector('.message-content').textContent = '⚠️ 后端服务未运行或未返回内容';
+        else { lastAIReply = full; aiNode.querySelector('.message-content').textContent = full; }
+    } catch (e) {
+        aiNode.querySelector('.message-content').textContent = '连接失败，请确保后端服务已启动';
+    }
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+$('chat-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+function clearChat() {
+    chatMessages.innerHTML = '';
+    appendChat(chatMessages, 'sys', '对话已清空。有什么新问题吗？');
+}
+function saveChat() {
+    const text = Array.from(chatMessages.querySelectorAll('.message-content')).map(el => el.textContent).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+    a.download = 'chat_history_' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
+    a.click();
+}
+async function speakLastResponse() {
+    if (!lastAIReply) { alert('暂无AI回复可朗读'); return; }
+    try {
+        const data = await fetchJSON('/api/tts/synthesize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: lastAIReply, voice: $('voice-voice') ? $('voice-voice').value : '晓晓', rate: '0%' })
+        });
+        if (data.audio) playPCM(data.audio, data.sample_rate || 24000);
+    } catch (e) {
+        alert('TTS播放失败: ' + e.message);
+    }
+}
+
+// ===== 语音聊天 =====
+const voiceMessages = $('voice-chat-messages');
+let mediaRecorder = null;
+let recordingStream = null;
+let voiceChatActive = false;
+let isBusy = false;
+
+function appendVoiceMessage(role, content) {
+    appendChat(voiceMessages, role, content);
+}
+
+async function startVoiceChat() {
+    if (isBusy) return;
+    voiceChatActive = true;
+    $('voice-start-btn').disabled = true;
+    $('voice-stop-btn').disabled = false;
+    appendVoiceMessage('sys', '对话已启动，请开始说话...');
+    if (!mediaRecorder) await setupRecorder();
+    if (mediaRecorder) {
+        mediaRecorder.start();
+        mediaRecorder.ondataavailable = async e => {
+            if (!voiceChatActive) return;
+            if (e.data.size > 0) {
+                await processRecording(e.data);
+            }
+        };
+    }
+}
+
+function stopVoiceChat() {
+    voiceChatActive = false;
+    $('voice-start-btn').disabled = false;
+    $('voice-stop-btn').disabled = true;
+    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+    if (recordingStream) recordingStream.getTracks().forEach(t => t.stop());
+    recordingStream = null;
+}
+
+async function setupRecorder() {
+    try {
+        recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(recordingStream);
+    } catch (e) {
+        appendVoiceMessage('sys', '无法访问麦克风: ' + e.message);
+    }
+}
+
+async function processRecording(blob) {
+    isBusy = true;
+    try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const audioCtx = getAudioCtx();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        const float32 = audioBuffer.getChannelData(0);
+        // 重采样到16kHz
+        const targetRate = 16000;
+        const ratio = audioBuffer.sampleRate / targetRate;
+        const newLength = Math.round(float32.length / ratio);
+        const resampled = new Float32Array(newLength);
+        for (let i = 0; i < newLength; i++) {
+            const idx = Math.floor(i * ratio);
+            resampled[i] = float32[idx];
+        }
+        // 静音检测
+        let sum = 0;
+        for (let i = 0; i < resampled.length; i++) sum += resampled[i] * resampled[i];
+        const rms = Math.sqrt(sum / resampled.length);
+        if (rms < 0.01) {
+            appendVoiceMessage('sys', '未检测到语音，请靠近麦克风说话');
+            isBusy = false;
+            if (voiceChatActive && mediaRecorder) mediaRecorder.start();
+            return;
+        }
+        appendVoiceMessage('sys', '检测到语音结束，正在识别...');
+        const data = await fetchJSON('/api/asr/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audio_data: Array.from(resampled), sample_rate: targetRate })
+        });
+        const text = data.text || '';
+        if (text.trim()) {
+            appendVoiceMessage('user', text.trim());
+            await sendToChat(text.trim(), true);
+        } else {
+            appendVoiceMessage('sys', '未识别到语音内容');
+        }
+    } catch (e) {
+        appendVoiceMessage('sys', '识别失败: ' + e.message);
+    }
+    isBusy = false;
+    if (voiceChatActive && mediaRecorder && mediaRecorder.state === 'inactive') mediaRecorder.start();
+}
+
+async function sendToChat(text, withTTS) {
+    const aiNode = appendChatNode(voiceMessages, 'ai');
+    aiNode.querySelector('.message-content').textContent = '思考中...';
+    let full = '';
+    try {
+        const resp = await fetch('/api/chat/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, tts_enabled: withTTS && $('voice-tts').checked })
+        });
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            let idx;
+            while ((idx = buffer.indexOf('\n\n')) >= 0) {
+                const line = buffer.slice(0, idx).trim();
+                buffer = buffer.slice(idx + 2);
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        if (data.content) { full += data.content; aiNode.querySelector('.message-content').textContent = full; }
+                        if (data.is_done && data.full_content) { full = data.full_content; aiNode.querySelector('.message-content').textContent = full; }
+                    } catch (e) {}
+                }
+            }
+        }
+        if (!full) aiNode.querySelector('.message-content').textContent = '无响应';
+    } catch (e) {
+        aiNode.querySelector('.message-content').textContent = '连接失败: ' + e.message;
+    }
+    voiceMessages.scrollTop = voiceMessages.scrollHeight;
+}
+
+async function sendVoiceText() {
+    const input = $('voice-chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    appendVoiceMessage('user', text);
+    await sendToChat(text, $('voice-tts').checked);
+}
+$('voice-chat-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendVoiceText(); }
+});
+function clearVoiceChat() {
+    voiceMessages.innerHTML = '';
+    appendVoiceMessage('sys', '语音对话已清空');
+}
+function saveVoiceChat() {
+    const text = Array.from(voiceMessages.querySelectorAll('.message-content')).map(el => el.textContent).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+    a.download = 'voice_chat_history_' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
+    a.click();
+}
+
+// ===== 工具 =====
+async function loadTools() {
+    const box = $('tools-list-box');
+    box.textContent = '正在加载工具列表，请稍候...';
+    try {
+        const data = await fetchJSON('/api/tools/list');
+        const tools = data.tools || [];
+        $('tools-count').textContent = '共 ' + tools.length + ' 个工具';
+        box.textContent = tools.map(t => {
+            const name = t.name || t.tool_name || '';
+            const desc = t.description || t.desc || '';
+            return (name ? '■ ' + name + (desc ? ' — ' + desc : '') : '');
+        }).filter(Boolean).join('\n') || '暂无工具';
+    } catch (e) {
+        box.textContent = '无法加载工具列表，请确保后端服务已启动';
+    }
+}
+async function callTool() {
+    const toolName = $('tool-name').value.trim();
+    if (!toolName) { alert('请输入工具名称'); return; }
+    let params = {};
+    const paramsText = $('tool-params').value.trim();
+    if (paramsText) {
+        try { params = JSON.parse(paramsText); }
+        catch (e) { alert('参数格式错误，请使用JSON格式'); return; }
+    }
+    $('tool-result-box').textContent = '正在调用工具，请稍候...';
+    try {
+        const data = await fetchJSON('/api/tools/call', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'manual', tool_name: toolName, parameters: params })
+        });
+        if (data.success) {
+            $('tool-result-box').textContent = '✅ 调用成功\n工具: ' + (data.tool_name || toolName) + '\n\n结果:\n' + (data.result || '');
+        } else {
+            $('tool-result-box').textContent = '❌ 调用失败\n工具: ' + (data.tool_name || toolName) + '\n\n错误:\n' + (data.result || data.message || '未知错误');
+        }
+    } catch (e) {
+        $('tool-result-box').textContent = '❌ 连接失败: ' + e.message + '\n\n请确保后端服务已启动';
+    }
+}
+
+// ===== 日志 =====
+async function refreshLogs() {
+    try {
+        const data = await fetchJSON('/api/logs?lines=50');
+        renderLogs($('log-container'), data.logs);
+    } catch (e) { /* 忽略 */ }
+}
+async function refreshBackendLogs() {
+    try {
+        const data = await fetchJSON('/api/logs/backend?lines=50');
+        renderLogs($('backend-log-container'), data.logs);
+    } catch (e) { /* 忽略 */ }
+}
+function clearLogs() {
+    if (confirm('确定要清空日志文件吗？')) {
+        fetchJSON('/api/logs/clear', { method: 'POST' }).then(() => refreshLogs());
+    }
+}
+function renderLogs(container, lines) {
+    if (!lines || lines.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:20px">暂无日志</div>';
+        return;
+    }
+    container.innerHTML = lines.map(line => {
+        let cls = 'log-info';
+        if (line.includes('ERROR')) cls = 'log-error';
+        else if (line.includes('WARNING')) cls = 'log-warning';
+        else if (line.includes('success') || line.includes('成功')) cls = 'log-success';
+        return '<div class="log-line ' + cls + '">' + escapeHtml(line) + '</div>';
+    }).join('');
+}
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ===== 系统信息 =====
+async function loadSystemInfo() {
+    try {
+        const data = await fetchJSON('/api/system/info');
+        $('sys-os').textContent = data.platform || '--';
+        $('sys-python').textContent = data.python_version || '--';
+        $('sys-cpu-cores').textContent = (data.cpu?.cores || '--') + ' 核';
+        $('sys-cpu').textContent = (data.cpu?.usage_percent || '--') + '%';
+        $('mem-total').textContent = (data.memory?.total_gb || '--') + ' GB';
+        $('mem-used').textContent = (data.memory?.used_gb || '--') + ' GB';
+        $('mem-percent').textContent = (data.memory?.percent || '--') + '%';
+        $('disk-percent').textContent = (data.disk?.percent || '--') + '%';
+        $('about-python').textContent = data.python_version || '--';
+        const gpuEl = $('gpu-info');
+        if (data.gpu && data.gpu.length > 0) {
+            gpuEl.innerHTML = data.gpu.map(g =>
+                '<div style="padding:10px;background:var(--bg-dark);border-radius:8px;margin-bottom:8px">' +
+                '<div style="font-weight:600;margin-bottom:4px">' + escapeHtml(g.name) + '</div>' +
+                '<div style="font-size:13px;color:var(--text-secondary)">' +
+                '显存: ' + g.memory_used_gb.toFixed(2) + '/' + g.memory_total_gb.toFixed(2) + ' GB | 利用率: ' + g.utilization_percent + '%' +
+                '</div></div>'
+            ).join('');
+        } else {
+            gpuEl.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:20px">未检测到GPU</div>';
+        }
+    } catch (e) { /* 忽略 */ }
+}
+async function runBenchmark(type) {
+    $('benchmark-result').textContent = '测试进行中...';
+    try {
+        const data = await fetchJSON('/api/benchmark/pcm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, iterations: 3 })
+        });
+        if (data.status === 'success') {
+            $('benchmark-result').textContent = '测试完成:\n' + JSON.stringify(data.results, null, 2);
+        } else {
+            $('benchmark-result').textContent = '测试失败: ' + (data.message || '');
+        }
+    } catch (e) {
+        $('benchmark-result').textContent = '测试失败: ' + e.message;
+    }
+}
+
+// ===== 运行时长 =====
+setInterval(() => {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const h = Math.floor(elapsed / 3600);
+    const m = Math.floor((elapsed % 3600) / 60);
+    const s = elapsed % 60;
+    $('uptime').textContent = h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}, 1000);
+
+// ===== 初始化 =====
+buildSidebar();
+initPersonaSelect();
+updateStatus();
+checkHealth();
+setInterval(updateStatus, 5000);
+setInterval(checkHealth, 5000);
+setInterval(() => { if ($('logs-auto').checked) refreshLogs(); }, 10000);
+setInterval(() => { if (document.getElementById('page-gpu').classList.contains('active')) refreshGPU(); }, parseInt($('gpu-interval').value || '5') * 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+    "room_id": 0,
+    "sessdata": "",
+    "bili_jct": "",
+    "buvid3": "",
+    "auto_reply_enabled": true,
+    "topic_interval": 300,
+    "reply_delay": 2,
+    "max_history_length": 100
+}

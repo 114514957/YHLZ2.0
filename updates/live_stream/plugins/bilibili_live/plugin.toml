@@ -1,0 +1,21 @@
+[plugin]
+id = "bilibili_live"
+name = "B站直播"
+description = "提供B站直播间弹幕监听、礼物监听和弹幕发送功能"
+version = "1.0.0"
+entry = "updates.live_stream.plugins.bilibili_live:BilibiliLivePlugin"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = false
+auto_start = false
+
+[plugin.store]
+enabled = true
+
+[dependencies]
+websockets = ">=12.0"
+requests = ">=2.31.0"

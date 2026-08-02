@@ -1,0 +1,23 @@
+[plugin]
+id = "screen_monitor"
+name = "屏幕监控"
+description = "定时捕获屏幕内容，分析用户活动，支持主动搭话触发"
+version = "1.0.0"
+entry = "plugin.plugins.screen_monitor:ScreenMonitorPlugin"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = true
+auto_start = true
+
+[plugin.store]
+enabled = true
+
+[screen_monitor]
+capture_interval = 30
+analysis_interval = 120
+auto_chat_enabled = true
+chat_cooldown = 300

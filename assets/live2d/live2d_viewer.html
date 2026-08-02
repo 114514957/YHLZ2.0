@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hiyori Live2D Viewer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { 
+            width: 100%; 
+            height: 100%; 
+            background: transparent !important; 
+            overflow: hidden; 
+            font-family: 'Microsoft YaHei', sans-serif;
+            cursor: default;
+        }
+        #canvas-container { 
+            width: 100%; 
+            height: 100%; 
+            position: relative;
+            overflow: hidden;
+            background: transparent !important;
+        }
+        canvas {
+            background: transparent !important;
+        }
+        #glow-layer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            opacity: 0.3;
+            transition: background-color 0.5s ease, opacity 0.5s ease, transform 0.5s ease;
+            pointer-events: none;
+            z-index: 0;
+        }
+        #loading { 
+            position: absolute; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            color: #aaa; 
+            font-size: 14px; 
+            text-align: center;
+            z-index: 100;
+            background: transparent;
+            padding: 20px 40px;
+        }
+        #error { 
+            position: absolute; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            color: #ff6b6b; 
+            font-size: 14px; 
+            text-align: center;
+            max-width: 300px;
+            z-index: 100;
+            background: transparent;
+            padding: 20px;
+        }
+        #status-indicator {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+            cursor: pointer;
+            z-index: 50;
+            transition: background-color 0.3s;
+            box-shadow: 0 0 4px rgba(0,0,0,0.3);
+        }
+        #status-indicator.unlocked {
+            background-color: #FF9800;
+        }
+        #status-indicator:hover + #status-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+        #status-tooltip {
+            position: absolute;
+            top: 8px;
+            right: 28px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            z-index: 51;
+            white-space: nowrap;
+        }
+        #context-menu {
+            position: fixed;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            padding: 6px 0;
+            min-width: 140px;
+            z-index: 1000;
+            display: none;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        #context-menu.show {
+            display: block;
+        }
+        #context-menu .menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #context-menu .menu-item:hover {
+            background-color: #f0f0f0;
+        }
+        #context-menu .menu-item.separator {
+            height: 1px;
+            background: #eee;
+            padding: 0;
+            margin: 4px 0;
+            cursor: default;
+        }
+        #context-menu .menu-item.separator:hover {
+            background: #eee;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">加载模型中...</div>
+    <div id="error" style="display: none;"></div>
+    <div id="glow-layer"></div>
+    <div id="canvas-container">
+        <div id="status-indicator" class="unlocked"></div>
+        <div id="status-tooltip">已解锁 - 可拖动和缩放</div>
+    </div>
+    <div id="context-menu">
+        <div class="menu-item" id="menu-lock">🔒 锁定模型</div>
+        <div class="menu-item" id="menu-unlock">🔓 解锁模型</div>
+        <div class="menu-item separator"></div>
+        <div class="menu-item" id="menu-reset">↺ 重置位置和缩放</div>
+        <div class="menu-item" id="menu-hit-body">👆 点击身体</div>
+        <div class="menu-item" id="menu-hit-head">👆 点击头部</div>
+    </div>
+
+    <script src="./pixi.min.js"></script>
+    <script src="./live2dcubismcore.min.js"></script>
+    <script src="./pixi-live2d-display-cubism4.min.js"></script>
+
+    <script>
+        const container = document.getElementById('canvas-container');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const glowLayer = document.getElementById('glow-layer');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusTooltip = document.getElementById('status-tooltip');
+        const contextMenu = document.getElementById('context-menu');
+
+        let modelBasePath = './hiyori_vts/';
+        let model = null;
+        let app = null;
+        
+        let isLocked = false;
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let modelStartX = 0;
+        let modelStartY = 0;
+        
+        let customScale = 0.4;
+        let customX = 0;
+        let customY = 0;
+        
+        const emotionColors = {
+            happy: { primary: '#FFD700', glow: 'rgba(255, 215, 0, 0.4)', intensity: 1.2, breathSpeed: 0.04, breathAmplitude: 0.03 },
+            sad: { primary: '#9370DB', glow: 'rgba(147, 112, 219, 0.4)', intensity: 0.8, breathSpeed: 0.02, breathAmplitude: 0.015 },
+            angry: { primary: '#FF6B6B', glow: 'rgba(255, 107, 107, 0.5)', intensity: 1.4, breathSpeed: 0.06, breathAmplitude: 0.04 },
+            surprised: { primary: '#FFA500', glow: 'rgba(255, 165, 0, 0.4)', intensity: 1.3, breathSpeed: 0.05, breathAmplitude: 0.035 },
+            anxious: { primary: '#87CEEB', glow: 'rgba(135, 206, 235, 0.3)', intensity: 0.9, breathSpeed: 0.035, breathAmplitude: 0.02 },
+            tired: { primary: '#708090', glow: 'rgba(112, 128, 144, 0.3)', intensity: 0.6, breathSpeed: 0.015, breathAmplitude: 0.01 },
+            excited: { primary: '#FF4500', glow: 'rgba(255, 69, 0, 0.5)', intensity: 1.5, breathSpeed: 0.08, breathAmplitude: 0.05 },
+            neutral: { primary: '#4169E1', glow: 'rgba(65, 105, 225, 0.3)', intensity: 1.0, breathSpeed: 0.03, breathAmplitude: 0.02 }
+        };
+
+        let currentEmotion = 'neutral';
+        let targetEmotion = 'neutral';
+        let emotionTransitionProgress = 0;
+        let breathingPhase = 0;
+        
+        // 口型同步：三正弦叠加
+        let mouthTarget = 0;
+        let mouthCurrent = 0;
+        let mouthPhase = 0;
+        let isSpeaking = false;
+        
+        // 视线状态机
+        let gazeState = 'idle';  // idle/viewing/thinking/replying
+        let gazeX = 0.5, gazeY = 0.5;
+        let gazeTargetX = 0.5, gazeTargetY = 0.5;
+        const GAZE_TARGETS = {
+            idle:      [0.5, 0.5],
+            viewing:   [0.25, 0.4],
+            thinking:  [0.65, 0.3],
+            replying:  [0.5, 0.5]
+        };
+        let mouseX = 0.5, mouseY = 0.5;  // 鼠标位置 [0,1]
+        
+        // 表情差分淡出
+        let expressionBaseline = {};  // 表情参数基线快照
+        let expressionDelta = {};     // 当前差分值
+        let expressionFadeProgress = 1.0;  // 淡出进度 (1=无淡出, 0=完全淡出)
+        let expressionFadeActive = false;
+
+        function updateLockStatus() {
+            if (isLocked) {
+                statusIndicator.classList.remove('unlocked');
+                statusTooltip.textContent = '已锁定 - 点击交互';
+            } else {
+                statusIndicator.classList.add('unlocked');
+                statusTooltip.textContent = '已解锁 - 可拖动和缩放';
+            }
+        }
+
+        function resetModelPosition() {
+            if (model && app) {
+                customScale = 0.4;
+                customX = app.screen.width / 2;
+                customY = app.screen.height * 0.85;
+                model.x = customX;
+                model.y = customY;
+                model.scale.set(customScale);
+            }
+        }
+
+        async function init() {
+            try {
+                // 强制销毁旧应用
+                if (app) {
+                    app.destroy(true, { children: true, texture: true, baseTexture: true });
+                    app = null;
+                }
+
+                app = new PIXI.Application({
+                    view: document.createElement('canvas'),
+                    background: null,  // 不设置任何背景
+                    backgroundAlpha: 0,
+                    antialias: true,
+                    resolution: window.devicePixelRatio || 1,
+                    autoDensity: true,
+                    resizeTo: container,
+                    powerPreference: 'high-performance',
+                    sharedTicker: true,
+                    sharedLoader: true
+                });
+                
+                // 强制设置 canvas 透明背景
+                const canvas = app.view;
+                canvas.style.background = 'transparent';
+                canvas.style.backgroundColor = 'transparent';
+                canvas.style.display = 'block';
+                
+                // 清除 canvas 内容
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                container.appendChild(canvas);
+                
+                // 强制容器透明
+                container.style.background = 'transparent';
+                container.style.backgroundColor = 'transparent';
+
+                const modelJsonPath = modelBasePath + 'hiyori.model3.json';
+                
+                model = await PIXI.live2d.Live2DModel.from(modelJsonPath, {
+                    autoInteract: true,
+                    autoIdle: true,
+                    idleMotionGroup: 'idle',
+                    expressionGroup: 'default',
+                    debug: false,
+                    renderer: 'auto',
+                    premultipliedAlpha: true,
+                    preserveDrawingBuffer: true
+                });
+
+                app.stage.addChild(model);
+
+                customScale = 0.4;
+                customX = app.screen.width / 2;
+                customY = app.screen.height * 0.85;
+                
+                model.scale.set(customScale);
+                model.x = customX;
+                model.y = customY;
+                model.anchor.set(0.5, 1);
+
+                model.on('hit', (hitAreas) => {
+                    if (!isLocked) return;
+                    if (hitAreas.includes('Body')) {
+                        model.startRandomMotion('tap_body');
+                    } else if (hitAreas.includes('Head')) {
+                        model.startRandomMotion('tap_head');
+                    }
+                });
+
+                model.on('motionStart', (motionGroup, motionIndex) => {
+                    console.log('动画开始:', motionGroup, motionIndex);
+                });
+
+                model.on('motionFinish', (motionGroup, motionIndex) => {
+                    console.log('动画完成:', motionGroup, motionIndex);
+                });
+
+                app.stage.sortableChildren = true;
+
+                loading.style.display = 'none';
+
+                window.addEventListener('resize', () => {
+                    if (model && app) {
+                        if (customX === app.screen.width / 2 && customY === app.screen.height * 0.85) {
+                            customX = app.screen.width / 2;
+                            customY = app.screen.height * 0.85;
+                            model.x = customX;
+                            model.y = customY;
+                        }
+                    }
+                });
+
+            } catch (e) {
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.textContent = '加载失败: ' + e.message;
+                console.error('=== Live2D Error ===');
+                console.error('错误类型:', e.name);
+                console.error('错误信息:', e.message);
+                console.error('错误堆栈:', e.stack);
+                console.error('=== End Error ===');
+            }
+        }
+
+        window.initModel = function() {
+            init();
+        };
+
+        function lerpColor(color1, color2, t) {
+            const hex2rgb = (hex) => {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return { r, g, b };
+            };
+            const c1 = hex2rgb(color1);
+            const c2 = hex2rgb(color2);
+            const r = Math.round(c1.r + (c2.r - c1.r) * t);
+            const g = Math.round(c1.g + (c2.g - c1.g) * t);
+            const b = Math.round(c1.b + (c2.b - c1.b) * t);
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function easeInOutQuad(t) {
+            return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        }
+
+        function updateBreathing() {
+            // 情感过渡
+            if (currentEmotion !== targetEmotion) {
+                emotionTransitionProgress += 0.02;
+                if (emotionTransitionProgress >= 1) {
+                    emotionTransitionProgress = 1;
+                    currentEmotion = targetEmotion;
+                }
+            }
+
+            const fromConfig = emotionColors[currentEmotion];
+            const toConfig = emotionColors[targetEmotion];
+            const easedProgress = easeInOutQuad(emotionTransitionProgress);
+
+            const breathSpeed = lerp(fromConfig.breathSpeed, toConfig.breathSpeed, easedProgress);
+            const breathAmplitude = lerp(fromConfig.breathAmplitude, toConfig.breathAmplitude, easedProgress);
+            const intensity = lerp(fromConfig.intensity, toConfig.intensity, easedProgress);
+
+            breathingPhase += breathSpeed;
+            const breathingScale = 1 + Math.sin(breathingPhase) * breathAmplitude;
+
+            if (model) {
+                model.scale.set(customScale * breathingScale * intensity);
+
+                // === 口型同步：三正弦叠加 ===
+                if (isSpeaking) {
+                    mouthPhase += 0.12;
+                    // 0.4*sin(2.5φ) + 0.3*sin(1.8φ) + 0.3*sin(3.3φ) 归一化到 [0,1]
+                    const raw = 0.4 * Math.sin(2.5 * mouthPhase) +
+                                0.3 * Math.sin(1.8 * mouthPhase) +
+                                0.3 * Math.sin(3.3 * mouthPhase);
+                    mouthTarget = (raw + 1.0) / 2.0;
+                } else {
+                    mouthTarget = 0.0;
+                }
+                mouthCurrent += (mouthTarget - mouthCurrent) * 0.3;
+                setMouthParam(mouthCurrent);
+
+                // === 视线状态机：补间到目标 ===
+                // idle 状态下跟随鼠标
+                if (gazeState === 'idle') {
+                    gazeTargetX = mouseX;
+                    gazeTargetY = mouseY;
+                }
+                const gazeLerp = 0.05;
+                gazeX += (gazeTargetX - gazeX) * gazeLerp;
+                gazeY += (gazeTargetY - gazeY) * gazeLerp;
+                
+                if (isLocked && model.internalModel) {
+                    model.internalModel.addParameterValueById('ParamAngleX', (gazeX - 0.5) * 30, 1.0);
+                    model.internalModel.addParameterValueById('ParamAngleY', (gazeY - 0.5) * 30, 1.0);
+                    model.internalModel.addParameterValueById('ParamEyeBallX', (gazeX - 0.5) * 1.0, 1.0);
+                    model.internalModel.addParameterValueById('ParamEyeBallY', (gazeY - 0.5) * 1.0, 1.0);
+                }
+
+                // === 表情差分淡出 ===
+                if (expressionFadeActive && expressionFadeProgress < 1.0) {
+                    expressionFadeProgress += 0.008;  // ~800ms 淡出
+                    if (expressionFadeProgress >= 1.0) {
+                        expressionFadeProgress = 1.0;
+                        expressionFadeActive = false;
+                        expressionDelta = {};
+                    }
+                    // 应用衰减后的差分
+                    const fadeFactor = 1.0 - easeInOutQuad(expressionFadeProgress);
+                    for (const [paramId, delta] of Object.entries(expressionDelta)) {
+                        if (model.internalModel) {
+                            model.internalModel.addParameterValueById(paramId, delta * fadeFactor, 1.0);
+                        }
+                    }
+                }
+            }
+
+            // 光效更新
+            const glowScale = 1 + Math.sin(breathingPhase) * 0.1 * intensity;
+            glowLayer.style.transform = `translate(-50%, -50%) scale(${glowScale})`;
+
+            const currentGlow = lerpColor(fromConfig.primary, toConfig.primary, easedProgress);
+            const currentGlowOpacity = 0.3 * intensity;
+            const alphaHex = Math.round(currentGlowOpacity * 255).toString(16).padStart(2, '0');
+            glowLayer.style.background = `radial-gradient(circle, ${currentGlow}${alphaHex} 0%, transparent 70%)`;
+            glowLayer.style.boxShadow = `0 0 ${60 * intensity}px ${20 * intensity}px ${currentGlow}40`;
+
+            requestAnimationFrame(updateBreathing);
+        }
+
+        updateBreathing();
+
+        // 辅助：设置口型参数
+        function setMouthParam(value) {
+            if (model && model.internalModel) {
+                // 尝试 ParamMouthOpenY (最常用)
+                model.internalModel.addParameterValueById('ParamMouthOpenY', value, 1.0);
+            }
+        }
+
+        // 辅助：保存表情参数基线快照
+        function saveExpressionBaseline() {
+            if (!model || !model.internalModel) return;
+            expressionBaseline = {};
+            try {
+                const paramIds = model.internalModel.coreModel.getParameterIds();
+                const paramValues = model.internalModel.coreModel.getParameterValues();
+                for (let i = 0; i < paramIds.length; i++) {
+                    expressionBaseline[paramIds[i]] = paramValues[i];
+                }
+            } catch(e) {
+                console.warn('保存表情基线失败:', e);
+            }
+        }
+
+        // 辅助：应用表情差分（淡出用）
+        function applyExpressionDelta(deltaMap, fadeDuration) {
+            if (!model || !model.internalModel) return;
+            expressionDelta = deltaMap;
+            expressionFadeProgress = 0.0;
+            expressionFadeActive = true;
+        }
+
+        // 鼠标跟踪（用于 idle 视线跟随）
+        container.addEventListener('mousemove', (e) => {
+            const rect = container.getBoundingClientRect();
+            mouseX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            mouseY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        });
+
+        container.addEventListener('mouseleave', () => {
+            mouseX = 0.5;
+            mouseY = 0.5;
+        });
+
+        container.addEventListener('mousedown', (e) => {
+            if (e.button === 0 && !isLocked && model) {
+                isDragging = true;
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+                modelStartX = model.x;
+                modelStartY = model.y;
+                document.body.style.cursor = 'grabbing';
+            }
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            if (isDragging && model) {
+                const deltaX = e.clientX - dragStartX;
+                const deltaY = e.clientY - dragStartY;
+                model.x = modelStartX + deltaX;
+                model.y = modelStartY + deltaY;
+                customX = model.x;
+                customY = model.y;
+            }
+        });
+
+        container.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.cursor = 'default';
+            }
+        });
+
+        container.addEventListener('mouseleave', () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.cursor = 'default';
+            }
+        });
+
+        container.addEventListener('wheel', (e) => {
+            if (isLocked || !model) return;
+            
+            e.preventDefault();
+            
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            const newScale = customScale * zoomFactor;
+            
+            const minScale = 0.1;
+            const maxScale = 2.0;
+            
+            if (newScale >= minScale && newScale <= maxScale) {
+                const rect = container.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                const worldX = (mouseX - model.x) / customScale;
+                const worldY = (mouseY - model.y) / customScale;
+                
+                customScale = newScale;
+                model.scale.set(customScale);
+                
+                model.x = mouseX - worldX * customScale;
+                model.y = mouseY - worldY * customScale;
+                
+                customX = model.x;
+                customY = model.y;
+            }
+        }, { passive: false });
+
+        container.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            contextMenu.style.left = e.clientX + 'px';
+            contextMenu.style.top = e.clientY + 'px';
+            contextMenu.classList.add('show');
+            
+            document.getElementById('menu-lock').style.display = isLocked ? 'none' : 'flex';
+            document.getElementById('menu-unlock').style.display = isLocked ? 'flex' : 'none';
+        });
+
+        document.addEventListener('click', () => {
+            contextMenu.classList.remove('show');
+        });
+
+        document.getElementById('menu-lock').addEventListener('click', () => {
+            isLocked = true;
+            updateLockStatus();
+            contextMenu.classList.remove('show');
+        });
+
+        document.getElementById('menu-unlock').addEventListener('click', () => {
+            isLocked = false;
+            updateLockStatus();
+            contextMenu.classList.remove('show');
+        });
+
+        document.getElementById('menu-reset').addEventListener('click', () => {
+            resetModelPosition();
+            contextMenu.classList.remove('show');
+        });
+
+        document.getElementById('menu-hit-body').addEventListener('click', () => {
+            if (model) {
+                model.startRandomMotion('tap_body');
+            }
+            contextMenu.classList.remove('show');
+        });
+
+        document.getElementById('menu-hit-head').addEventListener('click', () => {
+            if (model) {
+                model.startRandomMotion('tap_head');
+            }
+            contextMenu.classList.remove('show');
+        });
+
+        statusIndicator.addEventListener('click', () => {
+            isLocked = !isLocked;
+            updateLockStatus();
+        });
+
+        window.setParameter = function(paramName, value) {
+            if (model && model.internalModel) {
+                model.internalModel.setParamValue(paramName, value);
+            }
+        };
+
+        window.setExpression = function(expressionName) {
+            if (model) {
+                model.setExpression(expressionName);
+            }
+        };
+
+        window.startMotion = function(motionGroup, motionIndex) {
+            if (model) {
+                model.startMotion(motionGroup, motionIndex || 0);
+            }
+        };
+
+        window.startRandomMotion = function(motionGroup) {
+            if (model) {
+                model.startRandomMotion(motionGroup);
+            }
+        };
+
+        window.setLookAt = function(x, y) {
+            if (model && isLocked) {
+                model.setLookAt(x, y);
+            }
+        };
+
+        window.reloadModel = function(newBasePath) {
+            modelBasePath = newBasePath;
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            init();
+        };
+
+        window.getModelInfo = function() {
+            if (model) {
+                return {
+                    name: model.name,
+                    width: model.width,
+                    height: model.height,
+                    motionGroups: model.motionGroups || [],
+                    currentEmotion: currentEmotion,
+                    isLocked: isLocked,
+                    scale: customScale,
+                    position: { x: customX, y: customY }
+                };
+            }
+            return null;
+        };
+
+        window.setEmotion = function(emotionName) {
+            if (emotionColors[emotionName]) {
+                targetEmotion = emotionName;
+                emotionTransitionProgress = 0;
+                return true;
+            }
+            return false;
+        };
+
+        window.setEmotionWithIntensity = function(emotionName, intensity) {
+            if (emotionColors[emotionName]) {
+                targetEmotion = emotionName;
+                emotionTransitionProgress = 0;
+                return true;
+            }
+            return false;
+        };
+
+        window.setGlowColor = function(color) {
+            glowLayer.style.background = `radial-gradient(circle, ${color}40 0%, transparent 70%)`;
+            glowLayer.style.boxShadow = `0 0 60px 20px ${color}40`;
+        };
+
+        window.setMouthOpen = function(value) {
+            mouthTarget = Math.min(1, Math.max(0, value));
+            // 如果外部直接设置 mouthOpen（非 speaking 模式），立即应用
+            if (!isSpeaking && value > 0.01) {
+                mouthCurrent += (mouthTarget - mouthCurrent) * 0.5;
+            }
+        };
+
+        // 设置说话状态
+        window.setSpeaking = function(speaking) {
+            if (speaking) {
+                isSpeaking = true;
+                mouthPhase = 0;
+                setGazeState('replying');
+            } else {
+                isSpeaking = false;
+                mouthTarget = 0;
+                setTimeout(() => setGazeState('idle'), 500);
+            }
+        };
+
+        // 设置视线状态
+        window.setGazeState = function(state) {
+            if (GAZE_TARGETS[state]) {
+                gazeState = state;
+                gazeTargetX = GAZE_TARGETS[state][0];
+                gazeTargetY = GAZE_TARGETS[state][1];
+            }
+        };
+
+        // 设置表情（带差分淡出）
+        window.setExpressionWithFade = function(expressionName, fadeDuration) {
+            if (!model) return;
+            // 保存当前参数基线
+            saveExpressionBaseline();
+            // 应用新表情
+            model.setExpression(expressionName);
+            // 计算差分并启动淡出
+            setTimeout(() => {
+                if (!model || !model.internalModel) return;
+                const paramIds = model.internalModel.coreModel.getParameterIds();
+                const paramValues = model.internalModel.coreModel.getParameterValues();
+                const delta = {};
+                for (let i = 0; i < paramIds.length; i++) {
+                    const pid = paramIds[i];
+                    const baseline = expressionBaseline[pid] || 0;
+                    const current = paramValues[i];
+                    const diff = current - baseline;
+                    if (Math.abs(diff) > 0.001) {
+                        delta[pid] = diff;
+                    }
+                }
+                if (Object.keys(delta).length > 0) {
+                    applyExpressionDelta(delta, fadeDuration || 800);
+                }
+            }, 50);  // 等表情应用完成
+        };
+
+        window.addEventListener('message', (event) => {
+            const data = event.data;
+            if (data.type === 'live2d_parameter') {
+                setParameter(data.name, data.value);
+            } else if (data.type === 'live2d_expression') {
+                setExpression(data.name);
+            } else if (data.type === 'live2d_expression_fade') {
+                setExpressionWithFade(data.name, data.fadeDuration || 800);
+            } else if (data.type === 'live2d_motion') {
+                startRandomMotion(data.group);
+            } else if (data.type === 'live2d_lookat') {
+                setLookAt(data.x, data.y);
+            } else if (data.type === 'live2d_reload') {
+                reloadModel(data.path);
+            } else if (data.type === 'live2d_emotion') {
+                setEmotion(data.emotion);
+            } else if (data.type === 'live2d_emotion_intensity') {
+                setEmotionWithIntensity(data.emotion, data.intensity);
+            } else if (data.type === 'live2d_glow_color') {
+                setGlowColor(data.color);
+            } else if (data.type === 'live2d_mouth_open') {
+                setMouthOpen(data.value);
+            } else if (data.type === 'live2d_speaking') {
+                setSpeaking(data.speaking);
+            } else if (data.type === 'live2d_gaze_state') {
+                setGazeState(data.state);
+            }
+        });
+    </script>
+</body>
+</html>

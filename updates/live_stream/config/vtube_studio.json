@@ -1,0 +1,35 @@
+{
+    "enabled": true,
+    "host": "localhost",
+    "port": 8001,
+    "token_path": "./config/vts_token.txt",
+    "mouth_sync_enabled": true,
+    "sync_mode": "db",
+    "expression_control_enabled": true,
+    "auto_blink_enabled": true,
+    "blink_interval": 3000,
+    "auto_blink_interval_min": 2000,
+    "auto_blink_interval_max": 5000,
+    "easing_type": "easeBoth",
+    "animation_duration": 0.3,
+    "parameters": {
+        "mouth_open": "MouthOpen",
+        "eye_blink": "EyeBlink",
+        "head_x": "HeadX",
+        "head_y": "HeadY",
+        "body_angle": "BodyAngle"
+    },
+    "expressions": {
+        "happy": "happy_expression",
+        "sad": "sad_expression",
+        "surprised": "surprised_expression",
+        "neutral": "neutral_expression",
+        "angry": "angry_expression",
+        "shy": "shy_expression",
+        "excited": "excited_expression",
+        "sleepy": "sleepy_expression",
+        "confused": "confused_expression",
+        "laugh": "laugh_expression",
+        "cry": "cry_expression"
+    }
+}

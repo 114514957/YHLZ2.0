@@ -1,0 +1,62 @@
+# Core Framework
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+
+# OpenAI SDK
+openai>=1.0.0
+
+# HTTP Client
+httpx>=0.25.0
+
+# Speech Processing
+torch>=2.1.0
+torchaudio>=2.1.0
+transformers>=4.35.0
+datasets>=2.14.0
+
+# ASR
+accelerate>=0.25.0
+sentencepiece>=0.1.99
+openai-whisper>=20230314
+funasr>=1.0.0
+
+# TTS
+edge-tts>=6.1.0
+
+# Audio Processing
+librosa>=0.10.0
+sounddevice>=0.4.0
+soundfile>=0.12.0
+miniaudio>=1.71
+
+# Signal Processing
+scipy>=1.10.0
+filterpy>=1.4.5
+
+# VAD
+silero-vad>=1.0.0
+
+# Chinese Text Processing
+opencc>=1.1.6
+
+# Noise Reduction
+rnnoise>=0.1.0
+
+# GUI
+PyQt5>=5.15.0
+
+# Utilities
+numpy>=1.24.0
+websockets>=12.0
+aiofiles>=23.0.0
+
+# Optional: KV Cache optimization (requires CUDA)
+# flash-attn>=2.0.0
+
+# Optional: Memory optimization for quantization
+# bitsandbytes>=0.41.0
+
+# Optional: Faster compression
+# zlib-ng>=0.3.0

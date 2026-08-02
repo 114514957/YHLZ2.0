@@ -1,0 +1,21 @@
+[plugin]
+id = "vtube_studio"
+name = "VTube Studio"
+description = "提供VTube Studio虚拟形象控制功能，包括表情切换、口型同步、动画触发等"
+version = "1.0.0"
+entry = "updates.live_stream.plugins.vtube_studio:VTubeStudioPlugin"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = false
+auto_start = false
+
+[plugin.store]
+enabled = true
+
+[dependencies]
+pyvts = ">=0.3.0"
+websockets = ">=12.0"

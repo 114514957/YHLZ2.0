@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VTS Render Viewer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: transparent; 
+            overflow: hidden; 
+        }
+        #canvas { 
+            width: 100%; 
+            height: 100%; 
+            display: block;
+        }
+        #fps {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            color: white;
+            font-family: monospace;
+            font-size: 12px;
+            text-shadow: 1px 1px 2px black;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="fps">FPS: 0</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const fpsDiv = document.getElementById('fps');
+        
+        let ws = null;
+        let frameCount = 0;
+        let lastFpsUpdate = Date.now();
+        let token = '';
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        async function connect() {
+            try {
+                if (ws) {
+                    ws.close();
+                }
+                
+                ws = new WebSocket('ws://localhost:8001');
+                
+                ws.onopen = () => {
+                    console.log('WebSocket连接成功');
+                    authenticate();
+                };
+                
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    handleMessage(data);
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket错误:', error);
+                    setTimeout(connect, 2000);
+                };
+                
+                ws.onclose = () => {
+                    console.log('WebSocket连接关闭，2秒后重连');
+                    setTimeout(connect, 2000);
+                };
+                
+            } catch (e) {
+                console.error('连接失败:', e);
+                setTimeout(connect, 2000);
+            }
+        }
+
+        function authenticate() {
+            const request = {
+                apiName: 'VTubeStudioPublicAPI',
+                apiVersion: '1.0',
+                requestID: 'auth_' + Date.now(),
+                messageType: 'AuthenticationTokenRequest',
+                data: {}
+            };
+            ws.send(JSON.stringify(request));
+        }
+
+        function handleMessage(data) {
+            if (data.messageType === 'AuthenticationTokenResponse') {
+                token = data.data.token;
+                console.log('获取到认证令牌');
+                startRendering();
+            } else if (data.messageType === 'APIStateResponse') {
+                console.log('API状态:', data);
+            }
+        }
+
+        function startRendering() {
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    const request = {
+                        apiName: 'VTubeStudioPublicAPI',
+                        apiVersion: '1.0',
+                        requestID: 'render_' + Date.now(),
+                        messageType: 'RequestRenderedImageRequest',
+                        data: {
+                            authenticationToken: token,
+                            width: canvas.width,
+                            height: canvas.height
+                        }
+                    };
+                    ws.send(JSON.stringify(request));
+                }
+            }, 33);
+        }
+
+        ws.addEventListener('message', (event) => {
+            const data = JSON.parse(event.data);
+            if (data.messageType === 'RequestRenderedImageResponse') {
+                const imageData = data.data.imageData;
+                if (imageData) {
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        
+                        frameCount++;
+                        const now = Date.now();
+                        if (now - lastFpsUpdate >= 1000) {
+                            fpsDiv.textContent = 'FPS: ' + frameCount;
+                            frameCount = 0;
+                            lastFpsUpdate = now;
+                        }
+                    };
+                    img.src = 'data:image/png;base64,' + imageData;
+                }
+            }
+        });
+
+        connect();
+    </script>
+</body>
+</html>

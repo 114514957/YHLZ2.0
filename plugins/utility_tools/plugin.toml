@@ -1,0 +1,17 @@
+[plugin]
+id = "utility_tools"
+name = "实用工具"
+description = "提供计算器、时间查询、提醒等实用工具"
+version = "1.0.0"
+entry = "plugin.plugins.utility_tools:UtilityToolsPlugin"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = true
+auto_start = true
+
+[plugin.store]
+enabled = true

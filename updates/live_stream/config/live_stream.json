@@ -1,0 +1,11 @@
+{
+    "enabled": false,
+    "platform": "bilibili",
+    "auto_connect": false,
+    "auto_generate_topic": true,
+    "topic_generation_interval": 300,
+    "danmaku_response_enabled": true,
+    "gift_response_enabled": true,
+    "image_capture_enabled": true,
+    "image_analysis_enabled": true
+}

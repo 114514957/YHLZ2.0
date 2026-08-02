@@ -1,0 +1,19 @@
+[plugin]
+id = "live_control"
+name = "直播控制"
+description = "直播总控制面板，整合B站直播和虚拟形象控制"
+version = "1.0.0"
+entry = "updates.live_stream.plugins.live_control:LiveControlPlugin"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = false
+auto_start = false
+
+[plugin.store]
+enabled = true
+
+[dependencies]

@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>元亨桌宠</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent !important;
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: default;
+        }
+        #app {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        #live2d-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        /* 右键菜单 */
+        #context-menu {
+            position: fixed;
+            background: rgba(30, 30, 40, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 8px 0;
+            min-width: 160px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 10000;
+        }
+        #context-menu.active { display: block; }
+        .menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.15s;
+        }
+        .menu-item:hover {
+            background: rgba(0, 212, 255, 0.15);
+        }
+        .menu-item.disabled {
+            color: #666;
+            cursor: not-allowed;
+        }
+        .menu-item .icon { font-size: 16px; }
+        .menu-separator {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 4px 0;
+        }
+        
+        /* 字幕气泡 */
+        #subtitle-bubble {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 280px;
+            background: rgba(30, 30, 50, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 16px;
+            padding: 12px 20px;
+            color: #fff;
+            font-size: 14px;
+            line-height: 1.5;
+            text-align: center;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        #subtitle-bubble.active { display: block; }
+        #subtitle-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid rgba(30, 30, 50, 0.9);
+        }
+        
+        /* 加载指示器 */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            text-align: center;
+        }
+        #loading.hidden { display: none; }
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: rgba(0, 212, 255, 0.8);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 状态指示器 */
+        .status-dot {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: none;
+            z-index: 1000;
+        }
+        .status-dot.active { display: block; }
+        .status-dot.listening { background: #00FF88; box-shadow: 0 0 8px #00FF88; }
+        .status-dot.speaking { background: #00D4FF; box-shadow: 0 0 8px #00D4FF; }
+        .status-dot.thinking { background: #FFD93D; box-shadow: 0 0 8px #FFD93D; }
+        
+        /* 主题切换 */
+        #theme-indicator {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.3);
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="canvas-container">
+            <div id="live2d-container"></div>
+        </div>
+        
+        <!-- 状态指示 -->
+        <div class="status-dot" id="status-dot"></div>
+        
+        <!-- 字幕气泡 -->
+        <div id="subtitle-bubble"></div>
+        
+        <!-- 加载提示 -->
+        <div id="loading">
+            <div class="spinner"></div>
+            <div>加载模型中...</div>
+        </div>
+        
+        <!-- 右键菜单 -->
+        <div id="context-menu">
+            <div class="menu-item" data-action="toggle-through">
+                <span class="icon">👆</span>
+                <span id="menu-through-text">点击穿透</span>
+            </div>
+            <div class="menu-item" data-action="lock">
+                <span class="icon">🔒</span>
+                <span id="menu-lock-text">锁定位置</span>
+            </div>
+            <div class="menu-separator"></div>
+            <div class="menu-item" data-action="scale-up">
+                <span class="icon">🔍</span>
+                <span>放大</span>
+            </div>
+            <div class="menu-item" data-action="scale-down">
+                <span class="icon">🔎</span>
+                <span>缩小</span>
+            </div>
+            <div class="menu-item" data-action="scale-reset">
+                <span class="icon">📏</span>
+                <span>重置大小</span>
+            </div>
+            <div class="menu-separator"></div>
+            <div class="menu-item" data-action="hide">
+                <span class="icon">🙈</span>
+                <span>隐藏桌宠</span>
+            </div>
+            <div class="menu-item" data-action="close">
+                <span class="icon">❌</span>
+                <span>退出</span>
+            </div>
+        </div>
+        
+        <div id="theme-indicator">元亨 YHLZ 2.0</div>
+    </div>
+
+    <script>
+    // ============ 状态管理 ============
+    const state = {
+        model: null,
+        locked: false,
+        clickThrough: false,
+        scale: 1.0,
+        isDragging: false,
+        lastInteraction: 0
+    };
+    
+    // ============ DOM 元素 ============
+    const container = document.getElementById('live2d-container');
+    const loading = document.getElementById('loading');
+    const subtitleBubble = document.getElementById('subtitle-bubble');
+    const contextMenu = document.getElementById('context-menu');
+    const statusDot = document.getElementById('status-dot');
+    
+    // ============ Live2D 加载 ============
+    async function initLive2D(modelPath) {
+        try {
+            loading.classList.add('hidden');
+            
+            if (!modelPath) {
+                container.innerHTML = `
+                    <div style="color: rgba(255,255,255,0.6); text-align: center; padding: 40px;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🎭</div>
+                        <div style="font-size: 16px; margin-bottom: 8px;">元亨桌宠</div>
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.4);">
+                            尚未加载Live2D模型<br>
+                            请通过配置界面选择模型
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 动态加载必要的库
+            await loadScript('https://cdn.jsdelivr.net/npm/pixi.js@6.5.2/dist/browser/pixi.min.js');
+            await loadScript('https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/index.min.js');
+            await loadScript('https://cdn.jsdelivr.net/npm/pixi-live2d-display/cubism2@0.4.0/dist/index.min.js');
+            await loadScript('https://cdn.jsdelivr.net/npm/pixi-live2d-display/cubism4@0.4.0/dist/index.min.js');
+            
+            if (window.PIXI && window.PIXILive2D) {
+                setupPixiApp(modelPath);
+            } else {
+                throw new Error('Live2D库加载失败');
+            }
+        } catch (error) {
+            console.error('Live2D初始化失败:', error);
+            loading.classList.add('hidden');
+            container.innerHTML = `
+                <div style="color: rgba(255,255,255,0.5); text-align: center; padding: 40px;">
+                    <div style="font-size: 32px; margin-bottom: 12px;">⚠️</div>
+                    <div style="font-size: 14px;">加载失败</div>
+                </div>
+            `;
+        }
+    }
+    
+    function loadScript(url) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = url;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+    
+    function setupPixiApp(modelPath) {
+        const { Application } = PIXI;
+        const { Live2DModel } = PIXILive2D;
+        
+        const app = new Application({
+            view: createCanvas(),
+            transparent: true,
+            autoStart: true,
+            resizeTo: window,
+            backgroundAlpha: 0,
+            antialias: true
+        });
+        
+        app.stage.eventMode = 'static';
+        
+        Live2DModel.from(modelPath).then(model => {
+            state.model = model;
+            model.scale.set(state.scale);
+            model.x = window.innerWidth / 2;
+            model.y = window.innerHeight;
+            model.anchor.set(0.5, 1);
+            
+            app.stage.addChild(model);
+            
+            setupModelInteraction(model);
+            loading.classList.add('hidden');
+            
+            // 触发idle动作
+            setTimeout(() => {
+                if (model.internalModel.motionManager) {
+                    model.motion('Idle');
+                }
+            }, 500);
+            
+        }).catch(err => {
+            console.error('模型加载失败:', err);
+            container.innerHTML = `<div style="color: rgba(255,255,255,0.5); text-align: center; padding: 40px;">加载失败: ${err.message}</div>`;
+        });
+    }
+    
+    function createCanvas() {
+        const canvas = document.createElement('canvas');
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        container.appendChild(canvas);
+        return canvas;
+    }
+    
+    // ============ 模型交互 ============
+    function setupModelInteraction(model) {
+        model.on('hit', (hitAreas) => {
+            if (hitAreas.includes('Body')) {
+                model.motion('TapBody');
+            }
+        });
+        
+        model.on('pointerdown', () => {
+            if (!state.locked) {
+                model.motion('TapHead');
+            }
+        });
+        
+        // 心跳动画
+        const idleMotion = model.internalModel.motionManager;
+        if (idleMotion) {
+            setInterval(() => {
+                if (!state.isDragging && idleMotion.currentGroups.includes('Idle')) {
+                    idleMotion.startIdleMotion(0);
+                }
+            }, 30000);
+        }
+    }
+    
+    // ============ 窗口拖动 ============
+    let dragStartPos = null;
+    let mouseDownTime = 0;
+    
+    document.addEventListener('mousedown', (e) => {
+        if (e.button === 0 && !state.locked && e.target === container || e.target.tagName === 'CANVAS') {
+            mouseDownTime = Date.now();
+            const screenX = e.screenX !== undefined ? e.screenX : e.clientX;
+            const screenY = e.screenY !== undefined ? e.screenY : e.clientY;
+            
+            window.api.startDrag(
+                window.innerWidth / 2,
+                window.innerHeight / 2,
+                screenX,
+                screenY
+            );
+            dragStartPos = { x: e.clientX, y: e.clientY };
+            state.isDragging = true;
+            e.preventDefault();
+        }
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (state.isDragging) {
+            const screenX = e.screenX !== undefined ? e.screenX : e.clientX;
+            const screenY = e.screenY !== undefined ? e.screenY : e.clientY;
+            window.api.updateDrag(screenX, screenY);
+        }
+    });
+    
+    document.addEventListener('mouseup', (e) => {
+        if (state.isDragging) {
+            window.api.endDrag();
+            state.isDragging = false;
+            dragStartPos = null;
+            
+            // 点击检测（非拖动）
+            if (Date.now() - mouseDownTime < 200) {
+                handleClick(e);
+            }
+        }
+    });
+    
+    function handleClick(e) {
+        if (state.model) {
+            state.model.motion('TapHead');
+        }
+    }
+    
+    // ============ 右键菜单 ============
+    document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const x = e.clientX;
+        const y = e.clientY;
+        showContextMenu(x, y);
+    });
+    
+    function showContextMenu(x, y) {
+        updateMenuState();
+        contextMenu.style.left = x + 'px';
+        contextMenu.style.top = y + 'px';
+        contextMenu.classList.add('active');
+        
+        const closeMenu = (ev) => {
+            if (!contextMenu.contains(ev.target)) {
+                hideContextMenu();
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 10);
+    }
+    
+    function hideContextMenu() {
+        contextMenu.classList.remove('active');
+    }
+    
+    function updateMenuState() {
+        document.getElementById('menu-through-text').textContent = state.clickThrough ? '取消穿透' : '点击穿透';
+        document.getElementById('menu-lock-text').textContent = state.locked ? '解锁位置' : '锁定位置';
+    }
+    
+    contextMenu.addEventListener('click', (e) => {
+        const item = e.target.closest('.menu-item');
+        if (!item) return;
+        
+        const action = item.dataset.action;
+        hideContextMenu();
+        
+        switch (action) {
+            case 'toggle-through':
+                state.clickThrough = !state.clickThrough;
+                window.api.setClickThrough(state.clickThrough, false);
+                break;
+            case 'lock':
+                state.locked = !state.locked;
+                break;
+            case 'scale-up':
+                changeScale(1.2);
+                break;
+            case 'scale-down':
+                changeScale(0.83);
+                break;
+            case 'scale-reset':
+                changeScale(1.0);
+                break;
+            case 'hide':
+                window.api.hideWindow(true);
+                break;
+            case 'close':
+                window.api.closeWindow();
+                break;
+        }
+    });
+    
+    function changeScale(newScale) {
+        state.scale = Math.max(0.3, Math.min(3.0, newScale));
+        if (state.model) {
+            state.model.scale.set(state.scale);
+        }
+        window.api.setScale(state.scale);
+    }
+    
+    // ============ 字幕/气泡 ============
+    function showSubtitle(text, duration = 3000) {
+        if (!text) return;
+        subtitleBubble.textContent = text;
+        subtitleBubble.classList.add('active');
+        
+        clearTimeout(showSubtitle._timer);
+        showSubtitle._timer = setTimeout(() => {
+            subtitleBubble.classList.remove('active');
+        }, duration);
+    }
+    
+    // ============ 状态指示器 ============
+    function setStatus(status) {
+        statusDot.className = 'status-dot';
+        if (status) {
+            statusDot.classList.add('active', status);
+        }
+    }
+    
+    // ============ IPC 事件 ============
+    window.api.onWindowStateChanged((state) => {
+        state.clickThrough = state.clickThrough;
+        updateMenuState();
+    });
+    
+    window.api.onCursorMoved((pos) => {
+        // 可以用于实现光标跟随等效果
+    });
+    
+    // ============ 初始化 ============
+    async function init() {
+        try {
+            const config = await window.api.getConfig();
+            state.scale = config?.scale || 1.0;
+            
+            const modelPath = config?.model?.modelPath;
+            if (modelPath) {
+                await initLive2D(modelPath);
+            } else {
+                loading.classList.add('hidden');
+            }
+        } catch (e) {
+            console.error('初始化失败:', e);
+            loading.classList.add('hidden');
+        }
+    }
+    
+    // 窗口大小变化
+    window.addEventListener('resize', () => {
+        if (state.model) {
+            state.model.x = window.innerWidth / 2;
+            state.model.y = window.innerHeight;
+        }
+    });
+    
+    // 启动
+    init();
+    
+    // 暴露给外部调用
+    window.showSubtitle = showSubtitle;
+    window.setStatus = setStatus;
+    window.getModel = () => state.model;
+    window.performMotion = (group) => {
+        if (state.model) state.model.motion(group);
+    };
+    window.performExpression = (name) => {
+        if (state.model) state.model.expression(name);
+    };
+    </script>
+</body>
+</html>

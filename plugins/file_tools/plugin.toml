@@ -1,0 +1,17 @@
+[plugin]
+id = "file_tools"
+name = "文件工具"
+description = "提供文件读取、写入、列表等文件操作工具"
+version = "1.0.0"
+entry = "plugin.plugins.file_tools:FileToolsPlugin"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = true
+auto_start = true
+
+[plugin.store]
+enabled = true
