@@ -9,12 +9,12 @@ import time
 import re
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Tuple, Callable
-import aiohttp
 from pydub import AudioSegment
 import winsound
 import subprocess
 import shutil
 
+from backend.tts.adapters.gpt_sovits_adapter import GradioClient
 from .models import LiveSettings, ReplacementRule
 
 logger = logging.getLogger("live_stream.tts_service")
@@ -89,64 +89,6 @@ class AudioQueue:
                     return self._q.popleft()
                 except Exception:
                     self._cv.wait()
-
-class GradioClient:
-    def __init__(self, base_url: str, ssl_verify: bool = False, timeout: int = 300):
-        self.base_url = base_url if base_url.endswith("/") else (base_url + "/")
-        self.ssl_verify = ssl_verify
-        self.timeout = aiohttp.ClientTimeout(total=timeout)
-        self._session: Optional[aiohttp.ClientSession] = None
-        self._fn_map: Dict[str, int] = {}
-
-    async def ensure(self):
-        if self._session is None:
-            connector = aiohttp.TCPConnector(ssl=self.ssl_verify)
-            self._session = aiohttp.ClientSession(timeout=self.timeout, connector=connector, headers={
-                "User-Agent": "live_stream/tts_service"
-            })
-            await self._load_config()
-
-    async def _load_config(self):
-        assert self._session is not None
-        url = self.base_url + "config"
-        async with self._session.get(url) as resp:
-            resp.raise_for_status()
-            cfg = await resp.json()
-            deps = cfg.get("dependencies") or []
-            for i, dep in enumerate(deps):
-                api_name = (dep or {}).get("api_name")
-                if api_name:
-                    self._fn_map[str(api_name).strip().lstrip("/")] = int((dep or {}).get("id", i))
-
-    async def close(self):
-        if self._session is not None:
-            s = self._session
-            self._session = None
-            try:
-                await s.close()
-            except Exception:
-                pass
-
-    async def predict(self, api_name: str, *args: Any) -> Any:
-        await self.ensure()
-        assert self._session is not None
-        fn = self._fn_map.get(api_name.strip().lstrip("/"))
-        if fn is None:
-            raise RuntimeError(f"API '{api_name}' not found in gradio config")
-        url = self.base_url + "api/predict/"
-        data = {
-            "data": list(args),
-            "fn_index": fn,
-            "session_hash": str(int(time.time() * 1000))
-        }
-        async with self._session.post(url, json=data) as resp:
-            text = await resp.text()
-            if resp.status != 200:
-                raise RuntimeError(f"Gradio predict failed: {resp.status} {text[:200]}")
-            j = await resp.json()
-            if j.get("error"):
-                raise RuntimeError(f"Gradio API error: {j.get('error')}")
-            return j.get("data")
 
 class TTSService:
     def __init__(self) -> None:
@@ -329,14 +271,7 @@ class TTSService:
                         logger.error("Unexpected inference result: %s", repr(data)[:200])
                         continue
 
-                    async def _download(url: str) -> bytes:
-                        assert client is not None
-                        assert client._session is not None
-                        async with client._session.get(url) as resp:
-                            resp.raise_for_status()
-                            return await resp.read()
-
-                    buf = loop.run_until_complete(_download(audio_url))
+                    buf = loop.run_until_complete(client.download_audio(audio_url))
                     logger.info("Downloaded audio %.1f KB", len(buf) / 1024)
 
                     audio = AudioSegment.from_file(io.BytesIO(buf))

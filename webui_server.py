@@ -20,6 +20,15 @@ import atexit
 import socket
 from pathlib import Path
 from datetime import datetime
+
+# 统一 UTF-8 编码 (避免 Windows 下中文/emoji 乱码)
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+os.environ.setdefault("PYTHONUTF8", "1")
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 from flask import Flask, render_template, jsonify, request, send_from_directory, Response
 from flask_cors import CORS
 
@@ -591,7 +600,7 @@ def chat():
     data = request.get_json()
     message = data.get('message', '')
     tts_enabled = data.get('tts_enabled', False)
-    
+
     try:
         import requests as req
         resp = req.post(
@@ -603,16 +612,304 @@ def chat():
             },
             timeout=30
         )
-        return jsonify(resp.json())
+        # 后端 /chat 为 SSE 流式: 逐行转发 (兼容非流式调用方)
+        def proxy_stream():
+            for line in resp.iter_lines():
+                if line:
+                    yield line.decode('utf-8', errors='replace') + '\n\n'
+        return Response(proxy_stream(), mimetype='text/event-stream',
+                        headers={'Cache-Control': 'no-cache'})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# ==================== V2.2 声音克隆代理 ====================
+
+import requests as _voice_req  # 模块级 import, 保证 except 可用
+
+@app.route('/api/voice/clone', methods=['POST'])
+def voice_clone_proxy():
+    """代理到 backend POST /voice/clone (multipart 转发)"""
+    try:
+        audio = request.files.get('audio')
+        if audio is None:
+            return jsonify({"success": False, "error": "缺少 audio 文件", "stage": "validate"}), 400
+        files = {'audio': (audio.filename, audio.read(), audio.mimetype)}
+        data = {
+            'name': request.form.get('name', ''),
+            'engine': request.form.get('engine', 'qwen3'),
+            'voice_id': request.form.get('voice_id', '') or '',
+            'language': request.form.get('language', 'zh'),
+            'metadata': request.form.get('metadata', '') or '',
+        }
+        if not data['name']:
+            return jsonify({"success": False, "error": "缺少 name 参数", "stage": "validate"}), 400
+        resp = _voice_req.post(
+            'http://localhost:8000/voice/clone',
+            files=files, data=data, timeout=120,
+        )
+        return jsonify(resp.json())
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动 (请先启动 :8000)", "stage": "service_init"}), 503
+    except Exception as e:
+        logger.error(f"voice_clone_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e), "stage": "proxy"}), 500
+
+@app.route('/api/voice/synthesize', methods=['POST'])
+def voice_synthesize_proxy():
+    """代理到 backend POST /voice/synthesize"""
+    try:
+        data = request.get_json() or request.form.to_dict()
+        resp = _voice_req.post(
+            'http://localhost:8000/voice/synthesize',
+            data=data, timeout=60,
+        )
+        return jsonify(resp.json())
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_synthesize_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ==================== Phase 2.1 / 2.2 / 2.3 代理 ====================
+
+@app.route('/api/voice/list', methods=['GET'])
+def voice_list_proxy():
+    """代理到 backend GET /voice/list"""
+    try:
+        resp = _voice_req.get('http://localhost:8000/voice/list', timeout=15)
+        return jsonify(resp.json())
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_list_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/<voice_id>', methods=['GET'])
+def voice_detail_proxy(voice_id):
+    """代理到 backend GET /voice/<voice_id>"""
+    try:
+        resp = _voice_req.get(f'http://localhost:8000/voice/{voice_id}', timeout=15)
+        return jsonify(resp.json())
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_detail_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/<voice_id>', methods=['DELETE'])
+def voice_delete_proxy(voice_id):
+    """代理到 backend DELETE /voice/<voice_id>"""
+    try:
+        soft = request.args.get('soft', 'false').lower() == 'true'
+        resp = _voice_req.delete(
+            f'http://localhost:8000/voice/{voice_id}',
+            params={"soft": str(soft).lower()}, timeout=30,
+        )
+        return jsonify(resp.json())
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_delete_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/uploads/cleanup', methods=['POST'])
+def voice_cleanup_ttl_proxy():
+    """代理到 backend POST /voice/uploads/cleanup"""
+    try:
+        resp = _voice_req.post('http://localhost:8000/voice/uploads/cleanup', timeout=30)
+        return jsonify(resp.json())
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_cleanup_ttl_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/uploads/cleanup-all', methods=['DELETE'])
+def voice_cleanup_all_proxy():
+    """代理到 backend DELETE /voice/uploads/cleanup-all"""
+    try:
+        resp = _voice_req.delete('http://localhost:8000/voice/uploads/cleanup-all', timeout=30)
+        return jsonify(resp.json())
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_cleanup_all_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/quality/evaluate', methods=['POST'])
+def voice_quality_proxy():
+    """代理到 backend POST /voice/quality/evaluate (multipart)"""
+    try:
+        ref = request.files.get('reference_audio')
+        syn = request.files.get('synthesized_audio')
+        if ref is None or syn is None:
+            return jsonify({"success": False, "error": "缺少音频文件"}), 400
+        files = {
+            'reference_audio': (ref.filename, ref.read(), ref.mimetype),
+            'synthesized_audio': (syn.filename, syn.read(), syn.mimetype),
+        }
+        data = {
+            'reference_text': request.form.get('reference_text', '') or '',
+            'use_asr': request.form.get('use_asr', 'false'),
+        }
+        resp = _voice_req.post(
+            'http://localhost:8000/voice/quality/evaluate',
+            files=files, data=data, timeout=120,
+        )
+        return jsonify(resp.json())
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_quality_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/adapters/dashboard', methods=['GET'])
+def voice_adapters_dashboard_proxy():
+    """代理到 backend GET /voice/adapters/dashboard"""
+    try:
+        resp = _voice_req.get('http://localhost:8000/voice/adapters/dashboard', timeout=15)
+        return jsonify(resp.json())
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_adapters_dashboard_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/audio/<voice_id>', methods=['GET'])
+def voice_audio_proxy(voice_id):
+    """代理到 backend GET /voice/audio/<voice_id> (音频流)"""
+    try:
+        resp = _voice_req.get(f'http://localhost:8000/voice/audio/{voice_id}', timeout=30, stream=True)
+        if resp.status_code != 200:
+            return jsonify(resp.json()), resp.status_code
+        return Response(
+            resp.iter_content(chunk_size=8192),
+            content_type=resp.headers.get('content-type', 'audio/wav'),
+        )
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_audio_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ===== Phase 3.1 批量克隆 =====
+@app.route('/api/voice/clone/batch', methods=['POST'])
+def voice_clone_batch_proxy():
+    """代理到 backend POST /voice/clone/batch (multipart)"""
+    try:
+        resp = _voice_req.post(
+            'http://localhost:8000/voice/clone/batch',
+            data=request.form, timeout=30,
+        )
+        return jsonify(resp.json()), resp.status_code
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_clone_batch_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/clone/batch', methods=['GET'])
+def voice_clone_batch_list_proxy():
+    """代理到 backend GET /voice/clone/batch (列表)"""
+    try:
+        limit = request.args.get('limit', '50')
+        resp = _voice_req.get(f'http://localhost:8000/voice/clone/batch?limit={limit}', timeout=15)
+        return jsonify(resp.json()), resp.status_code
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_clone_batch_list_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/clone/batch/<task_id>', methods=['GET'])
+def voice_clone_batch_status_proxy(task_id):
+    """代理到 backend GET /voice/clone/batch/<task_id>"""
+    try:
+        resp = _voice_req.get(f'http://localhost:8000/voice/clone/batch/{task_id}', timeout=15)
+        return jsonify(resp.json()), resp.status_code
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_clone_batch_status_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/clone/batch/<task_id>/cancel', methods=['POST'])
+def voice_clone_batch_cancel_proxy(task_id):
+    """代理到 backend POST /voice/clone/batch/<task_id>/cancel"""
+    try:
+        resp = _voice_req.post(f'http://localhost:8000/voice/clone/batch/{task_id}/cancel', timeout=15)
+        return jsonify(resp.json()), resp.status_code
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_clone_batch_cancel_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ===== Phase 3.2 声音去重 =====
+@app.route('/api/voice/duplicate/check', methods=['POST'])
+def voice_duplicate_check_proxy():
+    """代理到 backend POST /voice/duplicate/check (multipart)"""
+    try:
+        files = {'audio': (request.files['audio'].filename, request.files['audio'].stream, request.files['audio'].mimetype)} if 'audio' in request.files else None
+        data = request.form
+        resp = _voice_req.post(
+            'http://localhost:8000/voice/duplicate/check',
+            files=files, data=data, timeout=60,
+        )
+        return jsonify(resp.json()), resp.status_code
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_duplicate_check_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ===== Phase 3.3 安全审计 =====
+@app.route('/api/voice/audit/log', methods=['GET'])
+def voice_audit_log_proxy():
+    """代理到 backend GET /voice/audit/log"""
+    try:
+        resp = _voice_req.get('http://localhost:8000/voice/audit/log', params=request.args, timeout=15)
+        return jsonify(resp.json()), resp.status_code
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_audit_log_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/audit/count', methods=['GET'])
+def voice_audit_count_proxy():
+    """代理到 backend GET /voice/audit/count"""
+    try:
+        resp = _voice_req.get('http://localhost:8000/voice/audit/count', params=request.args, timeout=15)
+        return jsonify(resp.json()), resp.status_code
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_audit_count_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/voice/audit/permission/<voice_id>', methods=['GET'])
+def voice_audit_permission_proxy(voice_id):
+    """代理到 backend GET /voice/audit/permission/<voice_id>"""
+    try:
+        resp = _voice_req.get(f'http://localhost:8000/voice/audit/permission/{voice_id}', params=request.args, timeout=15)
+        return jsonify(resp.json()), resp.status_code
+    except _voice_req.exceptions.ConnectionError:
+        return jsonify({"success": False, "error": "后端服务未启动"}), 503
+    except Exception as e:
+        logger.error(f"voice_audit_permission_proxy 异常: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/health')
 def health_check():
     try:
         import requests as req
         resp = req.get('http://localhost:8000/health', timeout=5)
-        return jsonify(resp.json())
+        data = resp.json()
+        # 状态归一化: 后端 healthy/ok 均视为正常 (前端判定 status === 'ok')
+        if data.get('status') in ('healthy', 'ok'):
+            data['status'] = 'ok'
+        return jsonify(data)
     except:
         return jsonify({"status": "unhealthy", "message": "后端服务未运行"})
 

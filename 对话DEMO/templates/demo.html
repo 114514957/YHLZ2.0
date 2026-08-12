@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YHLZ 2.0 Demo 控制台</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #f0f2f5;
+    color: #333;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  /* 顶部标题栏 */
+  header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .status-badge {
+    background: rgba(255,255,255,0.2);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+  }
+  header .status-badge.running { background: rgba(76,175,80,0.9); }
+  /* 主区域 */
+  main {
+    flex: 1;
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    overflow: hidden;
+  }
+  /* 左侧控制面板 */
+  .panel {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .control-panel {
+    width: 320px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+  .control-group { display: flex; flex-direction: column; gap: 8px; }
+  .control-group label {
+    font-size: 13px;
+    color: #888;
+    font-weight: 600;
+  }
+  /* 引擎选择卡片 */
+  .engine-options { display: flex; flex-direction: column; gap: 8px; }
+  .engine-card {
+    border: 2px solid #e8e8e8;
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .engine-card:hover { border-color: #667eea; }
+  .engine-card.active {
+    border-color: #667eea;
+    background: #f0f0ff;
+  }
+  .engine-card .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #ccc;
+  }
+  .engine-card.active .dot { background: #667eea; }
+  .engine-card .name { font-size: 14px; font-weight: 600; }
+  .engine-card .desc { font-size: 12px; color: #999; }
+  /* 按钮 */
+  .btn {
+    border: none;
+    border-radius: 8px;
+    padding: 11px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #fff;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-start { background: #4caf50; }
+  .btn-start:hover:not(:disabled) { background: #43a047; }
+  .btn-stop { background: #f44336; }
+  .btn-stop:hover:not(:disabled) { background: #e53935; }
+  .btn-text { background: #667eea; }
+  .btn-text:hover:not(:disabled) { background: #5a6fd6; }
+  .btn-clear { background: #bbb; font-size: 12px; padding: 6px 12px; }
+  /* 输入框 */
+  .text-input {
+    width: 100%;
+    border: 2px solid #e8e8e8;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 60px;
+  }
+  .text-input:focus { outline: none; border-color: #667eea; }
+  /* 右侧区域: 延迟面板 + 日志面板 */
+  .right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
+  }
+  /* 延迟追踪面板 */
+  .latency-panel {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    flex-shrink: 0;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .latency-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .latency-header h2 { font-size: 15px; color: #555; }
+  .latency-status { font-size: 12px; color: #999; }
+  .latency-content { display: flex; flex-direction: column; gap: 6px; }
+  .latency-empty { color: #ccc; font-size: 13px; text-align: center; padding: 20px 0; }
+  /* 延迟条 */
+  .latency-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .latency-row .lname {
+    width: 140px;
+    color: #666;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .latency-row .lbar-bg {
+    flex: 1;
+    height: 22px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .latency-row .lbar {
+    height: 100%;
+    background: #667eea;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    min-width: 2px;
+  }
+  .latency-row.max .lbar { background: #f44336; }
+  .latency-row.max .lname { color: #f44336; font-weight: bold; }
+  .latency-row .lval {
+    width: 70px;
+    text-align: right;
+    font-weight: 600;
+    color: #333;
+    flex-shrink: 0;
+  }
+  .latency-row.max .lval { color: #f44336; }
+  .latency-row .ltag {
+    font-size: 10px;
+    background: #f44336;
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 4px;
+  }
+  /* 关键指标卡片 */
+  .key-metrics {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .key-card {
+    flex: 1;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #fff;
+  }
+  .key-card.alt {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
+  .key-card .kname { font-size: 11px; opacity: 0.9; }
+  .key-card .kval { font-size: 24px; font-weight: bold; margin-top: 2px; }
+  .key-card .kval.na { font-size: 16px; opacity: 0.6; }
+  /* 日志面板 */
+  .log-panel-inner {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .log-header h2 { font-size: 15px; color: #555; }
+  .log-container {
+    flex: 1;
+    background: #1e1e2e;
+    border-radius: 8px;
+    padding: 12px;
+    overflow-y: auto;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .log-line { color: #cdd6f4; white-space: pre-wrap; word-break: break-all; }
+  .log-line.info { color: #89b4fa; }
+  .log-line.warn { color: #fab387; }
+  .log-line.error { color: #f38ba8; }
+  .log-line.report {
+    color: #a6e3a1;
+    font-weight: bold;
+    background: rgba(166,227,161,0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+  .log-line.report-key {
+    color: #f9e2af;
+    font-weight: bold;
+    font-size: 13px;
+  }
+  /* 滚动条 */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  .log-container::-webkit-scrollbar-thumb { background: #45475a; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>YHLZ 2.0 语音对话 Demo 控制台</h1>
+  <span id="statusBadge" class="status-badge">未运行</span>
+</header>
+
+<main>
+  <!-- 左侧控制面板 -->
+  <div class="panel control-panel">
+    <div class="control-group">
+      <label>TTS 引擎</label>
+      <div class="engine-options">
+        <div class="engine-card active" data-engine="qwen3-tts-customvoice" onclick="selectEngine(this)">
+          <span class="dot"></span>
+          <div>
+            <div class="name">Qwen3-TTS 本地</div>
+            <div class="desc">本地 · 音色 Vivian · 需加载 3.8GB</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>语音对话模式</label>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-start" id="btnStart" onclick="startVoice()">启动语音对话</button>
+        <button class="btn btn-stop" id="btnStop" onclick="stopDemo()" disabled>停止</button>
+      </div>
+      <div style="font-size:12px;color:#aaa;margin-top:4px;">启动后对着麦克风说话, 完整闭环测试</div>
+    </div>
+
+    <div class="control-group">
+      <label>文本模式测试 (跳过 ASR)</label>
+      <textarea class="text-input" id="textInput" placeholder="输入文本, 快速验证 LLM+TTS 链路...">你好, 请用一句话介绍你自己</textarea>
+      <button class="btn btn-text" id="btnText" onclick="sendText()">发送文本测试</button>
+    </div>
+
+    <div class="control-group">
+      <label>操作</label>
+      <button class="btn btn-clear" onclick="clearLogs()">清空日志</button>
+    </div>
+  </div>
+
+  <!-- 右侧: 延迟追踪 + 日志 -->
+  <div class="right-panel">
+    <!-- 延迟追踪面板 -->
+    <div class="latency-panel">
+      <div class="latency-header">
+        <h2>延迟追踪</h2>
+        <span class="latency-status" id="latencyStatus">暂无数据</span>
+      </div>
+      <div class="latency-content" id="latencyContent">
+        <div class="latency-empty">完成一轮对话后显示延迟数据</div>
+      </div>
+    </div>
+    <!-- 日志面板 -->
+    <div class="log-panel-inner">
+      <div class="log-header">
+        <h2>实时日志</h2>
+        <span style="font-size:12px;color:#999;" id="logCount">0 行</span>
+      </div>
+      <div class="log-container" id="logContainer"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+let selectedEngine = "qwen3-tts-customvoice";
+let logLines = 0;
+
+function selectEngine(card) {
+  document.querySelectorAll(".engine-card").forEach(c => c.classList.remove("active"));
+  card.classList.add("active");
+  selectedEngine = card.dataset.engine;
+}
+
+// ── API 调用 ──
+async function startVoice() {
+  const res = await fetch("/api/start", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({engine: selectedEngine}),
+  });
+  const data = await res.json();
+  if (!data.ok) { alert(data.msg); return; }
+  updateButtons(true, "voice");
+}
+
+async function stopDemo() {
+  const res = await fetch("/api/stop", {method: "POST"});
+  const data = await res.json();
+  if (!data.ok) { alert(data.msg); return; }
+  updateButtons(false);
+}
+
+async function sendText() {
+  const text = document.getElementById("textInput").value.trim();
+  if (!text) { alert("请输入文本"); return; }
+  const res = await fetch("/api/text", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({text: text, engine: selectedEngine}),
+  });
+  const data = await res.json();
+  if (!data.ok) { alert(data.msg); return; }
+  updateButtons(true, "text");
+}
+
+function updateButtons(running, mode) {
+  document.getElementById("btnStart").disabled = running;
+  document.getElementById("btnStop").disabled = !running;
+  document.getElementById("btnText").disabled = running;
+  const badge = document.getElementById("statusBadge");
+  if (running) {
+    badge.classList.add("running");
+    badge.textContent = mode === "voice" ? "语音对话中" : "文本测试中";
+  } else {
+    badge.classList.remove("running");
+    badge.textContent = "未运行";
+  }
+}
+
+function clearLogs() {
+  document.getElementById("logContainer").innerHTML = "";
+  logLines = 0;
+  document.getElementById("logCount").textContent = "0 行";
+  fetch("/api/logs/clear", {method: "POST"});
+}
+
+// ── SSE 日志流 ──
+const evt = new EventSource("/api/logs");
+let inReport = false;
+let isReportKey = false;
+
+evt.onmessage = function(e) {
+  const line = JSON.parse(e.data);
+  appendLog(line);
+};
+
+function appendLog(text) {
+  if (text.startsWith(": keepalive")) return;
+
+  const container = document.getElementById("logContainer");
+  const div = document.createElement("div");
+  div.className = "log-line";
+
+  // 延迟追踪报告高亮
+  if (text.includes("延迟追踪报告") || text.includes("════════")) {
+    div.classList.add("report");
+    inReport = !text.includes("────");
+  }
+  if (text.includes("★")) {
+    div.classList.add("report-key");
+  }
+  // 日志级别着色
+  if (text.includes("[ERROR]") || text.includes("FAILED")) {
+    div.classList.add("error");
+  } else if (text.includes("[WARNING]") || text.includes("WARN")) {
+    div.classList.add("warn");
+  } else if (text.includes("[INFO]") || text.includes("✅") || text.includes("🔊") || text.includes("🎙")) {
+    div.classList.add("info");
+  }
+
+  div.textContent = text;
+  container.appendChild(div);
+  logLines++;
+  document.getElementById("logCount").textContent = logLines + " 行";
+
+  // 自动滚动到底部
+  container.scrollTop = container.scrollHeight;
+
+  // 限制日志行数 (保留最后 1000 行)
+  if (container.children.length > 1000) {
+    container.removeChild(container.firstChild);
+  }
+
+  // 进程退出时更新按钮
+  if (text.includes("[WebUI] Demo 进程已退出")) {
+    updateButtons(false);
+  }
+}
+
+// ── 延迟追踪面板: 每 2 秒轮询 ──
+function fmtMs(v) { return v === null || v === undefined ? "N/A" : v + "ms"; }
+
+async function pollLatency() {
+  try {
+    const res = await fetch("/api/latency");
+    const data = await res.json();
+    renderLatency(data);
+  } catch (e) { /* 忽略 */ }
+}
+
+function renderLatency(data) {
+  const content = document.getElementById("latencyContent");
+  const status = document.getElementById("latencyStatus");
+
+  if (!data.available) {
+    content.innerHTML = '<div class="latency-empty">完成一轮对话后显示延迟数据</div>';
+    status.textContent = "暂无数据";
+    return;
+  }
+
+  // 找最大延迟项名称
+  const maxName = data.max_metric ? data.max_metric.name : null;
+  // 计算最大值用于 bar 比例
+  const allVals = data.metrics.filter(m => m.value !== null).map(m => m.value);
+  const maxVal = Math.max(...allVals, 1);
+
+  let html = "";
+
+  // 关键指标卡片 (端到端 / 总响应)
+  const keys = Object.entries(data.key_metrics);
+  if (keys.length > 0) {
+    html += '<div class="key-metrics">';
+    keys.forEach(([name, val], i) => {
+      const shortName = name.replace("(", " ").replace(")", "");
+      html += `<div class="key-card${i > 0 ? ' alt' : ''}">
+        <div class="kname">${shortName}</div>
+        <div class="kval${val === null ? ' na' : ''}">${fmtMs(val)}</div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  // 各环节延迟条形图
+  data.metrics.forEach(m => {
+    const isMax = m.name === maxName;
+    const pct = m.value !== null ? Math.round((m.value / maxVal) * 100) : 0;
+    html += `<div class="latency-row${isMax ? ' max' : ''}">
+      <span class="lname">${m.name}${isMax ? '<span class="ltag">最大</span>' : ''}</span>
+      <div class="lbar-bg"><div class="lbar" style="width:${pct}%"></div></div>
+      <span class="lval">${fmtMs(m.value)}</span>
+    </div>`;
+  });
+
+  content.innerHTML = html;
+  const time = new Date(data.timestamp * 1000).toLocaleTimeString();
+  status.textContent = `最近报告: ${time}`;
+}
+
+setInterval(pollLatency, 2000);
+pollLatency();
+
+// ── 初始化: 查询当前状态 ──
+fetch("/api/status").then(r => r.json()).then(data => {
+  if (data.running) {
+    updateButtons(true, data.mode);
+    // 同步引擎选择
+    document.querySelectorAll(".engine-card").forEach(c => {
+      c.classList.toggle("active", c.dataset.engine === data.engine);
+    });
+    selectedEngine = data.engine;
+  }
+});
+</script>
+
+</body>
+</html>

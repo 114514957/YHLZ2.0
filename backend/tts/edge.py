@@ -90,7 +90,10 @@ class EdgeTTSEngine(BaseTTSEngine):
 
             loop = asyncio.new_event_loop()
             try:
-                loop.run_until_complete(quick_warmup())
+                # M0.3: 预热加超时, 避免网络不可达时阻塞引擎加载/回退链
+                loop.run_until_complete(
+                    asyncio.wait_for(quick_warmup(), timeout=10.0)
+                )
             finally:
                 # 清理残留任务
                 pending = asyncio.all_tasks(loop)

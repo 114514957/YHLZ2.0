@@ -1,0 +1,267 @@
+YHLZ 2.0 改进建议（卷二：从成熟项目借鉴）
+改进目标：把 N.E.K.O / NachoBot 两个成熟项目的精华落地到 YHLZ 2.0
+日期: 2026-08-03
+前置文档: 针对YHLZ 2.0 改进建议（卷一Demo）.txt
+
+=======================================================================
+研究来源
+=======================================================================
+① Project-N-E-K-O/N.E.K.O（2356★，Apache-2.0）
+   定位：AI 猫娘实时陪伴数字生命。主动找你聊天、分享媒体、Agent 干活、
+   五维记忆、多形态 Avatar、插件生态、14+ AI 服务商、Steam 上架。
+   核心：brain/（Agent）、main_logic/（对话核心）、memory/（五维记忆）、
+   main_routers/（26 个路由）、app/（主/记忆/Agent 三服务器）。
+   亮点：会话状态机 + 事件总线、长回复 summary 三态压缩、混合召回
+   (BM25+余弦+RRF)、防重复(anti_repeat)、主动聊天两阶段协议、
+   Realtime/Offline 双路径统一抽象。
+
+② Big-Sh0t114/NachoBot（虚拟主播/桌宠机器人）
+   定位：B站直播/私聊机器人，弹幕驱动。插件系统、记忆图、
+   誓言缓存、关系记忆、TTS 智能缓冲、Live2D 渲染、GPT-SoVITS。
+   核心：bot.py（消息入口）、chat_stream.py（会话）、
+   private_generator.py（prompt 构建 8 块并行）、hippocampus.py
+   （记忆图：Graph+激活扩散检索）、tts_manager.py（智能缓冲）。
+
+=======================================================================
+一、两大项目共同印证的核心思想
+=======================================================================
+1. "大脑 + 身体"分离：对话引擎（Core）与平台适配器（Adapters）解耦，
+   LLM 回复不直接绑任何输入输出通道。YHLZ 的 backend 已是这个结构，方向对。
+
+2. 低延迟不靠单点优化，靠整条链路的排队/缓冲/抢占策略（见三）。
+
+3. 上下文防膨胀是三板斧的组合拳，缺一不可：
+   ① 窗口裁剪（按时间+条数取历史，不无限累积）
+   ② 摘要压缩（长段变 summary 进 history）
+   ③ 外部记忆（长期事实/记忆图/向量召回，不在 prompt 里堆原文）
+   YHLZ 的 context_manager 已有 ①+②，③（记忆）基本空白，是最大增量。
+
+4. 每层都要降级兜底：LLM 失败→发纯文本；摘要失败→保留原文；
+   记忆选择失败→取前 N 条。绝不把异常扩散到用户体验。
+
+=======================================================================
+二、N.E.K.O：会话状态机与上下文压缩（对话功能核心借鉴）
+=======================================================================
+【可抄 A1】会话状态收敛为单点状态机（session_state.py）
+  把分散的 current_speech_id / _is_responding / proactive 期望 ID /
+  用户最后活跃时间 收敛成 TurnOwner 枚举 + SessionStateMachine，
+  配合事件总线（SessionEvent）。收益：
+  - is_proactive_preempted(claim_token) 可在每个 LLM chunk 之间 O(1) 无锁轮询，
+    热路径不拖慢 token 吞吐；
+  - "谁在说话 / 谁接管" 成为可订阅事件，TTS worker/日志/前端同步拿到。
+  YHLZ 对应：voice_chat_demo 的 dispatcher 已按 seq 排序播放，但"打断/接管"
+  仍是散落布尔。建议抽一个 VoiceSessionState 状态机管理 说话/空闲/被抢断。
+
+【可抄 A2】长回复 summary 三态状态机（omni_offline_client/_streaming.py:688）
+  summary_state: 'idle' | 'pending_cutover' | 'cutover_done'
+  - cutover 触发时：prefix 快照进 history、tail 只进 UI、小模型摘要，
+    prefix+summary 进 history，tail 续 TTS；
+  - emit 去向矩阵：cutover_done 后 TTS 不再发 tail（防超长卡 TTS）。
+  YHLZ 对应：context_manager 的 summary_threshold 只做整段摘要，
+  无"生成中越界→切 summary 续 TTS"的流式压缩。建议在流式 LLM 输出里
+  实现同款三态，防止超长回复撑爆上下文和 TTS 队列。
+
+【可抄 A3】预算→max_tokens 映射（_shared.py _budget_to_max_tokens）
+  - budget >= 999999（无限制）→ 请求省略 max_tokens 字段（大固定值会被
+    某些 provider 拒绝为 out-of-range）；
+  - summary 模式只抬不压：max(budget + 20, 下限)；调用后必须恢复
+    原 max_tokens，防止污染后续请求。
+  YHLZ 对应：llm_engine 的 max_tokens 目前是固定值，建议按预算动态算。
+
+【可抄 A4】turn 事件 fanout + 隐私双通道（conversation_turns.py）
+  ConversationTurnEvent(actor/text/raw_text/...) 同步 fanout，chat 路径
+  拥有 turn timing，消费者自管存储。隐私模式默认把 text 脱敏，
+  仅授权 sink 拿 raw_text。建议 YHLZ 对话管理器产出标准 turn 事件，
+  供记忆、情绪、统计、TTS 各自消费，而非互相调方法。
+
+【可抄 A5】主动聊天两阶段协议（proactive.py）
+  prepare_proactive_delivery(min_idle_secs=10) → feed_tts_chunk →
+  finish_proactive_delivery(expected_speech_id)。
+  - 防打断提交：expected_speech_id 不匹配当前 current_speech_id（用户已接管）
+    则放弃提交；
+  - action_note 只进 history 不进 TTS（工具执行结果当元数据给下轮 LLM）。
+  YHLZ 对应：demo 目前纯被动应答，建议未来"元亨主动开口"沿用此协议。
+
+【可抄 A6】多提供商双路径统一抽象（omni_offline_client 模拟 realtime 接口）
+  Offline 客户端刻意实现与 Realtime 客户端相同的 connect/send_event/
+  update_session/switch_model 接口，业务层无感切换。
+  坑：switch_model 必须同步 base_url/api_key，否则打到旧端点（有注释警告）。
+  YHLZ 对应：llm_engine 已支持多 provider，建议把 TTS 也做成接口统一、
+  实现可插拔（edge-tts / qwen3-customvoice / GPT-SoVITS 同一接口）。
+
+【可抄 A7】热路径防坑
+  - asyncio.create_task 后必须存进 _bg_tasks + add_done_callback(discard)，
+    否则 Python 3.11+ 会被 GC 回收（YHLZ 大量 create_task，务必检查）；
+  - 哨兵对象 object() 表示"未传"，不要用 None（None 有时是合法值）；
+  - 跨模式 start_session 递归深度封顶、handshake 快照在第一次 await 前截取，
+    防并发 start_session 互相覆盖配置；
+  - _is_gibberish_response + 标点占比上限 0.25 过滤乱码/表情 spam，
+    摘要后还要再查一次乱码（防摘要本身吐脏）。
+
+=======================================================================
+三、N.E.K.O：五维记忆系统（YHLZ 最大增量）
+=======================================================================
+【总体】三层 tier + 横切设施：
+  Tier1 facts（原子事实，SHA-256+FTS5 去重，facts.json）
+  Tier2 reflection（反思，pending→confirmed→promoted 状态机）
+  Tier3 persona（稳定人格画像，persona.json）
+  横切：recent（近期记忆，recent.json）、timeindex（SQLite FTS5）、
+  archive_shards（按天分片归档）、event_log（追加式审计+启动重放）、
+  anti_repeat（防重复）、refine（精炼）。
+  全部按角色分目录：memory_dir/{name}/{type}.json。
+
+【可抄 B1】近期记忆：先合并落盘再锁外压缩（recent.py）
+  写入 = 临界区1（读盘+合并未落盘批+append+落盘），
+  压缩在锁外做（LLM 要数秒~数十秒，不能占锁）。
+  - 输入超预算 → 分段 map-reduce 压缩；摘要超上限 → 二次压缩，最多 3 轮；
+  - 硬上限 enforce_hard_cap：按"真实注入 prompt 的 content token"计算，
+    丢最旧非压缩文本，保留首个 memo 与最近 N 条；
+  - review（记忆整理）：快照式，LLM 修矛盾，完成后用 K 条指纹在当前
+    history 定位 cutoff 再 splice；指纹失配整批丢弃（'white'）。
+  YHLZ 对应：context_manager 的 summary 是简单的"超阈值就摘要"，
+  建议引入"先写盘再加锁外压缩 + 硬上限按真实 token 算"。
+
+【可抄 B2】事实记忆两阶段写入 + 三级去重（facts.py）
+  Stage-1 纯事实抽取（不携带既有观察，防 LLM 把已有 reflection 抄回当新 fact）；
+  Stage-2 信号检测（reinforce/negate），失败保持未处理，下次 idle 重试。
+  去重：① SHA-256 精确（text 做盐）→ ② 同 subject 的 FTS5 语义去重
+  （score≤-5 判定重复）→ ③ 归档行查重（防归档后同文本绕过）。
+  - Monotonic source 升级：ai_disclosure → user_observation 单向升级；
+  - 落盘回滚纪律：FTS 失败/落盘失败 → 回滚，否则 fail-closed 重试会撞
+    去重拿"空成功"、调用方推游标而磁盘永无此数据。
+
+【可抄 B3】混合召回：BM25 + 余弦 + RRF 融合（hybrid_recall.py）
+  - BM25 路：池 = facts + reflections + facts_archive（含归档！）；
+  - 余弦路：池 = facts + reflections（排除 archive 与 persona）；
+  - _rrf_fuse 按 RRF 合并，总量 ≤ 预算；
+  - _drop_archive_overlap：归档行只在活跃集无匹配时补位；
+  - 召回数量硬上限：每条候选 token 上限 / 总 token 上限双约束。
+  YHLZ 对应：无。若引入记忆，建议直接从 BM25+余弦+RRF 起步，
+  无需 embedding 服务（BM25 纯本地可跑），成本低见效快。
+
+【可抄 B4】防重复 anti_repeat（anti_repeat.py）
+  用 BM25 在滚动语料上评分：
+  - FG 窗口只统计 TTL 内的 AI 输出（整窗老化后分数归 0、草稿放行，
+    防"防重复死锁"）；BG 只贡献 DF；
+  - 未应答 proactive 检测：用户沉默期反复出现的话题模板计票，
+    任一真实用户消息即重置证据；
+  - top_recent_topics 把最近聊过的高分 n-gram 注入下轮 system prompt。
+  YHLZ 对应：暂无防重复机制（demo 曾被吐槽 LLM 复读）。强烈建议加
+  一个轻量 BM25 防重复，成本低、直接解决"复读"痛点。
+
+【可抄 B5】LLM 调用硬规则（memory/__init__.py，项目级约束）
+  - 不传 temperature（模型端默认，兼容 o1/gpt-5-thinking 等拒绝参数的模型）；
+  - 模型分 tier（summary/correction/emotion/vision），无硬编码回退，
+    未配置就显式报错，不悄悄 qwen-max 兜底；
+  - CI 检查脚本禁 temperature（scripts/check_no_temperature.py）。
+  YHLZ 对应：llm_engine 若未来接记忆，应遵守同款规则（可抄一半：tier 制）。
+
+=======================================================================
+四、NachoBot：对话链路与记忆图（弹幕/直播场景 + 记忆图借鉴）
+=======================================================================
+【可抄 C1】会话身份 MD5 化 + SQLite 持久化（chat_stream.py）
+  stream_id = MD5(platform + group_id) 或 MD5(platform + user_id + "private")，
+  稳定无敏感信息，重启不丢会话。
+  YHLZ 对应：当前按用户简单存 history，建议加 MD5 会话 ID 并持久化。
+
+【可抄 C2】异步单例 + 任务去重 + shield（chat_stream.py:200）
+  get_or_create_stream 用 Lock + _stream_creation_tasks + asyncio.shield
+  防并发重复建流，返回 deepcopy 防缓存污染。
+  YHLZ 对应：context_manager 单例目前无并发保护，多路并发请求时建议照抄。
+
+【可抄 C3】TTS 智能缓冲（去抖 + 标签配平）（tts_manager.py:404）
+  buffer_tts_reply：每次追加都取消上一个 0.5s 定时器再新建 → 天然去抖合并；
+  等 <ZH>/<JP> 双语标签配平，8s 超时未配平则自动修复；
+  失败回退发纯文本弹幕。
+  YHLZ 对应：voice_chat_demo 已有分句入队，但没有"去抖合并连续分片"。
+  若 LLM 输出分多片到达，建议加 0.5s 去抖窗口合并。
+
+【可抄 C4】句级切分 cut0~cut5（text_splitter.py）
+  cut5（默认）：先按标点切，超长段再按 max_length 二次硬切；
+  标点保留在前一段末尾，保证 TTS 断句自然；
+  _merge_short_segments：<10 字碎片合并到前一段，最后一段过短并入倒数第二段。
+  YHLZ 对应：voice_chat_demo 的 split_text_for_streaming 已有类似逻辑，
+  可对比补齐"过短碎片合并"。
+
+【可抄 C5】音频播放抢占 + 暂停/续播（audio_player.py）
+  - stop_event + asyncio.wait_for 超时播放，被中断保存现场 interrupted_audio；
+  - interrupt_idle：真正回复来临时清除队列中所有 idle 音频 + 立即打断；
+  - stop_and_pause / resume：暂停后 interrupted_audio 重新 appendleft 回队首续播。
+  YHLZ 对应：demo 播放是串行队列，没有"idle 音频让位于正经回复"的抢占。
+  建议给音频项打 is_idle 标签，参照实现抢占。
+
+【可抄 C6】记忆图 + 激活扩散检索（hippocampus.py）
+  - 底层 networkx 无向图：节点=概念（memory_items 单字符串 + weight），
+    边=关联（strength，共现 +1）；
+  - 写入：LLM 把整段对话压缩成"概念→摘要"，同概念新旧记忆用 LLM 整合
+    （保留重要、去重、调和矛盾），成功 weight+1，失败降级字符串拼接；
+  - 检索 get_memory_from_topic：关键词 BFS 激活扩散，邻居激活值
+    = current_activation - (1/strength)（边越强衰减越小），
+    激活值平方归一化选 Top-K（放大强关联节点选中概率）；
+  - 遗忘 operation_forget_topic：随机抽样，边超时 strength-1（≤0 删边），
+    节点超时阈值×weight（权重越高越难遗忘）；
+  - 哈希 diff 增量同步 DB（frozenset 保证顺序无关）。
+  YHLZ 对应：无。若不想上向量库，这个"图+扩散+平方概率"是纯本地、
+  零依赖的长期记忆方案，非常契合 YHLZ 的单机桌宠形态。
+
+【可抄 C7】誓言缓存两段式（promise_cache_manager.py）
+  raw 全量采集 → 空闲 180s 后 LLM 摘要成 processed；
+  touch_activity 随时可取消，不阻塞主链路；
+  _trim_old_caches 每关键词只保留最新 N 个。
+  YHLZ 对应：无。"记住用户偏好/约定"这类功能可照此实现。
+
+【可抄 C8】注入生命周期化（injection_manager.py）
+  注入内容带 remaining_rounds + cooldown_turns，每轮 -1，耗尽自动退场，
+  比"每轮重算"省 token 且稳定。
+  YHLZ 对应：若做主题注入（比如音乐推荐、知识彩蛋），照此实现。
+
+【坑（写代码前先看）】
+  - fire-and-forget create_task 不接异常（NachoBot live_worker.py:445）→
+    每个弹幕一个裸 task 异常被吞。YHLZ 务必包装 + 信号量限流；
+  - TTS 队列清理竞态：while not empty() 循环 + finally cancel 自身，
+    empty 判断与入队之间存在丢消息窗口；
+  - deepcopy(stream) 每请求一次，高频下有性能开销；
+  - Python 内置 hash() 带随机盐（PYTHONHASHSEED），跨进程 hash 值变化，
+    DB 里存 hash 字段跨重启会误判全量更新——存持久化 hash 要用 sha256 等稳定哈希；
+  - 关系记忆只增不减会膨胀（NachoBot relation.py 结尾自认的坑）；
+  - is_self_danmu 用"文本完全相等+时间窗"判回声，用户复读会被误滤。
+
+=======================================================================
+五、N.E.K.O 与 NachoBot 对照：YHLZ 2.0 落地优先级
+=======================================================================
+按"先对话功能、再记忆、再锦上添花"排序：
+
+【P0 对话功能（立即做，见卷一 Demo 验收）】
+ 1. 会话状态机：把 voice_chat_demo 的说话/打断/接管收敛为单点状态机（A1）
+ 2. 流式 summary 三态：超长回复流式压缩，不撑爆上下文与 TTS（A2）
+ 3. 音频抢占 + is_idle 标签：正经回复让位于闲聊/发呆音频（C5）
+ 4. TTS 去抖缓冲：LLM 分片输出 0.5s 窗口合并（C3）
+ 5. 防复读：轻量 BM25 anti_repeat，杜绝"每句话都复读"（B4）
+ 6. 句切分补齐"过短碎片合并"（C4）
+
+【P1 长期记忆（Demo 后，YHLZ 最大增量）】
+ 7. 近期记忆：先写盘 + 锁外压缩 + 硬上限按真实 token（B1）
+ 8. 事实记忆：两阶段抽取 + SHA-256/FTS5 去重（B2，可先只做 Stage-1）
+ 9. 混合召回 BM25+余弦+RRF（B3，BM25 纯本地可跑）
+10. 记忆图替代方案：图+激活扩散+遗忘（C6，零依赖）
+11. LLM 调用硬规则：tier 制 + 不传 temperature（B5）
+
+【P2 锦上添花】
+12. 主动聊天两阶段协议（A5）
+13. 多提供商 TTS 统一接口（A6）
+14. 誓言缓存 + 注入生命周期（C7/C8）
+15. turn 事件 fanout + 隐私双通道（A4）
+
+=======================================================================
+六、一句话总结
+=======================================================================
+N.E.K.O 教 YHLZ 怎么把"对话状态、上下文预算、记忆召回"做严谨：
+状态机 + 三态摘要 + BM25/余弦/RRF 混合召回 + 防重复 + 每层降级兜底。
+NachoBot 教 YHLZ 怎么在"直播/弹幕/桌宠"场景下把链路做顺滑：
+MD5 会话、去抖缓冲、句切分、音频抢占、记忆图 + 激活扩散。
+两者共同指向：对话功能先把"状态机 + 排队抢占 + 防膨胀"补齐，
+再上"外部记忆"——这就是 YHLZ 2.0 从"能 Demo"到"真正像伴侣"的路径。
+
+附：原始研究报告（本文档的素材来源，保留在 D:\YHLZ2.0\）：
+  NEKO对话核心研究报告.md
+  NEKO记忆系统研究报告.md

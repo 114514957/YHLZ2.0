@@ -1,0 +1,1121 @@
+核心调整：
+
+保留原 V6.0 Long-term Growth Companion
+增强为：
+Long-term Identity & Growth Continuity Layer
+增加：
+Memory Architecture
+Identity Continuity
+Growth Meaning
+Recovery Integrity
+Memory Importance
+保持你的工程原则：
+可执行
+可测试
+不引入黑盒
+不破坏已有架构
+
+建议文件名：
+
+YHLZ_AI伙伴_V6.0_Long-term_Identity_Growth_Continuity_专业工程Prompt.md
+
+# YHLZ AI伙伴 V6.0
+
+# Long-term Identity & Growth Continuity Layer
+
+## 专业工程开发 Prompt
+
+## 验收 Prompt
+
+## 完成返回 Prompt
+
+
+---
+
+# 0. 项目总纲
+
+
+## 项目名称
+
+YHLZ AI伙伴
+
+
+---
+
+## YHLZ含义
+
+
+YHLZ：
+
+元、亨、利、贞。
+
+
+来源：
+
+《周易》。
+
+
+YHLZ不是技术缩写。
+
+代表 AI伙伴长期演进原则。
+
+
+---
+
+# 1. YHLZ总体目标
+
+
+构建一个：
+
+具有：
+
+- 连续身份
+- 长期记忆
+- 经验成长
+- 安全验证
+- 主动创造
+- 长期陪伴能力
+
+
+的智能伙伴系统。
+
+
+---
+
+# 2. 四大架构原则
+
+
+# 元（Foundation）
+
+
+负责：
+
+身份与本源。
+
+
+模块：
+
+- Identity Core
+- Personality System
+- Core Value
+- Identity Boundary
+
+
+目标：
+
+回答：
+
+> AI伙伴是谁？
+
+
+---
+
+# 亨（Growth）
+
+
+负责：
+
+成长与演化。
+
+
+模块：
+
+- Experience Memory
+- Reflection
+- Learning
+- Growth System
+
+
+目标：
+
+回答：
+
+> AI伙伴如何成长？
+
+
+---
+
+# 利（Creation）
+
+
+负责：
+
+创造价值。
+
+
+模块：
+
+- Creative Intelligence
+- Opportunity Discovery
+- Proposal System
+
+
+目标：
+
+回答：
+
+> AI伙伴如何创造？
+
+
+---
+
+# 贞（Integrity）
+
+
+负责：
+
+安全与稳定。
+
+
+模块：
+
+- Verification
+- Reality Check
+- Safety Layer
+
+
+目标：
+
+回答：
+
+> AI伙伴如何可靠成长？
+
+
+---
+
+# 3. 当前系统基础
+
+
+## V5.7
+
+Experience Memory
+
+
+能力：
+
+
+事件
+
+↓
+
+经历
+
+↓
+
+经验
+
+↓
+
+查询
+
+
+
+---
+
+## V5.8
+
+Reflection & Cognitive Integrity
+
+
+能力：
+
+
+经验
+
+↓
+
+验证
+
+↓
+
+可靠经验
+
+↓
+
+反思
+
+↓
+
+改进
+
+
+
+---
+
+## V5.9
+
+Creative Intelligence
+
+
+能力：
+
+
+反思
+
+↓
+
+机会发现
+
+↓
+
+价值判断
+
+↓
+
+创造方案
+
+↓
+
+模拟
+
+
+
+---
+
+# 4. V6.0版本定位
+
+
+版本：
+
+YHLZ AI伙伴 V6.0
+
+
+名称：
+
+Long-term Identity & Growth Continuity Layer
+
+
+中文：
+
+长期身份与成长连续层。
+
+
+---
+
+# 5. V6.0核心目标
+
+
+解决：
+
+> AI伙伴如何拥有连续生命轨迹。
+
+
+---
+
+## 核心升级
+
+
+从：
+
+
+拥有记忆
+
+
+
+升级到：
+
+
+
+拥有成长历史
+
+
+
+---
+
+# 6. V6.0主要目标
+
+
+## 目标1
+
+全量持久化。
+
+
+保存：
+
+- 经历
+- 验证状态
+- 关系
+- 人格状态
+- 反思
+- 创造方案
+
+
+---
+
+## 目标2
+
+长期记忆组织。
+
+
+实现：
+
+- 活跃经验
+- 冷数据
+- 归档经验
+- 回收机制
+
+
+---
+
+## 目标3
+
+成长理解。
+
+
+不仅统计：
+
+数量。
+
+
+还理解：
+
+意义。
+
+
+---
+
+## 目标4
+
+身份连续。
+
+
+重启后：
+
+保持：
+
+- 身份
+- 人格
+- 关系
+- 历史
+
+
+---
+
+# 7. V6.0明确不做
+
+
+禁止：
+
+
+## 不做具身化
+
+
+包括：
+
+- 虚拟形象
+- 动作
+- 完整视觉人格化
+
+
+归属：
+
+V7.x
+
+
+---
+
+## 不做情绪模拟系统
+
+
+归属：
+
+V6.1/V6.2
+
+
+---
+
+## 不做黑盒训练
+
+
+禁止：
+
+- NN训练
+- 自我修改模型
+- 黑盒优化
+
+
+---
+
+## 不做自主目标修改
+
+
+AI伙伴：
+
+不能改变自身使命。
+
+
+---
+
+# 8. V6.0总体架构
+
+
+
+Identity
+
+↓
+
+Memory
+
+↓
+
+Experience
+
+↓
+
+Reflection
+
+↓
+
+Growth Meaning
+
+↓
+
+Identity Continuity
+
+↓
+
+Creative Improvement
+
+↓
+
+New Experience
+
+
+
+---
+
+# 9. 新增目录结构
+
+
+
+backend/embodied/companion/
+
+persistence/
+
+├── storage.py
+
+├── snapshot.py
+
+├── restore.py
+
+└── persistence_audit.py
+
+memory/
+
+├── memory_index.py
+
+├── memory_importance.py
+
+├── memory_consolidation.py
+
+identity_history/
+
+├── identity_snapshot.py
+
+├── identity_diff.py
+
+└── identity_audit.py
+
+growth/
+
+├── growth_tracker.py
+
+├── growth_report.py
+
+├── growth_trend.py
+
+└── growth_meaning.py
+
+
+
+---
+
+# 10. Persistence Layer
+
+
+## 目标
+
+
+建立统一状态持久化。
+
+
+---
+
+## storage.py
+
+
+要求：
+
+实现：
+
+- JSONL存储
+- 原子写入
+- 校验
+- 损坏数据跳过
+
+
+---
+
+格式：
+
+
+```json
+{
+"schema_version":"",
+"type":"",
+"timestamp":"",
+"data":""
+}
+11. Snapshot系统
+目标
+
+保存完整AI伙伴状态。
+
+包括：
+
+Identity
+Personality
+Relationship
+Experience
+Reflection
+Proposal
+
+结构：
+
+Snapshot
+
+↓
+
+Version
+
+↓
+
+State
+
+↓
+
+Checksum
+12. Restore系统
+恢复流程
+Load Snapshot
+
+↓
+
+Checksum Verify
+
+↓
+
+Schema Verify
+
+↓
+
+Identity Verify
+
+↓
+
+Memory Verify
+
+↓
+
+Activate
+
+要求：
+
+恢复失败：
+
+不能崩溃。
+
+必须：
+
+跳过
+记录
+审计
+13. Memory Architecture
+目标
+
+建立长期记忆体系。
+
+结构：
+
+Memory System
+
+
+Identity Memory
+
+↓
+
+Relationship Memory
+
+↓
+
+Experience Memory
+
+↓
+
+Reflection Memory
+
+↓
+
+Creative Memory
+14. Memory Importance
+
+增加：
+
+记忆价值评分。
+
+公式：
+
+Importance Score =
+
+Identity Impact
+
++
+
+Relationship Impact
+
++
+
+Creative Impact
+
++
+
+Repeat Value
+
+规则：
+
+高价值记忆：
+
+禁止自动删除。
+
+15. Experience Lifecycle
+
+生命周期：
+
+Active
+
+↓
+
+Cold
+
+↓
+
+Archive
+
+↓
+
+Recycle
+
+规则：
+
+Active
+
+近期、高价值。
+
+参与：
+
+Reflection
+Creation
+Cold
+
+低访问。
+
+保留查询。
+
+Archive
+
+高价值低频。
+
+压缩保存。
+
+Recycle
+
+低价值长期无用。
+
+删除并记录审计。
+
+16. Identity Continuity
+目标
+
+保存：
+
+AI伙伴成长轨迹。
+
+新增：
+
+Identity Snapshot。
+
+保存：
+
+Version
+
+↓
+
+Identity State
+
+↓
+
+Change Reason
+
+↓
+
+Approval
+
+规则：
+
+人格变化：
+
+必须：
+
+提出。
+
+不能：
+
+自动修改。
+
+17. Growth Meaning Layer
+目标
+
+让成长具有意义。
+
+不是：
+
+经验+100
+
+而是：
+
+发生了什么
+
+↓
+
+意味着什么
+
+↓
+
+影响未来什么
+
+数据结构：
+
+{
+"event":"",
+
+"meaning":"",
+
+"impact":"",
+
+"future_effect":""
+}
+18. Growth Report
+
+输出：
+
+长期成长报告。
+
+包括：
+
+经验成长
+数量
+类型
+价值
+认知成长
+Reflection数量
+Pattern变化
+创造成长
+Proposal数量
+转化率
+关系成长
+信任变化
+互动趋势
+19. API要求
+
+新增：
+
+companion_persistence_save
+
+companion_persistence_load
+
+companion_growth_report
+
+companion_experience_lifecycle
+
+要求：
+
+只读管理接口。
+
+禁止绕过Service层。
+
+20. 配置要求
+
+全部进入：
+
+config.py
+
+禁止：
+
+魔法数字。
+
+新增：
+
+companion_persistence_enabled
+
+companion_persistence_path
+
+companion_persistence_schema_version
+
+companion_experience_archive_days
+
+companion_growth_window_days
+
+companion_growth_enabled
+21. 工程规范
+
+必须：
+
+中文docstring
+类型注解
+RLock线程安全
+完整日志
+Mock优先
+临时目录测试
+22. 架构禁止事项
+
+禁止：
+
+跨层调用
+
+保持：
+
+Interface
+
+↓
+
+Service
+
+↓
+
+Manager
+
+↓
+
+Storage
+静默异常
+
+必须：
+
+日志记录。
+
+破坏旧API
+
+必须：
+
+向后兼容。
+
+23. 验收Prompt
+
+执行：
+
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+功能验收
+持久化
+
+验证：
+
+保存
+
+↓
+
+重启
+
+↓
+
+恢复
+
+结果：
+
+状态一致。
+
+身份连续
+
+验证：
+
+重启后：
+
+Personality不变
+Identity不变
+Relationship恢复
+Memory恢复
+生命周期
+
+验证：
+
+Active
+
+↓
+
+Archive
+
+↓
+
+Recycle
+
+规则正确。
+
+成长报告
+
+验证：
+
+输出：
+
+经验增长
+反思变化
+创造转化
+关系演化
+恢复安全
+
+验证：
+
+损坏数据跳过
+版本不兼容降级
+不崩溃
+24. 测试要求
+
+新增：
+
+不少于300测试。
+
+覆盖：
+
+Persistence
+
+↓
+
+Restart
+
+↓
+
+Restore
+
+↓
+
+Identity
+
+↓
+
+Memory
+
+↓
+
+Growth
+
+验收：
+
+Failed = 0
+25. 完成返回Prompt
+
+输出：
+
+YHLZ AI伙伴 V6.0 完成报告
+
+内容：
+
+版本信息
+
+Version:
+
+Commit:
+
+Date:
+
+新增模块
+
+列表。
+
+持久化统计
+
+输出：
+
+保存数量
+恢复数量
+跳过数量
+Memory统计
+
+输出：
+
+Active
+Cold
+Archive
+Recycle
+Identity统计
+
+输出：
+
+Snapshot数量
+变化记录
+Growth统计
+
+输出：
+
+成长事件
+成长意义
+趋势
+测试结果
+Total:
+
+Passed:
+
+Failed:
+26. 最终原则
+稳定开发
+
+增量迭代
+
+可测试
+
+可维护
+
+可扩展
+YHLZ进化路径
+有声音        ✓
+
+有视觉        基础 ✓
+
+有记忆        ✓ → 长期连续
+
+有人格        ✓
+
+能思考        ✓
+
+能创造        ✓
+
+能行动        未来
+最终目标
+
+YHLZ AI伙伴：
+
+不是一个保存数据的Agent。
+
+而是：
+
+拥有过去
+
+理解现在
+
+影响未来
+
+持续成长
+
+的长期智能伙伴。
+
+YHLZ
+
+元 · 亨 · 利 · 贞
+
+
+这版作为 **V6.0正式开发入口** 比原版更接近“AI伙伴”方向。
+
+核心变化：
+
+**V5.9：AI开始创造。**
+
+**V6.0：AI开始拥有连续成长历史。**
+
+这两个阶段必须分开，否则容易变成“功能堆叠型Agent”，而不是伙伴系统。

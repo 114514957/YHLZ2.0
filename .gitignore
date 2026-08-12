@@ -49,6 +49,8 @@ gui_config.json
 # Database
 backend/data/*.db
 backend/data/memories.json
+backend/data/*.db-shm
+backend/data/*.db-wal
 
 # OS
 Thumbs.db
@@ -57,3 +59,6 @@ desktop.ini
 # Node (deprecated desktop_avatar)
 desktop_avatar/node_modules/
 desktop_avatar/package-lock.json
+
+# 嵌套仓库(空)与本地预留
+GPT-SoVITS/

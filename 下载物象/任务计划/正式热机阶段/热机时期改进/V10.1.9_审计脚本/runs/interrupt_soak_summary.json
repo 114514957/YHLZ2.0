@@ -1,0 +1,26 @@
+{
+  "interrupt_test": {
+    "interrupt_http": 200,
+    "interrupt_latency_s": 0.003,
+    "tokens_after_interrupt": 898,
+    "stream_completed": true,
+    "total_len": 160784
+  },
+  "soak": {
+    "turns": 30,
+    "duration_s": 21.7,
+    "rss_start_mb": 3.4,
+    "rss_end_mb": 3.4,
+    "rss_delta_mb": -0.0,
+    "rss_samples_mb": [
+      3.4,
+      3.4,
+      3.4,
+      3.4,
+      3.4,
+      3.4
+    ],
+    "backend_log_delta_kb": 98.7,
+    "errors": []
+  }
+}

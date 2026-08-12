@@ -1,0 +1,705 @@
+前置阶段：V4.4（Adaptive Strategy Layer 自适应策略层）已验收：专项 929/929，全量回归 Failed=0。
+
+当前正式进入：
+
+YHLZ Embodied AI V4.5
+Meta Strategy Management
+元策略管理
+
+YHLZ 当前智能进化链
+
+当前完整链路：
+
+Voice
+
+↓
+
+Vision
+
+↓
+
+Understanding
+
+↓
+
+Memory
+
+↓
+
+Personality
+
+↓
+
+Action
+
+↓
+
+Environment
+
+↓
+
+Reasoning
+
+↓
+
+Experience Learning
+
+↓
+
+Adaptive Strategy
+
+↓
+
+Meta Strategy Management
+
+V4.4 已完成：
+
+经验记录
+
+↓
+
+经验复用
+
+↓
+
+经验评估
+
+↓
+
+策略生命周期管理
+
+包含：
+
+场景/目标类型调度
+质量排序
+可解释选择
+degraded
+stale
+archived
+恢复
+版本化
+审计
+趋势统计
+Dry Run
+
+V4.5 核心目标
+
+从：
+
+AI 选择当前最佳策略
+
+升级：
+
+AI 管理自己的策略体系
+
+注意：
+
+这里不是让 AI 自我训练。
+
+仍然保持：
+
+规则
+
++
+
+统计
+
++
+
+阈值
+
++
+
+可解释排序
+
++
+
+确定性流程
+
+禁止：
+
+神经网络训练
+梯度更新
+黑盒优化
+自主修改策略内容
+
+V4.5 开发重点
+一、Strategy System Overview
+
+目标：
+
+让 YHLZ 能回答：
+
+我有哪些策略？当前健康状态如何？
+
+新增：
+
+strategy_system_overview()
+
+输出：
+
+策略矩阵
+
+维度：
+
+scene × goal_type × kind
+
+统计：
+
+策略数量
+active 数
+degraded 数
+stale 数
+archived 数
+整体质量
+
+包含：
+
+平均 hit_rate
+平均 acceptance_rate
+版本数量
+归档数量
+老化数量
+恢复成功数量
+版本健康度
+
+检查：
+
+当前版本
+历史版本
+最新质量变化
+
+并保证：
+
+同一 trigger：
+
+只能存在一个 active 当前版本
+
+新增：
+
+strategy_system_report()
+
+生成文本报告。
+
+二、Strategy Governance 策略治理
+1. 冗余策略检测
+
+新增：
+
+redundant_policies()
+
+规则：
+
+同：
+
+scene
+
+×
+
+goal_type
+
+×
+
+kind
+
+×
+
+action_type
+
+存在多个 active 策略：
+
+且：
+
+action_sequence
+
+strategy
+
+detail
+
+一致。
+
+判定：
+
+冗余。
+
+输出：
+
+候选策略
+建议动作
+
+支持：
+
+archive_redundant_policies()
+
+并支持：
+
+dry_run。
+
+2. 冲突策略检测
+
+新增：
+
+conflicting_policies()
+
+检测：
+
+同一 trigger：
+
+多个 active version。
+
+规则：
+
+最新版本优先。
+
+旧版本：
+
+建议归档。
+
+支持：
+
+resolve_conflicts()
+
+3. 低效策略归档
+
+规则：
+
+满足：
+
+年龄 > embodied_policy_min_archive_age_days
+
++
+
+hit_rate < embodied_policy_min_archive_hit_rate
+
+默认：
+
+30 天
+
+0.3
+
+注意：
+
+不是自动删除。
+
+流程：
+
+检测
+
+↓
+
+建议
+
+↓
+
+人工确认
+
+↓
+
+执行
+
+API：
+
+archive_candidates()
+
+apply_archival(trigger, confirm=True)
+
+4. 策略回收站
+
+两阶段删除：
+
+archived
+
+↓
+
+deleted(retained)
+
+↓
+
+purge
+
+接口：
+
+delete_policy()
+
+restore_policy()
+
+purge_policy()
+
+recycle_bin()
+
+三、Strategy Evolution 策略体系进化
+1. 策略同化
+
+新增：
+
+consolidate_similar_policies()
+
+目标：
+
+发现：
+
+不同 trigger
+
+但是：
+
+相同 action_sequence
+
+形成：
+
+Policy Family
+
+共享：
+
+父级统计。
+
+子策略：
+
+保留独立历史。
+
+2. 策略分裂
+
+新增：
+
+split_policy()
+
+支持：
+
+按：
+
+scene
+
+或
+
+goal_type
+
+拆分。
+
+例如：
+
+原：
+
+pick_object
+
+拆成：
+
+warehouse_pick
+
+home_pick
+
+3. 版本比较
+
+新增：
+
+compare_policy_versions()
+
+输出：
+
+version
+updated_at
+action_sequence
+hit_rate
+acceptance_rate
+source_goal_id
+
+并判断：
+
+healthy
+
+or
+
+regression
+
+4. 策略回滚
+
+新增：
+
+rollback_policy()
+
+条件：
+
+只有：
+
+最新版本 regression
+
+才允许。
+
+旧版本：
+
+保留历史。
+
+四、Audit 审计增强
+
+V4.4：
+
+记录。
+
+V4.5：
+
+治理追踪。
+
+新增 Audit Action：
+
+consolidate
+
+split
+
+rollback
+
+purge
+
+resolve_conflict
+
+archive_redundant
+
+apply_archival
+
+新增：
+
+audit_policy_log(action=...)
+
+以及：
+
+audit_system_export()
+
+导出完整 JSON 审计档案。
+
+五、治理 Dry Run 体系化
+
+统一入口：
+
+governance_dry_run(action, **kwargs)
+
+支持：
+
+archive_redundant
+resolve_conflicts
+apply_archival
+consolidate
+split
+rollback
+purge
+
+返回：
+
+影响策略
+执行后系统快照差异
+保护规则检查结果
+
+P1 增强
+Scene Coverage
+
+分析：
+
+策略覆盖范围。
+
+输出：
+
+覆盖率
+未覆盖场景
+
+Policy Health Check
+
+新增：
+
+policy_health_check()
+
+输出：
+
+healthy
+
+weak
+
+stale
+
+conflict
+
+redundant
+
+并生成健康评分。
+
+配置驱动
+
+所有治理阈值：
+
+必须：
+
+embodied_* 
+
+前缀。
+
+支持：
+
+EMBODIED_*
+
+环境变量。
+
+安全约束
+
+保持：
+
+embodied_enabled=False
+
+固定链路：
+
+Observe
+
+↓
+
+Reasoning
+
+↓
+
+Permission
+
+↓
+
+Action
+
+↓
+
+Feedback
+
+禁止：
+
+真实设备控制
+机器人控制
+自动驾驶
+AI训练式学习
+修改 Agent Brain
+修改 Vision Interface
+修改 Memory Interface
+自我目标生成
+
+新增：
+
+治理动作：
+
+只能影响：
+
+策略表
+
+↓
+
+审计日志
+
+↓
+
+体系快照
+
+不能绕过：
+
+Permission Layer
+
+也不能写入：
+
+Agent Memory。
+
+验收标准
+
+测试：
+
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+
+专项：
+
+>=950 cases
+
+Failed = 0
+
+全量：
+
+Vision
+Action
+Personality
+Agent
+voice_identity
+
+全部通过。
+
+V4.5 完成后的能力跃迁
+V4.0
+AI 能行动
+
+
+↓
+
+V4.1
+AI 理解环境
+
+
+↓
+
+V4.2
+AI 理解原因
+
+
+↓
+
+V4.3
+AI 积累经验
+
+
+↓
+
+V4.4
+AI 选择最佳经验
+
+
+↓
+
+V4.5
+AI 管理策略体系
+
+工程判断：
+
+V4.5 是 YHLZ 从：
+
+Adaptive Agent
+
+进入：
+
+Self-Managing Agent
+
+的关键版本。
+
+下一阶段：
+
+YHLZ_Embodied_AI_V4.6_下一步开发Prompt.md
+
+方向：
+
+Meta Strategy Management
+
+↓
+
+Cross-Goal Strategic Planning
+
+即：
+
+从：
+
+管理策略体系
+
+进入：
+
+跨目标战略规划
+
+工程规范继续保持：
+
+先读后写
+接口先行
+配置驱动
+向后兼容
+无测试不交付
+只改 Embodied 模块
+纯规则治理
+中文注释
+Service → 子模块
+RLock
+单例 + reset
+
+下一步将生成：
+
+YHLZ_Embodied_AI_V4.6_下一步开发Prompt.md
+
+进入 Cross-Goal Strategic Planning（跨目标战略规划层）。

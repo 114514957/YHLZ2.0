@@ -1,0 +1,47 @@
+{
+  "phase1_first_extraction": {
+    "extract_time_sec": 0.051,
+    "save_time_sec": 0.0133,
+    "file_size_bytes": 7318,
+    "file_size_kb": 7.15,
+    "vram_before": {
+      "available": true,
+      "allocated_gb": 0.0,
+      "reserved_gb": 0.0
+    },
+    "vram_after": {
+      "available": true,
+      "allocated_gb": 0.0,
+      "reserved_gb": 0.0
+    },
+    "vram_delta_gb": 0.0
+  },
+  "phase2_files": {
+    "embedding.pt": 3513,
+    "metadata.json": 246,
+    "prompt.pt": 3559
+  },
+  "phase3_restore": {
+    "restore_time_sec": 0.0198,
+    "vram_before": {
+      "available": true,
+      "allocated_gb": 0.0,
+      "reserved_gb": 0.0
+    },
+    "vram_after": {
+      "available": true,
+      "allocated_gb": 0.0,
+      "reserved_gb": 0.0
+    },
+    "vram_delta_gb": 0.0
+  },
+  "speedup": 2.58,
+  "phase5_synthesis_ok": true,
+  "round_trip_integrity": "lossless",
+  "vram_summary": {
+    "phase1_delta_gb": 0.0,
+    "phase3_delta_gb": 0.0,
+    "note": "FakeModel 不占显存, delta≈0; 真实模型提取会有 GB 级 delta",
+    "cuda_available": true
+  }
+}

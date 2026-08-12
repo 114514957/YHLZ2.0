@@ -1,0 +1,936 @@
+YHLZ_Vision_Memory_V1.0_下一步开发Prompt.md
+
+# YHLZ Vision Memory V1.0 下一步开发 Prompt
+
+## YHLZ Engineering Next Development Prompt V1.0
+
+
+版本：
+
+YHLZ Vision Memory V1.0
+
+
+依据：
+
+- YHLZ AI工程开发习惯 Prompt V1.0
+- YHLZ Vision Foundation V1.0
+- YHLZ Vision Perception V1.0
+- YHLZ Vision Understanding V1.0 验收报告
+
+
+---
+
+# 一、当前系统状态分析
+
+## 角色
+
+你现在是 YHLZ 多模态 AI Companion 项目的长期维护高级工程师。
+
+
+你的职责不是简单写代码，而是完成完整工程闭环：
+
+
+需求分析
+
+↓
+
+架构设计
+
+↓
+
+开发实现
+
+↓
+
+自动测试
+
+↓
+
+验收评估
+
+↓
+
+生成报告
+
+↓
+
+下一阶段规划
+
+
+
+当前开发必须遵循：
+
+
+稳定开发
+增量迭代
+可测试
+可维护
+可扩展
+
+
+
+---
+
+# 二、当前系统能力
+
+## 1. Voice Infrastructure (V2.1 ~ V2.3)
+
+已完成：
+
+- Voice Pipeline
+- Voice Identity
+- TTS Adapter
+    - Qwen3-TTS
+    - GPT-SoVITS
+    - Mock
+- Quality Gate
+- Permission
+- Task System
+- Metrics
+- Security
+- Voice Lifecycle
+
+
+---
+
+## 2. Agent Core (V3.0)
+
+已完成：
+
+- Agent Brain
+- ReAct Reason → Act → Observe
+- Planner
+- Reasoning
+- Tool System
+- Plugin SDK
+- LLM Adapter
+- Memory Interface
+- Agent Service
+- Agent API
+
+
+---
+
+## 3. Memory 基础能力
+
+已完成：
+
+- SQLite Storage
+- Memory Manager
+- Short Term Memory
+- 自动提取
+- 衰减机制
+
+
+---
+
+## 4. Vision Foundation V1.0
+
+已完成：
+
+- VisionFrame
+- VisionSource
+- VisionStatus
+- VisionPermission
+- Screen Adapter
+- Camera Adapter
+- Mock Adapter
+- Vision Manager
+- Vision Service
+- Permission Checker
+- Vision Logger
+
+
+---
+
+## 5. Vision Perception V1.0
+
+已完成：
+
+能力：
+
+- OCR
+- Object Detection
+- Structured Perception Result
+
+
+输出：
+
+
+DetectedText
+
+DetectedObject
+
+
+
+---
+
+## 6. Vision Understanding V1.0
+
+已完成：
+
+建立：
+
+
+Vision Input
+
+↓
+
+Understanding Engine
+
+↓
+
+Semantic Result
+
+
+
+能力：
+
+- Scene Description
+- Visual QA
+- Structured Semantic
+
+
+输出：
+
+
+UnderstandingResult
+
+scene_type
+
+description
+
+subjects
+
+summary
+
+metadata
+
+timestamp
+
+
+---
+
+# 三、当前系统缺失能力
+
+目前 YHLZ 已经：
+
+
+能看
+
+↓
+
+能提取信息
+
+↓
+
+能理解画面
+
+
+
+但是仍然不能：
+
+- 保存过去看到的内容
+- 查询历史视觉事件
+- 建立视觉经验
+- 形成长期视觉上下文
+- 帮助 Agent 理解用户长期行为
+
+
+因此进入：
+
+
+Vision Understanding
+
+↓
+
+Vision Memory
+
+
+
+---
+
+# 四、本阶段开发判断
+
+
+## 为什么开发 Vision Memory
+
+
+### 1. 架构顺序正确
+
+完整视觉链路：
+
+
+视觉输入
+
+↓
+
+视觉感知
+
+↓
+
+视觉理解
+
+↓
+
+视觉记忆
+
+↓
+
+视觉经验
+
+
+
+Memory 是 Understanding 的自然下游。
+
+
+---
+
+### 2. Agent 能力需求
+
+
+没有视觉记忆：
+
+AI 每次看到画面都是新的。
+
+
+拥有视觉记忆：
+
+AI 可以理解：
+
+- 用户过去做过什么
+- 用户长期关注什么
+- 用户常用软件
+- 用户工作环境变化
+- 用户视觉习惯
+
+
+---
+
+### 3. 避免架构跳跃
+
+
+本阶段不进入：
+
+- 自动行动
+- 自主控制电脑
+- 视觉人格决策
+- 具身交互
+
+
+先建立稳定视觉经验层。
+
+
+---
+
+# 五、本版本目标
+
+
+版本：
+
+
+YHLZ Vision Memory V1.0
+
+
+
+目标：
+
+建立视觉记忆系统。
+
+
+整体架构：
+
+
+UnderstandingResult
+
+↓
+
+Vision Memory Engine
+
+↓
+
+Visual Memory Record
+
+↓
+
+Memory Storage
+
+↓
+
+Memory Retrieval
+
+
+
+---
+
+# 六、核心能力目标
+
+
+## 1. Visual Memory Storage
+
+
+保存：
+
+- 时间
+- 来源
+- 场景
+- 描述
+- 主体
+- 标签
+- 重要程度
+- 置信度
+
+
+---
+
+## 2. Visual Memory Retrieval
+
+
+支持：
+
+- 时间查询
+- 场景查询
+- 内容查询
+- 标签查询
+
+
+---
+
+## 3. Visual Memory Context
+
+
+提供：
+
+给 Agent 使用的视觉上下文。
+
+
+例如：
+
+用户：
+
+> "我之前看的那个代码是什么？"
+
+
+Agent：
+
+通过视觉记忆检索历史理解结果。
+
+
+---
+
+## 4. Memory 生命周期
+
+
+支持：
+
+
+创建
+
+↓
+
+更新
+
+↓
+
+查询
+
+↓
+
+衰减
+
+↓
+
+删除
+
+
+
+---
+
+# 七、本版本明确不包含
+
+
+禁止：
+
+## 1.
+
+自动视觉观察
+
+例如：
+
+后台持续截图。
+
+
+---
+
+## 2.
+
+自动电脑操作
+
+
+---
+
+## 3.
+
+视频流实时记忆
+
+
+---
+
+## 4.
+
+视觉人格决策
+
+
+---
+
+## 5.
+
+用户隐私图片永久保存
+
+
+---
+
+## 6.
+
+修改 Agent Brain
+
+
+---
+
+## 7.
+
+修改已有 Memory Interface
+
+
+---
+
+本版本只建设：
+
+- 视觉记忆接口
+- 视觉记忆存储
+- 视觉记忆检索
+- UnderstandingResult 对接
+
+
+---
+
+# 八、架构设计要求
+
+
+必须保持：
+
+
+Interface
+
+↓
+
+Service
+
+↓
+
+Manager
+
+↓
+
+Adapter / Storage
+
+
+
+---
+
+新增目录：
+
+
+backend/
+
+vision/
+
+    memory/
+
+
+结构：
+
+
+memory/
+
+├── schemas/
+
+├── interfaces/
+
+├── services/
+
+├── managers/
+
+├── adapters/
+
+├── providers/
+
+└── tests/
+
+
+
+---
+
+# 九、核心数据设计
+
+
+## VisualMemoryRecord
+
+
+字段：
+
+
+id
+
+memory_type
+
+source
+
+timestamp
+
+scene_type
+
+description
+
+subjects
+
+tags
+
+importance
+
+confidence
+
+metadata
+
+created_at
+
+updated_at
+
+
+
+---
+
+## MemoryQuery
+
+
+支持：
+
+
+时间范围
+
+scene_type
+
+tag
+
+keyword
+
+importance
+
+
+
+---
+
+# 十、开发任务
+
+
+# P0 必须完成
+
+
+## 1. Vision Memory Schema
+
+
+实现：
+
+- VisualMemoryRecord
+- MemoryQuery
+- MemoryStatus
+- MemoryImportance
+
+
+---
+
+## 2. Memory Interface
+
+
+定义：
+
+```python
+save()
+
+retrieve()
+
+delete()
+
+update()
+
+count()
+3. Storage Adapter
+
+必须支持：
+
+Mock Storage
+SQLite Storage
+
+要求：
+
+Service 不允许直接操作数据库。
+
+4. Memory Manager
+
+负责：
+
+Provider 注册
+Provider 路由
+单例
+reset
+5. Memory Service
+
+负责：
+
+保存 UnderstandingResult
+查询视觉记忆
+权限检查
+日志记录
+6. Permission
+
+默认：
+
+vision_memory_enabled=False
+
+必须：
+
+默认拒绝。
+
+十一、P1 建议完成
+1. Agent Tool
+
+新增：
+
+search_visual_memory
+
+功能：
+
+允许 Agent 查询视觉经验。
+
+2. Visual Context
+
+新增：
+
+recent_visual_context
+
+提供：
+
+最近视觉上下文。
+
+3. API
+
+新增：
+
+/vision-memory/save
+
+/vision-memory/query
+
+/vision-memory/status
+
+/vision-memory/logs
+4. Metrics
+
+记录：
+
+save_latency
+
+query_latency
+
+memory_count
+
+hit_rate
+十二、工程要求
+
+必须：
+
+全部类型注解
+中文注释
+完整日志
+RLock线程安全
+Mock 与真实双模式
+配置驱动
+单例 + reset
+
+配置：
+
+backend/config.py
+
+命名：
+
+vision_memory_*
+十三、禁止事项
+
+禁止：
+
+修改 Agent Core
+修改 Voice
+修改 Vision Foundation
+修改 Perception
+修改 Understanding Interface
+
+禁止：
+
+Adapter 调 Service
+Service 直接数据库操作
+硬编码路径
+硬编码阈值
+未授权保存图片
+临时方案进入主架构
+十四、测试验收 Prompt
+
+执行：
+
+venv\Scripts\python.exe -m unittest discover -s backend.vision.memory.tests -v
+
+验收标准：
+
+Total:
+Passed:
+Failed: 0
+Skipped:
+架构验收
+
+必须：
+
+[ ] Interface-Service-Manager-Adapter 分层正确
+
+[ ] 模块独立
+
+[ ] Provider 可替换
+
+[ ] 无硬编码
+
+[ ] 配置驱动
+
+[ ] 未破坏已有接口
+功能验收
+
+必须：
+
+[ ] UnderstandingResult 可以保存
+
+[ ] Memory 可以查询
+
+[ ] Mock 正常工作
+
+[ ] SQLite 正常工作
+
+[ ] 删除功能正常
+
+[ ] 更新功能正常
+权限验收
+
+必须：
+
+[ ] 默认关闭
+
+[ ] 无权限不能保存
+
+[ ] 不保存未经授权图片
+集成验收
+
+必须：
+
+[ ] Agent Tool 可以调用
+
+[ ] Vision 全量测试通过
+
+[ ] Memory 测试 Failed=0
+十五、开发完成返回格式
+
+完成后必须返回：
+
+一、版本信息
+
+包含：
+
+版本
+时间
+完成人
+二、执行总结
+
+包含：
+
+完成内容
+未完成内容
+原因
+三、代码修改记录
+
+格式：
+
+新增：
+
+修改：
+
+删除：
+四、测试报告
+
+包含：
+
+环境
+测试数量
+Passed
+Failed
+Skipped
+五、架构影响分析
+
+包含：
+
+影响模块
+兼容情况
+扩展能力
+风险
+六、问题复盘
+
+格式：
+
+问题
+
+↓
+
+原因
+
+↓
+
+解决方案
+
+↓
+
+预防措施
+七、下一阶段规划
+
+生成：
+
+YHLZ_Personality_Engine_V3.4_下一步开发Prompt.txt
+十六、最终原则
+
+YHLZ 开发不是堆功能。
+
+每一次升级必须：
+
+增强系统能力
+
+保持架构健康
+
+保护长期演进能力
+
+最终目标：
+
+有声音
+
+有视觉
+
+有记忆
+
+有人格
+
+能思考
+
+能行动
+
+持续进化的 AI Companion。

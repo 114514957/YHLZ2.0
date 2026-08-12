@@ -1,0 +1,775 @@
+# YHLZ V10.1.9
+# Full Infrastructure Reliability Audit & Heatup Validation Prompt
+
+项目：
+YHLZ AI伙伴「元亨」
+
+阶段：
+热机前最终基础设施可靠性审查
+
+目标：
+
+在进入 AI伙伴磨合、人格训练、直播互动、多模态能力融合之前。
+
+完成一次：
+
+全架构、全链路、无遗漏基础设施可靠性验证。
+
+
+---
+
+# 一、最高原则
+
+本次任务不是优化体验。
+
+本次任务不是增加能力。
+
+本次任务不是调人格。
+
+
+本次任务：
+
+验证 YHLZ 是否具备稳定运行基础。
+
+
+必须遵守：
+
+基础设施可靠
+
+↓
+
+系统稳定运行
+
+↓
+
+交互磨合
+
+↓
+
+人格成长
+
+↓
+
+高级能力扩展
+
+
+禁止：
+
+基础设施未通过前：
+
+- 接入更多Agent能力
+- 增加复杂Memory
+- 增加直播逻辑
+- 增加自动行为
+- 增加多模态复杂链路
+
+
+---
+
+# 二、审查目标
+
+必须完整检查：
+
+## 1. 前端层
+
+- WebUI
+- Desktop Shell
+- 状态显示
+- SSE接收
+- 错误显示
+- 用户输入
+- 资源释放
+
+
+## 2. 通信层
+
+- HTTP
+- SSE
+- WebSocket（如果存在）
+- Timeout
+- Reconnect
+- 断线恢复
+
+
+## 3. 对话层
+
+- Conversation Runtime
+- Turn Controller
+- Input Aggregator
+- Context Manager
+- Streaming
+
+
+## 4. 模型层
+
+- LLM Provider
+- Model Pool
+- Fallback
+- Router
+
+
+## 5. 语音层
+
+- ASR
+- VAD
+- Audio Buffer
+- AEC
+- TTS
+- Playback Queue
+
+
+## 6. 记忆层
+
+- Short Context
+- Compression
+- Memory
+- Retrieval
+
+
+## 7. Agent层
+
+- Embodied
+- Personality
+- Reflection
+- Growth
+- Research
+- Meta Cognition
+
+
+## 8. 运维层
+
+- Logging
+- Monitoring
+- Metrics
+- Error Recovery
+- Health Check
+
+
+---
+
+# 三、执行要求
+
+必须：
+
+先扫描现有工程。
+
+禁止：
+
+看到问题立即重构。
+
+
+执行顺序：
+
+1. 读取项目目录结构
+2. 确认所有核心服务入口
+3. 确认启动流程
+4. 确认依赖关系
+5. 确认模块调用关系
+6. 确认数据流
+7. 确认状态流
+8. 确认错误流
+9. 确认日志流
+10. 确认测试覆盖
+
+
+最后：
+
+生成风险报告。
+
+
+---
+
+# 四、架构完整性检查
+
+输出：
+
+Architecture Map
+
+
+必须包含：
+
+Frontend
+
+↓
+
+API Layer
+
+↓
+
+Runtime
+
+↓
+
+Conversation
+
+↓
+
+Model
+
+↓
+
+Memory
+
+↓
+
+Voice
+
+↓
+
+Agent
+
+↓
+
+Storage
+
+↓
+
+Monitoring
+
+
+每一层回答：
+
+1. 是否存在？
+2. 是否启动？
+3. 是否被调用？
+4. 是否有错误处理？
+5. 是否有日志？
+6. 是否可以单独测试？
+
+
+---
+
+# 五、启动可靠性测试
+
+测试：
+
+冷启动。
+
+连续启动10次。
+
+
+检查：
+
+- 是否成功启动
+- 是否端口冲突
+- 是否依赖缺失
+- 是否状态异常
+
+
+输出：
+
+Startup Test
+
+Success:
+
+Failed:
+
+Average Startup Time:
+
+
+---
+
+# 六、核心链路测试
+
+完整路径：
+
+用户输入
+
+↓
+
+WebUI
+
+↓
+
+API
+
+↓
+
+Conversation Runtime
+
+↓
+
+Context
+
+↓
+
+LLM
+
+↓
+
+Streaming
+
+↓
+
+SSE
+
+↓
+
+Frontend Render
+
+↓
+
+TTS
+
+↓
+
+Audio
+
+
+必须逐节点验证。
+
+
+每个节点记录：
+
+输入
+
+输出
+
+耗时
+
+状态
+
+错误
+
+
+---
+
+# 七、Conversation Runtime专项
+
+Turn生命周期：
+
+IDLE
+
+↓
+
+RECEIVING
+
+↓
+
+READY
+
+↓
+
+PROCESSING
+
+↓
+
+STREAMING
+
+↓
+
+TTS_PLAYING
+
+↓
+
+COMPLETE
+
+
+检查：
+
+- 卡死
+- 状态泄漏
+- 重复Turn
+- 未关闭Turn
+
+
+---
+
+# 八、Context系统检查
+
+短期上下文：
+
+6~10轮。
+
+
+测试：
+
+20轮连续对话。
+
+
+检查：
+
+- 遗忘
+- 串话
+
+
+压缩测试：
+
+超过窗口。
+
+
+检查：
+
+- 是否触发
+- 是否保留任务
+- 是否保持逻辑
+
+
+---
+
+# 九、Streaming可靠性
+
+测试：
+
+短回复。
+
+长回复。
+
+
+检查：
+
+- 首token
+- 首句
+- flush
+- 完成
+
+
+异常模拟：
+
+- 网络断开
+- 模型失败
+- 前端刷新
+
+
+要求：
+
+可以恢复。
+
+
+---
+
+# 十、Interrupt边界测试
+
+测试：
+
+## LLM阶段
+
+用户打断。
+
+检查：
+
+是否取消。
+
+
+## TTS阶段
+
+用户打断。
+
+检查：
+
+- 停止播放
+- 清空低优先级队列
+- 恢复监听
+
+
+---
+
+# 十一、Input Aggregator测试
+
+模拟直播环境。
+
+
+输入：
+
+1000条消息。
+
+
+包含：
+
+- 重复
+- 无意义
+- 关键问题
+
+
+检查：
+
+- 过滤
+- 合并
+- 排序
+
+
+禁止：
+
+简单全部进入Queue。
+
+
+---
+
+# 十二、Memory可靠性
+
+测试：
+
+- 写入
+- 读取
+- 删除
+- 冲突
+
+
+检查：
+
+- 错误召回
+- 污染当前对话
+- 无限增长
+
+
+---
+
+# 十三、模型池测试
+
+测试：
+
+主模型。
+
+备用模型。
+
+
+模拟：
+
+主模型失败。
+
+
+检查：
+
+- 自动切换
+- 上下文保持
+- 状态保持
+
+
+---
+
+# 十四、日志与可观测性
+
+每一次Turn必须具有：
+
+conversation_id
+
+turn_id
+
+request_id
+
+timestamp
+
+model
+
+latency
+
+state
+
+error
+
+result
+
+
+必须能够回答：
+
+为什么慢？
+
+为什么失败？
+
+为什么没有回复？
+
+为什么重复？
+
+
+---
+
+# 十五、资源稳定测试
+
+运行：
+
+24小时。
+
+
+观察：
+
+- CPU
+- GPU
+- Memory
+- VRAM
+- Disk
+- Queue
+- Thread
+- Connection
+
+
+检查：
+
+- 内存泄漏
+- 状态泄漏
+- 垃圾数据增长
+
+
+---
+
+# 十六、安全恢复测试
+
+模拟：
+
+- LLM断开
+- TTS失败
+- 网络断开
+- 数据库失败
+
+
+要求：
+
+系统不会永久卡死。
+
+
+---
+
+# 十七、禁止进入磨合阶段条件
+
+出现以下任意FAIL：
+
+禁止：
+
+人格磨合。
+
+
+包括：
+
+- 对话卡死
+- 日志无法定位
+- 状态错误
+- 内存泄漏
+- Streaming异常
+- 输入丢失
+- 恢复失败
+
+
+---
+
+# 十八、最终验收标准
+
+必须：
+
+基础设施 PASS
+
+对话链路 PASS
+
+Streaming PASS
+
+Voice PASS
+
+Memory PASS
+
+Monitoring PASS
+
+Recovery PASS
+
+Long Run PASS
+
+
+才允许进入：
+
+AI Companion Calibration Phase
+
+
+---
+
+# 十九、最终返回格式
+
+YHLZ Infrastructure Reliability Audit Report
+
+
+版本：
+
+测试时间：
+
+
+Architecture:
+PASS/FAIL
+
+
+Startup:
+PASS/FAIL
+
+
+Frontend:
+PASS/FAIL
+
+
+Backend:
+PASS/FAIL
+
+
+Conversation Runtime:
+PASS/FAIL
+
+
+Context:
+PASS/FAIL
+
+
+Streaming:
+PASS/FAIL
+
+
+Voice:
+PASS/FAIL
+
+
+Memory:
+PASS/FAIL
+
+
+Model Pool:
+PASS/FAIL
+
+
+Monitoring:
+PASS/FAIL
+
+
+Recovery:
+PASS/FAIL
+
+
+24H Stability:
+PASS/FAIL
+
+
+发现问题：
+
+1.
+
+2.
+
+3.
+
+
+严重等级：
+
+Critical
+
+High
+
+Medium
+
+Low
+
+
+最终判断：
+
+READY
+
+/
+
+NOT READY
+
+
+下一阶段：
+
+允许进入磨合
+
+/
+
+继续修复基础设施
+
+
+---
+
+YHLZ
+
+元 · 亨 · 利 · 贞

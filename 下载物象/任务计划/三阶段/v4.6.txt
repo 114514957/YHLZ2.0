@@ -1,0 +1,449 @@
+V4.5 验收状态：
+
+YHLZ Embodied AI V4.5
+Meta Strategy Management
+
+状态：完成 ✅
+
+核心测试：
+
+Embodied:
+1078 tests
+Passed: 1078
+Failed: 0
+
+全量回归:
+embodied       1078
+vision          136
+action          151
+agent           131
+personality     137
+voice_identity  181
+
+Total:
+1814
+
+Failed:
+0
+
+V4.5 已完成：
+
+Strategy System Overview
+冗余策略检测
+冲突检测
+低效策略归档
+回收站机制
+策略同化
+策略分裂
+版本比较
+策略回滚
+审计增强
+Dry Run 体系
+场景覆盖
+健康检查
+
+下一阶段确认
+
+进入：
+
+YHLZ Embodied AI V4.6
+
+Cross-Goal Strategic Planning
+
+跨目标战略规划层
+
+当前能力跃迁
+
+V4.0：
+
+AI 能行动
+
+↓
+
+V4.1：
+
+AI 理解环境
+
+↓
+
+V4.2：
+
+AI 理解原因
+
+↓
+
+V4.3：
+
+AI 积累经验
+
+↓
+
+V4.4：
+
+AI 选择最佳经验
+
+↓
+
+V4.5：
+
+AI 管理策略体系
+
+↓
+
+V4.6：
+
+AI 跨目标统筹规划
+
+V4.6 核心开发方向
+
+当前 V4.5 的限制：
+
+每个 Goal 独立选择策略
+
+但现实环境：
+
+多个目标
+
+↓
+
+共享资源
+
+↓
+
+共享信息
+
+↓
+
+需要统一规划
+
+例如：
+
+多个 pick 目标可以批量规划
+一次 scan 可以服务多个目标
+多目标共享步骤预算
+
+所以 V4.6 建立：
+
+Cross Goal Planner
+
+核心：
+
+Goal A
+Goal B
+Goal C
+
+↓
+
+依赖分析
+
+↓
+
+共享步骤识别
+
+↓
+
+资源预算
+
+↓
+
+战略规划
+
+V4.6 架构要求
+
+保持：
+
+Interface
+
+↓
+
+Service
+
+↓
+
+Manager
+
+↓
+
+Storage / Adapter
+
+新增：
+
+backend/embodied/planning/
+
+结构：
+
+planning/
+
+├── cross_goal.py
+│
+├── dependency.py
+│
+├── budget.py
+│
+└── __init__.py
+
+功能：
+
+cross_goal.py
+
+跨目标规划器：
+
+分组
+排序
+预算分配
+dependency.py
+
+目标关系：
+
+依赖
+共享动作
+信息复用
+budget.py
+
+步骤预算：
+
+max_steps
+优先级
+可解释分配
+
+核心数据模型
+
+新增：
+
+CrossGoalPlan
+
+结构：
+
+{
+    plan_id,
+
+    goals,
+
+    groups,
+
+    shared_steps,
+
+    budget_allocation,
+
+    explainable_reason,
+
+    mode:"rule_based"
+}
+
+Service 新增 API
+
+保持 V4.5 API 不变，只增加：
+
+cross_goal_plan(goals, budget)
+
+跨目标规划入口。
+
+cross_goal_groups()
+
+目标分组分析。
+
+cross_goal_budget()
+
+预算分配。
+
+cross_goal_dry_run()
+
+规划预演。
+
+P0 开发任务
+
+必须完成：
+
+1. 目标分组分析
+
+规则：
+
+相同：
+
+scene
+goal_type
+action_sequence
+
+形成目标组。
+
+2. 共享步骤识别
+
+例如：
+
+多个目标：
+
+pick A
+
+pick B
+
+pick C
+
+共同需要：
+
+scan()
+
+只规划一次。
+
+3. 跨目标预算分配
+
+依据：
+
+策略质量
+优先级
+资源限制
+
+必须可解释。
+
+4. cross_goal_plan()
+
+输出：
+
+完整规划结果。
+
+5. 测试
+
+新增：
+
+>=60 cases
+
+目标专项：
+
+>=1138 cases
+
+P1 增强
+
+加入：
+
+跨目标策略复用统计
+
+记录：
+
+一次策略帮助多少目标。
+
+规划冲突检测
+
+例如：
+
+预算不足：
+
+100 steps
+
+需要:
+
+150 steps
+
+输出降级建议。
+
+Cross Goal Dry Run
+
+复用 V4.5：
+
+SystemSnapshot 风格。
+
+安全边界
+
+继续保持：
+
+embodied_enabled=False
+
+禁止：
+
+神经网络训练
+梯度更新
+黑盒优化
+自主修改策略内容
+绕过 Permission Layer
+写 Agent Memory
+真实设备控制
+修改 Agent Brain
+修改 Vision Interface
+修改 Memory Interface
+自我目标生成
+
+工程要求
+
+必须：
+
+先读后写
+接口先行
+配置驱动
+向后兼容
+中文 docstring
+类型注解
+完整日志
+RLock
+单例 + reset
+Mock 优先
+异常结构化返回
+
+禁止：
+
+硬编码
+跨层调用
+临时方案进入架构
+静默吞异常
+修改 V4.5 API
+
+V4.6 验收目标
+
+专项：
+
+>=1138 cases
+
+Failed=0
+
+命令：
+
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+
+全量：
+
+embodied
+
+vision
+
+action
+
+agent
+
+personality
+
+voice_identity
+
+全部 Failed=0
+
+工程判断：
+
+YHLZ 当前路线已经从：
+
+单目标智能体
+
+进入：
+
+多目标战略智能体
+
+V4.5 解决：
+
+如何管理策略。
+
+V4.6 解决：
+
+如何利用多个策略协同完成复杂目标。
+
+完成 V4.6 后，下一阶段 V4.7 应进入：
+
+Cross-Goal Strategic Planning
+
+↓
+
+Long Horizon Planning Layer
+
+方向：
+
+从跨目标规划，进入长期任务规划与战略执行管理。
+
+当前状态：
+
+✅ V4.5 验收完成
+✅ V4.6 Prompt 已确认
+➡️ 下一步：开始 V4.6 工程实现。

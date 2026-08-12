@@ -1,0 +1,1018 @@
+# YHLZ AI伙伴 V5.8 Reflection & Cognitive Integrity Layer
+
+## 专业工程开发 Prompt  验收 Prompt  完成返回 Prompt
+
+---
+
+# 0. 项目总纲（Project Charter）
+
+## 项目名称
+
+YHLZ AI伙伴
+
+---
+
+## 名称含义
+
+YHLZ：
+
+元、亨、利、贞
+
+来源：
+
+《周易》“元亨利贞”。
+
+YHLZ 不是技术缩写，而是 AI伙伴长期演进的核心哲学。
+
+---
+
+# 1. AI伙伴项目定位
+
+## 产品定位
+
+YHLZ AI伙伴不是普通 Agent。
+
+不是：
+
+- 单次任务执行器
+- 聊天机器人
+- 工具调用集合
+
+而是：
+
+ 一个具有长期身份连续性、关系能力、经验积累、安全成长能力和逐步创造能力的智能伙伴系统。
+
+---
+
+# 2. YHLZ 四大架构原则
+
+---
+
+# 元（Foundation）
+
+## 含义
+
+建立本源。
+
+回答：
+
+ AI伙伴是谁？
+
+## 工程映射
+
+负责：
+
+- Identity Core
+- Personality System
+- Core Value
+- Behavior Boundary
+- Decision Center
+
+
+目标：
+
+保持：
+
+- 一个AI伙伴身份
+- 一个核心人格
+- 一个连续的发展历史
+
+---
+
+# 亨（Growth）
+
+## 含义
+
+成长、运行、连接。
+
+回答：
+
+ AI伙伴如何成长？
+
+## 工程映射
+
+负责：
+
+- Relationship System
+- Experience Memory
+- Learning System
+- Reflection System
+
+
+目标：
+
+让 AI伙伴能够：
+
+- 经历事件
+- 保存经验
+- 总结规律
+- 改进未来行为
+
+---
+
+# 利（Creation）
+
+## 含义
+
+产生价值。
+
+回答：
+
+ AI伙伴如何创造？
+
+## 工程映射
+
+负责：
+
+- Creative Proposal
+- Problem Discovery
+- Improvement Engine
+
+
+目标：
+
+从：
+
+被动响应
+
+进入：
+
+主动发现和建议。
+
+---
+
+# 贞（Integrity）
+
+## 含义
+
+守正、稳定。
+
+回答：
+
+ AI伙伴如何避免错误成长？
+
+## 工程映射
+
+负责：
+
+- Safety Layer
+- Verification System
+- Reality Grounding
+- Anti-Hallucination
+- Identity Protection
+
+
+目标：
+
+让 AI伙伴：
+
+可以成长，
+
+但不会失控。
+
+---
+
+# 3. 当前基础状态
+
+## V5.7 已完成能力
+
+V5.7 Experience Memory Layer 已建立：
+
+- ExperienceRecord
+- ExperienceStore
+- ExperienceManager
+- ExperienceQuery
+- ExperienceExtractor
+- ExperienceAudit
+
+实现：
+
+```
+事件
+ ↓
+经历
+ ↓
+经验
+ ↓
+存储
+ ↓
+查询
+```
+
+---
+
+# 4. V5.8 版本定义
+
+## 版本名称
+
+YHLZ AI伙伴 V5.8
+
+## 名称
+
+Reflection & Cognitive Integrity Layer
+
+---
+
+# 5. V5.8 核心目标
+
+V5.7 解决：
+
+ AI伙伴如何记住经历。
+
+V5.8 解决：
+
+ AI伙伴如何理解经历，并判断经历是否可信。
+
+
+升级：
+
+```
+Experience
+
+↓
+
+Verification
+
+↓
+
+Validated Experience
+
+↓
+
+Reflection
+
+↓
+
+Improvement Proposal
+```
+
+---
+
+# 6. 开发总 Prompt
+
+## 角色定义
+
+你是一名高级 AI伙伴系统架构工程师。
+
+负责开发：
+
+YHLZ AI伙伴 V5.8 Reflection & Cognitive Integrity Layer。
+
+---
+
+# 开发原则
+
+必须遵守：
+
+## 1. 增量开发原则
+
+禁止破坏：
+
+- V5.7 Memory
+- Personality System
+- Relationship System
+- Existing Agent Pipeline
+
+
+---
+
+## 2. 可验证原则
+
+所有成长：
+
+必须：
+
+- 有来源
+- 有证据
+- 有置信度
+- 可回溯
+
+
+---
+
+## 3. 身份稳定原则
+
+禁止：
+
+经验直接修改：
+
+- 核心人格
+- 核心价值
+- 决策中心
+
+
+---
+
+## 4. 安全优先原则
+
+任何：
+
+Memory
+
+Reflection
+
+Growth
+
+Proposal
+
+必须经过验证。
+
+---
+
+# 7. V5.8 新增模块设计
+
+
+目录：
+
+```
+backendembodiedcompanion
+```
+
+
+新增：
+
+```
+reflection
+
+├── reflection_engine.py
+├── pattern_discovery.py
+├── failure_analysis.py
+├── improvement_proposal.py
+└── reflection_audit.py
+
+
+verification
+
+├── experience_verifier.py
+├── confidence_engine.py
+├── evidence_manager.py
+├── contradiction_detector.py
+└── reality_check.py
+```
+
+---
+
+# 8. Reflection Engine
+
+## 功能目标
+
+从 Experience 中提取：
+
+- 长期模式
+- 行为规律
+- 失败原因
+- 改进方向
+
+
+---
+
+## 输入
+
+Experience Records
+
+
+---
+
+## 输出
+
+Reflection Report
+
+
+格式：
+
+```json
+{
+  observation,
+  evidence[],
+  pattern,
+  risk,
+  suggestion,
+  confidence0.0
+}
+```
+
+---
+
+# 9. Pattern Discovery 模块
+
+
+## 目标
+
+发现跨经历规律。
+
+
+例如：
+
+输入：
+
+多次交互记录。
+
+
+发现：
+
+```
+用户连续多次要求工程化输出
+
+↓
+
+形成偏好模式
+
+↓
+
+未来默认提供结构化方案
+```
+
+
+---
+
+## 限制
+
+禁止：
+
+单次事件形成长期规则。
+
+
+必须考虑：
+
+- 样本数量
+- 时间跨度
+- 重复程度
+- 反例
+
+
+---
+
+# 10. Failure Analysis 模块
+
+
+## 目标
+
+从失败中学习。
+
+
+流程：
+
+```
+Failure Event
+
+↓
+
+Possible Cause
+
+↓
+
+Evidence
+
+↓
+
+Correction Proposal
+```
+
+
+---
+
+数据结构：
+
+```json
+{
+ failure,
+ possible_reason,
+ evidence[],
+ confidence0.0
+}
+```
+
+---
+
+# 11. Cognitive Integrity Layer
+
+## 目标
+
+建立 AI伙伴认知免疫系统。
+
+
+防止：
+
+- 错误经验进入长期记忆
+- 幻觉形成事实
+- 错误循环强化
+- 自我欺骗式成长
+
+
+---
+
+# 12. Experience Verification 系统
+
+
+经验状态：
+
+```
+UNKNOWN
+
+↓
+
+PENDING
+
+↓
+
+PROBABLE
+
+↓
+
+CONFIRMED
+
+↓
+
+REJECTED
+```
+
+---
+
+# 13. Confidence Engine
+
+
+所有 Experience 必须拥有：
+
+```
+confidence
+```
+
+---
+
+评估因素：
+
+- 信息来源可靠度
+- 重复出现次数
+- 结果一致性
+- 是否存在反例
+- 时间稳定性
+
+
+---
+
+# 14. Evidence Manager
+
+
+负责：
+
+保存经验依据。
+
+
+每条重要经验必须关联：
+
+- 来源事件
+- 时间
+- 结果
+- 证据
+
+
+---
+
+# 15. Contradiction Detector
+
+
+目标：
+
+发现经验冲突。
+
+
+例如：
+
+经验A：
+
+```
+用户喜欢简短回答
+```
+
+
+经验B：
+
+```
+用户喜欢详细工程方案
+```
+
+
+不能简单覆盖。
+
+
+应该生成：
+
+```
+Context-dependent Experience
+
+场景相关经验
+```
+
+---
+
+# 16. Reality Check
+
+
+所有成长建议必须回答：
+
+
+```
+1. 来源是什么？
+
+2. 证据是什么？
+
+3. 是否重复？
+
+4. 有没有反例？
+
+5. 是否值得影响未来行为？
+```
+
+---
+
+# 17. Memory 系统升级
+
+
+V5.7：
+
+```
+Experience Memory
+```
+
+
+V5.8：
+
+升级：
+
+```
+Verified Experience Memory
+```
+
+
+规则：
+
+只有：
+
+CONFIRMED
+
+经验。
+
+才能进入长期成长参考。
+
+---
+
+# 18. Improvement Proposal
+
+
+## 核心规则
+
+Proposal ≠ Action
+
+
+AI伙伴：
+
+可以提出。
+
+不能直接执行。
+
+
+---
+
+流程：
+
+```
+Reflection
+
+↓
+
+Proposal
+
+↓
+
+Verification
+
+↓
+
+Approval
+
+↓
+
+Execution
+```
+
+---
+
+# 19. 验收 Prompt
+
+
+执行：
+
+```
+python -m unittest discover
+```
+
+
+---
+
+# 功能验收
+
+
+确认：
+
+## Reflection
+
+- 是否可以生成反思报告
+- 是否可以发现模式
+- 是否可以分析失败
+
+
+## Verification
+
+- 是否可以判断经验可信度
+- 是否可以处理冲突
+- 是否可以拒绝错误经验
+
+
+## Integration
+
+验证闭环：
+
+```
+Action
+
+↓
+
+Experience
+
+↓
+
+Verification
+
+↓
+
+Reflection
+
+↓
+
+Proposal
+```
+
+---
+
+# 20. 测试要求
+
+
+新增：
+
+不少于 200 个测试。
+
+
+覆盖：
+
+- 单元测试
+- 集成测试
+- 异常测试
+- 回归测试
+
+
+目标：
+
+```
+Failed = 0
+```
+
+---
+
+# 21. 完成返回 Prompt
+
+
+输出：
+
+# YHLZ AI伙伴 V5.8 完成报告
+
+
+必须包含：
+
+---
+
+## 版本信息
+
+Version
+
+Commit
+
+Date
+
+
+---
+
+## 新增模块
+
+
+列表：
+
+- Reflection
+- Verification
+- Integrity
+
+
+---
+
+## Reflection统计
+
+
+输出：
+
+- Experience数量
+- Reflection数量
+- Pattern数量
+- Proposal数量
+
+
+---
+
+## Verification统计
+
+
+输出：
+
+- Pending数量
+- Confirmed数量
+- Rejected数量
+- Confidence分布
+
+
+---
+
+## 测试结果
+
+
+输出：
+
+```
+Total
+
+Passed
+
+Failed
+```
+
+
+---
+
+## 成长能力验证
+
+
+回答：
+
+1. 是否能够理解经历？
+
+2. 是否能够验证经验？
+
+3. 是否能够发现规律？
+
+4. 是否能够提出改进？
+
+5. 是否保持身份连续？
+
+
+---
+
+# 22. 后续长期路线
+
+
+```
+YHLZ AI伙伴
+
+元
+
+↓
+
+身份基础
+
+
+亨
+
+↓
+
+经验成长
+
+
+利
+
+↓
+
+创造价值
+
+
+贞
+
+↓
+
+安全守正
+
+
+循环演化
+```
+
+---
+
+# 23. 后续版本规划
+
+
+## V5.9
+
+Creative Proposal Engine
+
+目标：
+
+初步元创造力。
+
+
+能力：
+
+- 主动发现问题
+- 提出方案
+- 生成创新建议
+
+
+---
+
+## V6.x
+
+Long-term Growth Companion
+
+目标：
+
+形成长期成长闭环。
+
+
+能力：
+
+- 连续经验
+- 深层关系
+- 稳定成长
+
+
+---
+
+## V7.x
+
+Embodied AI Companion
+
+目标：
+
+具身化。
+
+
+包括：
+
+- 虚拟形象
+- 视觉
+- 声音
+- 动作
+- 环境交互
+
+
+---
+
+# 最终目标
+
+
+YHLZ AI伙伴：
+
+不是追求成为一个更会回答问题的模型。
+
+
+而是建立：
+
+```
+连续身份
+
++
+
+长期记忆
+
++
+
+可靠经验
+
++
+
+安全成长
+
++
+
+主动创造
+
++
+
+长期陪伴
+```
+
+
+的智能伙伴系统。
+
+---
+
+# YHLZ
+
+元 · 亨 · 利 · 贞
+
+```
+```

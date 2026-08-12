@@ -29,8 +29,8 @@ class VADEngine:
         self.frame_size = 1600
         
         self.min_voiced_frames = 2
-        self.min_unvoiced_frames = 4
-        self.hangover_frames = 4
+        self.min_unvoiced_frames = 2
+        self.hangover_frames = 1
         self.noise_floor = 0.0
         self.noise_adapt_rate = 0.02
         
@@ -42,6 +42,7 @@ class VADEngine:
         self._voiced_count = 0
         self._unvoiced_count = 0
         self._hangover_count = 0
+        self._speaking_frames = 0
         
         self._speech_start_time = 0
         self._speech_detected = False
@@ -126,6 +127,7 @@ class VADEngine:
                 if self._voiced_count >= self.min_voiced_frames:
                     self._state = 'speaking'
                     self._voiced_count = 0
+                    self._speaking_frames = 0
                     self._speech_detected = True
                     logger.info("VAD状态机：检测到语音开始")
                     return True
@@ -134,6 +136,7 @@ class VADEngine:
             return False
             
         elif self._state == 'speaking':
+            self._speaking_frames += 1
             if is_voiced:
                 self._unvoiced_count = 0
                 return True
@@ -153,10 +156,14 @@ class VADEngine:
                 return True
             else:
                 self._hangover_count += 1
-                if self._hangover_count >= self.hangover_frames:
+                dynamic_hangover = self.hangover_frames
+                if self._speaking_frames < 15:
+                    dynamic_hangover = max(self.hangover_frames, 3)
+                if self._hangover_count >= dynamic_hangover:
                     self._state = 'silence'
                     self._hangover_count = 0
                     self._speech_detected = False
+                    self._speaking_frames = 0
                     logger.info("VAD状态机：检测到语音结束")
                     return False
                 return True
@@ -173,6 +180,7 @@ class VADEngine:
         self._voiced_count = 0
         self._unvoiced_count = 0
         self._hangover_count = 0
+        self._speaking_frames = 0
         self._speech_detected = False
         self._confidence_history = []
         logger.debug("VAD状态机已重置")

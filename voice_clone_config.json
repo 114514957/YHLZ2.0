@@ -1,0 +1,28 @@
+{
+  "_comment": "YHLZ Voice Identity System V2.2 声音克隆配置 (Pipeline / Adapter 读取)",
+  "_version": "2.2.0",
+  "default_engine": "qwen3",
+  "auto_prepare": true,
+  "qwen3": {
+    "mode": "mock",
+    "model_path": "",
+    "cache_dir": "cache/voice_clone",
+    "_mode_comment": "mock=不加载模型(测试/无GPU); real=加载 Qwen3-TTS 引擎真实克隆"
+  },
+  "gpt_sovits": {
+    "mode": "mock",
+    "gradio_url": "http://127.0.0.1:9872",
+    "cache_dir": "cache/voice_clone",
+    "_mode_comment": "mock=不连 Gradio; real=连 GPT-SoVITS WebUI (需先启动 :9872)"
+  },
+  "validation": {
+    "min_duration_s": 3.0,
+    "max_duration_s": 60.0,
+    "min_sample_rate": 16000,
+    "supported_formats": [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
+  },
+  "upload": {
+    "max_size_mb": 50,
+    "temp_dir": "cache/voice_clone/_uploads"
+  }
+}

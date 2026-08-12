@@ -1,0 +1,254 @@
+# YHLZ AI伙伴 V7.0 下一步开发Prompt
+# Embodied AI Partner (具身伙伴层)
+
+> 依据：YHLZ Engineering Development Convention Prompt V3.0
+> 来源：V6.8 Hybrid Intelligence Layer 完成报告
+> 日期：2026-08-09
+
+---
+
+## 1. 当前系统状态分析
+
+### 已交付能力（V2.1 ~ V6.8，全部 Failed=0）
+
+```
+有声音     Voice Infrastructure V2.1~V2.3 (TTS 三适配器 + 克隆 + 身份)
+能思考     Agent Core V3.0 (ReAct/Planner/Tool/LLM 双模式)
+有视觉     采集+感知+真实引擎+认知集成 (V6.3~6.4)
+能行动     Embodied AI V4.0~V4.7 (受控)
+有人格     Companion V5.0~V5.6 (铁哥们)
+有记忆     V5.7 + 连续 V6.0 + 网关 V6.3 + 认知 V6.4
+有认知免疫 V5.8 + 恢复安全 V6.0
+能创造     Creative Intelligence V5.9
+有情绪     Emotion V6.1.1 + 反思联动 V6.6
+有节律     Growth Rhythm V6.1.1
+能表达     Expression V6.2
+能感知     V6.2 (Mock) + V6.3 (真实) + V6.4 (认知闭环)
+能理解     Cognitive Reflection V6.5 + 情绪集成 V6.6
+能成长     受控成长 V6.5 + 闭环自动化 V6.6 + 趋势 V6.6
+能调度     Hybrid Intelligence V6.8 (本地/云端/混合 + 成本/隐私/审计)
+```
+
+### 当前测试基线
+
+```
+embodied:        5591   Failed=0 (Skipped=2 Tesseract 保护)
+vision:           136   Failed=0
+action:           151   Failed=0
+agent:            131   Failed=0
+personality:      137   Failed=0
+voice_identity:   181   Failed=0
+TOTAL:           6327   Failed=0 ✅
+```
+
+### V6.8 完成后 YHLZ 状态
+
+```
+元 (Foundation): Identity ✅
+亨 (Growth):     记忆/反思/连续/节律/情绪/认知反思/反思联动情绪 ✅
+贞 (Integrity):  验证/恢复/审计/权限/批准/身份守护 ✅
+利 (Creation):   创造智能 ✅
+理解:            认知反思 + 情绪集成 ✅
+调度:            混合智能层 ✅ (本地/云端/成本/隐私/审计)
+具身:            虚拟形象/动作表达 ❌ ← 本阶段
+```
+
+---
+
+## 2. 本阶段开发判断（为什么做这个，不做那个）
+
+### 为什么做"具身伙伴层"
+
+V6.8 打通了智能调度（知道任务该在哪里算），但 YHLZ 仍无"身体"：
+1. **无虚拟形象表达**（表情/动作/姿态无法承载情绪与人格）
+2. **HIL 未接真实模型**（全部 Mock，无真实云端推理）
+3. **HIL 未接感知任务**（摄像头实时分析/语音情绪理解未走调度）
+
+V7.0 三主线：
+1. **虚拟形象表达层**：表情/动作状态机 → 情绪/人格 → 形象状态
+   （不依赖 GPU 渲染，状态驱动 + WebSocket 推流）
+2. **HIL 接真实模型**：真实 Adapter 注入（OpenAI/Claude/Gemini/
+   本地模型），Mock ↔ Real 双模式
+3. **感知-调度联动**：视觉/语音任务自动走 HIL 路由（摄像头→本地，
+   情绪理解→混合）
+
+### 为什么不做（V7.0 明确不包含）
+
+- 不做 3D 渲染引擎（LLM 不做，GPU 渲染不做）
+- 不做自动应用成长（growth_auto_apply 保持 false）
+- 不做云端成为核心（身份/记忆/安全永远本地）
+- 不做多智能体协作调度（V8 Constitution Engine 前）
+
+---
+
+## 3. 本版本目标
+
+**V7.0 Embodied AI Partner**
+
+1. **虚拟形象表达层** `companion/embodied_presence/`
+   - 表情状态机（平静/高兴/关切/思考/疲惫）
+   - 动作姿态状态（待机/聆听/回应/专注）
+   - 情绪/人格 → 形象状态映射（可解释规则）
+   - 状态快照 + WebSocket 推送接口（预留）
+2. **HIL 真实模型接入** `hybrid/cloud/adapters/`
+   - 真实 Provider Adapter（OpenAI/Claude/Gemini/本地）
+   - Mock ↔ Real 双模式（测试默认 Mock，YHLZ_RUN_REAL_TESTS 切真实）
+3. **感知-调度联动**
+   - 视觉任务 → HIL 路由（本地实时/云端增强）
+   - 语音情绪任务 → HIL 路由（混合）
+
+---
+
+## 4. 架构设计要求
+
+### 分层铁律（保持）
+
+```
+Interface → Service → Manager → Storage / Adapter
+```
+
+### 虚拟形象表达层
+
+```
+backend/embodied/companion/embodied_presence/
+├── presence_state.py      (形象状态: 表情/姿态/强度)
+├── presence_mapper.py     (情绪/人格 → 形象状态映射)
+├── presence_engine.py     (状态机 + 快照 + 推送接口)
+└── presence_audit.py      (形象状态审计)
+```
+
+- 纯规则状态机（可解释）
+- 情绪经 EmotionEngine 状态 → 映射（不直接改情绪）
+- 人格维度参与映射（热情→微笑强度等）
+
+### HIL 真实模型接入
+
+```
+backend/embodied/companion/hybrid/cloud/adapters/
+├── base.py                (CloudAdapter 接口)
+├── openai_adapter.py      (OpenAI 真实)
+├── claude_adapter.py      (Claude 真实)
+├── gemini_adapter.py      (Gemini 真实)
+├── local_adapter.py       (本地模型)
+└── mock_adapter.py        (Mock 默认)
+```
+
+- ModelEndpoint.handler 注入 Adapter（现有接口不变）
+- 真实调用失败 → 降级 Mock（不崩溃）
+
+### 感知-调度联动
+
+- VisionService/PerceptionService 任务入口 → HIL.route → 执行
+- 权限模型不变（screen/camera 默认 false）
+
+---
+
+## 5. 开发任务
+
+### P0（必须）
+
+1. `presence_state.py` + `presence_mapper.py`：形象状态与映射（≥80 测试）
+2. `presence_engine.py`：状态机 + 快照（≥80 测试）
+3. HIL 真实 Adapter 接口 + Mock（≥60 测试）
+4. Service API：`companion_presence_state` / `companion_presence_update` /
+   `companion_hybrid_adapter_status`
+
+### P1（尽力）
+
+5. 感知-调度联动（vision → HIL）
+6. 形象状态入快照（presence_state 域）
+7. WebSocket 推送接口预留
+
+---
+
+## 6. 开发要求
+
+### 必须
+
+- 形象表达经状态机（禁止直接改情绪/人格）
+- HIL 真实接入双模式（Mock 默认，测试隔离）
+- 身份稳定（形象 ≠ 身份，形象可换身份不变）
+- 配置驱动（`companion_presence_*` / `companion_hybrid_*` 前缀）
+- 中文 docstring / 类型注解 / RLock / 完整日志 / 测试 CRLF
+- 版本断言批量更新用 Python 脚本
+
+### 禁止
+
+- 禁止破坏 V6.8 及以前 API
+- 禁止自动应用成长（growth_auto_apply 恒 false 语义）
+- 禁止云端结果直接改变身份/记忆（验证铁律保持）
+- 禁止跨层调用 / 静默吞异常 / 黑盒 / 临时方案
+
+---
+
+## 7. 测试验收 Prompt
+
+执行：
+
+```bash
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+```
+
+### 功能验收
+
+- **形象表达**：情绪/人格 → 表情/姿态映射正确；状态机转移可解释
+- **HIL 真实接入**：Mock ↔ Real 双模式切换；失败降级
+- **感知联动**：视觉任务 → 正确路由（本地/云端）
+- **安全**：形象不触身份 / 云端验证铁律 / 成本铁律
+- **兼容**：V6.8 及以前全部 API
+
+### 测试要求
+
+- 新增 ≥400（专项 ≥5991）
+- 覆盖：Presence / Adapter / Linkage / Security / Compat
+- 验收标准：Failed = 0
+
+---
+
+## 8. 开发完成返回 Prompt
+
+输出：**YHLZ AI伙伴 V7.0 完成报告**
+
+```
+版本信息: Version / Commit / Date
+新增模块: 列表
+形象表达统计: 状态转移次数 / 表情分布 / 推送次数
+HIL 接入统计: 真实调用次数 / 降级次数 / 成本
+测试结果: Total / Passed / Failed / Skipped
+具身能力验证: 形象表达 / 真实调度 / 身份稳定 / 兼容
+```
+
+---
+
+## 9. 最终原则
+
+```
+稳定开发 增量迭代 可测试 可维护 可扩展
+小步推进 持续验证 保持架构健康
+```
+
+**YHLZ 进化路径：**
+
+| 能力 | 状态 |
+|------|------|
+| 有声音 | ✓ |
+| 有视觉 | ✓ → 感知 ✓ → 认知 ✓ |
+| 有记忆 | ✓ → 长期连续 ✓ |
+| 有人格 | ✓ (铁哥们) |
+| 有情绪 | ✓ → 反思联动 ✓ |
+| 能思考 | ✓ |
+| 能创造 | ✓ |
+| 能表达 | ✓ → 形象表达 ← 本阶段 |
+| 能感知 | ✓ |
+| 能理解 | ✓ → 情绪集成 ✓ |
+| 能成长 | ✓ → 闭环自动化 ✓ |
+| 能调度 | ✓ → 真实模型接入 ← 本阶段 |
+| 能行动 | 具身伙伴层 ← 本阶段 |
+
+让 YHLZ 持续成为：
+
+**有声音 / 有视觉 / 有记忆 / 有人格 / 有情绪 / 能思考 / 能创造 / 能表达 / 能感知 / 能理解 / 能成长 / 能调度 / 能行动**
+
+持续进化的 AI 伙伴。
+
+**YHLZ · 元 · 亨 · 利 · 贞**

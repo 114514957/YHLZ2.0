@@ -1,0 +1,812 @@
+# YHLZ Embodied AI V4.7
+# Long Horizon Planning Layer
+# 长期任务规划层
+#
+# Engineering Development Prompt
+# Version: V4.7
+# Mode: Rule-Based Embodied Intelligence
+
+
+---
+
+# 0. 项目背景
+
+当前 YHLZ Embodied AI 已完成：
+
+V4.0
+Environment Foundation
+环境基础层
+
+V4.1
+Environment Intelligence Layer
+环境理解层
+
+V4.2
+Environment Reasoning Layer
+环境推理层
+
+V4.3
+Experience Learning Layer
+经验学习层
+
+V4.4
+Adaptive Strategy Layer
+自适应策略层
+
+V4.5
+Meta Strategy Management
+元策略管理层
+
+V4.6
+Cross-Goal Strategic Planning
+跨目标战略规划层
+
+
+当前系统已经具备：
+
+- 环境状态理解
+- 环境事件分析
+- 因果推理
+- 经验沉淀
+- 策略选择
+- 策略治理
+- 多目标规划
+
+
+进入 V4.7：
+
+Long Horizon Planning Layer
+
+目标：
+
+构建长期任务规划能力。
+
+
+---
+
+# 1. V4.7 核心目标
+
+
+V4.6 解决：
+
+多个目标如何协调。
+
+
+V4.7 解决：
+
+长时间跨度任务如何拆解、管理和追踪。
+
+
+升级：
+
+从：
+
+Goal
+
+↓
+
+Plan
+
+↓
+
+Execute
+
+
+升级为：
+
+
+Long Goal
+
+↓
+
+Milestone
+
+↓
+
+Sub Goals
+
+↓
+
+Dependencies
+
+↓
+
+Execution
+
+↓
+
+Verification
+
+↓
+
+Adjustment
+
+
+要求：
+
+系统能够理解：
+
+“一个复杂目标不是一次完成，而是一个持续过程。”
+
+
+例如：
+
+
+目标：
+
+整理房间
+
+
+拆解：
+
+
+Phase 1:
+
+收集物品
+
+
+Phase 2:
+
+分类
+
+
+Phase 3:
+
+整理
+
+
+Phase 4:
+
+检查
+
+
+Phase 5:
+
+维护
+
+
+---
+
+# 2. 设计原则
+
+
+必须保持：
+
+
+Rule-Based Intelligence
+
+
+禁止：
+
+- 神经网络训练
+- 梯度更新
+- 黑盒优化
+- 自修改核心逻辑
+- 自主目标生成
+
+
+允许：
+
+- 状态机
+- 规则图
+- 优先级计算
+- 时间窗口
+- 依赖分析
+- 统计反馈
+
+
+所有规划必须：
+
+可解释。
+
+---
+
+# 3. 架构设计
+
+
+新增模块：
+
+
+backend/embodied/planning/
+
+
+结构：
+
+
+planning/
+
+├── long_horizon.py
+
+├── milestone.py
+
+├── dependency_graph.py
+
+├── progress_tracker.py
+
+├── adjustment.py
+
+└── __init__.py
+
+
+---
+
+# 4. Long Horizon Planner
+
+
+新增核心组件：
+
+
+LongHorizonPlanner
+
+
+职责：
+
+管理长期任务生命周期。
+
+
+接口：
+
+
+```python
+create_long_goal(goal)
+
+decompose_goal(goal_id)
+
+generate_milestones(goal_id)
+
+track_progress(goal_id)
+
+adjust_plan(goal_id)
+5. Long Goal 数据模型
+
+新增：
+
+LongGoal
+
+结构：
+
+{
+    goal_id,
+
+    title,
+
+    description,
+
+    created_at,
+
+    status,
+
+    milestones,
+
+    dependencies,
+
+    progress,
+
+    priority,
+
+    explainable_reason
+}
+
+status:
+
+pending
+
+active
+
+paused
+
+completed
+
+failed
+
+archived
+6. Milestone 系统
+
+新增：
+
+Milestone
+
+作用：
+
+长期目标阶段管理。
+
+结构：
+
+{
+    milestone_id,
+
+    goal_id,
+
+    title,
+
+    sub_goals,
+
+    order,
+
+    status,
+
+    completion_rate
+}
+
+要求：
+
+支持：
+
+add_milestone()
+
+complete_milestone()
+
+rollback_milestone()
+
+query_progress()
+7. Sub Goal 分解系统
+
+长期目标必须拆解。
+
+例如：
+
+Long Goal:
+
+学习 Python
+
+↓
+
+Milestone:
+
+基础阶段
+
+↓
+
+Sub Goals:
+
+变量
+
+函数
+
+类
+
+项目实践
+
+要求：
+
+支持：
+
+decompose_goal()
+
+输出：
+
+完整任务树。
+
+8. Dependency Graph
+
+新增：
+
+依赖关系分析。
+
+例如：
+
+不能：
+
+执行安装软件
+
+之前：
+
+未完成环境准备。
+
+建立：
+
+Goal A
+
+   ↓
+
+Goal B
+
+   ↓
+
+Goal C
+
+新增：
+
+dependency_graph()
+
+输出：
+
+前置任务
+后续任务
+阻塞原因
+9. Progress Tracking
+
+新增：
+
+ProgressTracker
+
+负责：
+
+长期任务状态。
+
+接口：
+
+get_progress(goal_id)
+
+update_progress(goal_id)
+
+progress_report(goal_id)
+
+输出：
+
+Goal:
+
+60%
+
+
+Completed:
+
+3/5 milestones
+
+
+Blocked:
+
+1
+
+
+Next:
+
+Milestone 4
+10. Plan Adjustment
+
+长期任务必须允许调整。
+
+新增：
+
+adjust_plan(goal_id)
+
+触发条件：
+
+失败次数增加
+资源不足
+时间变化
+环境变化
+
+输出：
+
+新的：
+
+milestone 顺序
+优先级
+建议
+
+禁止：
+
+自动执行。
+
+必须经过：
+
+Permission Layer。
+
+11. 与 V4.6 集成
+
+V4.7 必须复用：
+
+Cross Goal Planner
+
+Strategy Manager
+
+Experience Memory
+
+Policy System
+
+流程：
+
+Long Goal
+
+↓
+
+Milestone
+
+↓
+
+Cross Goal Planner
+
+↓
+
+Strategy Selection
+
+↓
+
+Execution
+
+12. Memory 集成
+
+允许读取：
+
+Experience Memory
+
+用于：
+
+提供历史参考
+提醒失败模式
+推荐策略
+
+禁止：
+
+直接修改 Memory。
+
+13. Audit 系统增强
+
+新增审计事件：
+
+create_long_goal
+
+decompose_goal
+
+milestone_complete
+
+plan_adjust
+
+goal_pause
+
+goal_resume
+
+goal_fail
+
+记录：
+
+{
+timestamp,
+
+goal_id,
+
+action,
+
+reason,
+
+result
+}
+14. Dry Run 支持
+
+新增：
+
+long_horizon_dry_run(goal)
+
+返回：
+
+任务拆解
+时间估计
+风险点
+依赖关系
+
+禁止：
+
+执行。
+
+15. P1 增强功能
+15.1 时间规划
+
+支持：
+
+deadline
+
+estimated_duration
+
+time_window
+15.2 风险预测
+
+根据：
+
+历史失败经验。
+
+输出：
+
+risk:
+
+low
+
+medium
+
+high
+15.3 Goal Snapshot
+
+保存：
+
+当前任务状态
+
+完成情况
+
+阻塞点
+
+下一步骤
+
+支持恢复。
+
+16. 安全约束
+
+继续保持：
+
+embodied_enabled=False
+
+固定流程：
+
+Observe
+
+↓
+
+Reasoning
+
+↓
+
+Permission
+
+↓
+
+Action
+
+↓
+
+Feedback
+
+禁止：
+
+真实机器人控制
+自动驾驶
+自主目标生成
+修改 Agent Brain
+修改 Vision Interface
+修改 Memory Interface
+绕过 Permission Layer
+17. 工程规范
+
+必须：
+
+先读后写
+接口先行
+配置驱动
+类型注解
+中文 docstring
+完整日志
+RLock
+单例 + reset
+Mock 优先
+异常结构化
+
+禁止：
+
+硬编码
+跨层调用
+临时方案进入主架构
+静默异常
+18. 测试要求
+
+测试命令：
+
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests -v
+
+新增测试：
+
+=100 cases
+
+专项目标：
+
+=1250 cases
+
+要求：
+
+Failed = 0
+
+19. 验收标准
+
+必须完成：
+
+[ ] Long Goal 创建
+
+[ ] Goal 分解
+
+[ ] Milestone 管理
+
+[ ] Dependency Graph
+
+[ ] Progress Tracking
+
+[ ] Plan Adjustment
+
+[ ] Dry Run
+
+[ ] Audit
+
+[ ] Snapshot
+
+[ ] 全量测试通过
+
+20. V4.7 完成后的能力
+
+升级前：
+
+AI:
+
+“我知道下一步做什么。”
+
+升级后：
+
+AI:
+
+“我知道一个长期目标应该如何推进。”
+
+能力变化：
+
+V4.5:
+
+管理策略
+
+↓
+
+V4.6:
+
+协调多个目标
+
+↓
+
+V4.7:
+
+管理长期任务
+
+下一阶段规划
+
+V4.7 完成后：
+
+进入：
+
+YHLZ Embodied AI V5.0
+
+方向：
+
+Adaptive Companion Architecture
+
+自适应 AI 伙伴架构
+
+核心：
+
+引入：
+
+Internal Multi-Agent System
+
+建立：
+
+Main Companion Agent
+
+Specialist Agents
+
+但保持：
+
+一个人格
+
+一个核心意识
+
+一个决策中心。
+
+END
+
+工程判断：
+
+现在 YHLZ 的路线已经很清晰：
+
+```text
+V4.5
+管理经验和策略
+
+↓
+
+V4.6
+协调多个目标
+
+↓
+
+V4.7
+管理长期任务
+
+↓
+
+V5.0
+内部多智能体协作
+
+V4.7 是进入“长期 AI 伙伴”的最后一个单体智能阶段。
+
+完成 V4.7 后，再进入 Multi-Agent 才是正确顺序。

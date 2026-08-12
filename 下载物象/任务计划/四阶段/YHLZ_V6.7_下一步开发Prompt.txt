@@ -1,0 +1,237 @@
+# YHLZ AI伙伴 V6.7 下一步开发Prompt
+# Autonomous Growth Governance (自主成长治理)
+
+> 依据：YHLZ Engineering Development Convention Prompt V3.0
+> 来源：V6.6 Autonomous Growth Maturation 完成报告
+> 日期：2026-08-09
+
+---
+
+## 1. 当前系统状态分析
+
+### 已交付能力（V2.1 ~ V6.6，全部 Failed=0）
+
+```
+有声音     Voice Infrastructure V2.1~V2.3
+能思考     Agent Core V3.0
+有视觉     采集+感知+真实引擎+认知集成
+能行动     Embodied AI V4.0~V4.7 (受控)
+有人格     Companion V5.0~V5.6 (铁哥们)
+有记忆     V5.7 + 连续 V6.0 + 网关 V6.3 + 认知 V6.4
+有认知免疫 V5.8 + 恢复安全 V6.0
+能创造     Creative Intelligence V5.9
+有情绪     Emotion Representation V6.1.1 + 反思联动 V6.6
+有节律     Growth Rhythm V6.1.1
+能表达     Expression V6.2
+能感知     V6.2 (Mock) + V6.3 (真实) + V6.4 (认知闭环)
+能理解     Cognitive Reflection V6.5 + 情绪集成 V6.6
+能成长     受控成长 V6.5 + 闭环自动化 V6.6 + 趋势 V6.6
+```
+
+### 当前测试基线
+
+```
+embodied:        5184   Failed=0 (Skipped=2 Tesseract 保护)
+vision:           136   Failed=0
+action:           151   Failed=0
+agent:            131   Failed=0
+personality:      137   Failed=0
+voice_identity:   181   Failed=0
+TOTAL:           5920   Failed=0 ✅
+```
+
+### V6.6 完成后 YHLZ 状态
+
+```
+元 (Foundation): Identity ✅
+亨 (Growth):     记忆/反思/连续/节律/情绪/认知反思/反思联动情绪 ✅
+贞 (Integrity):  验证/恢复/审计/权限/批准/身份守护 ✅
+利 (Creation):   创造智能 ✅
+理解:            认知反思 + 情绪集成 ✅ → 趋势认知 ⬆️
+成长:            受控成长 + 闭环自动化 ✅ → 成长治理 ⬆️
+```
+
+---
+
+## 2. 本阶段开发判断（为什么做这个，不做那个）
+
+### 为什么做"自主成长治理"
+
+V6.6 打通了反思-情绪联动与成长闭环自动化，但三个缺口：
+1. **趋势无时间对比**（growth_score 静态分档，无近期 vs 早期趋势判断）
+2. **审批模式未学习**（用户批准/拒绝模式未反馈到建议排序）
+3. **闭环是单体的**（无多智能体成长协作准备，无策略多样性）
+
+V6.7 三主线：
+1. **趋势双窗口对比**：近期窗口 vs 早期窗口 → 加速/减速真实判定
+2. **成长策略偏好学习**：用户审批记录 → 策略偏好 → 建议排序（只排序不越权）
+3. **多智能体成长协作接口**（V7 具身化前最后准备，只建接口）
+
+### 为什么不做（V6.7 明确不包含）
+
+- 不做具身化（虚拟形象/动作）→ V7.x
+- 不做 LLM（纯规则保持）
+- 不做自动应用（应用永远需人工/审批，growth_auto_apply 保持 false）
+- 不做身份/核心价值自动调整（永远人工 + 身份守护）
+
+---
+
+## 3. 本版本目标
+
+**V6.7 Autonomous Growth Governance**
+
+1. **趋势双窗口对比** `growth_trend_analysis` 扩展
+   - 近期（近半窗口）vs 早期（前半窗口）指标对比
+   - 输出 trend: accelerating/decelerating/stable（基于对比，非静态分档）
+2. **成长策略偏好学习** `growth/growth_preference.py`
+   - 用户审批记录（approve/reject）→ 策略类型偏好分
+   - 建议排序（偏好分 + 评估分加权），不改变审批流程
+3. **多智能体成长协作接口**（Reserved 接口）
+   - 成长策略注册表（策略源可替换）
+   - 不实现协作调度
+4. **快照增强**：preference_state 域
+
+---
+
+## 4. 架构设计要求
+
+### 分层铁律（保持）
+
+```
+Interface → Service → Manager → Storage / Adapter
+```
+
+### 趋势双窗口对比
+
+- 复用 GrowthTrendAnalysis，新增对比段（不破坏 V6.6 API）
+- 输入增加 events（带时间戳的成长事件）或 recent/earlier 统计
+
+### 策略偏好学习
+
+```
+backend/embodied/companion/growth/growth_preference.py
+```
+
+- 输入：审批记录（proposal.type + decision）
+- 输出：偏好分（每类型 0~1）+ 排序建议（只读）
+- 禁止：偏好分改变评估结果/跳过审批
+
+### 多智能体协作接口
+
+```
+backend/embodied/companion/growth/growth_registry.py
+```
+
+- 策略源注册表（注册/查询/替换）
+- 状态：Reserved（只建接口，不实现调度）
+
+---
+
+## 5. 开发任务
+
+### P0（必须）
+
+1. 趋势双窗口对比扩展（≥80 测试）
+2. `growth_preference.py`：策略偏好学习（≥80 测试）
+3. Service API：`growth_trend_compare` / `growth_preference_stats` /
+   `growth_proposals_sorted`
+4. 偏好学习接入 growth_cycle（decide 时记录）
+
+### P1（尽力）
+
+5. 建议相似度去重（同类型同 trigger 合并）
+6. 成长治理报告（preference + trend 汇总）
+7. growth_registry 预留接口
+
+---
+
+## 6. 开发要求
+
+### 必须
+
+- 偏好学习只排序，不越权（审批流程不变）
+- 趋势对比纯规则（无黑盒）
+- 自动行为全部审计
+- 配置驱动（`companion_growth_*` 前缀）
+- 中文 docstring / 类型注解 / RLock / 完整日志 / 测试 CRLF
+- 版本断言批量更新用 Python 脚本
+
+### 禁止
+
+- 禁止破坏 V6.6 及以前 API
+- 禁止自动应用成长（growth_auto_apply 恒 false 语义）
+- 禁止偏好分直接修改评估结果
+- 禁止跨层调用 / 静默吞异常 / 黑盒 / 临时方案
+
+---
+
+## 7. 测试验收 Prompt
+
+执行：
+
+```bash
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+```
+
+### 功能验收
+
+- **趋势对比**：近期 vs 早期 → 真实加速/减速判定
+- **偏好学习**：审批记录 → 偏好分 → 建议排序（审批不变）
+- **闭环集成**：decide 自动记录偏好
+- **安全**：排序不越权 / 应用需审批 / 人格稳定
+- **兼容**：V6.6 及以前全部 API
+
+### 测试要求
+
+- 新增 ≥400（专项 ≥5584）
+- 覆盖：Trend Compare / Preference / Cycle Integration / Audit / Compat
+- 验收标准：Failed = 0
+
+---
+
+## 8. 开发完成返回 Prompt
+
+输出：**YHLZ AI伙伴 V6.7 完成报告**
+
+```
+版本信息: Version / Commit / Date
+新增模块: 列表
+趋势对比统计: 对比次数 / 加速减速分布
+偏好学习统计: 记录数 / 偏好分布 / 排序次数
+测试结果: Total / Passed / Failed / Skipped
+成长能力验证: 趋势认知 / 偏好学习 / 身份稳定 / 兼容
+```
+
+---
+
+## 9. 最终原则
+
+```
+稳定开发 增量迭代 可测试 可维护 可扩展
+小步推进 持续验证 保持架构健康
+```
+
+**YHLZ 进化路径：**
+
+| 能力 | 状态 |
+|------|------|
+| 有声音 | ✓ |
+| 有视觉 | ✓ → 感知 ✓ → 认知 ✓ |
+| 有记忆 | ✓ → 长期连续 ✓ |
+| 有人格 | ✓ (铁哥们) |
+| 有情绪 | ✓ → 反思联动 ✓ |
+| 能思考 | ✓ |
+| 能创造 | ✓ |
+| 能表达 | ✓ |
+| 能感知 | ✓ |
+| 能理解 | ✓ → 情绪集成 ✓ → 趋势认知 ← 本阶段 |
+| 能成长 | ✓ → 闭环自动化 ✓ → 成长治理 ← 本阶段 |
+| 能行动 | 未来 (V7) |
+
+让 YHLZ 持续成为：
+
+**有声音 / 有视觉 / 有记忆 / 有人格 / 有情绪 / 能思考 / 能创造 / 能表达 / 能感知 / 能理解 / 能成长 / 能行动**
+
+持续进化的 AI 伙伴。
+
+**YHLZ · 元 · 亨 · 利 · 贞**

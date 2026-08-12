@@ -10,6 +10,8 @@ import logging
 import re
 from typing import Dict, Optional
 
+from backend.tts.voice_style import VoiceStyle, get_style_for_emotion
+
 logger = logging.getLogger(__name__)
 
 # 情绪五分类 (对齐 NEKO OUTWARD_EMOTION_ANALYSIS_PROMPT)
@@ -136,3 +138,54 @@ def resolve_voice_for_emotion(
 def get_emotion_voice(emotion: str, base_voice: str = "zh-CN-XiaoxiaoNeural") -> str:
     """按显式情绪名取音色 (供 /synthesize emotion 参数使用)"""
     return EMOTION_VOICE_MAP.get(emotion, base_voice)
+
+
+# ======================================================================
+# M0.5: VoiceStyle 输出接口 (Emotion 系统统一输出, TTS Adapter 统一接收)
+# ======================================================================
+# 旧函数 (resolve_voice_for_emotion / get_emotion_voice) 直接输出 Edge-TTS 音色
+# 字符串, 是引擎专属的, 无法跨 Qwen3 / GPT-SoVITS 复用。
+# M0.5 新增 VoiceStyle 路径: 文本/情绪 → VoiceStyle (数值字段), 由适配器翻译。
+# 旧函数保留向后兼容, 新代码应优先使用下方函数。
+
+def emotion_to_voice_style(emotion: str) -> VoiceStyle:
+    """显式情绪名 → VoiceStyle (未知情绪回退 neutral)
+
+    Emotion 系统输出 VoiceStyle 的入口之一 (显式指定情绪场景)。
+    """
+    return get_style_for_emotion(emotion)
+
+
+def text_to_voice_style(
+    text: str,
+    enabled: bool = True,
+    confidence_threshold: float = 0.5,
+    fallback: Optional[VoiceStyle] = None,
+) -> VoiceStyle:
+    """文本 → 情绪分类 → VoiceStyle (Emotion 系统主输出)
+
+    Args:
+        text: 待合成文本
+        enabled: 是否启用情绪→风格映射; False 时返回 fallback 或 DEFAULT_VOICE_STYLE
+        confidence_threshold: 置信度阈值, 低于则回退 fallback/默认
+        fallback: 低置信度时的回退风格; None 则用 DEFAULT_VOICE_STYLE
+
+    Returns:
+        VoiceStyle (含 emotion 标签 + speed/pitch/energy 数值)
+    """
+    if not enabled or not text:
+        return fallback if fallback is not None else VoiceStyle()
+
+    try:
+        result = classify_emotion(text)
+        if result["confidence"] >= confidence_threshold:
+            style = get_style_for_emotion(result["emotion"])
+            logger.info(
+                f"情绪→风格: {result['emotion']}(conf={result['confidence']:.2f}) "
+                f"→ speed={style.speed} pitch={style.pitch} energy={style.energy}"
+            )
+            return style
+        return fallback if fallback is not None else VoiceStyle()
+    except Exception as e:
+        logger.warning(f"情绪→VoiceStyle 解析失败, 回退默认: {e}")
+        return fallback if fallback is not None else VoiceStyle()

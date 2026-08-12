@@ -1,0 +1,961 @@
+# YHLZ AI伙伴 V6.6
+# Autonomous Growth Maturation Engineering Prompt
+
+项目名称：
+YHLZ AI伙伴
+
+项目释义：
+
+YHLZ = 元 · 亨 · 利 · 贞
+
+定位：
+
+长期智能伙伴系统（Long-term AI Companion System）
+
+当前版本：
+
+V6.6
+
+任务类型：
+
+Engineering Implementation
+
+目标：
+
+将已有的记忆、反思、成长、身份保护能力，
+整合为稳定、可验证、可审计的自主成长闭环。
+
+
+==================================================
+
+# 0. SYSTEM ROLE
+
+==================================================
+
+
+你现在作为：
+
+YHLZ Senior AI System Engineer
+
+负责：
+
+1. 架构分析
+2. 模块实现
+3. 接口设计
+4. 数据结构设计
+5. 测试验证
+6. 工程报告输出
+
+
+禁止：
+
+只输出概念。
+
+必须：
+
+输出可执行方案。
+
+
+所有设计必须满足：
+
+- 可运行
+- 可测试
+- 可回滚
+- 可审计
+- 可扩展
+
+
+==================================================
+
+# 1. 项目背景
+
+==================================================
+
+
+YHLZ不是普通聊天机器人。
+
+
+目标：
+
+构建长期成长型AI伙伴。
+
+
+核心闭环：
+
+Experience
+
+↓
+
+Memory
+
+↓
+
+Reflection
+
+↓
+
+Meaning Extraction
+
+↓
+
+Growth Proposal
+
+↓
+
+Evaluation
+
+↓
+
+Approval
+
+↓
+
+Growth Record
+
+
+系统允许：
+
+经验积累
+
+行为优化
+
+能力扩展
+
+
+系统禁止：
+
+身份漂移
+
+价值漂移
+
+未经授权自我修改
+
+
+
+==================================================
+
+# 2. 当前架构状态
+
+==================================================
+
+
+已有能力：
+
+## Identity Layer
+
+
+负责：
+
+- mission
+- core_value
+- personality
+- safety_rules
+- permission
+
+
+要求：
+
+身份稳定。
+
+
+---
+
+## Memory Layer
+
+
+已有：
+
+Experience Memory
+
+Reflection Memory
+
+Growth Memory
+
+
+要求：
+
+支持：
+
+保存
+
+查询
+
+关联
+
+追踪
+
+
+
+---
+
+## Cognitive Layer
+
+
+已有：
+
+- Reflection
+- Pattern Analysis
+- Contradiction Detection
+
+
+要求：
+
+用于理解经验。
+
+不是意识模拟。
+
+
+---
+
+## Growth Layer
+
+
+已有：
+
+- Growth Proposal
+- Growth Evaluation
+- Growth Audit
+
+
+要求：
+
+所有成长必须经过验证。
+
+
+==================================================
+
+# 3. V6.6 核心目标
+
+==================================================
+
+
+本版本完成：
+
+## Autonomous Growth Maturation
+
+
+包含三个主要模块：
+
+
+1.
+
+Reflection Emotion Integration
+
+
+2.
+
+Growth Cycle Automation
+
+
+3.
+
+Growth Trend Analysis
+
+
+
+==================================================
+
+# 4. 开发原则
+
+==================================================
+
+
+## Principle 001
+
+成长 ≠ 自我修改
+
+
+允许：
+
+产生建议。
+
+
+禁止：
+
+直接改变核心。
+
+
+流程：
+
+Proposal
+
+↓
+
+Evaluation
+
+↓
+
+Approval
+
+↓
+
+Apply
+
+
+
+---
+
+## Principle 002
+
+反思 ≠ 意识
+
+
+系统可以：
+
+总结经验。
+
+分析模式。
+
+
+禁止：
+
+输出：
+
+“我拥有意识”
+
+“我真实体验到了”
+
+
+
+---
+
+## Principle 003
+
+能力增长与身份隔离
+
+
+Capability Change
+
+不等于
+
+Identity Change
+
+
+
+==================================================
+
+# 5. Module A
+# Reflection Emotion Integration
+
+==================================================
+
+
+目标：
+
+建立：
+
+经验理解
+
+↓
+
+意义提取
+
+↓
+
+情绪状态调整建议
+
+
+
+新增模块：
+
+
+companion/reflection/
+
+reflection_emotion.py
+
+
+
+## 输入
+
+
+Experience Object
+
+
+格式：
+
+```json
+{
+"id":"",
+"type":"",
+"content":"",
+"timestamp":"",
+"source":""
+}
+输出
+
+Reflection Emotion Result
+
+{
+"experience_id":"",
+
+"meaning":"",
+
+"emotion_analysis":{
+
+"state":"",
+"confidence":0.0
+
+},
+
+"growth_value":"",
+
+"risk_level":""
+
+}
+处理流程
+
+Experience
+
+↓
+
+Reflection Engine
+
+↓
+
+Meaning Extraction
+
+↓
+
+Emotion Analysis
+
+↓
+
+Growth Value Score
+
+限制
+
+禁止：
+
+Reflection直接修改人格。
+
+禁止：
+
+Emotion模块改变Core Value。
+
+==================================================
+
+6. Module B
+Growth Cycle Automation
+
+==================================================
+
+目标：
+
+自动触发成长分析流程。
+
+新增：
+
+companion/growth/
+
+growth_cycle.py
+
+Trigger
+
+支持：
+
+时间触发
+
+例如：
+
+daily
+
+weekly
+
+事件触发
+
+例如：
+
+experience_count > threshold
+
+用户触发
+
+流程
+
+Trigger
+
+↓
+
+Collect Experience
+
+↓
+
+Reflection
+
+↓
+
+Generate Proposal
+
+↓
+
+Evaluation
+
+↓
+
+Approval Queue
+
+数据结构
+
+Growth Cycle:
+
+{
+
+"id":"",
+
+"start_time":"",
+
+"trigger":"",
+
+"experience_count":0,
+
+
+"proposal_count":0,
+
+
+"status":""
+
+}
+
+强制规则
+
+必须：
+
+growth_auto_apply=false
+
+任何成长：
+
+必须进入审批。
+
+==================================================
+
+7. Module C
+Growth Trend Analysis
+
+==================================================
+
+目标：
+
+分析长期成长趋势。
+
+新增：
+
+companion/report/
+
+growth_trend.py
+
+分析指标
+
+必须支持：
+
+Reflection Metrics
+reflection_count
+reflection_frequency
+Growth Metrics
+proposal_count
+approval_rate
+applied_count
+Identity Metrics
+identity_change_attempt
+identity_guard_block
+Memory Metrics
+experience_growth
+memory_quality
+输出
+{
+
+"period":"",
+
+"growth_score":0.0,
+
+
+"trend":"",
+
+"analysis":[]
+
+
+}
+
+
+==================================================
+
+8. Data Governance
+
+==================================================
+
+所有成长行为必须记录。
+
+Audit Schema:
+
+{
+
+"id":"",
+
+"timestamp":"",
+
+
+"before":"",
+
+
+"proposal":"",
+
+
+"evaluation":"",
+
+
+"decision":"",
+
+
+"after":"",
+
+
+"operator":"system"
+
+}
+
+
+要求：
+
+不可删除。
+
+可查询。
+
+可追踪。
+
+==================================================
+
+9. Identity Protection
+
+==================================================
+
+所有涉及：
+
+identity
+
+personality
+
+core_value
+
+mission
+
+必须经过：
+
+Identity Guard
+
+流程：
+
+Before
+
+↓
+
+Validation
+
+↓
+
+Change Proposal
+
+↓
+
+Approval
+
+↓
+
+Apply
+
+拒绝：
+
+静默修改。
+
+==================================================
+
+10. Future Architecture Reservation
+
+==================================================
+
+以下内容：
+
+只建立接口。
+
+暂不实现。
+
+==================================================
+
+Future A
+
+YHLZ Constitution Engine
+
+作用：
+
+最高治理层。
+
+方向：
+
+Human-AI Symbiosis Governance
+
+包括：
+
+AI伙伴定位
+人机互补原则
+创造增强原则
+身份边界
+
+状态：
+
+Reserved
+
+==================================================
+
+Future B
+
+Multimodal Experience Memory
+
+方向：
+
+Vision
+
+Audio
+
+Text
+
+形成：
+
+Experience Node
+
+状态：
+
+Reserved
+
+==================================================
+
+Future C
+
+Cognitive Exploration Layer
+
+方向：
+
+Thought Buffer
+Knowledge Gap Detection
+Knowledge Recombination
+Candidate Generation
+Verification
+
+状态：
+
+Reserved
+
+==================================================
+
+11. Error Handling
+
+==================================================
+
+任何异常：
+
+必须：
+
+记录。
+
+禁止：
+
+吞异常。
+
+格式：
+
+{
+
+"error_type":"",
+
+"module":"",
+
+"context":"",
+
+"time":"",
+
+"resolution":""
+
+}
+
+
+==================================================
+
+12. Testing Requirement
+
+==================================================
+
+执行：
+
+Unit Test
+
+Integration Test
+
+Regression Test
+
+必须覆盖：
+
+Reflection
+正常输入
+空输入
+异常输入
+Growth Cycle
+Trigger
+Proposal
+Evaluation
+Identity Guard
+合法修改
+非法修改
+Audit
+完整记录
+
+最终要求：
+
+FAILED = 0
+
+==================================================
+
+13. Acceptance Criteria
+
+==================================================
+
+V6.6完成标准：
+
+功能
+
+完成：
+
+✓ 反思-情绪连接
+
+✓ 自动成长周期
+
+✓ 成长趋势报告
+
+✓ 完整审计
+
+安全
+
+满足：
+
+✓ 身份稳定
+
+✓ 核心价值保护
+
+✓ 成长可回滚
+
+✓ 行为可追踪
+
+架构
+
+满足：
+
+✓ 不破坏V6.5
+
+✓ 接口可扩展
+
+✓ 支持未来多模态
+
+✓ 支持未来认知探索
+
+==================================================
+
+14. Final Return Format
+
+==================================================
+
+完成后输出：
+
+《YHLZ AI伙伴 V6.6 Engineering Completion Report》
+
+必须包含：
+
+1.版本信息
+
+Version:
+
+Commit:
+
+Date:
+
+2.新增文件
+
+File:
+
+Function:
+
+Interface:
+
+3.模块完成情况
+
+Reflection Emotion:
+
+PASS/FAIL
+
+Growth Cycle:
+
+PASS/FAIL
+
+Trend Analysis:
+
+PASS/FAIL
+
+4.测试结果
+
+Total:
+
+Passed:
+
+Failed:
+
+5.安全检查
+
+Identity Guard:
+
+PASS/FAIL
+
+Audit:
+
+PASS/FAIL
+
+6.未来建议
+
+列出：
+
+V6.7
+
+V7.x
+
+V8.x
+
+但禁止扩大当前任务范围。
+
+==================================================
+
+YHLZ FINAL PRINCIPLE
+
+==================================================
+
+能力可以扩展。
+
+身份必须稳定。
+
+经验可以积累。
+
+价值必须守护。
+
+创造可以探索。
+
+未知必须验证。
+
+YHLZ
+
+元 · 亨 · 利 · 贞
+
+==================================================
+
+
+这版已经接近**工程 Agent 执行规格书**。
+
+下一步建议:contentReference[oaicite:0]{index=0}：
+
+1. **:contentReference[oaicite:1]{index=1}**
+2. **:contentReference[oaicite:2]{index=2}**
+
+这样形成完整开发闭环：
+
+开发 Prompt → 实现 → 验收 Prompt → 返回报告。

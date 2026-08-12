@@ -1,0 +1,1001 @@
+# YHLZ AI伙伴 V6.1.1
+
+# Emotion Representation & Growth Rhythm Layer
+
+## 情绪表征与成长节律层
+
+---
+
+# 专业工程开发 Prompt
+
+# 验收 Prompt
+
+# 完成返回 Prompt
+
+
+---
+
+# 0. 项目基本信息
+
+
+## 项目名称
+
+YHLZ AI伙伴
+
+
+---
+
+## YHLZ含义
+
+
+YHLZ：
+
+元、亨、利、贞。
+
+
+来源：
+
+《周易》。
+
+
+YHLZ代表：
+
+AI伙伴长期演进哲学。
+
+
+---
+
+# 1. 当前系统状态
+
+
+## 已完成版本
+
+
+
+V2.x
+
+Voice Infrastructure
+
+有声音
+
+↓
+
+V3.0
+
+Agent Core
+
+能思考
+
+↓
+
+V4.x
+
+Embodied AI
+
+能行动
+
+↓
+
+V5.x
+
+Companion Personality
+
+有人格
+
+↓
+
+V5.7
+
+Experience Memory
+
+有记忆
+
+↓
+
+V5.8
+
+Reflection & Cognitive Integrity
+
+有认知免疫
+
+↓
+
+V5.9
+
+Creative Intelligence
+
+能创造
+
+↓
+
+V6.0
+
+Long-term Identity & Growth Continuity
+
+有连续成长
+
+
+
+---
+
+# 2. V6.0基础能力
+
+
+V6.0已经完成：
+
+
+## 长期持久化
+
+包括：
+
+- Experience
+- Relationship
+- Identity
+- Reflection
+- Proposal
+
+
+---
+
+## 记忆生命周期
+
+
+包括：
+
+- Active
+- Cold
+- Archive
+- Recycle
+
+
+---
+
+## 身份连续
+
+
+包括：
+
+- Identity Snapshot
+- Identity History
+- Restore Verification
+
+
+---
+
+## 成长理解
+
+
+包括：
+
+- Growth Report
+- Growth Meaning
+
+
+---
+
+# 3. V6.1.1版本定位
+
+
+版本：
+
+YHLZ AI伙伴 V6.1.1
+
+
+名称：
+
+Emotion Representation & Growth Rhythm Layer
+
+
+中文：
+
+情绪表征与成长节律层。
+
+
+---
+
+# 4. 核心目标
+
+
+本版本目标：
+
+让AI伙伴从：
+
+
+拥有长期记忆
+
+
+升级为：
+
+
+拥有连续互动状态表达
++
+自动成长节律
+
+
+
+---
+
+# 5. 核心设计原则
+
+
+## 原则1：
+
+情绪不是意识。
+
+
+YHLZ不模拟真实情感。
+
+
+Emotion Layer定义：
+
+> 基于交互状态、关系状态、任务结果产生的可计算状态变量。
+
+
+用途：
+
+- 调整表达方式
+- 丰富互动体验
+- 辅助成长分析
+
+
+---
+
+## 原则2：
+
+情绪不是人格。
+
+
+严格隔离：
+
+
+
+Identity Layer
+
+    ↑
+
+禁止修改
+
+    ↑
+
+Emotion Layer
+
+
+
+Emotion不能改变：
+
+
+- Personality Base
+- Core Value
+- Mission
+- Decision Boundary
+
+
+---
+
+## 原则3：
+
+自主成长不是自主失控。
+
+
+允许：
+
+- 自动记录
+- 自动整理
+- 自动生成报告
+
+
+禁止：
+
+- 自动改变人格
+- 自动改变目标
+- 自动修改核心价值
+- 自动执行高风险行为
+
+
+---
+
+# 6. V6.1.1总体架构
+
+
+
+Interaction
+
+↓
+
+Event
+
+↓
+
+Emotion Representation
+
+↓
+
+Growth Rhythm
+
+↓
+
+Memory Consolidation
+
+↓
+
+Reflection Trigger
+
+↓
+
+Growth Meaning
+
+↓
+
+Snapshot
+
+↓
+
+Long-term Companion Evolution
+
+
+
+---
+
+# 7. 新增模块
+
+
+目录：
+
+
+
+backend/embodied/companion/
+
+emotion/
+
+├── emotion_state.py
+
+├── emotion_engine.py
+
+├── emotion_rules.py
+
+├── emotion_decay.py
+
+├── emotion_memory.py
+
+└── emotion_audit.py
+
+rhythm/
+
+├── growth_rhythm.py
+
+├── growth_trigger.py
+
+├── consolidation_scheduler.py
+
+└── rhythm_audit.py
+
+
+
+---
+
+# 8. Emotion Representation Layer
+
+
+## 目标
+
+
+建立：
+
+可计算、可解释、可审计的情绪状态。
+
+
+---
+
+# 9. Emotion State设计
+
+
+三个核心维度：
+
+
+## positivity
+
+积极度。
+
+
+范围：
+
+
+0.0 - 1.0
+
+
+
+---
+
+## energy
+
+活跃程度。
+
+
+范围：
+
+
+0.0 - 1.0
+
+
+
+---
+
+## warmth
+
+关系温度。
+
+
+范围：
+
+
+0.0 - 1.0
+
+
+
+---
+
+状态结构：
+
+
+```json
+{
+"positivity":0.0,
+
+"energy":0.0,
+
+"warmth":0.0,
+
+"last_reason":"",
+
+"timestamp":""
+}
+10. Emotion Engine
+
+负责：
+
+状态更新
+状态查询
+状态统计
+状态衰减
+
+接口：
+
+update(context)
+
+decay()
+
+get_state()
+
+get_stats()
+11. Emotion Rules
+
+采用：
+
+规则驱动。
+
+禁止：
+
+LLM情绪推断。
+
+规则表：
+
+success
+
+↓
+
+positivity +
+
+energy +
+
+failure
+
+↓
+
+positivity -
+
+energy -
+relationship_up
+
+↓
+
+warmth +
+
+允许情境：
+
+success
+
+failure
+
+consecutive_fail
+
+creative_done
+
+creative_rejected
+
+relationship_up
+
+relationship_down
+
+idle
+12. Emotion Decay
+
+必须实现：
+
+自然衰减。
+
+公式：
+
+Current Emotion
+
+=
+
+Previous Emotion
+
++
+
+Event Impact
+
+-
+
+Natural Decay
+
+要求：
+
+配置驱动
+禁止魔法数字
+防止永久高情绪
+13. Emotion Stability
+
+必须具备：
+
+连续失败限制
+
+避免：
+
+失败
+
+↓
+
+情绪无限下降
+连续成功限制
+
+避免：
+
+成功
+
+↓
+
+无限兴奋
+回归基线
+
+长期无事件：
+
+逐渐恢复。
+
+14. Emotion Memory
+
+新增：
+
+情绪历史。
+
+记录：
+
+{
+"event":"",
+
+"emotion_before":"",
+
+"emotion_after":"",
+
+"reason":"",
+
+"impact":""
+}
+
+用途：
+
+用于：
+
+Reflection
+Growth Report
+Relationship Analysis
+15. Emotion Audit
+
+所有情绪变化必须记录。
+
+包括：
+
+时间
+原因
+输入事件
+前状态
+后状态
+
+禁止：
+
+静默修改。
+
+16. Growth Rhythm Layer
+目标
+
+让成长过程从：
+
+人工调用
+
+升级为：
+
+自动节律。
+
+17. Growth Rhythm流程
+Handle
+
+↓
+
+Event Capture
+
+↓
+
+Growth Track
+
+↓
+
+Threshold Check
+
+↓
+
+Memory Consolidation
+
+↓
+
+Reflection Trigger
+
+↓
+
+Snapshot
+18. Handle联动
+
+每次任务完成：
+
+自动：
+
+track_event()
+
+记录：
+
+experience_added
+task_completed
+relationship_change
+
+当经验验证完成：
+
+自动：
+
+experience_confirmed
+19. Consolidation Scheduler
+
+自动整理触发条件：
+
+条件1
+
+经验数量达到阈值。
+
+条件2
+
+距离上次整理超过N天。
+
+触发：
+
+Memory Consolidation
+20. Snapshot Trigger
+
+自动快照。
+
+默认：
+
+每日一次。
+
+配置：
+
+companion_rhythm_daily_snapshot
+21. 快照扩展
+
+V6.0 Snapshot Domains增加：
+
+emotion
+
+兼容要求：
+
+旧快照：
+
+无emotion域。
+
+恢复：
+
+跳过。
+
+禁止：
+
+报错。
+
+22. API设计
+
+新增：
+
+companion_emotion()
+
+companion_emotion_adjust(context)
+
+companion_emotion_audit()
+
+companion_growth_rhythm()
+23. 配置要求
+
+新增：
+
+companion_emotion_enabled
+
+companion_emotion_decay_rate
+
+companion_emotion_update_step
+
+companion_rhythm_enabled
+
+companion_rhythm_consolidate_days
+
+companion_rhythm_daily_snapshot
+24. 工程规范
+
+必须：
+
+中文docstring
+类型注解
+RLock线程安全
+完整日志
+Service分层
+Mock测试
+CRLF兼容
+25. 架构铁律
+
+保持：
+
+Interface
+
+↓
+
+Service
+
+↓
+
+Manager
+
+↓
+
+Storage / Adapter
+
+禁止：
+
+跨层调用
+静默异常
+黑盒情绪模型
+修改人格
+26. 测试验收 Prompt
+
+执行：
+
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+27. 功能验收
+Emotion
+
+验证：
+
+成功事件：
+
+情绪变化正确。
+
+失败事件：
+
+情绪下降有限。
+
+连续事件：
+
+不会剧烈震荡。
+
+Emotion Isolation
+
+验证：
+
+Emotion变化：
+
+不会影响：
+
+Personality
+Core Value
+Identity
+Emotion Recovery
+
+验证：
+
+Idle状态：
+
+情绪逐渐恢复。
+
+Growth Rhythm
+
+验证：
+
+任务完成：
+
+自动记录成长事件。
+
+Consolidation
+
+验证：
+
+达到条件：
+
+自动整理。
+
+Snapshot
+
+验证：
+
+保存：
+
+emotion。
+
+恢复：
+
+emotion。
+
+旧版本：
+
+兼容。
+
+Audit
+
+验证：
+
+所有自动行为：
+
+可追踪。
+
+28. 测试要求
+
+新增：
+
+不少于250测试。
+
+专项测试覆盖：
+
+Emotion
+
+Emotion Safety
+
+Decay
+
+Memory
+
+Rhythm
+
+Scheduler
+
+Snapshot
+
+Compatibility
+
+验收标准：
+
+Failed = 0
+29. 完成返回 Prompt
+
+输出：
+
+YHLZ AI伙伴 V6.1.1 完成报告
+版本信息
+
+Version:
+
+Commit:
+
+Date:
+
+新增模块
+
+列表。
+
+Emotion统计
+
+输出：
+
+当前状态
+更新次数
+原因分布
+平均变化
+Rhythm统计
+
+输出：
+
+自动采集次数
+自动整理次数
+自动快照次数
+Snapshot统计
+
+输出：
+
+emotion保存次数
+emotion恢复次数
+兼容次数
+测试结果
+Total:
+
+Passed:
+
+Failed:
+
+Skipped:
+成长能力验证
+
+回答：
+
+情绪是否可计算？
+
+情绪是否与人格隔离？
+
+成长节律是否自动运行？
+
+自动行为是否可审计？
+
+恢复后身份是否稳定？
+
+30. YHLZ长期路线
+有声音        ✓
+
+有视觉        基础 ✓
+
+有记忆        ✓
+
+有人格        ✓
+
+有情绪        V6.1
+
+能思考        ✓
+
+能创造        ✓
+
+能行动        Future
+最终目标
+
+YHLZ AI伙伴：
+
+不是模拟人类情绪。
+
+而是：
+
+理解互动
+
+表达状态
+
+持续成长
+
+保持身份
+
+创造价值
+
+的长期智能伙伴。
+
+YHLZ
+
+元 · 亨 · 利 · 贞
+
+
+这版作为 **V6.1正式开发 Prompt**，比原 V6.1 增加了：
+
+1. **Emotion Representation 定义**（避免走向伪情感）
+2. **人格/情绪隔离协议**
+3. **Emotion Decay**
+4. **Emotion Memory**
+5. **Growth Reflection Cycle**
+6. **自主成长边界**
+7. **专项安全验收**
+
+这样 V6.1 才能成为 YHLZ 从“长期智能体”进入“长期伙伴”的稳定过渡版本。

@@ -4,8 +4,17 @@ YHLZ 2.0 后端主入口
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
+
+# 统一 UTF-8 编码 (避免 Windows 下中文/emoji 乱码)
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+os.environ.setdefault("PYTHONUTF8", "1")
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 # 添加项目路径
 root_path = Path(__file__).parent.parent
@@ -16,13 +25,13 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(root_path / "backend.log"),
+        logging.FileHandler(root_path / "backend.log", encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
     ]
 )
 logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
@@ -54,6 +63,9 @@ from backend.context_manager import context_manager
 from backend.conversation_manager import conversation_manager
 from backend.sync_manager import sync_manager
 import time
+
+# V10.1.7: 对话回合控制器 (Conversation Turn Controller, 懒加载)
+_turn_controller = None
 
 # 导入音频输出模块
 try:
@@ -236,7 +248,7 @@ async def lifespan(app: FastAPI):
     logger.info("模块管理模式已启用，可通过 /modules/status, /modules/start, /modules/stop 管理模块")
 
     # 播放欢迎语音（延迟到后台执行，避免阻塞启动）
-    welcome_text = "llm初始化成功,tts初始化成功,这里是元亨,信息于你无限,科技开拓未来"
+    welcome_text = "llm初始化成功,tts初始化成功,这里是元亨,信息于你无限,元亨重塑未来"
     logger.info(f"欢迎语音准备就绪: {welcome_text}")
 
     # 初始化连续对话管理器
@@ -299,6 +311,54 @@ async def lifespan(app: FastAPI):
         logger.info("应急重置热键已注册: Ctrl+Shift+R → 清空对话历史")
     except Exception as e:
         logger.warning(f"热键注册失败: {e}")
+
+    # Vision Perception V1.0 - 注册感知工具 + 懒加载 Service
+    try:
+        from backend.vision.perception.tools import register_vision_tools
+        n = register_vision_tools(override=True)
+        logger.info(f"Vision Perception 工具已注册: {n} 个 (read_screen_text / detect_objects)")
+    except Exception as e:
+        logger.warning(f"Vision Perception 工具注册失败: {e}")
+
+    # Vision Understanding V1.0 - 注册理解工具 + 懒加载 Service
+    try:
+        from backend.vision.understanding.tools import register_understanding_tools
+        n = register_understanding_tools(override=True)
+        logger.info(f"Vision Understanding 工具已注册: {n} 个 (describe_scene / answer_visual)")
+    except Exception as e:
+        logger.warning(f"Vision Understanding 工具注册失败: {e}")
+
+    # Vision Memory V1.0 - 注册视觉记忆工具 + 懒加载 Service
+    try:
+        from backend.vision.memory.tools import register_vision_memory_tools
+        n = register_vision_memory_tools(override=True)
+        logger.info(f"Vision Memory 工具已注册: {n} 个 (search_visual_memory)")
+    except Exception as e:
+        logger.warning(f"Vision Memory 工具注册失败: {e}")
+
+    # Personality Engine V3.4 - 注册人格工具 + 懒加载 Service
+    try:
+        from backend.personality.tools import register_personality_tools
+        n = register_personality_tools(override=True)
+        logger.info(f"Personality Engine 工具已注册: {n} 个 (get_personality_style)")
+    except Exception as e:
+        logger.warning(f"Personality Engine 工具注册失败: {e}")
+
+    # Vision Action V1.0 - 注册行动工具 + 懒加载 Service
+    try:
+        from backend.action.tools import register_action_tools
+        n = register_action_tools(override=True)
+        logger.info(f"Vision Action 工具已注册: {n} 个 (request_action)")
+    except Exception as e:
+        logger.warning(f"Vision Action 工具注册失败: {e}")
+
+    # Embodied AI V4.1 - 注册具身工具 + 懒加载 Service
+    try:
+        from backend.embodied.tools import register_embodied_tools
+        n = register_embodied_tools(override=True)
+        logger.info(f"Embodied AI 工具已注册: {n} 个 (query_environment_state)")
+    except Exception as e:
+        logger.warning(f"Embodied AI 工具注册失败: {e}")
 
     yield  # 应用运行中
 
@@ -602,30 +662,43 @@ async def get_cache_stats():
 # 文本聊天
 @app.post("/chat", summary="文本对话", description="使用 SSE 协议进行流式文本对话")
 async def chat(request: ChatRequest):
+    # V10.1.7: Conversation Turn Controller 集成 (事件协议输出)
+    from backend.conversation_controller import (
+        ConversationTurnController,
+    )
+    global _turn_controller
+    if _turn_controller is None:
+        _turn_controller = ConversationTurnController()
+    ctc = _turn_controller
     try:
         logger.info(f"收到聊天请求: {request.text[:50]}...")
-        
+
+        # Turn 生命周期: 接收 → READY (或 QUEUED)
+        turn = ctc.begin_turn(request.text, source="user")
+        turn_id = turn.turn_id
+
         # 添加用户消息到上下文
         context_manager.add_message("user", request.text)
-        
+
         # 获取上下文
-        messages = context_manager.get_context()
-        
+        messages = context_manager.get_context(recent_messages=8)
+
         # 打印发送给LLM的消息，用于调试
         logger.info(f"发送给LLM的消息数: {len(messages)}")
         for i, msg in enumerate(messages):
             logger.info(f"  [{i}] {msg['role']}: {msg['content'][:80]}...")
-        
+
         # 流式生成响应
         full_response = ""
-        
+
         async def generate():
             nonlocal full_response
-            
+            turn_ = ctc.claim_ready_turn()
+
             import asyncio
             text_queue = asyncio.Queue()
             tts_task = None
-            
+
             async def tts_producer():
                 tts_accumulated_text = ""
                 while True:
@@ -660,7 +733,7 @@ async def chat(request: ChatRequest):
                     except Exception as e:
                         logger.error(f"TTS生产者任务错误: {e}")
                         break
-                
+
                 if tts_accumulated_text:
                     tts_voice = resolve_voice_for_emotion(
                         tts_accumulated_text,
@@ -670,39 +743,61 @@ async def chat(request: ChatRequest):
                     )
                     async for audio_chunk, sr in tts_engine.stream_synthesize_text(tts_accumulated_text, voice=tts_voice):
                         audio_buffer.add_audio(audio_chunk, sr)
-                
+
                 # 蓝图1.3: 正常结束标记 done 哨兵 (被打断的流由interrupt清掉)
                 audio_buffer.mark_stream_done()
-            
+
             if request.tts_enabled:
                 tts_task = asyncio.create_task(tts_producer())
-            
+
+            # V10.1.7 事件协议: START
+            start_evt = ctc.stream_event(turn_id, "START", {
+                "input": request.text[:200],
+            })
+            yield f"data: {json.dumps(start_evt, ensure_ascii=False)}\n\n"
+
+            # 流式 LLM 生成
+            ctc.mark_streaming(turn_id)
             async for chunk in llm_engine.generate_stream(
                 messages,
                 temperature=request.temperature,
                 max_tokens=request.max_tokens
             ):
                 full_response += chunk
-                yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
-                
+                # V10.1.7 事件协议: TOKEN (sequence 单调递增)
+                tok_evt = ctc.stream_event(turn_id, "TOKEN", {
+                    "content": chunk,
+                })
+                yield f"data: {json.dumps(tok_evt, ensure_ascii=False)}\n\n"
+
                 if request.tts_enabled:
                     await text_queue.put(chunk)
-            
+
             if request.tts_enabled and tts_task:
                 await text_queue.put(None)
                 await tts_task
-            
+
             context_manager.add_message("assistant", full_response)
-            
-            yield f"data: {json.dumps({'is_done': True, 'full_content': full_response}, ensure_ascii=False)}\n\n"
-        
+
+            # V10.1.7 事件协议: COMPLETE
+            comp_evt = ctc.stream_event(turn_id, "COMPLETE", {
+                "full_content": full_response,
+            })
+            yield f"data: {json.dumps(comp_evt, ensure_ascii=False)}\n\n"
+
+            ctc.complete_turn(turn_id)
+
         return StreamingResponse(
             generate(),
             media_type="text/event-stream"
         )
-        
+
     except Exception as e:
         logger.error(f"聊天请求失败: {e}")
+        try:
+            ctc.error_turn(turn_id, str(e))
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=str(e))
 
 # 语音识别
@@ -815,13 +910,19 @@ class PersonalityUpdate(BaseModel):
     speaking_style: Optional[str] = None
     tone: Optional[str] = None
     catchphrases: Optional[List[str]] = None
+    voice_identity: Optional[Dict[str, Any]] = None  # M0.4: 顶层 voice_identity 字段（替代 character.yaml）
 
-@app.get("/personality", summary="获取性格配置", description="获取当前AI的性格设定")
+class VoiceIdentityUpdate(BaseModel):
+    """M0.4: voice_identity 专用更新模型（字段级 merge，None=不修改）"""
+    voice_id: Optional[str] = None
+    engine: Optional[str] = None
+
+@app.get("/personality", summary="获取性格配置", description="获取当前AI的性格设定（含 voice_identity）")
 async def get_personality():
-    config = context_manager.get_personality_config()
-    return config.dict()
+    cfg = context_manager.get_personality_config()
+    return cfg  # M0.4: 修复原 config.dict() bug（dict 无 .dict() 方法），直接返回 dict
 
-@app.post("/personality", summary="更新性格配置", description="更新AI的性格设定")
+@app.post("/personality", summary="更新性格配置", description="更新AI的性格设定（voice_identity 走字段级 merge）")
 async def update_personality(update: PersonalityUpdate):
     update_dict = update.dict(exclude_none=True)
     if update_dict:
@@ -829,10 +930,982 @@ async def update_personality(update: PersonalityUpdate):
         return {"success": True, "message": "性格配置已更新"}
     return {"success": False, "message": "没有提供任何更新"}
 
-@app.post("/personality/reset", summary="重置性格配置", description="将性格配置重置为默认值")
+@app.post("/personality/reset", summary="重置性格配置", description="将性格配置重置为默认值（含 voice_identity 重置）")
 async def reset_personality():
     context_manager.reset_personality()
     return {"success": True, "message": "性格配置已重置"}
+
+# ==================== Voice Identity API (M0.4) ====================
+# 替代 character.yaml：personality.json 单源扩展，voice_identity 字段独立端点
+
+@app.get("/personality/voice-identity", summary="获取声音身份", description="获取当前角色绑定的 voice_identity (voice_id + engine)")
+async def get_voice_identity():
+    vi = context_manager.get_voice_identity()
+    return {"success": True, "voice_identity": vi}
+
+@app.post("/personality/voice-identity", summary="更新声音身份", description="字段级更新 voice_identity（None=不修改），持久化到 personality.json")
+async def update_voice_identity(update: VoiceIdentityUpdate):
+    update_dict = update.dict(exclude_none=True)
+    if not update_dict:
+        return {"success": False, "message": "没有提供任何更新字段"}
+    new_vi = context_manager.update_voice_identity(**update_dict)
+    return {"success": True, "message": "voice_identity 已更新", "voice_identity": new_vi}
+
+# ==================== V2.2 声音克隆 API ====================
+# 懒加载 voice_identity service 单例 (避免启动时强制初始化)
+_voice_identity_service = None
+
+def _get_voice_identity_service():
+    """懒加载 VoiceIdentityService (V2.2 + V2.3-Phase6 TEST_MODE)"""
+    global _voice_identity_service
+    if _voice_identity_service is None:
+        try:
+            from backend.voice_identity import VoiceIdentityService
+            _voice_identity_service = VoiceIdentityService.create_default()
+            # V2.3-Phase6: TEST_MODE 下强制 mock adapter, 不加载真实模型
+            from backend.voice_identity.mock_loader import is_test_mode, get_mock_loader
+            if is_test_mode():
+                loader = get_mock_loader()
+                adapter_result = loader.load("qwen3")
+                if adapter_result.is_ok:
+                    _voice_identity_service.set_adapter(adapter_result.unwrap())
+                    logger.info("VoiceIdentityService 已初始化 (TEST_MODE, mock adapter)")
+                else:
+                    logger.warning(f"TEST_MODE mock adapter 加载失败: {adapter_result.error}, 回退到配置加载")
+                    _voice_identity_service.load_adapter_from_config()
+            else:
+                # 生产路径: 从 voice_clone_config.json 加载默认 adapter
+                _voice_identity_service.load_adapter_from_config()
+                logger.info("VoiceIdentityService 已初始化 (V2.2)")
+        except Exception as e:
+            logger.error(f"VoiceIdentityService 初始化失败: {e}")
+            raise
+    return _voice_identity_service
+
+@app.post("/voice/clone", summary="声音克隆", description="上传参考音频克隆声音 (V2.2)")
+async def voice_clone(
+    request: Request,
+    audio: UploadFile = File(..., description="参考音频 wav/mp3/flac/ogg/m4a"),
+    name: str = Form(..., description="声音展示名"),
+    engine: str = Form("qwen3", description="引擎 qwen3/gpt_sovits"),
+    voice_id: Optional[str] = Form(None, description="显式 voice_id (可选)"),
+    language: str = Form("zh", description="主语言"),
+    metadata: Optional[str] = Form(None, description="JSON 字符串元数据 (gpt_sovits 需含 sovits_model/gpt_model)"),
+):
+    """声音克隆端点 (V2.2)
+
+    流程: 上传音频 → 校验 → 分析 → 创建 Profile → Adapter.prepare_voice → 返回
+
+    返回:
+        成功: {"voice_id", "status", "warnings", "adapter", "quality_score"}
+        失败: {"error", "stage"}
+    """
+    # V2.3-Phase3 权限校验: 创建类操作 (先于 service init, 避免 403 时加载模型)
+    try:
+        from backend.voice_identity.permission import get_permission_checker, get_actor_id
+        actor_id = get_actor_id(request)
+        get_permission_checker().check_create(actor_id)
+    except HTTPException:
+        raise  # 403 直接抛出
+    except Exception as e:
+        logger.warning(f"权限校验异常 (不阻塞): {e}")
+
+    try:
+        svc = _get_voice_identity_service()
+    except Exception as e:
+        return {"success": False, "error": str(e), "stage": "service_init"}
+
+    # V2.3-Phase8: 记录克隆开始时间 (用于延迟指标)
+    _clone_start_time = time.time()
+
+    # 1. 校验引擎
+    if engine not in ("qwen3", "gpt_sovits"):
+        return {"success": False, "error": f"不支持的 engine: {engine}", "stage": "validate"}
+
+    # 2. 保存上传音频到临时文件
+    import os, tempfile, json as _json
+    try:
+        from backend.voice_identity.adapter.config import load_config
+        cfg = load_config()
+        upload_dir = cfg.upload.temp_dir
+        os.makedirs(upload_dir, exist_ok=True)
+        max_size = cfg.upload.max_size_mb * 1024 * 1024
+    except Exception:
+        upload_dir = os.path.join("cache", "voice_clone", "_uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        max_size = 50 * 1024 * 1024
+
+    # 读全部内容并校验大小
+    content = await audio.read()
+    if len(content) == 0:
+        return {"success": False, "error": "音频文件为空", "stage": "validate"}
+    if len(content) > max_size:
+        return {"success": False, "error": f"音频文件过大 (> {max_size//1024//1024}MB)", "stage": "validate"}
+
+    # 扩展名
+    ext = os.path.splitext(audio.filename or "audio.wav")[1] or ".wav"
+    tmp_path = os.path.join(upload_dir, f"upload_{int(time.time()*1000)}{ext}")
+    try:
+        with open(tmp_path, "wb") as f:
+            f.write(content)
+    except Exception as e:
+        return {"success": False, "error": f"保存上传文件失败: {e}", "stage": "validate"}
+
+    # 3. 解析 metadata
+    meta_dict = None
+    if metadata:
+        try:
+            meta_dict = _json.loads(metadata)
+        except _json.JSONDecodeError as e:
+            return {"success": False, "error": f"metadata JSON 解析失败: {e}", "stage": "validate"}
+
+    # 4. 按引擎构造请求级 Adapter (并发安全: 不修改全局 _adapter)
+    #    V2.3-Phase6: TEST_MODE 下使用 mock adapter, 不加载真实模型
+    request_adapter = None
+    try:
+        from backend.voice_identity.mock_loader import build_adapter_from_config_test_aware
+        adapter_r = build_adapter_from_config_test_aware(engine)
+        if adapter_r.is_err():
+            return {"success": False, "error": f"Adapter 构造失败: {adapter_r.error}", "stage": "cache"}
+        request_adapter = adapter_r.unwrap()
+    except Exception as e:
+        return {"success": False, "error": f"Adapter 构造失败: {e}", "stage": "cache"}
+
+    # 5. 调用 Service.clone_voice_with_adapter (请求级上下文绑定, 不污染全局)
+    result = svc.clone_voice_with_adapter(
+        audio_path=tmp_path, name=name, engine=engine,
+        voice_id=voice_id, metadata=meta_dict, language=language,
+        auto_prepare=True, adapter=request_adapter,
+    )
+
+    if result.is_err():
+        # 解析 stage: error 以 [validate]/[analyze]/[create_voice]/[register] 开头
+        err = str(result.error)
+        stage = "unknown"
+        for s in ("validate", "analyze", "create_voice", "register", "cache"):
+            if f"[{s}]" in err:
+                stage = s
+                break
+        # V2.3-Phase8: 记录失败指标
+        try:
+            from backend.voice_identity.metrics import record_clone
+            record_clone(
+                success=False, latency=time.time() - _clone_start_time,
+                voice_id=voice_id or "",
+            )
+        except Exception:
+            pass
+        return {"success": False, "error": err, "stage": stage}
+
+    clone_result = result.unwrap()
+    profile = clone_result.profile
+    logger.info(f"声音克隆成功: voice_id={profile.voice_id} adapter={clone_result.adapter}")
+
+    # V2.3-Phase8: 记录成功指标
+    try:
+        from backend.voice_identity.metrics import record_clone
+        record_clone(
+            success=True,
+            latency=time.time() - _clone_start_time,
+            voice_id=profile.voice_id,
+            quality_score=clone_result.quality_score,
+        )
+    except Exception:
+        pass
+
+    # Phase 3.3 审计: 记录创建事件 (失败不阻塞)
+    try:
+        from backend.voice_identity.audit import get_audit_logger
+        get_audit_logger().log(
+            event_type="voice_created",
+            voice_id=profile.voice_id,
+            actor_id="system",
+            owner_id=profile.owner_id,
+            detail={"engine": profile.engine, "name": profile.name, "adapter": clone_result.adapter},
+        )
+    except Exception:
+        pass
+
+    # 克隆成功后可选立即删除上传音频 (由配置 cleanup_on_success 控制)
+    try:
+        from backend.voice_identity.adapter.config import load_config as _lc
+        _cleanup_on_success = _lc().upload.cleanup_on_success
+    except Exception:
+        _cleanup_on_success = False
+    if _cleanup_on_success:
+        try:
+            from backend.voice_identity.adapter.upload_cleaner import cleanup_file
+            cleanup_file(tmp_path)
+        except Exception:
+            pass
+
+    return {
+        "success": True,
+        "voice_id": profile.voice_id,
+        "name": profile.name,
+        "status": profile.status,
+        "engine": profile.engine,
+        "warnings": clone_result.warnings,
+        "adapter": clone_result.adapter,
+        "cache_path": clone_result.cache_path,
+        "embedding_hash": clone_result.embedding_hash,
+        "quality_score": clone_result.quality_score,
+    }
+
+@app.post("/voice/synthesize", summary="声音合成测试", description="用已克隆声音合成语音 (V2.2)")
+async def voice_synthesize_test(
+    voice_id: str = Form(..., description="已克隆的 voice_id"),
+    text: str = Form(..., description="待合成文本"),
+    language: str = Form("zh", description="语言"),
+):
+    """声音合成测试端点 (V2.2)
+
+    返回:
+        成功: {"audio_path", "text"}
+        失败: {"error"}
+    """
+    try:
+        svc = _get_voice_identity_service()
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+    result = svc.synthesize(voice_id=voice_id, text=text, language=language)
+    if result.is_err():
+        return {"success": False, "error": result.error}
+    # Phase 3.3 审计: 记录合成事件 (失败不阻塞)
+    try:
+        from backend.voice_identity.audit import get_audit_logger
+        get_audit_logger().log(
+            event_type="voice_synthesized",
+            voice_id=voice_id,
+            actor_id="system",
+            detail={"text": text[:200], "language": language, "audio_path": result.unwrap()},
+        )
+    except Exception:
+        pass
+    return {"success": True, "audio_path": result.unwrap(), "text": text}
+
+# ==================== Phase 2.1 声音资产管理 ====================
+
+@app.get("/voice/list", summary="声音列表", description="获取所有已克隆声音 (Phase 2.1)")
+async def voice_list():
+    """返回所有 voice profile (按 created_time 倒序)"""
+    try:
+        svc = _get_voice_identity_service()
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    try:
+        profiles = svc.list_voice()
+        items = []
+        for p in profiles:
+            items.append({
+                "voice_id": p.voice_id,
+                "name": p.name,
+                "engine": p.engine,
+                "type": p.type,
+                "status": p.status,
+                "created_time": p.created_at,
+                "language": p.language,
+                "metadata": p.metadata,
+            })
+        return {"success": True, "total": len(items), "items": items}
+    except Exception as e:
+        logger.error(f"声音列表查询失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/voice/{voice_id}", summary="声音详情", description="查询单个声音 profile (Phase 2.1)")
+async def voice_detail(voice_id: str):
+    """返回指定 voice_id 的 profile + model 信息"""
+    try:
+        svc = _get_voice_identity_service()
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    try:
+        db = svc.db
+        profile = db.get_profile_by_id(voice_id)
+        if profile is None:
+            return {"success": False, "error": f"voice_id 不存在: {voice_id}"}
+        return {
+            "success": True,
+            "voice_id": profile.voice_id,
+            "name": profile.name,
+            "engine": profile.engine,
+            "type": profile.type,
+            "status": profile.status,
+            "created_time": profile.created_at,
+            "language": profile.language,
+            "metadata": profile.metadata,
+        }
+    except Exception as e:
+        logger.error(f"声音详情查询失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.delete("/voice/{voice_id}", summary="删除声音", description="删除指定声音 (Phase 2.1)")
+async def voice_delete(voice_id: str, request: Request, soft: bool = False):
+    """删除 voice profile + 关联缓存
+
+    参数:
+        soft: True=软删(保留数据), False=硬删(级联清理, 默认)
+    """
+    try:
+        svc = _get_voice_identity_service()
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    # V2.3-Phase3 权限校验: delete 须 owner/system
+    try:
+        from backend.voice_identity.permission import get_permission_checker, get_actor_id
+        actor_id = get_actor_id(request)
+        get_permission_checker().check_delete(svc, voice_id, actor_id)
+    except HTTPException:
+        raise  # 403/404 直接抛出
+    except Exception as e:
+        logger.warning(f"权限校验异常 (不阻塞): {e}")
+    try:
+        # 先查存在性
+        db = svc.db
+        profile = db.get_profile_by_id(voice_id)
+        if profile is None:
+            return {"success": False, "error": f"voice_id 不存在: {voice_id}"}
+        # 经 Service 删除 (会清理缓存), 返回 bool
+        ok = svc.delete_voice(voice_id, soft=soft)
+        if not ok:
+            return {"success": False, "error": f"删除失败: {voice_id}"}
+        logger.info(f"声音已删除: {voice_id} soft={soft}")
+        # Phase 3.3 审计: 记录删除事件 (失败不阻塞)
+        try:
+            from backend.voice_identity.audit import get_audit_logger
+            get_audit_logger().log(
+                event_type="voice_deleted",
+                voice_id=voice_id,
+                actor_id=actor_id,
+                owner_id=profile.owner_id,
+                detail={"soft": soft, "name": profile.name},
+            )
+        except Exception:
+            pass
+        return {"success": True, "voice_id": voice_id, "soft": soft}
+    except Exception as e:
+        logger.error(f"声音删除失败: {e}")
+        return {"success": False, "error": str(e)}
+
+# ==================== 上传音频清理 ====================
+
+@app.post("/voice/uploads/cleanup", summary="清理超时上传音频", description="按 TTL 清理 _uploads 目录 (工程化项)")
+async def voice_uploads_cleanup_ttl():
+    """按 TTL 清理超时的上传音频文件"""
+    try:
+        from backend.voice_identity.adapter.upload_cleaner import cleanup_expired
+        stats = cleanup_expired()
+        return {"success": True, "stats": stats.to_dict()}
+    except Exception as e:
+        logger.error(f"TTL 清理失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.delete("/voice/uploads/cleanup-all", summary="清理全部上传音频", description="删除 _uploads 目录下所有音频 (无视 TTL)")
+async def voice_uploads_cleanup_all():
+    """手动清理: 删除所有上传音频"""
+    try:
+        from backend.voice_identity.adapter.upload_cleaner import cleanup_all
+        stats = cleanup_all()
+        return {"success": True, "stats": stats.to_dict()}
+    except Exception as e:
+        logger.error(f"全量清理失败: {e}")
+        return {"success": False, "error": str(e)}
+
+# ==================== Phase 1.3 质量评估 ====================
+
+@app.post("/voice/quality/evaluate", summary="音频质量评估", description="评估合成音频质量 (Phase 1.3)")
+async def voice_quality_evaluate(
+    request: Request,
+    reference_audio: UploadFile = File(..., description="原始参考音频 wav"),
+    synthesized_audio: UploadFile = File(..., description="合成音频 wav"),
+    reference_text: Optional[str] = Form(None, description="原始文本 (可选, 用于 WER)"),
+    use_asr: bool = Form(False, description="是否启用 ASR 转写计算 WER (需 ASR 引擎就绪)"),
+):
+    """质量评估端点 (Phase 1.3)
+
+    返回 QualityReport: similarity_score / wer / snr / duration_score / status
+    """
+    # V2.3-Phase3 权限校验: synthesize (评估合成质量)
+    try:
+        from backend.voice_identity.permission import get_permission_checker, get_actor_id
+        actor_id = get_actor_id(request)
+        get_permission_checker().check_create(actor_id)  # 复用: 拒绝 anonymous/guest
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"权限校验异常 (不阻塞): {e}")
+    import os, tempfile
+    from backend.voice_identity.adapter.voice_quality_evaluator import evaluate_quality
+
+    tmp_dir = tempfile.mkdtemp(prefix="yhlz_quality_")
+    try:
+        ref_path = os.path.join(tmp_dir, "ref.wav")
+        syn_path = os.path.join(tmp_dir, "syn.wav")
+        with open(ref_path, "wb") as f:
+            f.write(await reference_audio.read())
+        with open(syn_path, "wb") as f:
+            f.write(await synthesized_audio.read())
+
+        asr_fn = None
+        if use_asr:
+            try:
+                from backend.asr_engine import asr_engine
+                def asr_fn(p):
+                    return asr_engine.transcribe_file(p)
+            except Exception as e:
+                logger.warning(f"ASR 引擎不可用, 跳过 WER: {e}")
+
+        report = evaluate_quality(ref_path, syn_path, reference_text, asr_fn)
+        return {"success": True, "report": report.to_dict()}
+    except Exception as e:
+        logger.error(f"质量评估失败: {e}")
+        return {"success": False, "error": str(e)}
+    finally:
+        try:
+            import shutil
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+# ==================== Phase 2.3 Adapter Dashboard ====================
+
+@app.get("/voice/adapters/dashboard", summary="Adapter 状态面板", description="获取所有 Adapter 健康状态 (Phase 2.3)")
+async def voice_adapters_dashboard():
+    """返回各 adapter 的 mode/can_serve/health_check"""
+    try:
+        from backend.voice_identity.adapter import list_adapters, build_adapter
+        from backend.voice_identity.adapter.config import load_config
+        cfg = load_config()
+        items = []
+        for name in list_adapters():
+            entry = {"name": name}
+            try:
+                if name == "qwen3":
+                    mode = cfg.qwen3.mode
+                elif name == "gpt_sovits":
+                    mode = cfg.gpt_sovits.mode
+                else:
+                    mode = "unknown"
+                entry["mode"] = mode
+                # 构造 adapter 实例 (mock 模式不依赖外部服务)
+                r = build_adapter(name, {
+                    "mode": mode,
+                    "cache_dir": getattr(cfg, name, cfg.qwen3).cache_dir if hasattr(getattr(cfg, name, None), "cache_dir") else "cache/voice_clone",
+                })
+                if r.is_ok:
+                    ad = r.unwrap()
+                    entry["can_serve"] = ad.can_serve()
+                    entry["health"] = ad.health_check()
+                else:
+                    entry["can_serve"] = False
+                    entry["health"] = {"ok": False, "error": r.error}
+            except Exception as e:
+                entry["can_serve"] = False
+                entry["health"] = {"ok": False, "error": str(e)}
+            items.append(entry)
+        return {"success": True, "adapters": items}
+    except Exception as e:
+        logger.error(f"Adapter Dashboard 查询失败: {e}")
+        return {"success": False, "error": str(e)}
+
+# ==================== Phase 2.2 音频试听 ====================
+
+@app.get("/voice/audio/{voice_id}", summary="音频试听", description="获取合成音频文件 (Phase 2.2)")
+async def voice_audio_play(voice_id: str):
+    """返回指定 voice_id 的合成音频文件 (供 <audio> 试听)
+
+    优先返回该 voice 的最近合成结果; 若无则 404。
+    """
+    import os
+    from fastapi.responses import FileResponse
+    try:
+        # 在 cache/voice_clone 下查找该 voice_id 的音频文件
+        cache_root = os.path.join("cache", "voice_clone")
+        # 1. 查找 _uploads 下的合成结果 (mock synthesize 写入)
+        synth_dir = os.path.join(cache_root, "_synth")
+        if os.path.isdir(synth_dir):
+            candidates = [f for f in os.listdir(synth_dir) if f.startswith(voice_id) and f.endswith(".wav")]
+            if candidates:
+                candidates.sort(key=lambda f: os.path.getmtime(os.path.join(synth_dir, f)), reverse=True)
+                return FileResponse(os.path.join(synth_dir, candidates[0]), media_type="audio/wav")
+        # 2. 查找 voice_cache 永久缓存
+        vc_dir = os.path.join("backend", "data", "voice_cache", voice_id)
+        if os.path.isdir(vc_dir):
+            wavs = [f for f in os.listdir(vc_dir) if f.endswith(".wav")]
+            if wavs:
+                return FileResponse(os.path.join(vc_dir, wavs[0]), media_type="audio/wav")
+        return {"success": False, "error": f"无音频文件: {voice_id}"}
+    except Exception as e:
+        logger.error(f"音频试听失败: {e}")
+        return {"success": False, "error": str(e)}
+
+# ==================== Phase 3.1 批量克隆任务 ====================
+
+@app.post("/voice/clone/batch", summary="批量声音克隆", description="提交批量克隆任务 (Phase 3.1)")
+async def voice_clone_batch(
+    request: Request,
+    items_json: str = Form(..., description='任务项 JSON 数组, 每项含 audio_path/name/engine/language/metadata'),
+    owner: str = Form("system", description="任务发起者"),
+):
+    """批量克隆端点 (Phase 3.1)
+
+    参数:
+        items_json: JSON 数组字符串, 每项 {audio_path, name, engine?, language?, metadata?}
+        owner: 任务发起者
+
+    返回:
+        {"success": true, "task": {task_id, status, total, ...}}
+    """
+    # V2.3-Phase3 权限校验: 创建类操作 (先于 service init)
+    try:
+        from backend.voice_identity.permission import get_permission_checker, get_actor_id
+        actor_id = get_actor_id(request)
+        get_permission_checker().check_create(actor_id)
+        # actor 覆盖 owner (除非 owner 显式指定非默认值)
+        if owner == "system":
+            owner = actor_id
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"权限校验异常 (不阻塞): {e}")
+    import json as _json
+    try:
+        from backend.voice_identity.batch import get_task_queue, BatchTaskError
+        items = _json.loads(items_json)
+        if not isinstance(items, list):
+            return {"success": False, "error": "items_json 必须是 JSON 数组"}
+        queue = get_task_queue()
+        task = queue.submit(items, owner=owner)
+        return {"success": True, "task": task.to_dict()}
+    except BatchTaskError as e:
+        return {"success": False, "error": str(e)}
+    except _json.JSONDecodeError as e:
+        return {"success": False, "error": f"JSON 解析失败: {e}"}
+    except Exception as e:
+        logger.error(f"批量克隆提交失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/voice/clone/batch/{task_id}", summary="批量任务状态", description="查询批量克隆任务状态 (Phase 3.1)")
+async def voice_clone_batch_status(task_id: str):
+    """查询批量任务详情"""
+    try:
+        from backend.voice_identity.batch import get_task_queue
+        task = get_task_queue().get_task(task_id)
+        if task is None:
+            return {"success": False, "error": f"任务不存在: {task_id}"}
+        return {"success": True, "task": task.to_dict()}
+    except Exception as e:
+        logger.error(f"批量任务查询失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/voice/clone/batch", summary="批量任务列表", description="列出最近批量克隆任务 (Phase 3.1)")
+async def voice_clone_batch_list(limit: int = 50):
+    """列出最近批量任务 (摘要)"""
+    try:
+        from backend.voice_identity.batch import get_task_queue
+        summaries = get_task_queue().list_tasks(limit=limit)
+        return {"success": True, "total": len(summaries), "items": [s.to_dict() for s in summaries]}
+    except Exception as e:
+        logger.error(f"批量任务列表失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/voice/clone/batch/{task_id}/cancel", summary="取消批量任务", description="取消未完成的批量任务项 (Phase 3.1)")
+async def voice_clone_batch_cancel(task_id: str):
+    """取消批量任务 (仅标记, 不中断已运行项)"""
+    try:
+        from backend.voice_identity.batch import get_task_queue
+        ok = get_task_queue().cancel(task_id)
+        if not ok:
+            return {"success": False, "error": f"任务不存在或已完成: {task_id}"}
+        return {"success": True, "task_id": task_id}
+    except Exception as e:
+        logger.error(f"批量任务取消失败: {e}")
+        return {"success": False, "error": str(e)}
+
+# ==================== Phase 3.2 声音去重 ====================
+
+@app.post("/voice/duplicate/check", summary="声音去重检测", description="检测音频是否与已有声音重复 (Phase 3.2)")
+async def voice_duplicate_check(
+    audio: UploadFile = File(..., description="待检测音频 wav/mp3"),
+    threshold: float = Form(0.85, description="相似度阈值 (0.0~1.0)"),
+    skip_asr: bool = Form(True, description="跳过声学特征分析 (仅哈希匹配)"),
+):
+    """去重检测端点 (Phase 3.2)
+
+    返回 DuplicateResult: is_duplicate/confidence/matched_voice_id/match_type
+    """
+    import os, tempfile
+    try:
+        from backend.voice_identity.dedup import VoiceDeduplicator
+        from backend.voice_identity.clone.audio_validator import validate_audio
+        from backend.voice_identity.clone.voice_analyzer import analyze_voice
+
+        svc = _get_voice_identity_service()
+        dedup = VoiceDeduplicator(svc, threshold=threshold)
+
+        # 保存上传音频
+        tmp_dir = tempfile.mkdtemp(prefix="yhlz_dedup_")
+        ext = os.path.splitext(audio.filename or "audio.wav")[1] or ".wav"
+        tmp_path = os.path.join(tmp_dir, f"check{ext}")
+        with open(tmp_path, "wb") as f:
+            f.write(await audio.read())
+
+        # 可选: 提取特征 (提高检测精度)
+        feature = None
+        if not skip_asr:
+            v = validate_audio(tmp_path)
+            if v.is_ok():
+                a = analyze_voice(v.unwrap())
+                if a.is_ok():
+                    feature = a.unwrap()
+
+        result = dedup.check_duplicate(tmp_path, feature=feature)
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        logger.error(f"去重检测失败: {e}")
+        return {"success": False, "error": str(e)}
+    finally:
+        try:
+            import shutil
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+# ==================== Phase 3.3 安全与审计 ====================
+
+@app.get("/voice/audit/log", summary="审计日志查询", description="查询声音操作审计日志 (Phase 3.3)")
+async def voice_audit_log(
+    voice_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    actor_id: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """审计日志查询端点 (Phase 3.3)
+
+    支持按 voice_id/event_type/actor_id/时间范围 筛选
+    """
+    try:
+        from backend.voice_identity.audit import get_audit_logger
+        logger_audit = get_audit_logger()
+        entries = logger_audit.query(
+            voice_id=voice_id, event_type=event_type, actor_id=actor_id,
+            start_time=start_time, end_time=end_time,
+            limit=limit, offset=offset,
+        )
+        total = logger_audit.count(voice_id=voice_id, event_type=event_type, actor_id=actor_id)
+        return {
+            "success": True, "total": total, "limit": limit, "offset": offset,
+            "items": [e.to_dict() for e in entries],
+        }
+    except Exception as e:
+        logger.error(f"审计日志查询失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/voice/audit/count", summary="审计日志计数", description="统计审计日志条数 (Phase 3.3)")
+async def voice_audit_count(
+    voice_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    actor_id: Optional[str] = None,
+):
+    """审计日志计数端点 (Phase 3.3)"""
+    try:
+        from backend.voice_identity.audit import get_audit_logger
+        count = get_audit_logger().count(
+            voice_id=voice_id, event_type=event_type, actor_id=actor_id,
+        )
+        return {"success": True, "count": count}
+    except Exception as e:
+        logger.error(f"审计日志计数失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/voice/audit/permission/{voice_id}", summary="权限检查", description="检查操作者对声音的权限 (Phase 3.3)")
+async def voice_permission_check(
+    voice_id: str,
+    actor_id: str = "system",
+    action: str = "read",
+):
+    """权限检查端点 (Phase 3.3)
+
+    action: read/write/delete/synthesize
+    """
+    try:
+        from backend.voice_identity.audit import VoicePermission, PermissionError
+        svc = _get_voice_identity_service()
+        profile = svc.get_voice(voice_id)
+        if profile is None:
+            return {"success": False, "error": f"voice_id 不存在: {voice_id}"}
+        perm = VoicePermission()
+        allowed = perm.can(profile, actor_id, action)
+        return {
+            "success": True,
+            "voice_id": voice_id,
+            "actor_id": actor_id,
+            "action": action,
+            "allowed": allowed,
+            "owner_id": profile.owner_id,
+        }
+    except Exception as e:
+        logger.error(f"权限检查失败: {e}")
+        return {"success": False, "error": str(e)}
+
+# ==================== V2.3-Phase4 声音生命周期 ====================
+
+@app.post("/voice/{voice_id}/archive", summary="归档声音", description="将声音归档 (V2.3-Phase4)")
+async def voice_archive(voice_id: str, request: Request):
+    """归档声音 (ready/active/inactive → archived)"""
+    try:
+        from backend.voice_identity.voice_lifecycle import get_lifecycle
+        from backend.voice_identity.permission import get_permission_checker, get_actor_id
+        svc = _get_voice_identity_service()
+        actor_id = get_actor_id(request)
+        # 归档须 write 权限 (owner/system)
+        try:
+            get_permission_checker().check_write(svc, voice_id, actor_id)
+        except HTTPException:
+            raise
+        result = get_lifecycle().archive_voice(voice_id)
+        return {"success": result.success, "result": result.to_dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"归档声音失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/voice/{voice_id}/restore", summary="恢复归档声音", description="恢复归档/停用声音 (V2.3-Phase4)")
+async def voice_restore(voice_id: str, request: Request):
+    """恢复声音 (archived/inactive → ready)"""
+    try:
+        from backend.voice_identity.voice_lifecycle import get_lifecycle
+        from backend.voice_identity.permission import get_permission_checker, get_actor_id
+        svc = _get_voice_identity_service()
+        actor_id = get_actor_id(request)
+        try:
+            get_permission_checker().check_write(svc, voice_id, actor_id)
+        except HTTPException:
+            raise
+        result = get_lifecycle().restore_voice(voice_id)
+        return {"success": result.success, "result": result.to_dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"恢复声音失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/voice/lifecycle/cleanup", summary="生命周期清理", description="按使用时长自动降级未使用声音 (V2.3-Phase4)")
+async def voice_lifecycle_cleanup(
+    request: Request,
+    inactive_days: int = Form(90, description="未使用降级 inactive 天数"),
+    archive_days: int = Form(180, description="未使用归档天数"),
+):
+    """批量清理未使用声音 (90d → inactive, 180d → archived)"""
+    try:
+        from backend.voice_identity.voice_lifecycle import get_lifecycle
+        from backend.voice_identity.permission import get_permission_checker, get_actor_id
+        # 清理须 system 权限
+        actor_id = get_actor_id(request)
+        if actor_id != "system":
+            raise HTTPException(status_code=403, detail="permission denied: 仅 system 可执行生命周期清理")
+        report = get_lifecycle().cleanup_unused_voice(
+            inactive_days=inactive_days, archive_days=archive_days,
+        )
+        return {"success": True, "report": report.to_dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"生命周期清理失败: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/voice/lifecycle/list", summary="生命周期状态列表", description="列出归档/停用声音 (V2.3-Phase4)")
+async def voice_lifecycle_list(status: Optional[str] = None):
+    """列出归档/停用声音"""
+    try:
+        from backend.voice_identity.voice_lifecycle import get_lifecycle
+        lc = get_lifecycle()
+        if status == "archived":
+            items = lc.list_archived()
+        elif status == "inactive":
+            items = lc.list_inactive()
+        else:
+            items = lc.list_archived() + lc.list_inactive()
+        return {
+            "success": True,
+            "total": len(items),
+            "items": [
+                {
+                    "voice_id": p.voice_id, "name": p.name,
+                    "status": p.status, "owner_id": p.owner_id,
+                    "created_at": p.created_at,
+                } for p in items
+            ],
+        }
+    except Exception as e:
+        logger.error(f"生命周期列表查询失败: {e}")
+        return {"success": False, "error": str(e)}
+
+# ==================== V2.3-Phase7 WebUI Dashboard 生产化 ====================
+
+@app.get("/voice/dashboard", summary="声音系统仪表盘", description="聚合统计: 声音/任务/质量/Adapter (V2.3-Phase7)")
+async def voice_dashboard():
+    """Dashboard 聚合统计端点
+
+    返回:
+        - voices: 声音数量统计 (total/active/ready/archived)
+        - tasks: 任务统计 (total/pending/running/done/failed)
+        - quality: 质量统计 (avg_score/distribution)
+        - adapters: Adapter 状态 (engine/loaded/health)
+        - metrics: 累计监控指标 (clone_total/success/failed/latency)
+    """
+    try:
+        svc = _get_voice_identity_service()
+        # 声音统计
+        all_profiles = svc.list_voice()
+        voice_stats = {
+            "total": len(all_profiles),
+            "active": sum(1 for p in all_profiles if p.status == "active"),
+            "ready": sum(1 for p in all_profiles if p.status == "ready"),
+            "archived": sum(1 for p in all_profiles if p.status == "archived"),
+            "warning": sum(1 for p in all_profiles if p.status == "warning"),
+        }
+        # 任务统计
+        task_stats = {"total": 0, "pending": 0, "running": 0, "done": 0, "failed": 0}
+        try:
+            from backend.voice_identity.batch import get_task_queue
+            summaries = get_task_queue().list_tasks(limit=1000)
+            task_stats["total"] = len(summaries)
+            for s in summaries:
+                if s.status in task_stats:
+                    task_stats[s.status] += 1
+        except Exception:
+            pass
+        # 质量统计
+        quality_scores = [
+            getattr(p, "quality_score", None) for p in all_profiles
+            if getattr(p, "quality_score", None) is not None
+        ]
+        quality_stats = {
+            "count": len(quality_scores),
+            "avg_score": round(sum(quality_scores) / len(quality_scores), 4) if quality_scores else 0,
+        }
+        # Adapter 状态
+        adapters_info = {"test_mode": False, "engines": []}
+        try:
+            from backend.voice_identity.mock_loader import is_test_mode, get_mock_loader
+            adapters_info["test_mode"] = is_test_mode()
+            if is_test_mode():
+                adapters_info["engines"] = get_mock_loader().health_check().get("loaded_engines", [])
+            else:
+                # 生产环境: 检查 service 注入的 adapter
+                adp = getattr(svc, "_adapter", None)
+                if adp is not None:
+                    adapters_info["engines"] = [adp.name]
+        except Exception:
+            pass
+        # 监控指标
+        metrics_snapshot = {}
+        try:
+            from backend.voice_identity.metrics import get_metrics
+            m = get_metrics().get_snapshot()
+            metrics_snapshot = {
+                "clone_total": m.clone_total,
+                "clone_success": m.clone_success,
+                "clone_failed": m.clone_failed,
+                "adapter_error_total": m.adapter_error_total,
+                "latency_avg": round(m.latency_sum / m.latency_count, 4) if m.latency_count > 0 else 0,
+                "last_clone_latency": m.last_clone_latency,
+                "last_clone_quality": m.last_clone_quality,
+            }
+        except Exception:
+            pass
+        return {
+            "success": True,
+            "voices": voice_stats,
+            "tasks": task_stats,
+            "quality": quality_stats,
+            "adapters": adapters_info,
+            "metrics": metrics_snapshot,
+        }
+    except Exception as e:
+        logger.error(f"Dashboard 查询失败: {e}")
+        return {"success": False, "error": str(e)}
+
+# ==================== V2.3-Phase8 监控系统 ====================
+
+@app.get("/metrics", summary="Prometheus 指标", description="Prometheus 文本格式监控指标 (V2.3-Phase8)")
+async def metrics_endpoint():
+    """Prometheus scrape 端点
+
+    返回 voice_clone_total / voice_clone_success / voice_clone_failed /
+    voice_clone_latency_seconds / voice_quality_score / voice_adapter_error_total
+    """
+    from backend.voice_identity.metrics import render_prometheus
+    from fastapi import Response
+    text = render_prometheus()
+    return Response(content=text, media_type="text/plain; version=0.0.4; charset=utf-8")
+
+@app.get("/voice/metrics", summary="Voice 指标 JSON", description="Voice Identity 指标 JSON 格式 (V2.3-Phase8)")
+async def voice_metrics_json():
+    """JSON 格式指标 (便于 WebUI 直接消费)"""
+    try:
+        from backend.voice_identity.metrics import get_metrics
+        m = get_metrics().get_snapshot()
+        return {
+            "success": True,
+            "clone_total": m.clone_total,
+            "clone_success": m.clone_success,
+            "clone_failed": m.clone_failed,
+            "adapter_error_total": m.adapter_error_total,
+            "latency_sum": round(m.latency_sum, 4),
+            "latency_count": m.latency_count,
+            "latency_avg": round(m.latency_sum / m.latency_count, 4) if m.latency_count > 0 else 0,
+            "quality_sum": round(m.quality_sum, 4),
+            "quality_count": m.quality_count,
+            "quality_avg": round(m.quality_sum / m.quality_count, 4) if m.quality_count > 0 else 0,
+            "adapter_errors": dict(m.adapter_errors),
+            "last_clone_voice_id": m.last_clone_voice_id,
+            "last_clone_latency": m.last_clone_latency,
+            "last_clone_quality": m.last_clone_quality,
+        }
+    except Exception as e:
+        logger.error(f"Voice 指标查询失败: {e}")
+        return {"success": False, "error": str(e)}
+
+# ==================== V2.3-Phase9 安全增强 ====================
+
+@app.post("/voice/security/check", summary="音频安全检查", description="检查音频文件安全性 (V2.3-Phase9)")
+async def voice_security_check(
+    audio: UploadFile = File(..., description="待检查音频"),
+):
+    """安全检查端点
+
+    检查项: 文件大小 / 格式白名单 / 时长上限 / SHA256 哈希 / 静音 / 削波
+    返回 SecurityReport
+    """
+    import os, tempfile
+    try:
+        content = await audio.read()
+        if not content:
+            return {"success": False, "error": "音频文件为空"}
+        # 保存到临时文件
+        ext = os.path.splitext(audio.filename or "audio.wav")[1] or ".wav"
+        tmp_path = os.path.join(tempfile.gettempdir(), f"sec_check_{int(time.time()*1000)}{ext}")
+        with open(tmp_path, "wb") as f:
+            f.write(content)
+        try:
+            from backend.voice_identity.voice_security import check_audio_security
+            report = check_audio_security(tmp_path)
+            return {"success": True, "report": report.to_dict()}
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+    except Exception as e:
+        logger.error(f"安全检查失败: {e}")
+        return {"success": False, "error": str(e)}
 
 # ==================== VAD相关API ====================
 
@@ -1025,7 +2098,7 @@ async def websocket_stream_endpoint(websocket: WebSocket):
                     continue
                 
                 context_manager.add_message("user", text)
-                messages = context_manager.get_context()
+                messages = context_manager.get_context(recent_messages=8)
                 
                 full_response = ""
                 tts_queue = asyncio.Queue()
@@ -1477,6 +2550,1284 @@ async def delete_memory(memory_id: str):
 @app.put("/memory/{memory_id}")
 async def update_memory(memory_id: str, request: MemoryAddRequest):
     return {"success": True, "memory_id": memory_id}
+
+
+# ==================== Agent API (V3.0) ====================
+# 新增 /agent/* 端点, 不破坏 V2.3 已有接口
+
+class AgentChatRequest(BaseModel):
+    query: str
+    use_tools: bool = True
+    use_memory: Optional[bool] = None
+    history: Optional[List[Dict[str, Any]]] = []
+
+@app.post("/agent/chat", summary="Agent 对话 (含工具调用与记忆)")
+async def agent_chat(request: AgentChatRequest):
+    """V3.0 Agent 主入口: ReAct 循环 + 工具调用 + 记忆"""
+    try:
+        from backend.agent.service import get_service
+        from backend.agent.schemas import Message
+        svc = get_service()
+        # 转换历史消息
+        history = None
+        if request.history:
+            history = []
+            for m in request.history:
+                role = m.get("role", "user")
+                content = m.get("content", "")
+                history.append(Message(role=role, content=content))
+        result = await svc.chat(
+            query=request.query,
+            history=history,
+            use_tools=request.use_tools,
+            use_memory=request.use_memory,
+        )
+        return {
+            "success": result.success,
+            "answer": result.answer,
+            "iterations": result.iterations,
+            "tool_calls": [tc.to_openai_dict() for tc in result.tool_calls],
+            "memory_used": result.memory_used,
+            "memory_stored": result.memory_stored,
+            "latency_ms": round(result.latency_ms, 2),
+            "steps_count": len(result.steps),
+            "error": result.error,
+        }
+    except Exception as e:
+        logger.error(f"Agent 对话失败: {e}", exc_info=True)
+        return {"success": False, "answer": "", "error": str(e)}
+
+
+@app.post("/agent/chat/stream", summary="Agent 流式对话 (SSE)")
+async def agent_chat_stream(request: AgentChatRequest):
+    """V3.0 Agent 流式对话 (不含工具调用)"""
+    from backend.agent.service import get_service
+    from backend.agent.schemas import Message
+    svc = get_service()
+    history = None
+    if request.history:
+        history = [Message(role=m.get("role", "user"), content=m.get("content", "")) for m in request.history]
+
+    async def _gen():
+        async for ch in svc.chat_stream(request.query, history=history):
+            yield f"data: {ch}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
+
+
+@app.post("/agent/plan", summary="生成执行计划")
+async def agent_plan(request: Request):
+    """V3.0 任务规划: 将目标分解为步骤"""
+    try:
+        body = await request.json()
+        goal = body.get("goal", "")
+        available_tools = body.get("available_tools")
+        if not goal:
+            return {"success": False, "error": "goal 为空"}
+        from backend.agent.service import get_service
+        svc = get_service()
+        plan = svc.plan(goal, available_tools)
+        return {
+            "success": True,
+            "plan": {
+                "id": plan.id,
+                "goal": plan.goal,
+                "steps": [
+                    {"id": s.id, "description": s.description, "tool": s.tool, "status": s.status}
+                    for s in plan.steps
+                ],
+                "created_at": plan.created_at,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Agent 规划失败: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/agent/tools", summary="列出可用工具")
+async def agent_list_tools(category: Optional[str] = None):
+    """V3.0 列出所有已注册工具"""
+    try:
+        from backend.agent.service import get_service
+        svc = get_service()
+        return {"success": True, "tools": svc.list_tools(category=category), "count": len(svc.list_tools(category=category))}
+    except Exception as e:
+        return {"success": False, "error": str(e), "tools": []}
+
+
+@app.get("/agent/tools/{tool_name}", summary="获取工具详情")
+async def agent_get_tool(tool_name: str):
+    """V3.0 获取单个工具详情"""
+    try:
+        from backend.agent.service import get_service
+        svc = get_service()
+        t = svc.get_tool(tool_name)
+        if t is None:
+            raise HTTPException(status_code=404, detail=f"工具不存在: {tool_name}")
+        return {"success": True, "tool": t}
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/agent/status", summary="Agent 系统状态")
+async def agent_status():
+    """V3.0 Agent 系统状态"""
+    try:
+        from backend.agent.service import get_service
+        svc = get_service()
+        return {"success": True, **svc.status()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/agent/memory", summary="添加记忆")
+async def agent_memory_add(request: Request):
+    """V3.0 添加记忆条目"""
+    try:
+        body = await request.json()
+        content = body.get("content", "")
+        category = body.get("category", "fact")
+        source = body.get("source", "user")
+        metadata = body.get("metadata")
+        if not content:
+            return {"success": False, "error": "content 为空"}
+        from backend.agent.service import get_service
+        svc = get_service()
+        mem_id = await svc.memory_add(content, category, source, metadata)
+        return {"success": True, "memory_id": mem_id}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/agent/memory", summary="列出记忆")
+async def agent_memory_list(category: Optional[str] = None, limit: int = 100, offset: int = 0):
+    """V3.0 列出记忆"""
+    try:
+        from backend.agent.service import get_service
+        svc = get_service()
+        entries = await svc.memory_list(category, limit, offset)
+        return {
+            "success": True,
+            "memories": [e.to_dict() for e in entries],
+            "count": len(entries),
+            "total": await svc.memory_count(category),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e), "memories": []}
+
+
+@app.get("/agent/memory/search", summary="搜索记忆")
+async def agent_memory_search(query: str, limit: int = 5, category: Optional[str] = None):
+    """V3.0 搜索记忆 (关键词匹配)"""
+    try:
+        from backend.agent.service import get_service
+        svc = get_service()
+        entries = await svc.memory_search(query, limit, category)
+        return {"success": True, "memories": [e.to_dict() for e in entries], "count": len(entries)}
+    except Exception as e:
+        return {"success": False, "error": str(e), "memories": []}
+
+
+@app.get("/agent/memory/short-term", summary="获取短期记忆")
+async def agent_memory_short_term(limit: int = 10):
+    """V3.0 获取短期记忆 (最近对话)"""
+    try:
+        from backend.agent.service import get_service
+        svc = get_service()
+        items = svc.memory_short_term(limit=limit)
+        return {"success": True, "memories": items, "count": len(items)}
+    except Exception as e:
+        return {"success": False, "error": str(e), "memories": []}
+
+
+@app.get("/agent/memory/{memory_id}", summary="获取记忆详情")
+async def agent_memory_get(memory_id: str):
+    """V3.0 获取单个记忆"""
+    try:
+        from backend.agent.service import get_service
+        svc = get_service()
+        entry = await svc.memory_get(memory_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"记忆不存在: {memory_id}")
+        return {"success": True, "memory": entry.to_dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.put("/agent/memory/{memory_id}", summary="更新记忆")
+async def agent_memory_update(memory_id: str, request: Request):
+    """V3.0 更新记忆字段"""
+    try:
+        body = await request.json()
+        from backend.agent.service import get_service
+        svc = get_service()
+        ok = await svc.memory_update(memory_id, **body)
+        return {"success": ok}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/agent/memory/{memory_id}", summary="删除记忆")
+async def agent_memory_delete(memory_id: str):
+    """V3.0 删除记忆"""
+    try:
+        from backend.agent.service import get_service
+        svc = get_service()
+        ok = await svc.memory_delete(memory_id)
+        if not ok:
+            raise HTTPException(status_code=404, detail=f"记忆不存在: {memory_id}")
+        return {"success": True, "deleted": memory_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/agent/memory", summary="清空所有记忆")
+async def agent_memory_clear():
+    """V3.0 清空记忆库"""
+    try:
+        from backend.agent.service import get_service
+        svc = get_service()
+        n = await svc.memory_clear()
+        return {"success": True, "deleted_count": n}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ==================== Vision Perception V1.0 ====================
+
+def _get_perception_service():
+    """获取 PerceptionService 单例 (按 config 自动加载权限)"""
+    from backend.vision.perception.service import get_service
+    svc = get_service()
+    if not svc._initialized:
+        svc.load_config({
+            "perception_enabled": config.perception_enabled,
+            "ocr_enabled": config.perception_ocr_enabled,
+            "detection_enabled": config.perception_detection_enabled,
+            "allow_image_save": config.perception_allow_image_save,
+            "max_image_size": config.perception_max_image_size,
+            "min_confidence": config.perception_min_confidence,
+            "save_policy": config.perception_save_policy,
+        })
+        # 懒加载注入 VisionService (用于截屏后感知)
+        try:
+            from backend.vision.service import get_service as _get_vision_service
+            svc.set_vision_service(_get_vision_service())
+        except Exception as e:
+            logger.warning(f"VisionService 注入失败: {e}")
+    return svc
+
+
+@app.get("/perception/status", summary="感知系统状态", description="获取 Perception 子系统状态 (V1.0)")
+async def perception_status():
+    try:
+        svc = _get_perception_service()
+        return {"success": True, "status": svc.status()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/perception/permission", summary="获取感知权限", description="获取当前 Perception 权限配置")
+async def perception_get_permission():
+    try:
+        svc = _get_perception_service()
+        return {"success": True, "permission": svc.get_permission()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/perception/permission", summary="更新感知权限", description="字段级更新 Perception 权限 (None=不修改)")
+async def perception_update_permission(payload: Dict[str, Any] = None):
+    try:
+        svc = _get_perception_service()
+        if payload is None:
+            payload = {}
+        # 过滤 None 值 (字段级更新)
+        updates = {k: v for k, v in payload.items() if v is not None}
+        if updates:
+            perm = svc.update_permission(**updates)
+            return {"success": True, "permission": perm.to_dict()}
+        return {"success": True, "permission": svc.get_permission(), "note": "无更新字段"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/perception/reset-permission", summary="重置感知权限", description="重置为默认 (全部拒绝)")
+async def perception_reset_permission():
+    try:
+        svc = _get_perception_service()
+        svc.reset_permission()
+        return {"success": True, "permission": svc.get_permission()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/perception/ocr", summary="OCR 文字识别", description="对上传图片执行 OCR 识别 (V1.0)")
+async def perception_ocr(
+    file: UploadFile = File(...),
+    language: str = Form("zh"),
+    min_confidence: float = Form(0.0),
+):
+    """上传图片并执行 OCR 识别
+
+    Args:
+        file: 图片文件 (PNG / JPG)
+        language: 期望语言 (zh / en / mixed)
+        min_confidence: 最小置信度阈值
+    """
+    try:
+        import numpy as np
+        import cv2
+
+        # 读取上传图片
+        contents = await file.read()
+        img_array = np.frombuffer(contents, dtype=np.uint8)
+        image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if image is None:
+            return {"success": False, "error": "无法解码图片"}
+
+        svc = _get_perception_service()
+        result = svc.recognize_ocr(
+            image=image,
+            language=language,
+            min_confidence=min_confidence,
+        )
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/perception/detect", summary="目标检测", description="对上传图片执行目标检测 (V1.0)")
+async def perception_detect(
+    file: UploadFile = File(...),
+    min_confidence: float = Form(0.0),
+    max_objects: Optional[int] = Form(None),
+):
+    """上传图片并执行目标检测"""
+    try:
+        import numpy as np
+        import cv2
+
+        contents = await file.read()
+        img_array = np.frombuffer(contents, dtype=np.uint8)
+        image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if image is None:
+            return {"success": False, "error": "无法解码图片"}
+
+        svc = _get_perception_service()
+        result = svc.detect_objects(
+            image=image,
+            min_confidence=min_confidence,
+            max_objects=max_objects,
+        )
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/perception/combined", summary="联合感知", description="同时执行 OCR + Detection (V1.0)")
+async def perception_combined(
+    file: UploadFile = File(...),
+    language: str = Form("zh"),
+    min_confidence: float = Form(0.0),
+    max_objects: Optional[int] = Form(None),
+):
+    """上传图片并执行联合感知 (OCR + Detection)"""
+    try:
+        import numpy as np
+        import cv2
+
+        contents = await file.read()
+        img_array = np.frombuffer(contents, dtype=np.uint8)
+        image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if image is None:
+            return {"success": False, "error": "无法解码图片"}
+
+        svc = _get_perception_service()
+        result = svc.perceive_combined(
+            image=image,
+            language=language,
+            min_confidence=min_confidence,
+            max_objects=max_objects,
+        )
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/perception/screen/ocr", summary="截屏 OCR", description="截取当前屏幕并执行 OCR (需 screen + ocr 权限)")
+async def perception_screen_ocr(
+    region: Optional[str] = Form(None),         # JSON 字符串: {"x":0,"y":0,"w":100,"h":100}
+    language: str = Form("zh"),
+):
+    """截屏并 OCR"""
+    try:
+        import json as _json
+        svc = _get_perception_service()
+        region_dict = _json.loads(region) if region else None
+        result = svc.capture_screen_and_perceive(
+            mode="ocr",
+            region=region_dict,
+            language=language,
+        )
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/perception/screen/detect", summary="截屏检测", description="截取当前屏幕并执行目标检测")
+async def perception_screen_detect(
+    region: Optional[str] = Form(None),
+):
+    """截屏并检测"""
+    try:
+        import json as _json
+        svc = _get_perception_service()
+        region_dict = _json.loads(region) if region else None
+        result = svc.capture_screen_and_perceive(
+            mode="detection",
+            region=region_dict,
+        )
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/perception/adapters", summary="Adapter 列表", description="列出所有 OCR / Detection Adapter")
+async def perception_list_adapters():
+    try:
+        svc = _get_perception_service()
+        return {
+            "success": True,
+            "ocr_adapters": svc.list_ocr_adapters(),
+            "detection_adapters": svc.list_detection_adapters(),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/perception/logs", summary="感知日志查询", description="查询感知处理日志")
+async def perception_logs(
+    source: Optional[str] = None,
+    adapter: Optional[str] = None,
+    event: Optional[str] = None,
+    limit: int = 100,
+):
+    try:
+        svc = _get_perception_service()
+        return {
+            "success": True,
+            "logs": svc.get_logs(source=source, adapter=adapter, event=event, limit=limit),
+            "stats": svc.get_log_stats(),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/perception/logs", summary="清空感知日志", description="清空所有感知处理日志")
+async def perception_clear_logs():
+    try:
+        svc = _get_perception_service()
+        n = svc.clear_logs()
+        return {"success": True, "cleared": n}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ==================== Vision Understanding V1.0 ====================
+
+def _get_understanding_service():
+    """获取 UnderstandingService 单例 (按 config 自动加载权限)"""
+    from backend.vision.understanding.service import get_service
+    svc = get_service()
+    if not svc._initialized:
+        svc.load_config({
+            "understanding_enabled": config.understanding_enabled,
+            "allow_image_save": config.understanding_allow_image_save,
+            "max_image_size": config.understanding_max_image_size,
+            "save_policy": config.understanding_save_policy,
+        })
+        # 懒加载注入 VisionService (用于截屏后理解)
+        try:
+            from backend.vision.service import get_service as _get_vision_service
+            svc.set_vision_service(_get_vision_service())
+        except Exception as e:
+            logger.warning(f"VisionService 注入失败: {e}")
+        # 懒加载注入 PerceptionService (用于感知上下文增强)
+        try:
+            from backend.vision.perception.service import get_service as _get_perception_service
+            svc.set_perception_service(_get_perception_service())
+        except Exception as e:
+            logger.warning(f"PerceptionService 注入失败: {e}")
+    return svc
+
+
+@app.get("/understanding/status", summary="理解系统状态", description="获取 Understanding 子系统状态 (V1.0)")
+async def understanding_status():
+    try:
+        svc = _get_understanding_service()
+        return {"success": True, "status": svc.status()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/understanding/permission", summary="获取理解权限", description="获取当前 Understanding 权限配置")
+async def understanding_get_permission():
+    try:
+        svc = _get_understanding_service()
+        return {"success": True, "permission": svc.get_permission()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/understanding/permission", summary="更新理解权限", description="字段级更新 Understanding 权限 (None=不修改)")
+async def understanding_update_permission(payload: Dict[str, Any] = None):
+    try:
+        svc = _get_understanding_service()
+        if payload is None:
+            payload = {}
+        updates = {k: v for k, v in payload.items() if v is not None}
+        if updates:
+            perm = svc.update_permission(**updates)
+            return {"success": True, "permission": perm.to_dict()}
+        return {"success": True, "permission": svc.get_permission(), "note": "无更新字段"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/understanding/reset-permission", summary="重置理解权限", description="重置为默认 (全部拒绝)")
+async def understanding_reset_permission():
+    try:
+        svc = _get_understanding_service()
+        svc.reset_permission()
+        return {"success": True, "permission": svc.get_permission()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/understanding/describe", summary="场景描述", description="对上传图片执行场景理解与描述 (V1.0)")
+async def understanding_describe(
+    file: UploadFile = File(...),
+    language: str = Form("zh"),
+    max_tokens: int = Form(512),
+):
+    """上传图片并执行场景描述"""
+    try:
+        import numpy as np
+        import cv2
+
+        contents = await file.read()
+        img_array = np.frombuffer(contents, dtype=np.uint8)
+        image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if image is None:
+            return {"success": False, "error": "无法解码图片"}
+
+        svc = _get_understanding_service()
+        result = svc.describe_scene(
+            image=image,
+            language=language,
+        )
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/understanding/qa", summary="视觉问答", description="对上传图片提问并回答 (V1.0)")
+async def understanding_qa(
+    file: UploadFile = File(...),
+    question: str = Form(...),
+    language: str = Form("zh"),
+    max_tokens: int = Form(512),
+):
+    """上传图片并执行视觉问答"""
+    try:
+        import numpy as np
+        import cv2
+
+        contents = await file.read()
+        img_array = np.frombuffer(contents, dtype=np.uint8)
+        image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if image is None:
+            return {"success": False, "error": "无法解码图片"}
+
+        svc = _get_understanding_service()
+        result = svc.answer_visual(
+            image=image,
+            question=question,
+            language=language,
+        )
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/understanding/screen/describe", summary="截屏场景描述", description="截取当前屏幕并描述场景 (需 screen + understanding 权限)")
+async def understanding_screen_describe(
+    region: Optional[str] = Form(None),         # JSON 字符串: {"x":0,"y":0,"w":100,"h":100}
+    language: str = Form("zh"),
+):
+    """截屏并描述场景"""
+    try:
+        import json as _json
+        svc = _get_understanding_service()
+        region_dict = _json.loads(region) if region else None
+        result = svc.capture_screen_and_understand(
+            mode="describe",
+            region=region_dict,
+            language=language,
+        )
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/understanding/screen/qa", summary="截屏视觉问答", description="截取当前屏幕并回答问题 (需 screen + understanding 权限)")
+async def understanding_screen_qa(
+    question: str = Form(...),
+    region: Optional[str] = Form(None),
+    language: str = Form("zh"),
+):
+    """截屏并视觉问答"""
+    try:
+        import json as _json
+        svc = _get_understanding_service()
+        region_dict = _json.loads(region) if region else None
+        result = svc.capture_screen_and_understand(
+            mode="qa",
+            region=region_dict,
+            language=language,
+            question=question,
+        )
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/understanding/adapters", summary="VLM Adapter 列表", description="列出所有 VLM Adapter")
+async def understanding_list_adapters():
+    try:
+        svc = _get_understanding_service()
+        return {
+            "success": True,
+            "adapters": svc.list_adapters(),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/understanding/logs", summary="理解日志查询", description="查询理解处理日志")
+async def understanding_logs(
+    source: Optional[str] = None,
+    adapter: Optional[str] = None,
+    event: Optional[str] = None,
+    limit: int = 100,
+):
+    try:
+        svc = _get_understanding_service()
+        return {
+            "success": True,
+            "logs": svc.get_logs(source=source, adapter=adapter, event=event, limit=limit),
+            "stats": svc.get_log_stats(),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/understanding/logs", summary="清空理解日志", description="清空所有理解处理日志")
+async def understanding_clear_logs():
+    try:
+        svc = _get_understanding_service()
+        n = svc.clear_logs()
+        return {"success": True, "cleared": n}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ==================== Vision Memory V1.0 ====================
+
+def _get_vision_memory_service():
+    """获取 MemoryService 单例 (按 config 自动加载权限)"""
+    from backend.vision.memory.service import get_service
+    svc = get_service(db_path=config.vision_memory_db_path)
+    if not svc._initialized:
+        svc.load_config({
+            "vision_memory_enabled": config.vision_memory_enabled,
+            "allow_raw_image_save": config.vision_memory_allow_raw_image_save,
+            "default_importance": config.vision_memory_default_importance,
+            "max_query_limit": config.vision_memory_max_query_limit,
+            "db_path": config.vision_memory_db_path,
+        })
+    return svc
+
+
+@app.get("/vision-memory/status", summary="视觉记忆状态", description="获取 Vision Memory 子系统状态 (V1.0)")
+async def vision_memory_status():
+    try:
+        svc = _get_vision_memory_service()
+        return {"success": True, "status": svc.status()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/vision-memory/permission", summary="获取记忆权限", description="获取当前 Vision Memory 权限配置")
+async def vision_memory_get_permission():
+    try:
+        svc = _get_vision_memory_service()
+        return {"success": True, "permission": svc.get_permission()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/vision-memory/permission", summary="更新记忆权限", description="字段级更新 Vision Memory 权限 (None=不修改)")
+async def vision_memory_update_permission(payload: Dict[str, Any] = None):
+    try:
+        svc = _get_vision_memory_service()
+        if payload is None:
+            payload = {}
+        updates = {k: v for k, v in payload.items() if v is not None}
+        if updates:
+            perm = svc.update_permission(**updates)
+            return {"success": True, "permission": perm.to_dict()}
+        return {"success": True, "permission": svc.get_permission(), "note": "无更新字段"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/vision-memory/reset-permission", summary="重置记忆权限", description="重置为默认 (全部拒绝)")
+async def vision_memory_reset_permission():
+    try:
+        svc = _get_vision_memory_service()
+        svc.reset_permission()
+        return {"success": True, "permission": svc.get_permission()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/vision-memory/save", summary="保存视觉记忆", description="保存视觉记忆记录 (只记忆结构化结果, 禁止原始图像)")
+async def vision_memory_save(payload: Dict[str, Any]):
+    try:
+        svc = _get_vision_memory_service()
+        from backend.vision.memory.schema import VisualMemoryRecord
+        if not payload:
+            return {"success": False, "error": "缺少请求体"}
+        if "understanding_result" in payload:
+            from backend.vision.understanding.schema import UnderstandingResult
+            result = UnderstandingResult.from_dict(payload["understanding_result"])
+            res = svc.save_understanding_result(
+                result,
+                tags=payload.get("tags"),
+                importance=payload.get("importance"),
+            )
+            return {"success": res.success, **res.to_dict()}
+        record = VisualMemoryRecord.from_dict(payload)
+        res = svc.save(record)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/vision-memory/query", summary="检索视觉记忆", description="按条件检索视觉记忆 (时间/场景/标签/关键词/重要程度)")
+async def vision_memory_query(payload: Dict[str, Any] = None):
+    try:
+        svc = _get_vision_memory_service()
+        from backend.vision.memory.schema import MemoryQuery
+        payload = payload or {}
+        if isinstance(payload.get("time_from"), (int, float)):
+            payload["time_from"] = float(payload["time_from"])
+        if isinstance(payload.get("time_to"), (int, float)):
+            payload["time_to"] = float(payload["time_to"])
+        query = MemoryQuery.from_dict(payload)
+        res = svc.query(query)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/vision-memory/update", summary="更新视觉记忆", description="字段级更新记忆记录 (白名单字段)")
+async def vision_memory_update(payload: Dict[str, Any] = None):
+    try:
+        svc = _get_vision_memory_service()
+        payload = payload or {}
+        memory_id = payload.pop("memory_id", None) or payload.pop("id", None)
+        if not memory_id:
+            return {"success": False, "error": "缺少 memory_id"}
+        fields = {k: v for k, v in payload.items() if v is not None}
+        if not fields:
+            return {"success": False, "error": "无更新字段"}
+        res = svc.update(memory_id, **fields)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/vision-memory/recent-context", summary="最近视觉上下文", description="生成最近视觉记忆上下文文本 (给 Agent 使用)")
+async def vision_memory_recent_context(limit: int = 5):
+    try:
+        svc = _get_vision_memory_service()
+        if limit <= 0:
+            limit = 5
+        context = svc.recent_visual_context(limit=min(limit, 50))
+        return {"success": True, "context": context, "count": svc.count()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/vision-memory/logs", summary="记忆日志查询", description="查询视觉记忆操作日志")
+async def vision_memory_logs(
+    event: Optional[str] = None,
+    action: Optional[str] = None,
+    store: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+):
+    try:
+        svc = _get_vision_memory_service()
+        return {
+            "success": True,
+            "logs": svc.get_logs(event=event, action=action, store=store, status=status, limit=limit),
+            "stats": svc.get_log_stats(),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/vision-memory/logs", summary="清空记忆日志", description="清空所有视觉记忆操作日志")
+async def vision_memory_clear_logs():
+    try:
+        svc = _get_vision_memory_service()
+        n = svc.clear_logs()
+        return {"success": True, "cleared": n}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/vision-memory/count", summary="记忆总数", description="当前视觉记忆记录总数")
+async def vision_memory_count():
+    try:
+        svc = _get_vision_memory_service()
+        return {"success": True, "count": svc.count()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/vision-memory/all", summary="清空视觉记忆", description="清空所有视觉记忆记录 (需权限)")
+async def vision_memory_clear_all():
+    try:
+        svc = _get_vision_memory_service()
+        res = svc.clear()
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/vision-memory/{memory_id}", summary="删除单条记忆", description="按 id 删除单条视觉记忆记录 (需权限)")
+async def vision_memory_delete(memory_id: str):
+    try:
+        svc = _get_vision_memory_service()
+        res = svc.delete(memory_id)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/vision-memory/{memory_id}", summary="获取单条记忆", description="按 id 获取单条视觉记忆记录 (需权限)")
+async def vision_memory_get(memory_id: str):
+    try:
+        svc = _get_vision_memory_service()
+        res = svc.retrieve(memory_id)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ==================== Personality Engine V3.4 ====================
+
+def _get_personality_service():
+    """获取 PersonalityService 单例 (按 config 自动加载权限)"""
+    from backend.personality.service import get_service
+    svc = get_service(db_path=config.personality_db_path)
+    if not svc._initialized:
+        svc.load_config({
+            "personality_enabled": config.personality_enabled,
+            "allow_sensitive": config.personality_allow_sensitive,
+            "max_profiles": config.personality_max_profiles,
+            "db_path": config.personality_db_path,
+        })
+    return svc
+
+
+@app.get("/personality/status", summary="人格引擎状态", description="获取 Personality Engine 子系统状态 (V3.4)")
+async def personality_status():
+    try:
+        svc = _get_personality_service()
+        return {"success": True, "status": svc.status()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/personality/permission", summary="获取人格权限", description="获取当前 Personality Engine 权限配置")
+async def personality_get_permission():
+    try:
+        svc = _get_personality_service()
+        return {"success": True, "permission": svc.get_permission()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/personality/permission", summary="更新人格权限", description="字段级更新 Personality Engine 权限 (None=不修改)")
+async def personality_update_permission(payload: Dict[str, Any] = None):
+    try:
+        svc = _get_personality_service()
+        if payload is None:
+            payload = {}
+        updates = {k: v for k, v in payload.items() if v is not None}
+        if updates:
+            perm = svc.update_permission(**updates)
+            return {"success": True, "permission": perm.to_dict()}
+        return {"success": True, "permission": svc.get_permission(), "note": "无更新字段"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/personality/reset-permission", summary="重置人格权限", description="重置为默认 (全部拒绝)")
+async def personality_reset_permission():
+    try:
+        svc = _get_personality_service()
+        svc.reset_permission()
+        return {"success": True, "permission": svc.get_permission()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/personality/profiles", summary="保存人格档案", description="保存人格档案 (需权限, 敏感字段过滤, 数量上限)")
+async def personality_save(payload: Dict[str, Any]):
+    try:
+        svc = _get_personality_service()
+        from backend.personality.schema import PersonalityProfile
+        if not payload:
+            return {"success": False, "error": "缺少请求体"}
+        profile = PersonalityProfile.from_dict(payload)
+        res = svc.save(profile)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/personality/profiles", summary="检索人格档案", description="按条件检索人格档案 (关键词/维度/活跃)")
+async def personality_query(
+    keyword: Optional[str] = None,
+    active_only: bool = False,
+    limit: int = 20,
+    offset: int = 0,
+):
+    try:
+        svc = _get_personality_service()
+        from backend.personality.schema import PersonalityQuery
+        query = PersonalityQuery(
+            keyword=keyword, active_only=active_only,
+            limit=min(limit, 100), offset=max(offset, 0),
+        )
+        res = svc.query(query)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.put("/personality/profiles/{profile_id}", summary="更新人格档案", description="字段级更新人格档案 (白名单字段)")
+async def personality_update(profile_id: str, payload: Dict[str, Any] = None):
+    try:
+        svc = _get_personality_service()
+        payload = payload or {}
+        fields = {k: v for k, v in payload.items() if v is not None}
+        if not fields:
+            return {"success": False, "error": "无更新字段"}
+        res = svc.update(profile_id, **fields)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/personality/profiles/{profile_id}", summary="删除人格档案", description="按 id 删除人格档案 (需权限)")
+async def personality_delete(profile_id: str):
+    try:
+        svc = _get_personality_service()
+        res = svc.delete(profile_id)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/personality/profiles/{profile_id}", summary="获取单个人格档案", description="按 id 获取人格档案 (需权限)")
+async def personality_get(profile_id: str):
+    try:
+        svc = _get_personality_service()
+        res = svc.retrieve(profile_id)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/personality/current", summary="加载当前人格", description="加载默认人格 (无活跃档案时创建默认人格并设为当前)")
+async def personality_load_default():
+    try:
+        svc = _get_personality_service()
+        res = svc.load_default()
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/personality/current", summary="获取当前人格", description="获取当前活跃人格档案")
+async def personality_get_current():
+    try:
+        svc = _get_personality_service()
+        res = svc.get_current_profile()
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/personality/current/{profile_id}", summary="切换当前人格", description="切换当前人格 (置 active, 其他档案取消 active)")
+async def personality_switch(profile_id: str):
+    try:
+        svc = _get_personality_service()
+        res = svc.switch_profile(profile_id)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/personality/style", summary="生成人格风格指令", description="生成当前人格的风格指令文本 (供 LLM 使用)")
+async def personality_style():
+    try:
+        svc = _get_personality_service()
+        res = svc.personality_style()
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/personality/assess", summary="一致性评估", description="评估文本与当前人格的一致性 (0.0 ~ 1.0)")
+async def personality_assess(payload: Dict[str, Any] = None):
+    try:
+        svc = _get_personality_service()
+        payload = payload or {}
+        text = payload.get("text", "")
+        res = svc.assess_consistency(text)
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/personality/context", summary="人格上下文", description="生成人格上下文文本 (供 LLM System Prompt, 无权限返回空串)")
+async def personality_context():
+    try:
+        svc = _get_personality_service()
+        context = svc.build_persona_context()
+        return {"success": True, "context": context}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/personality/logs", summary="人格日志查询", description="查询人格操作日志")
+async def personality_logs(
+    event: Optional[str] = None,
+    action: Optional[str] = None,
+    store: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+):
+    try:
+        svc = _get_personality_service()
+        return {
+            "success": True,
+            "logs": svc.get_logs(event=event, action=action, store=store, status=status, limit=limit),
+            "stats": svc.get_log_stats(),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/personality/logs", summary="清空人格日志", description="清空所有人格操作日志")
+async def personality_clear_logs():
+    try:
+        svc = _get_personality_service()
+        n = svc.clear_logs()
+        return {"success": True, "cleared": n}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/personality/count", summary="人格档案总数", description="当前人格档案记录总数")
+async def personality_count():
+    try:
+        svc = _get_personality_service()
+        return {"success": True, "count": svc.count()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/personality/all", summary="清空人格档案", description="清空所有人格档案记录 (需权限)")
+async def personality_clear_all():
+    try:
+        svc = _get_personality_service()
+        res = svc.clear()
+        return {"success": res.success, **res.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ==================== Vision Action V1.0 ====================
+
+def _get_action_service():
+    """获取 ActionService 单例 (按 config 自动加载权限)"""
+    from backend.action.service import get_service
+    svc = get_service()
+    if not svc._initialized:
+        svc.load_config({
+            "action_enabled": config.action_enabled,
+            "require_confirm_high_risk": config.action_require_confirm_high_risk,
+        })
+    return svc
+
+
+@app.get("/action/status", summary="行动系统状态", description="获取 Vision Action 子系统状态 (V1.0)")
+async def action_status():
+    try:
+        svc = _get_action_service()
+        return {"success": True, "status": svc.status()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/action/permission", summary="获取行动权限", description="获取当前 Vision Action 权限配置")
+async def action_get_permission():
+    try:
+        svc = _get_action_service()
+        return {"success": True, "permission": svc.get_permission()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/action/permission", summary="更新行动权限", description="字段级更新 Vision Action 权限 (None=不修改)")
+async def action_update_permission(payload: Dict[str, Any] = None):
+    try:
+        svc = _get_action_service()
+        if payload is None:
+            payload = {}
+        updates = {k: v for k, v in payload.items() if v is not None}
+        if updates:
+            cfg = svc.update_permission(**updates)
+            return {"success": True, "permission": cfg.to_dict()}
+        return {"success": True, "permission": svc.get_permission(), "note": "无更新字段"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/action/reset-permission", summary="重置行动权限", description="重置为默认 (全部拒绝)")
+async def action_reset_permission():
+    try:
+        svc = _get_action_service()
+        svc.reset_permission()
+        return {"success": True, "permission": svc.get_permission()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/action/request", summary="提交行动请求", description="提交行动请求 (权限检查 → 风险评估 → 执行; 高风险需 confirmed=true)")
+async def action_request(payload: Dict[str, Any]):
+    try:
+        svc = _get_action_service()
+        from backend.action.schema import ActionRequest
+        if not payload:
+            return {"success": False, "error": "缺少请求体"}
+        request = ActionRequest.from_dict(payload)
+        confirmed = bool(payload.get("confirmed", False))
+        op = svc.execute(request, confirmed=confirmed)
+        return {"success": op.success, **op.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/action/status/{action_id}", summary="查询行动状态", description="按 action_id 查询行动状态 (从历史记录)")
+async def action_status_detail(action_id: str):
+    try:
+        svc = _get_action_service()
+        result = svc.get_status(action_id)
+        if result is None:
+            return {"success": False, "status": "not_found", "error": f"行动不存在: {action_id}"}
+        return {"success": True, "result": result.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/action/{action_id}/cancel", summary="取消行动", description="取消行动 (路由到执行器)")
+async def action_cancel(action_id: str):
+    try:
+        svc = _get_action_service()
+        op = svc.cancel(action_id)
+        return {"success": op.success, **op.to_dict()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/action/history", summary="行动历史", description="检索历史行动记录 (状态过滤, 最新在前)")
+async def action_history(
+    status: Optional[str] = None,
+    limit: int = 50,
+):
+    try:
+        svc = _get_action_service()
+        from backend.action.schema import ActionQuery
+        records = svc.history(ActionQuery(status=status, limit=min(limit, 200)))
+        return {"success": True, "records": records, "count": len(records)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/action/metrics", summary="行动指标", description="行动性能指标 (action_count / success_rate / approval_rate / execution_latency / failure_rate)")
+async def action_metrics():
+    try:
+        svc = _get_action_service()
+        return {"success": True, "metrics": svc.get_log_stats()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/action/logs", summary="行动日志查询", description="查询行动操作日志")
+async def action_logs(
+    event: Optional[str] = None,
+    action_type: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+):
+    try:
+        svc = _get_action_service()
+        return {
+            "success": True,
+            "logs": svc.get_logs(event=event, action_type=action_type, status=status, limit=limit),
+            "stats": svc.get_log_stats(),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/action/logs", summary="清空行动日志", description="清空所有行动操作日志")
+async def action_clear_logs():
+    try:
+        svc = _get_action_service()
+        n = svc.clear_logs()
+        return {"success": True, "cleared": n}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 
 # ==================== WebSocket 实时对话 ====================
 

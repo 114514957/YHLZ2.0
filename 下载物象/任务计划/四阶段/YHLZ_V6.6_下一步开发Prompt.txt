@@ -1,0 +1,242 @@
+# YHLZ AI伙伴 V6.6 下一步开发Prompt
+# Autonomous Growth Maturation (自主成长成熟化)
+
+> 依据：YHLZ Engineering Development Convention Prompt V2.0
+> 来源：V6.5 Cognitive Reflection & Autonomous Growth 完成报告
+> 日期：2026-08-09
+
+---
+
+## 1. 当前系统状态分析
+
+### 已交付能力（V2.1 ~ V6.5，全部 Failed=0）
+
+```
+有声音     Voice Infrastructure V2.1~V2.3
+能思考     Agent Core V3.0
+有视觉     采集+感知+真实引擎+认知集成
+能行动     Embodied AI V4.0~V4.7 (受控)
+有人格     Companion V5.0~V5.6 (铁哥们)
+有记忆     V5.7 + 连续 V6.0 + 网关 V6.3 + 认知 V6.4
+有认知免疫 V5.8 + 恢复安全 V6.0
+能创造     Creative Intelligence V5.9
+有情绪     Emotion Representation V6.1.1
+有节律     Growth Rhythm V6.1.1
+能表达     Expression V6.2
+能感知     V6.2 (Mock) + V6.3 (真实) + V6.4 (认知闭环)
+能理解     Cognitive Reflection V6.5 (总结/模式/矛盾)
+能成长     Autonomous Growth V6.5 (建议/评估/受控应用/身份守护)
+```
+
+### 当前测试基线
+
+```
+embodied:        4760   Failed=0 (Skipped=2 Tesseract 保护)
+vision:           136   Failed=0
+action:           151   Failed=0
+agent:            131   Failed=0
+personality:      137   Failed=0
+voice_identity:   181   Failed=0
+TOTAL:           5496   Failed=0 ✅
+```
+
+### V6.5 完成后 YHLZ 状态
+
+```
+元 (Foundation): Identity ✅
+亨 (Growth):     记忆/反思/连续/节律/情绪/认知反思 ✅
+贞 (Integrity):  验证/恢复/审计/权限/批准/身份守护 ✅
+利 (Creation):   创造智能 ✅
+理解:            认知反思 ✅ → 反思-情绪集成 ⬆️
+成长:            受控成长 ✅ → 成长闭环自动化 ⬆️
+```
+
+---
+
+## 2. 本阶段开发判断（为什么做这个，不做那个）
+
+### 为什么做"自主成长成熟化"
+
+V6.5 打通了**认知反思与受控成长**（理解经验 → 建议 → 评估 → 受控应用）。
+但三个缺口：
+1. **反思不联动情绪**（Reflection → Meaning → Growth Value → Emotion 未接）
+2. **成长闭环靠人工触发**（反思/建议/评估未自动化）
+3. **成长趋势不入报告**（成长历史无趋势分析）
+
+V6.6 三主线：
+1. **反思-情绪集成**：反思结果经 Meaning → Growth Value → 情绪调整（不直接）
+2. **成长闭环自动化**：节律触发反思 → 建议 → 评估（自动生成，应用仍人工/审批）
+3. **成长趋势报告**：建议/评估/应用趋势入 growth_report
+
+### 为什么不做（V6.6 明确不包含）
+
+- 不做具身化（虚拟形象/动作）→ V7.x
+- 不做 LLM（纯规则保持）
+- 不做自动应用（应用永远需人工/审批，growth_auto_apply 保持 false）
+- 不做多智能体成长协作（V6.7/V7）
+
+---
+
+## 3. 本版本目标
+
+**V6.6 Autonomous Growth Maturation**
+
+1. **反思-情绪集成** `companion/reflection/reflection_emotion.py`
+   - 反思 → Meaning → Growth Value → Emotion Adjustment（不直接）
+   - 正面反思（有效策略）→ 温和积极；负面反思（问题模式）→ 有限调整
+2. **成长闭环自动化** `companion/growth/growth_cycle.py`
+   - 节律触发：每日/事件驱动自动反思 → 建议生成 → 评估（应用仍需审批）
+   - 自动行为全部审计
+3. **成长趋势**（growth_report 扩展）
+   - 建议/评估/应用趋势（按天/周）
+4. **快照增强**：growth_state 域补充趋势统计
+
+---
+
+## 4. 架构设计要求
+
+### 分层铁律（保持）
+
+```
+Interface → Service → Manager → Storage / Adapter
+```
+
+### 反思-情绪集成
+
+```
+backend/embodied/companion/reflection/
+└── reflection_emotion.py
+```
+
+- 规则：反思报告 → Meaning（成功模式→积极；问题模式→中性/有限）→ 情绪调整（creative_done/relationship_up 级别，不剧烈）
+- 情绪调整经 EmotionEngine（不直接写状态）
+- 禁止：负面反思大幅压低情绪（有限幅）
+
+### 成长闭环
+
+```
+backend/embodied/companion/growth/
+└── growth_cycle.py
+```
+
+- 触发器：距上次反思 ≥ N 天 或 经历数增长 ≥ M
+- 流程：track(experience) → 自动反思 → 建议 → 评估 → 待审批列表
+- 应用永远需人工（growth_auto_apply=false 硬保持）
+- 自动行为审计（reuse GrowthAudit）
+
+### 成长趋势
+
+- growth_report 增加 growth_trend（建议数/评估通过率/应用数 按天）
+- GrowthTrend 复用（V6.1 已有按桶统计）
+
+---
+
+## 5. 开发任务
+
+### P0（必须）
+
+1. `reflection_emotion.py`：反思-情绪规则集成（≥80 测试）
+2. `growth_cycle.py`：成长闭环自动化（≥100 测试）
+3. growth_report 趋势扩展（≥60 测试）
+4. Service API：`reflection_emotion_adjust` / `growth_cycle_run` /
+   `growth_pending_approvals` / `growth_trend`
+5. 节律联动（rhythm.on_handle 触发成长闭环检查）
+
+### P1（尽力）
+
+6. 成长历史持久化（growth_state 快照扩展）
+7. 建议相似度去重（同类型同 trigger 合并）
+
+---
+
+## 6. 开发要求
+
+### 必须
+
+- 反思-情绪集成必须经 Meaning（禁止反思直接改情绪）
+- 成长闭环自动化不改变"应用需审批"铁律
+- 自动行为全部审计
+- 配置驱动（`companion_growth_*` / `companion_reflection_*`）
+- 中文 docstring / 类型注解 / RLock / 完整日志 / 测试 CRLF
+- 版本断言批量更新用 Python 脚本
+
+### 禁止
+
+- 禁止破坏 V6.5 及以前 API
+- 禁止自动应用成长（growth_auto_apply 恒 false 语义）
+- 禁止反思直接修改情绪/人格
+- 禁止跨层调用 / 静默吞异常 / 黑盒 / 临时方案
+
+---
+
+## 7. 测试验收 Prompt
+
+执行：
+
+```bash
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+```
+
+### 功能验收
+
+- **反思-情绪**：正面反思 → 温和积极；负面反思 → 有限调整（经 Meaning）
+- **成长闭环**：节律触发自动反思/建议/评估（应用仍审批）
+- **趋势**：成长趋势入报告
+- **安全**：自动行为全审计、应用需审批、人格稳定
+- **兼容**：V6.5 及以前全部 API
+
+### 测试要求
+
+- 新增 ≥400（专项 ≥5160）
+- 覆盖：Reflection-Emotion / Growth Cycle / Trend / Audit / Compat
+- 验收标准：Failed = 0
+
+---
+
+## 8. 开发完成返回 Prompt
+
+输出：**YHLZ AI伙伴 V6.6 完成报告**
+
+```
+版本信息: Version / Commit / Date
+新增模块: 列表
+反思-情绪统计: 联动次数 / 情绪调整分布
+成长闭环统计: 自动反思次数 / 自动建议数 / 待审批数
+趋势统计: 建议趋势 / 通过率趋势
+测试结果: Total / Passed / Failed / Skipped
+成长能力验证: 反思联动情绪 / 闭环自动化 / 身份稳定 / 兼容
+```
+
+---
+
+## 9. 最终原则
+
+```
+稳定开发 增量迭代 可测试 可维护 可扩展
+小步推进 持续验证 保持架构健康
+```
+
+**YHLZ 进化路径：**
+
+| 能力 | 状态 |
+|------|------|
+| 有声音 | ✓ |
+| 有视觉 | ✓ → 感知 ✓ → 认知 ✓ |
+| 有记忆 | ✓ → 长期连续 ✓ |
+| 有人格 | ✓ (铁哥们) |
+| 有情绪 | ✓ → 反思联动 ← 本阶段 |
+| 能思考 | ✓ |
+| 能创造 | ✓ |
+| 能表达 | ✓ |
+| 能感知 | ✓ |
+| 能理解 | ✓ → 情绪集成 ← 本阶段 |
+| 能成长 | ✓ → 闭环自动化 ← 本阶段 |
+| 能行动 | 未来 (V7) |
+
+让 YHLZ 持续成为：
+
+**有声音 / 有视觉 / 有记忆 / 有人格 / 有情绪 / 能思考 / 能创造 / 能表达 / 能感知 / 能理解 / 能成长 / 能行动**
+
+持续进化的 AI 伙伴。
+
+**YHLZ · 元 · 亨 · 利 · 贞**

@@ -1,0 +1,237 @@
+# YHLZ AI伙伴 V6.0 下一步开发Prompt
+# Long-term Growth Companion (长期成长闭环)
+
+> 依据：YHLZ Engineering Development Convention Prompt V2.0
+> 来源：V5.9 Creative Intelligence & Value Discovery Layer 完成报告
+> 日期：2026-08-08
+
+---
+
+## 1. 当前系统状态分析
+
+### 已交付能力（V2.1 ~ V5.9，全部 Failed=0）
+
+```
+有声音     Voice Infrastructure V2.1~V2.3 (TTS 三适配器 + 质量门禁 + 权限)
+能思考     Agent Core V3.0 (ReAct 主循环 + 工具系统 + LLM 双模式)
+有视觉     Vision Foundation V1.0 (屏幕/摄像头/Mock, 136 tests)
+能行动     Embodied AI V4.0~V4.7 (环境/推理/经验/策略/治理/跨目标/长期任务)
+有人格     Companion V5.0~V5.6 (伙伴架构/协调/人格/关系/稳定)
+有记忆     Experience Memory V5.7 (经历记录/抽取/查询)
+有认知免疫 Reflection & Cognitive Integrity V5.8 (反思/验证/证据/矛盾/现实检查)
+能创造     Creative Intelligence V5.9 (机会发现/价值评估/方案生成/模拟/审批)
+```
+
+### 当前测试基线
+
+```
+embodied:        2788   Failed=0
+vision:           136   Failed=0
+action:           151   Failed=0
+agent:            131   Failed=0
+personality:      137   Failed=0
+voice_identity:   181   Failed=0
+TOTAL:           3524   Failed=0 ✅
+```
+
+### V5.9 完成后 YHLZ 状态
+
+```
+元 (Foundation): Identity ✅
+亨 (Growth):     Experience / Reflection / Memory ✅
+贞 (Integrity):  Verification / Cognitive Integrity ✅
+利 (Creation):   Creative Intelligence ⬆️ → 下一阶段持续
+```
+
+---
+
+## 2. 本阶段开发判断（为什么做这个，不做那个）
+
+### 为什么做"长期成长闭环"
+
+V5.7~V5.9 已经证明：伙伴能够**积累经验 → 验证 → 反思 → 发现机会 → 提出方案**。
+但所有关键状态（经历/关系/人格/反思/创造）都是**内存态**，重启即丢失。
+没有连续性的伙伴无法形成"长期成长"——这是 V6 的核心主题。
+
+### 为什么不做（V6.0 明确不包含）
+
+- 不做具身化（虚拟形象/视觉/声音/动作）→ V7.x
+- 不做情感表示（Emotion Representation）→ V6.1 或 V6.2
+- 不做 LLM 驱动创造（保持纯规则可解释）→ 铁律
+- 不做自由协商 / 黑盒优化 / 神经网络训练 → 铁律
+
+---
+
+## 3. 本版本目标
+
+**V6.0 Long-term Growth Companion（长期成长闭环）**
+
+1. **全量持久化**：经历 / 验证状态 / 关系 / 人格调整 / 反思报告 / 创造方案统一 JSONL 持久化与恢复
+2. **长期经验组织**：经验分层（活跃/归档）、低价值回收、高价值长期保存、跨会话连续
+3. **成长报告**：长期成长轨迹（经验增长曲线 / 反思频次 / 创造转化率 / 关系演化）
+4. **连续身份验证**：重启后身份/人格/关系/记忆完整恢复，且核心人格不可变
+
+---
+
+## 4. 架构设计要求
+
+### 分层铁律（保持）
+
+```
+Interface → Service → Manager → Storage / Adapter
+```
+
+### 持久化设计
+
+```
+backend/embodied/companion/persistence/
+├── storage.py          # 统一 JSONL 存储 (原子写 + 校验 + 恢复)
+├── snapshot.py         # 全量快照 (version + state + checksum)
+├── restore.py          # 恢复 (校验版本兼容 + 降级策略)
+└── persistence_audit.py# 持久化审计
+```
+
+- 所有子系统状态经 `persistence/storage.py` 统一读写（禁止各模块自写文件）
+- 路径配置 `companion_persistence_path`（默认空=不持久化，显式配置开启）
+- 保存格式 JSONL + 每条含 `schema_version`
+- 恢复时版本不兼容 → 跳过并记录（不崩溃）
+
+### 长期经验组织
+
+```
+backend/embodied/companion/experience/
+└── experience_lifecycle.py   # 经验生命周期: 活跃 → 冷数据 → 归档 → 回收
+```
+
+- 活跃经验：近期 + 高价值（参与创造/反思）
+- 冷数据：超期低访问（不参与，但可查）
+- 归档：高价值但低频（压缩保留）
+- 回收：低价值超期（删除, 记录审计）
+
+### 成长报告
+
+```
+backend/embodied/companion/growth/
+├── growth_tracker.py     # 成长指标采集 (经验/反思/创造/关系/验证)
+├── growth_report.py      # 长期成长报告生成
+└── growth_trend.py       # 趋势分析 (按天/周/月)
+```
+
+### 配置（全部进 config.py，companion_persistence_* / companion_growth_* 前缀）
+
+- `companion_persistence_enabled` / `companion_persistence_path`
+- `companion_persistence_snapshot_max` / `companion_persistence_schema_version`
+- `companion_experience_archive_days` / `companion_experience_recycle_value`
+- `companion_growth_window_days` / `companion_growth_enabled`
+
+---
+
+## 5. 开发任务
+
+### P0（必须）
+
+1. `persistence/storage.py`：JSONL 原子写入 + 读取 + 损坏行跳过 + 校验
+2. `persistence/snapshot.py`：全量快照（各子系统状态汇总 + checksum）
+3. `persistence/restore.py`：恢复 + 版本兼容校验
+4. `experience_lifecycle.py`：经验 4 阶段生命周期
+5. `growth_tracker.py` + `growth_report.py`：成长指标与报告
+6. Service API：`companion_persistence_save/load`、`companion_growth_report`、
+   `companion_experience_lifecycle`（只读管理）
+7. 重启连续验证测试：写 → 重建 Service → 加载 → 状态一致
+
+### P1（尽力）
+
+8. `growth_trend.py`：按周/月趋势分析
+9. 创造结果反哺关系（V5.9 完成方案 → 关系信任微调，只增不减防滥用）
+
+---
+
+## 6. 开发要求
+
+### 必须
+
+- 全部配置进 config.py（环境变量 + 默认值），禁止魔法数字
+- 持久化默认关闭（`companion_persistence_enabled=false`），显式开启
+- 恢复失败不崩溃（跳过 + 日志 + 审计）
+- 新模块带 `companion_*` 前缀 property 命名（禁止与 API 方法同名）
+- 中文 docstring / 类型注解 / RLock / 完整日志
+- Mock 优先：持久化用临时目录测试，无真实路径依赖
+- 版本断言批量更新用 Python 脚本（UTF-8，禁止 PowerShell 写中文文件）
+- 测试文件 CRLF 行尾
+
+### 禁止
+
+- 禁止破坏 V5.9 及以前 API（向后兼容测试必须全绿）
+- 禁止跨层调用（Adapter 不调 Service）
+- 禁止静默吞异常（必须日志）
+- 禁止修改核心人格 / 自主改变目标 / 自主执行高风险行为
+- 禁止 NN 训练 / 黑盒 / 临时方案进主架构
+
+---
+
+## 7. 测试验收 Prompt
+
+执行：
+
+```bash
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+```
+
+### 功能验收
+
+- **持久化**：保存 → 新实例加载 → 经历/验证/关系/人格/反思/方案完整恢复
+- **重启连续**：重启后身份（人格 base）+ 关系（trust）+ 经验（count）不变
+- **经验生命周期**：活跃→归档→回收规则正确，低价值回收不影响高价值
+- **成长报告**：指标齐全（经验增长/反思/创造转化/关系演化）
+- **恢复容错**：损坏行跳过、版本不兼容降级、不崩溃
+
+### 测试要求
+
+- 新增 ≥250 用例（专项 ≥3038）
+- 覆盖全流程：持久化 → 重启 → 恢复 → 成长报告
+- 验收标准：Failed = 0
+
+---
+
+## 8. 开发完成返回 Prompt
+
+输出：**YHLZ AI伙伴 V6.0 完成报告**
+
+```
+版本信息: Version / Commit / Date
+新增模块: 列表
+持久化统计: 保存条数 / 恢复条数 / 损坏跳过
+生命周期统计: 活跃 / 冷数据 / 归档 / 回收
+成长报告: 关键指标
+测试结果: Total / Passed / Failed / Skipped
+成长能力验证: 是否重启连续 / 身份稳定 / 长期经验组织 / 成长可报告
+```
+
+---
+
+## 9. 最终原则
+
+```
+稳定开发 增量迭代 可测试 可维护 可扩展
+小步推进 持续验证 保持架构健康
+```
+
+**YHLZ 进化路径：**
+
+| 能力 | 状态 |
+|------|------|
+| 有声音 | ✓ |
+| 有视觉 | 基础输入 ✓ → 基础感知 ← 待开发 |
+| 有记忆 | ✓ → 长期持久化 ← 本阶段 |
+| 有人格 | ✓ (铁哥们) |
+| 能思考 | ✓ (Agent Core) |
+| 能创造 | ✓ (V5.9) |
+| 能行动 | 未来 |
+
+让 YHLZ 持续成为：
+
+**有声音 / 有视觉 / 有记忆 / 有人格 / 能思考 / 能创造 / 能行动**
+
+持续进化的 AI 伙伴。
+
+**YHLZ · 元 · 亨 · 利 · 贞**

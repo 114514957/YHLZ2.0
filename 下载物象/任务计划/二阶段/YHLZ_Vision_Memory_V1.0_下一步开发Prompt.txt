@@ -1,0 +1,330 @@
+YHLZ 下一步开发 Prompt
+
+版本： YHLZ Engineering Next Development Prompt V1.0
+
+依据： YHLZ AI工程开发习惯 Prompt V1.0
+       YHLZ Vision Understanding V1.0 验收报告
+       YHLZ Multimodal AI Companion 蓝图
+
+================================================ 一、当前系统状态分析
+================================================
+
+角色：
+
+你现在是 YHLZ 多模态 AI Companion 长期维护工程师。
+
+当前开发必须遵循：
+
+稳定开发 增量迭代 可测试 可维护 可扩展
+
+当前已有能力：
+
+1. Voice Infrastructure (V2.1 ~ V2.3)
+   - Voice Pipeline / Voice Identity / TTS Adapter (Qwen3 / GPT-SoVITS / Mock)
+   - Quality Gate / Permission / Task System / Metrics / Security / Lifecycle
+
+2. Agent Core (V3.0)
+   - Agent Brain (ReAct) / Planner / Reasoning
+   - Tool System / Plugin SDK / LLM Adapter (OpenAI 兼容 / Mock)
+   - Memory Interface (SQLite + Manager + 短期记忆 + 自动提取 + 衰减)
+   - Agent Service (单例) / Agent API (11 个 /agent/* 端点)
+
+3. Vision Foundation (V1.0 已交付)
+   - VisionFrame / VisionAdapter (Screen / Camera / Mock) / Manager / Service
+   - Permission (默认拒绝) / Logger / 9 个 vision_* 配置 / 136 测试
+
+4. Vision Perception (V1.0 已交付)
+   - PerceptionResult (DetectedObject / DetectedText)
+   - OCR (PaddleOCR / Tesseract / Mock) / Detection (YOLO / Mock)
+   - Manager / Service / Permission / Logger
+   - Agent 工具 (read_screen_text / detect_objects) / 11 个 API 端点
+   - 14 个 perception_* 配置 / 201 测试
+
+5. Vision Understanding (V1.0 已交付)
+   - UnderstandingResult (scene_type / description / subjects / summary)
+   - VLMAdapter + Provider (Mock / OpenAI 兼容 Qwen-VL)
+   - Manager / Service / Permission / Logger
+   - Agent 工具 (describe_scene / answer_visual) / 10 个 API 端点
+   - 13 个 understanding_* 配置 / 162 测试
+
+================================================ 二、本阶段开发判断
+================================================
+
+当前系统已经具备：
+
+- 输入： Voice + Vision (基础帧)
+- 感知： Vision Perception (文字 + 对象)
+- 理解： Vision Understanding (场景语义 + 视觉问答)
+- 思考： Agent Core
+- 基础记忆： Memory Interface (文本记忆)
+
+当前 YHLZ 每次理解屏幕后立即丢弃结果 —— 不能记住"上次看到了什么"、
+不能积累用户视觉偏好、不能基于历史画面回答"刚才屏幕上是什么"。
+
+Understanding 阶段严守"只理解不记忆"的边界, 已完成并验收通过。
+
+下一步必须进入：
+
+视觉理解 → 视觉记忆
+
+为什么做 Vision Memory, 不做其他：
+- 架构顺序: 感知 → 理解 → 记忆 → 行动, 记忆是让理解产生长期价值的关键
+- 用户价值: "刚才那个窗口写的什么?" / "上次看到的界面是什么样" 需要视觉记忆
+- 避免跳级: 未记忆就做自主行动会导致行为无据可依
+
+================================================ 三、本版本目标
+================================================
+
+版本：
+
+YHLZ Vision Memory V1.0
+
+目标：
+
+建立 Vision Memory Layer
+
+```
+UnderstandingResult / PerceptionResult
+    ↓
+Vision Memory Engine
+    ↓
+Persistent Vision Memory (持久化视觉记忆)
+```
+
+输出：
+
+- 视觉记忆持久化 (SQLite, 复用 Agent Memory 模式)
+- 视觉记忆检索 (按时间 / 关键词 / 场景类型)
+- 视觉记忆管理 (增删改查 / 清理策略)
+
+================================================ 四、本版本不包含
+================================================
+
+禁止（明确边界）：
+
+1. Agent 自主视觉行动（自动看屏幕后主动执行, 未来）
+2. 视觉人格化（视觉记忆参与人格决策, 未来）
+3. 视觉偏好自动学习（从记忆自动推断偏好并改变行为, 未来）
+4. 自动电脑控制（一切外部操作, 未来）
+5. 视频流实时记忆（本版本仅单帧 / 快照记忆）
+
+本版本只建设：
+
+- 视觉记忆存储引擎 + 数据结构
+- 记忆检索 / 管理接口
+- Agent 视觉记忆工具
+- 与 Understanding / Perception 的可选自动归档通道
+
+================================================ 五、架构设计要求
+================================================
+
+必须保持既有分层：
+
+Interface
+    ↓
+Service
+    ↓
+Manager
+    ↓
+Adapter / Storage
+
+目录设计：
+
+backend/
+
+    vision/
+
+        memory/                     (新增, 与 perception / understanding 平级)
+
+            __init__.py
+            schema.py               # VisionMemoryEntry 数据结构
+            interface.py            # VisionMemoryStore 抽象接口
+            manager.py              # 注册表 + 路由 + 单例
+            service.py              # 统一入口 (增删改查/检索/归档)
+            permission.py           # 权限控制 (默认拒绝)
+            logger.py               # 记忆操作日志 (可选, 简单实现)
+            stores/                 # 存储实现
+                sqlite_store.py     # SQLite 持久化
+                memory_store.py     # 内存存储 (测试)
+            tools.py                # Agent 工具注册
+            tests/
+
+约束：
+
+- 不修改 Agent Core / Voice 模块
+- 不修改 Vision Foundation / Perception / Understanding 既有接口 (仅新增调用)
+- 可选用 UnderstandingResult / PerceptionResult 作为记忆输入 (仅新增调用)
+- 禁止跨层调用: Adapter/Store 不调 Service
+- 全部配置进 config.py (vision_memory_* 前缀)
+
+================================================ 六、开发任务
+================================================
+
+P0 必须完成：
+
+1. Vision Memory Schema
+
+   VisionMemoryEntry 字段:
+   - id / timestamp / created_at
+   - memory_type      (scene / text / object / qa / combined)
+   - source           (describe / qa / ocr / detection / combined)
+   - scene_type       (场景类型)
+   - content          (记忆内容: 描述文本)
+   - summary          (简短摘要)
+   - keywords         (关键词列表, 供检索)
+   - subjects         (主体列表, 复用 UnderstandingSubject 结构或平铺 dict)
+   - confidence / metadata / processed 标志
+
+2. Vision Memory Store Interface
+
+   VisionMemoryStore 接口:
+   - add(entry) -> id
+   - get(memory_id) -> entry
+   - update(memory_id, **fields) -> bool
+   - delete(memory_id) -> bool
+   - list_all(limit, offset) -> entries
+   - search(keywords, scene_type, time_range, limit) -> entries
+   - count() -> int
+   - clear() -> int
+   - close()
+
+3. SQLite Store
+
+   - 数据库: backend/data/vision_memories.db (配置可改)
+   - 表: vision_memories
+   - 字段与 schema 对应 (JSON 列存 subjects / keywords / metadata)
+   - 线程安全 (SQLite 连接池或每操作连接 + WAL)
+   - 懒加载 / 启动不阻塞
+
+4. Memory Store (内存实现)
+
+   - 测试用, 与 SQLite 实现同一接口
+   - 环形 / 容量上限可配
+
+5. Vision Memory Manager
+
+   - Store 注册表 + 路由
+   - 默认注册: 内存优先 (测试) / SQLite (生产)
+   - 单例 get_manager / reset_manager
+
+6. Vision Memory Service
+
+   - 统一入口: 增删改查 / 检索 / 统计
+   - 权限校验 (vision_memory_enabled 默认 False)
+   - 日志记录 (add / delete / search)
+   - 可选: remember_from_result(result) 自动归档 UnderstandingResult / PerceptionResult
+   - 单例 get_service / reset_service
+
+7. 权限控制
+
+   - vision_memory_enabled 默认 False
+   - allow_save 策略 (仅记忆结构化结果, 不保存原始图片)
+   - 禁止未经授权保存图片
+
+P1 建议完成：
+
+8. Agent 工具: remember_scene (记住当前屏幕) / recall_scene (回忆最近的视觉记忆)
+
+9. 配置管理: vision_memory_* 配置项 (enabled / db_path / max_entries / test_mode / tool_timeout)
+
+10. API 端点: /vision-memory/status / add / list / search / get / delete / clear / logs
+
+11. 性能指标: 操作耗时记录 + 统计 (add/search 平均耗时)
+
+================================================ 七、开发要求
+================================================
+
+必须：
+
+- 中文注释 / 类型注解 / 异常处理 / 线程安全 (RLock)
+- 日志记录关键操作 (add / search / delete)
+- Mock 与真实双模式 (测试默认内存 Store, YHLZ_VISION_MEMORY_TEST_MODE=true)
+- 测试同步开发 (单元 + 集成 + Mock)
+- 无硬编码 (路径 / 阈值全进配置)
+- 权限默认拒绝
+- 单例 + reset (测试隔离)
+- SQLite 操作异常隔离 (不导致 YHLZ 主流程崩溃)
+
+禁止：
+
+- 禁止保存原始图像 (只记忆结构化结果)
+- 禁止修改 Agent Core / Voice / Vision Foundation / Perception / Understanding 既有接口
+- 禁止跨层调用
+- 禁止绑定单一存储实现 (必须可换 SQLite / 内存 / 未来向量库)
+- 禁止未经授权保存图片
+- 禁止临时方案进入主架构
+
+================================================ 八、测试验收 Prompt
+================================================
+
+执行:
+
+```
+venv\Scripts\python.exe -m unittest discover -s backend.vision.memory.tests -v
+```
+
+验收标准:
+
+```
+Total:  ___   Passed: ___   Failed: 0   Skipped: ___
+```
+
+架构验收:
+
+- [ ] Interface-Service-Manager-Store 分层正确
+- [ ] 模块独立 (不依赖 agent / voice)
+- [ ] 存储可替换 (SQLite + 内存双实现)
+- [ ] 无硬编码 / 配置驱动
+- [ ] 未破坏既有接口
+
+功能验收:
+
+- [ ] 增删改查: add / get / update / delete / clear 全链路
+- [ ] 检索: 按关键词 / 场景类型 / 时间范围
+- [ ] 归档: remember_from_result(UnderstandingResult) / (PerceptionResult)
+- [ ] 权限: vision_memory_enabled=False → 拒绝, 不写库
+
+集成验收:
+
+- [ ] Agent 可调用 remember_scene / recall_scene (不修改 Agent Core)
+- [ ] 回归: Vision Foundation + Perception + Understanding 测试全部通过 (Failed = 0)
+
+安全验收:
+
+- [ ] 权限默认拒绝
+- [ ] 无原始图片入库 (仅结构化结果)
+- [ ] 日志无敏感图像内容
+
+================================================ 九、开发完成返回 Prompt
+================================================
+
+开发完成后必须返回:
+
+一、版本信息 (版本 / 任务 / 完成时间 / 负责人)
+二、执行总结 (目标 / 完成 / 未完成 / 原因)
+三、代码修改记录 (新增 / 修改 / 删除文件)
+四、测试报告 (环境 / 统计 / 失败记录)
+五、架构影响分析 (影响模块 / 兼容 / 未来扩展 / 风险)
+六、问题复盘 (现象 / 原因 / 方案 / 预防)
+七、下一阶段规划 (生成 YHLZ Vision Action / 视觉自主行动 V1.0 开发 Prompt)
+
+同时生成:
+
+- YHLZ_Vision_Memory_V1.0_验收报告.md
+- YHLZ_Vision_Action_V1.0_下一步开发Prompt.txt
+
+================================================ 十、最终原则
+================================================
+
+YHLZ 开发不是堆功能。
+
+每一次开发必须：
+
+增强系统能力
+保持架构健康
+保护长期演进能力
+
+最终目标：
+
+建设 有声音 / 有视觉 / 有记忆 / 有人格 / 能思考 / 能行动
+持续进化的 AI Companion。

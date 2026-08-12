@@ -1,0 +1,251 @@
+# YHLZ AI伙伴 V6.5 下一步开发Prompt
+# Interaction Understanding & Adaptive Expression (互动理解与自适应表达)
+
+> 依据：YHLZ Engineering Development Convention Prompt V2.0
+> 来源：V6.4 Perception-Memory Cognitive Integration 完成报告
+> 日期：2026-08-08
+
+---
+
+## 1. 当前系统状态分析
+
+### 已交付能力（V2.1 ~ V6.4，全部 Failed=0）
+
+```
+有声音     Voice Infrastructure V2.1~V2.3
+能思考     Agent Core V3.0
+有视觉     采集 V1.0 + 感知 V6.2 + 真实引擎 V6.3 + 认知集成 V6.4
+能行动     Embodied AI V4.0~V4.7 (受控)
+有人格     Companion V5.0~V5.6 (铁哥们)
+有记忆     V5.7 + 连续 V6.0 + 网关 V6.3 + 认知 V6.4
+有认知免疫 V5.8 + 恢复安全 V6.0
+能创造     Creative Intelligence V5.9
+有情绪     Emotion Representation V6.1.1
+有节律     Growth Rhythm V6.1.1
+能表达     Expression V6.2
+能感知     V6.2 (Mock) + V6.3 (真实) + V6.4 (认知闭环)
+```
+
+### 当前测试基线
+
+```
+embodied:        4355   Failed=0 (Skipped=2 Tesseract 保护)
+vision:           136   Failed=0
+action:           151   Failed=0
+agent:            131   Failed=0
+personality:      137   Failed=0
+voice_identity:   181   Failed=0
+TOTAL:           5091   Failed=0 ✅
+```
+
+### V6.4 完成后 YHLZ 状态
+
+```
+元 (Foundation): Identity ✅
+亨 (Growth):     记忆/反思/连续/节律/情绪 ✅
+贞 (Integrity):  验证/恢复/审计/权限/批准/反事实 ✅
+利 (Creation):   创造智能 ✅
+感知:            真实 + 认知闭环 ✅ → 语义理解 ⬆️
+表达:            状态建议 ✅ → 自适应融合 ⬆️
+行动:            感知 → 行动闭环 ⬆️ → 本阶段
+```
+
+---
+
+## 2. 本阶段开发判断（为什么做这个，不做那个）
+
+### 为什么做"互动理解 + 自适应表达"
+
+V6.4 打通了**感知-记忆认知闭环**（感知 → 验证 → 反思 → 批准 → 经验）。
+但两个缺口：
+1. **一致性/模式判断是关键词包含**（简单规则），没有语义相似度
+2. **表达层与感知/情绪分离**（表达建议不感知感知结果）
+
+V6.5 三主线：
+1. **语义理解增强**：纯规则 TF 相似度（反思一致性/模式匹配升级）
+2. **自适应表达融合**：情绪 + 感知批准 → 表达建议融合
+3. **感知-行动预览**：感知帧 → 行动建议（经 Permission，不自动执行）
+
+### 为什么不做（V6.5 明确不包含）
+
+- 不做具身化（虚拟形象/动作）→ V7.x
+- 不做 LLM 语义理解（纯规则 TF，铁律保持）
+- 不做自主行动（行动建议需 Permission + 用户确认）
+- 不做音频感知（V7.x）
+
+---
+
+## 3. 本版本目标
+
+**V6.5 Interaction Understanding & Adaptive Expression**
+
+1. **语义相似度引擎** `companion/semantics/`
+   - `tokenizer.py`：中文分词（规则：字/词/短语）
+   - `similarity.py`：TF 余弦相似度（纯规则）
+   - `semantic_matcher.py`：语义匹配（一致性/模式/重复判断升级）
+2. **自适应表达融合** `companion/expression/`
+   - `expression_fusion.py`：情绪 + 感知结果 + 任务上下文 → 融合表达建议
+   - 感知批准 → 表达建议（"我看到任务清单了" 风格）
+3. **感知-行动预览** `companion/perception/action_preview.py`
+   - 感知帧 → 行动建议（经 Permission + action_allowed 检查）
+   - 预览 ≠ 执行（禁止自动行动）
+4. **成长报告感知趋势**（multimodal 事件趋势入报告）
+
+---
+
+## 4. 架构设计要求
+
+### 分层铁律（保持）
+
+```
+Interface → Service → Manager → Storage / Adapter
+```
+
+### 语义理解层
+
+```
+backend/embodied/companion/semantics/
+├── tokenizer.py        # 中文规则分词
+├── similarity.py       # TF 余弦相似度
+└── semantic_matcher.py # 语义匹配器
+```
+
+- 纯规则（禁止 NN/LLM）
+- tokenizer：按长度/常见词拆分（可解释）
+- similarity：TF 向量 + 余弦（0~1）
+- 集成：reflection_rules 一致性/模式用语义相似度替代包含匹配
+
+### 表达融合
+
+```
+backend/embodied/companion/expression/
+└── expression_fusion.py
+```
+
+- 输入：情绪状态 + 感知批准事件 + 任务结果
+- 规则：感知批准 → 表达含感知参考（"我注意到..."）；情绪高 → 热情叠加
+- 输出：{style, tone, content_hint, reason, confidence}
+
+### 行动预览
+
+```
+backend/embodied/companion/perception/
+└── action_preview.py
+```
+
+- 感知帧 → 行动建议（路由 target + action_allowed 检查）
+- 建议含：目标/理由/风险/需确认标记
+- 禁止：自动执行（返回 preview 供上层/用户确认）
+
+---
+
+## 5. 开发任务
+
+### P0（必须）
+
+1. `semantics/`：tokenizer + similarity + matcher（≥120 测试）
+2. `expression/expression_fusion.py`：融合建议（≥80 测试）
+3. `perception/action_preview.py`：行动预览（≥60 测试）
+4. reflection_rules 集成语义匹配（向后兼容）
+5. Service API：`semantic_similarity` / `expression_fusion` / `action_preview` /
+   `perception_action_preview`
+6. 成长报告 multimodal 趋势
+
+### P1（尽力）
+
+7. 感知批准自动生成表达内容提示
+8. 行动预览历史审计
+
+---
+
+## 6. 开发要求
+
+### 必须
+
+- 语义纯规则（TF 余弦，可解释，禁 NN/LLM）
+- 表达融合不修改人格/情绪（只读融合）
+- 行动预览不自动执行（Preview ≠ Action）
+- 配置驱动（`companion_semantics_*` / `companion_expression_*` /
+  `perception_*`），禁止魔法数字
+- 中文 docstring / 类型注解 / RLock / 完整日志 / 测试 CRLF
+- 版本断言批量更新用 Python 脚本
+
+### 禁止
+
+- 禁止破坏 V6.4 及以前 API
+- 禁止语义层依赖 LLM/NN
+- 禁止行动预览绕过 Permission
+- 禁止跨层调用 / 静默吞异常 / 临时方案
+
+---
+
+## 7. 测试验收 Prompt
+
+执行：
+
+```bash
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+```
+
+### 功能验收
+
+- **语义**：相似文本 → 高相似度；无关文本 → 低相似度
+- **一致性升级**：语义相似 → 一致性检查触发
+- **融合表达**：情绪 + 感知 → 融合建议（可解释）
+- **行动预览**：预览生成 + 不自动执行
+- **权限**：未授权 → 预览拒绝
+- **兼容**：V6.4 及以前全部 API
+
+### 测试要求
+
+- 新增 ≥300（专项 ≥4655）
+- 覆盖：Semantics / Fusion / Action Preview / Reflection 升级 / Compat
+- 验收标准：Failed = 0
+
+---
+
+## 8. 开发完成返回 Prompt
+
+输出：**YHLZ AI伙伴 V6.5 完成报告**
+
+```
+版本信息: Version / Commit / Date
+新增模块: 列表
+Semantics 统计: 分词数 / 相似度计算次数 / 一致性命中
+Fusion 统计: 融合建议数 / 内容提示数
+Action Preview 统计: 预览数 / 权限拒绝数 / 未自动执行验证
+测试结果: Total / Passed / Failed / Skipped
+成长能力验证: 语义可计算 / 表达自适应 / 行动受控 / 身份稳定
+```
+
+---
+
+## 9. 最终原则
+
+```
+稳定开发 增量迭代 可测试 可维护 可扩展
+小步推进 持续验证 保持架构健康
+```
+
+**YHLZ 进化路径：**
+
+| 能力 | 状态 |
+|------|------|
+| 有声音 | ✓ |
+| 有视觉 | 采集+感知+认知 ✓ → 语义理解 ← 本阶段 |
+| 有记忆 | ✓ → 感知-记忆闭环 ✓ |
+| 有人格 | ✓ (铁哥们) |
+| 有情绪 | ✓ |
+| 能思考 | ✓ |
+| 能创造 | ✓ |
+| 能表达 | ✓ → 自适应融合 ← 本阶段 |
+| 能感知 | ✓ → 行动预览 ← 本阶段 |
+| 能行动 | 未来 (V7) |
+
+让 YHLZ 持续成为：
+
+**有声音 / 有视觉 / 有记忆 / 有人格 / 有情绪 / 能思考 / 能创造 / 能表达 / 能感知 / 能行动**
+
+持续进化的 AI 伙伴。
+
+**YHLZ · 元 · 亨 · 利 · 贞**

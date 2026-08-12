@@ -1,0 +1,157 @@
+YHLZ Embodied AI V4.7 下一步开发 Prompt
+Long Horizon Planning Layer 长期任务规划与战略执行管理
+
+一、当前系统状态分析
+
+已完成版本:
+- V4.0: AI 能行动 (Action)
+- V4.1: AI 理解环境 (Vision/Understanding + World Model + Reasoning)
+- V4.2: AI 理解原因 (Causal Analysis)
+- V4.3: AI 积累经验 (Experience Learning: 记录/复用/评估)
+- V4.4: AI 选择最佳经验 (Adaptive Strategy Layer)
+- V4.5: AI 管理策略体系 (Meta Strategy Management: 治理/进化/健康/Dry Run)
+- V4.6: AI 跨目标统筹规划 (Cross-Goal Strategic Planning: 分组/共享步骤/预算分配/
+  CrossGoalPlan/Dry Run/审计追踪)
+
+V4.6 专项: 1172 tests (含规划专项 94), Failed=0
+全量回归: embodied 1172 + vision 136 + action 151 + agent 131 +
+          personality 137 + voice_identity 181 = 1908 tests, Failed=0
+
+二、本阶段开发判断
+
+为什么做 Long Horizon Planning Layer:
+- V4.6 已让 AI 能"跨目标统筹规划" (一次规划多目标: 分组/共享/预算)
+- 但 V4.6 输出的是"规划方案" (CrossGoalPlan), 不包含执行编排
+- 现实任务是多阶段/长时间跨度的: 需要把规划落地为可执行的
+  长期任务序列 (阶段划分 → 顺序编排 → 进度跟踪 → 战略调整)
+
+例如:
+- 仓库整理任务: 感知 → 搬运 → 归位 (多阶段长期任务)
+- 巡逻任务: 多轮 scan+inspect 组合 (长时间跨度)
+- 资源受限长期任务: 预算随执行动态调整 (战略执行管理)
+
+V4.7 让 AI 从"跨目标统筹规划"进入"长期任务规划与战略执行管理":
+- 阶段划分: 长期目标 → 阶段 (Phase) 序列 (感知阶段/执行阶段/收尾阶段)
+- 顺序编排: 阶段间依赖 (前阶段输出 → 后阶段输入)
+- 进度跟踪: 阶段执行状态 (pending/running/done/failed), 可恢复
+- 战略调整: 阶段失败 → 重规划 (规则驱动, 可解释)
+
+为什么不做 (本阶段边界):
+- 不做端到端自动执行编排 (仍是规则 + 统计 + 阈值)
+- 不做强化学习 / 神经网络 / 黑盒优化
+- 不改 Agent Brain / Vision Interface / Memory Interface
+- 不控制真实设备 / 机器人 / 自动驾驶
+- 不做自我目标生成
+
+三、本版本目标
+
+YHLZ Embodied AI V4.7
+Long Horizon Planning Layer
+长期任务规划与战略执行管理
+
+核心目标:
+从:
+    AI 跨目标统筹规划 (V4.6)
+升级:
+    AI 长期任务规划与战略执行管理 (V4.7)
+
+四、本版本不包含 (明确边界)
+
+- 禁止神经网络训练 / 梯度更新 / 黑盒优化
+- 禁止自主修改策略内容 (内容修改仍仅来自经验学习规则)
+- 禁止绕过 Permission Layer
+- 禁止写入 Agent Memory
+- 禁止真实设备控制
+- 禁止修改 Agent Brain / Vision Interface / Memory Interface
+- 禁止自我目标生成 (目标仍由外部提供)
+- 禁止跨子系统调用 (只改 Embodied 模块)
+
+五、架构设计要求
+
+分层: Interface → Service → Manager → Storage/Adapter (保持)
+新增模块建议:
+- backend/embodied/longhorizon/  (长期任务规划层, 新建包)
+  - mission.py     长期任务模型: LongHorizonMission (阶段序列/依赖/进度/状态机)
+  - phasing.py     阶段划分器: 长期目标 → Phase 序列 (规则驱动, 可解释)
+  - executor.py    执行编排器: 阶段顺序/依赖解析/进度跟踪/失败重规划
+  - __init__.py    门面类 (Service 唯一接入点)
+- backend/embodied/planning/ 保持 V4.6 不变 (作为阶段内子规划复用)
+
+配置项 (全部 backend/config.py, embodied_* 前缀, EMBODIED_* 环境变量):
+- embodied_mission_max_phases (默认 10)
+- embodied_mission_retry_limit (默认 2, 阶段失败重试上限)
+- embodied_mission_resume_enabled (默认 True, 支持断点恢复)
+
+数据模型:
+- LongHorizonMission: {mission_id, goals, phases, dependencies, progress,
+  status: pending/running/done/failed, strategy_mode: rule_based}
+
+API (Service 层新增, 保持 V4.6 兼容):
+- long_horizon_plan(goals, budget)   长期任务规划 (阶段划分 + 顺序编排)
+- long_horizon_phases(goals)         阶段划分分析
+- long_horizon_progress(mission_id)  进度跟踪
+- long_horizon_retry(mission_id, phase_id) 阶段重试 (失败 → 重规划)
+- long_horizon_dry_run(goals)        预演 (复用 V4.5/V4.6 dry_run 风格)
+
+六、开发任务
+
+P0:
+1. 阶段划分: 长期目标 → Phase 序列 (感知→执行→收尾, 规则驱动)
+2. 顺序编排: 阶段依赖解析 (前阶段输出 → 后阶段输入)
+3. 进度跟踪: 阶段状态机 (pending/running/done/failed) + 断点恢复
+4. long_horizon_plan() 主入口 + 可解释输出
+5. 单元测试 (新增 >=60 用例, 目标专项 >= 1232)
+
+P1:
+6. 阶段失败重规划 (失败 → 规则调整 → 重试, 上限可配)
+7. 阶段内子规划衔接 (复用 V4.6 cross_goal_plan 作为阶段规划器)
+8. 长期任务 Dry Run (复用 SystemSnapshot 风格)
+
+七、开发要求
+
+必须:
+- 先读后写 / 接口先行 / 配置驱动 / 向后兼容
+- 中文注释 (模块/类/函数 docstring) / 类型注解 / 完整日志
+- RLock 线程安全 / 单例 + reset (get_service/reset_service)
+- Mock 与真实双模式 / 默认测试模式
+- 异常分层隔离 (Service 捕获返回结构化错误)
+- 无测试不交付 (每功能配单元测试)
+
+禁止:
+- 硬编码 (魔法数字/路径/阈值全进 config)
+- 跨层调用 (Adapter 不调 Service)
+- 临时方案进入主架构
+- 静默吞异常
+- 破坏 V4.6 既有 API (只新增不修改)
+
+八、测试验收 Prompt
+
+专项 (必须 >=1232 cases, Failed=0):
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+
+全量 (全部 Failed=0):
+- embodied / vision / action / agent / personality / voice_identity
+- voice_identity 需显式模块运行 (tests 无 __init__.py)
+
+验收报告: YHLZ_Embodied_AI_V4.7_验收报告.md
+(完成状态/修改内容/测试结果/问题风险/架构影响/下一阶段建议)
+
+九、开发完成返回 Prompt
+
+完成后返回:
+1. 专项测试统计 (Total/Passed/Failed/Skipped)
+2. 全量回归统计 (各子系统)
+3. 验收报告路径
+4. 下一阶段建议 (V4.8 方向)
+
+十、最终原则
+
+稳定开发 / 增量迭代 / 可测试 / 可维护 / 可扩展
+小步推进 / 持续验证 / 保持架构健康
+
+V4.7 进化路径:
+V4.6 AI 跨目标统筹规划 → V4.7 AI 长期任务规划与战略执行管理
+(多目标统筹 → 长期任务战略执行)
+
+让 YHLZ 持续成为: 有声音 / 有视觉 / 有记忆 / 有人格 / 能思考 / 能行动
+持续进化的 AI 伙伴。

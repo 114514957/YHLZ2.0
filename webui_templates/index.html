@@ -461,6 +461,9 @@ tr:hover td { background: var(--bg-dark); }
         <div id="topbar">
             <span class="title">YHLZ 2.0 智能语音助手</span>
             <span class="spacer"></span>
+            <span class="item" id="topbar-conv">对话: <span class="status-pill inactive" id="topbar-conv-status">IDLE</span></span>
+            <span class="item" id="topbar-tts">TTS: <span class="status-pill inactive" id="topbar-tts-status">-</span></span>
+            <span class="item" id="topbar-ctx">上下文: <span class="status-pill active" id="topbar-ctx-status">8条</span></span>
             <span class="item" id="topbar-backend">后端: <span class="status-pill inactive" id="topbar-backend-status">未连接</span></span>
             <span class="item" id="topbar-avatar">桌宠: <span class="status-pill inactive" id="topbar-avatar-status">未运行</span></span>
             <span class="item">运行时长: <span id="uptime">00:00:00</span></span>
@@ -659,6 +662,266 @@ tr:hover td { background: var(--bg-dark); }
                 <button class="btn btn-danger" id="tts-stop-btn" onclick="stopTTS()" disabled>停止TTS</button>
                 <button class="btn btn-default" onclick="testTTS()">🔊 试听</button>
                 <span id="tts-msg" style="font-size:12px;color:var(--accent-dark);align-self:center"></span>
+            </div>
+        </div>
+
+        <!-- ===== 声音克隆 (V2.2) ===== -->
+        <div class="page" id="page-voice_clone">
+            <div class="page-title">声音克隆</div>
+            <div class="page-desc">上传参考音频,克隆生成可调用的声音 (V2.2)</div>
+            <div class="card">
+                <div class="card-title">参考音频上传</div>
+                <div class="form-row">
+                    <label class="form-label">音频文件:</label>
+                    <input type="file" id="vc-audio" accept=".wav,.mp3,.flac,.ogg,.m4a" style="flex:1">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">声音名称:</label>
+                    <input type="text" id="vc-name" placeholder="如:元亨克隆" style="flex:1">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">引擎:</label>
+                    <select id="vc-engine" style="width:180px">
+                        <option value="qwen3">qwen3 (Qwen3-TTS)</option>
+                        <option value="gpt_sovits">gpt_sovits (GPT-SoVITS)</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">Voice ID (可选):</label>
+                    <input type="text" id="vc-voice-id" placeholder="留空自动生成" style="flex:1">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">语言:</label>
+                    <select id="vc-language" style="width:120px">
+                        <option value="zh">中文</option>
+                        <option value="en">英文</option>
+                        <option value="ja">日文</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">metadata (JSON, 可选):</label>
+                    <input type="text" id="vc-metadata" placeholder='gpt_sovits: {"sovits_model":"...","gpt_model":"..."}' style="flex:1">
+                </div>
+                <div class="btn-row">
+                    <button class="btn primary" id="vc-clone-btn" onclick="voiceCloneSubmit()">开始克隆</button>
+                    <button class="btn" id="vc-reset-btn" onclick="voiceCloneReset()">重置</button>
+                </div>
+            </div>
+            <div class="card" id="vc-result-card" style="display:none">
+                <div class="card-title">克隆结果</div>
+                <div id="vc-result-content"></div>
+            </div>
+            <div class="card">
+                <div class="card-title">合成测试</div>
+                <div class="form-row">
+                    <label class="form-label">Voice ID:</label>
+                    <input type="text" id="vc-synth-vid" placeholder="克隆返回的 voice_id" style="flex:1">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">测试文本:</label>
+                    <input type="text" id="vc-synth-text" value="你好,这是克隆声音的测试。" style="flex:1">
+                </div>
+                <div class="btn-row">
+                    <button class="btn primary" onclick="voiceSynthesizeTest()">合成测试</button>
+                </div>
+                <div id="vc-synth-result" style="margin-top:8px"></div>
+            </div>
+        </div>
+
+        <!-- ===== 声音管理 ===== -->
+        <div class="page" id="page-voice_manage">
+            <div class="page-title">声音管理</div>
+            <div class="page-desc">已克隆声音列表 / 试听 / 删除 (Phase 2.1 + 2.2)</div>
+            <div class="card">
+                <div class="card-title">声音列表</div>
+                <div class="btn-row" style="margin-bottom:12px">
+                    <button class="btn btn-primary" onclick="voiceManageLoad()">刷新列表</button>
+                    <button class="btn btn-warning" onclick="voiceCleanupTtl()">TTL清理</button>
+                    <button class="btn btn-danger" onclick="voiceCleanupAll()">清空上传音频</button>
+                </div>
+                <table id="vm-table">
+                    <thead>
+                        <tr>
+                            <th>voice_id</th><th>名称</th><th>引擎</th><th>状态</th>
+                            <th>创建时间</th><th>语言</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vm-tbody"><tr><td colspan="7" style="text-align:center;color:#999">点击"刷新列表"加载</td></tr></tbody>
+                </table>
+            </div>
+            <div class="card">
+                <div class="card-title">试听</div>
+                <div class="form-row">
+                    <label class="form-label">voice_id:</label>
+                    <input type="text" id="vm-play-id" placeholder="输入 voice_id" style="flex:1">
+                    <button class="btn btn-accent" onclick="voicePlayAudio()">试听</button>
+                </div>
+                <audio id="vm-audio" controls style="width:100%;margin-top:8px"></audio>
+            </div>
+        </div>
+
+        <!-- ===== 质量评估 ===== -->
+        <div class="page" id="page-voice_quality">
+            <div class="page-title">音频质量评估</div>
+            <div class="page-desc">评估合成音频质量: 相似度 / WER / SNR / 时长 (Phase 1.3)</div>
+            <div class="card">
+                <div class="card-title">上传音频</div>
+                <div class="form-row">
+                    <label class="form-label">参考音频:</label>
+                    <input type="file" id="vq-ref" accept=".wav" style="flex:1">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">合成音频:</label>
+                    <input type="file" id="vq-syn" accept=".wav" style="flex:1">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">参考文本:</label>
+                    <input type="text" id="vq-text" placeholder="可选, 用于 WER" style="flex:1">
+                </div>
+                <div class="checkbox-row">
+                    <input type="checkbox" id="vq-use-asr">
+                    <label for="vq-use-asr">启用 ASR 转写计算 WER (需 ASR 引擎就绪)</label>
+                </div>
+                <button class="btn btn-primary" onclick="voiceQualityEval()">开始评估</button>
+            </div>
+            <div class="card">
+                <div class="card-title">评估结果</div>
+                <pre id="vq-result" style="background:var(--bg-dark);padding:12px;border-radius:8px;min-height:80px;white-space:pre-wrap">等待评估...</pre>
+            </div>
+        </div>
+
+        <!-- ===== Adapter 面板 ===== -->
+        <div class="page" id="page-adapter_dashboard">
+            <div class="page-title">Adapter 状态面板</div>
+            <div class="page-desc">TTS 适配器健康状态 / 模式 / 可用性 (Phase 2.3)</div>
+            <div class="card">
+                <div class="card-title">Adapter 列表</div>
+                <div class="btn-row" style="margin-bottom:12px">
+                    <button class="btn btn-primary" onclick="adapterDashboardLoad()">刷新</button>
+                </div>
+                <table id="ad-table">
+                    <thead>
+                        <tr><th>名称</th><th>模式</th><th>可用</th><th>健康</th></tr>
+                    </thead>
+                    <tbody id="ad-tbody"><tr><td colspan="4" style="text-align:center;color:#999">点击"刷新"加载</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ===== 批量克隆 (Phase 3.1) ===== -->
+        <div class="page" id="page-voice_batch">
+            <div class="page-title">批量声音克隆</div>
+            <div class="page-desc">批量提交克隆任务 / 异步执行 / 状态查询 (Phase 3.1)</div>
+            <div class="card">
+                <div class="card-title">提交批量任务</div>
+                <div class="form-row">
+                    <label class="form-label">任务项 JSON:</label>
+                    <textarea id="vb-items" rows="6" style="flex:1;font-family:monospace;font-size:12px" placeholder='[{"audio_path":"D:/a.wav","name":"声音A"},{"audio_path":"D:/b.wav","name":"声音B","engine":"qwen3"}]'></textarea>
+                </div>
+                <div class="btn-row" style="margin-top:8px">
+                    <button class="btn btn-primary" onclick="voiceBatchSubmit()">提交任务</button>
+                    <button class="btn btn-accent" onclick="voiceBatchList()">刷新列表</button>
+                </div>
+                <div id="vb-submit-result" style="margin-top:8px;color:#666"></div>
+            </div>
+            <div class="card">
+                <div class="card-title">任务列表</div>
+                <table id="vb-table">
+                    <thead>
+                        <tr><th>任务ID</th><th>状态</th><th>总数</th><th>成功</th><th>失败</th><th>创建时间</th><th>结束时间</th><th>操作</th></tr>
+                    </thead>
+                    <tbody id="vb-tbody"><tr><td colspan="8" style="text-align:center;color:#999">点击"刷新列表"加载</td></tr></tbody>
+                </table>
+            </div>
+            <div class="card">
+                <div class="card-title">任务详情</div>
+                <div class="form-row">
+                    <label class="form-label">任务ID:</label>
+                    <input type="text" id="vb-detail-id" placeholder="输入任务ID" style="flex:1">
+                    <button class="btn btn-accent" onclick="voiceBatchDetail()">查询</button>
+                    <button class="btn btn-warning" onclick="voiceBatchCancel()">取消</button>
+                </div>
+                <pre id="vb-detail-result" style="margin-top:8px;background:#f5f5f5;padding:8px;border-radius:4px;max-height:300px;overflow:auto;font-size:12px;color:#333"></pre>
+            </div>
+        </div>
+
+        <!-- ===== 声音去重 (Phase 3.2) ===== -->
+        <div class="page" id="page-voice_dedup">
+            <div class="page-title">声音去重检测</div>
+            <div class="page-desc">检测音频是否与已有声音重复 / 哈希+特征双级匹配 (Phase 3.2)</div>
+            <div class="card">
+                <div class="card-title">去重检测</div>
+                <div class="form-row">
+                    <label class="form-label">音频文件:</label>
+                    <input type="file" id="dd-file" accept=".wav,.mp3,.flac,.ogg,.m4a" style="flex:1">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">相似度阈值:</label>
+                    <input type="number" id="dd-threshold" value="0.85" min="0" max="1" step="0.05" style="width:100px">
+                    <label class="form-label" style="margin-left:16px">启用特征分析:</label>
+                    <input type="checkbox" id="dd-feature">
+                </div>
+                <div class="btn-row" style="margin-top:8px">
+                    <button class="btn btn-primary" onclick="voiceDedupCheck()">检测重复</button>
+                </div>
+                <pre id="dd-result" style="margin-top:8px;background:#f5f5f5;padding:8px;border-radius:4px;max-height:300px;overflow:auto;font-size:12px;color:#333"></pre>
+            </div>
+        </div>
+
+        <!-- ===== 安全审计 (Phase 3.3) ===== -->
+        <div class="page" id="page-voice_audit">
+            <div class="page-title">安全审计</div>
+            <div class="page-desc">审计日志查询 / 权限检查 (Phase 3.3)</div>
+            <div class="card">
+                <div class="card-title">审计日志查询</div>
+                <div class="form-row">
+                    <label class="form-label">voice_id:</label>
+                    <input type="text" id="au-voice-id" placeholder="可选" style="flex:1">
+                    <label class="form-label">事件类型:</label>
+                    <select id="au-event-type" style="width:180px">
+                        <option value="">全部</option>
+                        <option value="voice_created">创建</option>
+                        <option value="voice_selected">选择</option>
+                        <option value="voice_activated">激活</option>
+                        <option value="voice_deleted">删除</option>
+                        <option value="voice_synthesized">合成</option>
+                        <option value="voice_accessed">访问</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">操作者:</label>
+                    <input type="text" id="au-actor-id" placeholder="可选" style="flex:1">
+                    <label class="form-label">条数:</label>
+                    <input type="number" id="au-limit" value="100" min="1" max="1000" style="width:80px">
+                </div>
+                <div class="btn-row" style="margin-top:8px">
+                    <button class="btn btn-primary" onclick="voiceAuditQuery()">查询</button>
+                    <button class="btn btn-accent" onclick="voiceAuditCount()">计数</button>
+                </div>
+                <table id="au-table" style="margin-top:8px">
+                    <thead>
+                        <tr><th>ID</th><th>事件</th><th>voice_id</th><th>操作者</th><th>归属者</th><th>详情</th><th>时间</th></tr>
+                    </thead>
+                    <tbody id="au-tbody"><tr><td colspan="7" style="text-align:center;color:#999">点击"查询"加载</td></tr></tbody>
+                </table>
+            </div>
+            <div class="card">
+                <div class="card-title">权限检查</div>
+                <div class="form-row">
+                    <label class="form-label">voice_id:</label>
+                    <input type="text" id="ap-voice-id" placeholder="声音ID" style="flex:1">
+                    <label class="form-label">操作者:</label>
+                    <input type="text" id="ap-actor-id" value="system" style="flex:1">
+                    <label class="form-label">动作:</label>
+                    <select id="ap-action" style="width:120px">
+                        <option value="read">read</option>
+                        <option value="write">write</option>
+                        <option value="delete">delete</option>
+                        <option value="synthesize">synthesize</option>
+                    </select>
+                    <button class="btn btn-accent" onclick="voicePermissionCheck()">检查</button>
+                </div>
+                <pre id="ap-result" style="margin-top:8px;background:#f5f5f5;padding:8px;border-radius:4px;font-size:12px;color:#333"></pre>
             </div>
         </div>
 
@@ -1152,6 +1415,13 @@ const MODULES = [
     { id: 'service',     icon: '⚙️',  title: '服务设置',   desc: '端口、绑定地址、日志设置' },
     { id: 'asr',         icon: '🎤',  title: 'ASR语音识别', desc: '语音识别模型、精度、降噪设置' },
     { id: 'tts',         icon: '🔊',  title: 'TTS语音合成', desc: '语音合成引擎、音色、情绪设置' },
+    { id: 'voice_clone', icon: '🎙️', title: '声音克隆',   desc: '上传参考音频克隆声音 (V2.2)' },
+    { id: 'voice_manage', icon: '📂', title: '声音管理',   desc: '已克隆声音列表/试听/删除' },
+    { id: 'voice_quality', icon: '📊', title: '质量评估',   desc: '合成音频质量评估 (Phase 1.3)' },
+    { id: 'adapter_dashboard', icon: '🔌', title: 'Adapter面板', desc: 'TTS适配器健康状态' },
+    { id: 'voice_batch',    icon: '📦', title: '批量克隆',   desc: '批量声音克隆任务 (Phase 3.1)' },
+    { id: 'voice_dedup',    icon: '🔍', title: '声音去重',   desc: '检测重复声音 (Phase 3.2)' },
+    { id: 'voice_audit',    icon: '🛡️', title: '安全审计',   desc: '审计日志/权限查询 (Phase 3.3)' },
     { id: 'llm',         icon: '🤖',  title: 'LLM设置',    desc: '模型提供商、参数配置' },
     { id: 'gpu',         icon: '🖥️', title: 'GPU设置',    desc: '显存检测、运行模式、资源管理' },
     { id: 'memory',      icon: '📝',  title: '记忆管理',   desc: '添加、删除、搜索记忆条目' },
@@ -1657,6 +1927,122 @@ function playPCM(floatArray, sampleRate) {
     return src;
 }
 
+// ===== DEMO 流模式: 句级切分 + 并行预合成 + 顺序播放 =====
+let audioCtx2 = null;
+function getAudioCtx2() {
+    // 复用用户手势创建的 AudioContext (浏览器自动播放策略:
+    // 非用户手势创建的 ctx 会 suspended 且 resume 可能被拒)
+    return getAudioCtx();
+}
+
+// 句级切分 (仿 DEMO split_text_for_streaming): 标点断句, min_segment_length 保护
+function splitTextForStreaming(text, minSegmentLength = 4) {
+    if (!text) return [];
+    const segments = [];
+    let buf = '';
+    for (const ch of text) {
+        buf += ch;
+        if ('。！？；!?;…'.includes(ch) && buf.length >= minSegmentLength) {
+            segments.push(buf);
+            buf = '';
+        } else if ('，、,'.includes(ch) && buf.length >= minSegmentLength * 2) {
+            segments.push(buf);
+            buf = '';
+        } else if (buf.length >= 50) {
+            segments.push(buf);
+            buf = '';
+        }
+    }
+    if (buf.trim()) segments.push(buf);
+    return segments;
+}
+
+// 流式播放器: 并行预合成 (seq 递增) + 顺序播放 (dispatcher 语义)
+const streamPlayer = {
+    _seq: 0,
+    _nextPlay: 0,
+    _pending: {},          // seq -> {audio, sampleRate} 或 {finished:true}
+    _playing: false,
+    _interrupted: false,
+    _currentSource: null,
+
+    reset() {
+        this._seq = 0;
+        this._nextPlay = 0;
+        this._pending = {};
+        this._interrupted = false;
+        this._stopCurrent();
+    },
+
+    interrupt() {
+        this._interrupted = true;
+        this._stopCurrent();
+        this._pending = {};
+    },
+
+    _stopCurrent() {
+        if (this._currentSource) {
+            try { this._currentSource.stop(); } catch (e) {}
+            this._currentSource = null;
+        }
+    },
+
+    // 预合成一句: 立即发起 TTS 请求 (并行), 完成后入 pending
+    async preSynth(text, voice) {
+        const seq = this._seq++;
+        try {
+            const data = await fetchJSON('/api/tts/synthesize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, voice: voice || 'Vivian', rate: '0%' })
+            });
+            if (this._interrupted) return;
+            if (data && data.audio && data.audio.length > 0) {
+                this._pending[seq] = { audio: data.audio, sampleRate: data.sample_rate || 24000 };
+                this._dispatch();
+            } else {
+                this._pending[seq] = { finished: true };
+                this._dispatch();
+            }
+        } catch (e) {
+            this._pending[seq] = { finished: true };  // 失败哨兵, 不卡 dispatcher
+            this._dispatch();
+        }
+    },
+
+    // 顺序播放: 只有 next 就绪才播 (仿 DEMO dispatcher)
+    async _dispatch() {
+        while (this._pending[this._nextPlay] && !this._interrupted) {
+            const item = this._pending[this._nextPlay];
+            if (item.finished) {
+                delete this._pending[this._nextPlay];
+                this._nextPlay++;
+                continue;
+            }
+            const ctx = getAudioCtx2();
+            if (ctx.state === 'suspended') {
+                try { await ctx.resume(); } catch (e) {}
+            }
+            setTtsStatus('播放中');
+            const buffer = ctx.createBuffer(1, item.audio.length, item.sampleRate);
+            buffer.copyToChannel(Float32Array.from(item.audio), 0);
+            const src = ctx.createBufferSource();
+            src.buffer = buffer;
+            src.connect(ctx.destination);
+            this._currentSource = src;
+            const doneSeq = this._nextPlay;
+            src.onended = () => {
+                if (this._currentSource === src) this._currentSource = null;
+                delete this._pending[doneSeq];
+                this._nextPlay++;
+                this._dispatch();
+            };
+            src.start();
+            return;  // 播放中, 等 onended 继续
+        }
+    }
+};
+
 // ===== LLM模型列表 =====
 const LLM_MODELS = {
     '阿里云通义千问': ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-2.5-turbo'],
@@ -2153,15 +2539,222 @@ async function speakLastResponse() {
     }
 }
 
-// ===== 语音聊天 =====
+// ===== 语音聊天 (DEMO 流模式: 说完自动识别 + 打断 + 防回声) =====
 const voiceMessages = $('voice-chat-messages');
-let mediaRecorder = null;
-let recordingStream = null;
 let voiceChatActive = false;
 let isBusy = false;
+let lastAIReplyText = '';   // 防回声: 最近 AI 回复
+let lastUserText = '';      // 防回声: 最近用户输入
 
 function appendVoiceMessage(role, content) {
     appendChat(voiceMessages, role, content);
+}
+
+// VAD 说完检测 (沿用 DEMO 数值配置: 能量阈值0.015 + 状态机 + 采音周期延长)
+const VAD_ENERGY_THRESHOLD = 0.015;   // DEMO energy_threshold
+const VAD_MIN_VOICED = 2;             // DEMO min_voiced_frames (语音开始确认)
+const VAD_MIN_UNVOICED = 2;           // DEMO min_unvoiced_frames (静音确认)
+const VAD_HANGOVER = 6;               // 尾音缓冲 6 帧 (~510ms): 采音周期延长, 避免停顿误切
+const VAD_MIN_SPEECH_MS = 300;        // DEMO MIN_SPEECH_DURATION 0.3s
+const VAD_MAX_SPEECH_MS = 8000;       // DEMO SILENCE_TIMEOUT 8s
+const VAD_PREROLL_MS = 1000;          // DEMO 预滚动 1s
+// 输入队列: 按输入顺序排队输出, 每句只输出一遍
+const voiceInputQueue = [];
+let voiceQueueBusy = false;
+async function pushVoiceInput(text) {
+    voiceInputQueue.push(text);
+    if (!voiceQueueBusy) await processVoiceQueue();
+}
+async function processVoiceQueue() {
+    voiceQueueBusy = true;
+    while (voiceInputQueue.length > 0) {
+        const text = voiceInputQueue.shift();
+        await sendToChat(text, true);   // 串行: 每句只输出一遍
+    }
+    voiceQueueBusy = false;
+}
+const vadRecorder = {
+    _frames: [],        // 只存语音帧 (静音帧不累积, 仿 DEMO)
+    _preroll: [],       // 预滚动缓冲 (防丢开头字)
+    _state: 'silence',  // DEMO VAD 状态机: silence/speaking/hangover
+    _voicedCount: 0,    // 连续语音帧计数
+    _unvoicedCount: 0,  // 连续静音帧计数
+    _hangoverCount: 0,  // 尾音帧计数
+    _speechStartMs: 0,  // 语音开始时间 (最短时长判断)
+    _stream: null,
+    _audioCtx: null,
+    _processor: null,
+    _frameDurMs: 85.3,  // 4096/48000*1000
+
+    async start() {
+        this._frames = [];
+        this._preroll = [];
+        this._state = 'silence';
+        this._voicedCount = 0;
+        this._unvoicedCount = 0;
+        this._hangoverCount = 0;
+        this._speechStartMs = 0;
+        this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // V10.1.8: 音频层回声控制 (WebRTC AEC/NS/AGC, 浏览器原生)
+        // 回声/降噪/增益在音频层处理, 文本检测仅作异常保护
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,   // AEC 回声消除
+                noiseSuppression: true,   // NS 降噪
+                autoGainControl: true,    // AGC 自动增益
+            }
+        });
+        this._stream = stream;
+        const source = this._audioCtx.createMediaStreamSource(stream);
+        // 能量检测用 ScriptProcessor (兼容性最好)
+        this._processor = this._audioCtx.createScriptProcessor(4096, 1, 1);
+        this._frameDurMs = 4096 / (this._audioCtx.sampleRate || 48000) * 1000;
+        this._processor.onaudioprocess = (e) => {
+            if (!voiceChatActive) return;
+            const input = e.inputBuffer.getChannelData(0);
+            // 帧能量 (DEMO: rms > adjusted_threshold)
+            let sum = 0;
+            for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
+            const rms = Math.sqrt(sum / input.length);
+            const isVoiced = rms > VAD_ENERGY_THRESHOLD;
+            const frame = new Float32Array(input);
+
+            // 预滚动: 保留最近 1 秒
+            this._preroll.push(frame);
+            if (this._preroll.length > VAD_PREROLL_MS / this._frameDurMs) this._preroll.shift();
+
+            // DEMO VAD 状态机: silence → speaking → hangover → silence
+            if (this._state === 'silence') {
+                if (isVoiced) {
+                    this._voicedCount++;
+                    if (this._voicedCount >= VAD_MIN_VOICED) {
+                        this._state = 'speaking';
+                        this._voicedCount = 0;
+                        // 语音开始: 含预滚动缓冲 (防丢开头) + barge-in
+                        this._frames = this._preroll.slice();
+                        this._preroll = [];
+                        this._speechStartMs = Date.now();
+                        streamPlayer.interrupt();
+                    }
+                } else {
+                    this._voicedCount = 0;
+                }
+            } else if (this._state === 'speaking') {
+                this._frames.push(frame);
+                if (isVoiced) {
+                    this._unvoicedCount = 0;
+                } else {
+                    this._unvoicedCount++;
+                    if (this._unvoicedCount >= VAD_MIN_UNVOICED) {
+                        this._state = 'hangover';
+                        this._unvoicedCount = 0;
+                        this._hangoverCount = 0;
+                    }
+                }
+                // 长度保护 (DEMO SILENCE_TIMEOUT 8s)
+                if (Date.now() - this._speechStartMs > VAD_MAX_SPEECH_MS) {
+                    this._flushAndSend();
+                }
+            } else if (this._state === 'hangover') {
+                if (isVoiced) {
+                    this._state = 'speaking';
+                    this._hangoverCount = 0;
+                    this._frames.push(frame);
+                } else {
+                    this._hangoverCount++;
+                    // DEMO: 短语音(<15帧)动态延长尾音, 这里简化用 1 帧
+                    if (this._hangoverCount >= VAD_HANGOVER) {
+                        this._state = 'silence';
+                        this._flushAndSend();
+                    }
+                }
+            }
+        };
+        source.connect(this._processor);
+        this._processor.connect(this._audioCtx.destination);
+    },
+
+    async _flushAndSend() {
+        const frames = this._frames;
+        this._frames = [];
+        this._state = 'silence';
+        this._voicedCount = 0;
+        this._unvoicedCount = 0;
+        this._hangoverCount = 0;
+        this._preroll = [];
+        if (!frames.length) return;
+        // 最短语音段过滤 (DEMO MIN_SPEECH_DURATION 0.3s)
+        const durMs = frames.length * this._frameDurMs;
+        if (durMs < VAD_MIN_SPEECH_MS) return;
+        // 合并 → 重采样 16kHz
+        const total = frames.reduce((n, c) => n + c.length, 0);
+        const merged = new Float32Array(total);
+        let off = 0;
+        for (const c of frames) { merged.set(c, off); off += c.length; }
+        const targetRate = 16000;
+        const ratio = (this._audioCtx.sampleRate || 48000) / targetRate;
+        const newLen = Math.round(merged.length / ratio);
+        const resampled = new Float32Array(newLen);
+        for (let i = 0; i < newLen; i++) resampled[i] = merged[Math.floor(i * ratio)];
+        // 自适应增益: 目标 RMS 0.06 (解决声音偏小), 上限 30x
+        let gs = 0;
+        for (let i = 0; i < resampled.length; i++) gs += resampled[i] * resampled[i];
+        const rawRms = Math.sqrt(gs / resampled.length);
+        if (rawRms > 0.0003) {
+            const gain = Math.min(30.0, 0.06 / rawRms);
+            for (let i = 0; i < resampled.length; i++) resampled[i] *= gain;
+        }
+        // 静音过滤 (语音帧已过滤, 此处兜底)
+        let ss = 0;
+        for (let i = 0; i < resampled.length; i++) ss += resampled[i] * resampled[i];
+        if (Math.sqrt(ss / resampled.length) < 0.01) return;
+        appendVoiceMessage('sys', '正在识别...');
+        try {
+            const data = await fetchJSON('/api/asr/transcribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ audio_data: Array.from(resampled), sample_rate: targetRate })
+            });
+            const text = (data.text || '').trim();
+            if (!text) { appendVoiceMessage('sys', '未识别到语音内容'); return; }
+            // 防回声 (DEMO ECHO_OVERLAP_RATIO 0.6)
+            if (lastAIReplyText && isEcho(text, lastAIReplyText)) {
+                appendVoiceMessage('sys', '(检测到回声, 已忽略)');
+                return;
+            }
+            lastUserText = text;
+            appendVoiceMessage('user', text);
+            await pushVoiceInput(text);   // 入队: 按输入顺序排队输出
+        } catch (e) {
+            appendVoiceMessage('sys', '识别失败: ' + e.message);
+        }
+    },
+
+    stop() {
+        this._state = 'silence';
+        this._voicedCount = 0;
+        this._unvoicedCount = 0;
+        this._hangoverCount = 0;
+        try { this._processor && this._processor.disconnect(); } catch (e) {}
+        try { this._stream && this._stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+        try { this._audioCtx && this._audioCtx.close(); } catch (e) {}
+        this._processor = null; this._stream = null; this._audioCtx = null;
+        this._frames = []; this._preroll = [];
+    }
+};
+
+// 防回声检测 (沿用 DEMO ECHO_OVERLAP_RATIO=0.6): 文本重叠率
+const ECHO_OVERLAP_RATIO = 0.6;
+function isEcho(text, aiReply) {
+    if (!aiReply) return false;
+    const a = text.replace(/\s/g, '');
+    const b = aiReply.replace(/\s/g, '');
+    if (!a || !b) return false;
+    // 计算 a 中与 b 重叠的字符比例
+    let overlap = 0;
+    for (const ch of a) if (b.includes(ch)) overlap++;
+    const ratio = overlap / a.length;
+    return ratio > ECHO_OVERLAP_RATIO && a.length > 4;
 }
 
 async function startVoiceChat() {
@@ -2170,91 +2763,68 @@ async function startVoiceChat() {
     $('voice-start-btn').disabled = true;
     $('voice-stop-btn').disabled = false;
     appendVoiceMessage('sys', '对话已启动，请开始说话...');
-    if (!mediaRecorder) await setupRecorder();
-    if (mediaRecorder) {
-        mediaRecorder.start();
-        mediaRecorder.ondataavailable = async e => {
-            if (!voiceChatActive) return;
-            if (e.data.size > 0) {
-                await processRecording(e.data);
-            }
-        };
+    // 用户手势内创建并恢复 AudioContext (浏览器自动播放策略)
+    try {
+        const actx = getAudioCtx();
+        if (actx.state === 'suspended') await actx.resume();
+    } catch (e) {
+        console.warn('AudioContext resume:', e.message);
+    }
+    try {
+        await vadRecorder.start();
+        appendVoiceMessage('sys', '麦克风就绪 (说完自动识别)');
+    } catch (e) {
+        appendVoiceMessage('sys', '无法访问麦克风: ' + e.message);
+        voiceChatActive = false;
+        $('voice-start-btn').disabled = false;
+        $('voice-stop-btn').disabled = true;
     }
 }
 
 function stopVoiceChat() {
     voiceChatActive = false;
+    vadRecorder.stop();
+    streamPlayer.interrupt();
+    voiceInputQueue.length = 0;   // 清空待处理输入队列
+    voiceQueueBusy = false;
     $('voice-start-btn').disabled = false;
     $('voice-stop-btn').disabled = true;
-    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-    if (recordingStream) recordingStream.getTracks().forEach(t => t.stop());
-    recordingStream = null;
 }
 
-async function setupRecorder() {
-    try {
-        recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(recordingStream);
-    } catch (e) {
-        appendVoiceMessage('sys', '无法访问麦克风: ' + e.message);
-    }
+// V10.1.8: 对话状态栏更新 (Conversation/TTS)
+function setConvStatus(state) {
+    const el = $('topbar-conv-status');
+    if (!el) return;
+    el.textContent = state;
+    const colors = {
+        'STREAMING': '#6fd06f', 'TTS_PLAYING': '#6fb0e0',
+        'COMPLETED': '#b0b0b0', 'INTERRUPTED': '#e0b060',
+        'PROCESSING': '#e0b060', 'ERROR': '#e07070',
+    };
+    el.style.color = colors[state] || '#b0b0b0';
 }
-
-async function processRecording(blob) {
-    isBusy = true;
-    try {
-        const arrayBuffer = await blob.arrayBuffer();
-        const audioCtx = getAudioCtx();
-        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        const float32 = audioBuffer.getChannelData(0);
-        // 重采样到16kHz
-        const targetRate = 16000;
-        const ratio = audioBuffer.sampleRate / targetRate;
-        const newLength = Math.round(float32.length / ratio);
-        const resampled = new Float32Array(newLength);
-        for (let i = 0; i < newLength; i++) {
-            const idx = Math.floor(i * ratio);
-            resampled[i] = float32[idx];
-        }
-        // 静音检测
-        let sum = 0;
-        for (let i = 0; i < resampled.length; i++) sum += resampled[i] * resampled[i];
-        const rms = Math.sqrt(sum / resampled.length);
-        if (rms < 0.01) {
-            appendVoiceMessage('sys', '未检测到语音，请靠近麦克风说话');
-            isBusy = false;
-            if (voiceChatActive && mediaRecorder) mediaRecorder.start();
-            return;
-        }
-        appendVoiceMessage('sys', '检测到语音结束，正在识别...');
-        const data = await fetchJSON('/api/asr/transcribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ audio_data: Array.from(resampled), sample_rate: targetRate })
-        });
-        const text = data.text || '';
-        if (text.trim()) {
-            appendVoiceMessage('user', text.trim());
-            await sendToChat(text.trim(), true);
-        } else {
-            appendVoiceMessage('sys', '未识别到语音内容');
-        }
-    } catch (e) {
-        appendVoiceMessage('sys', '识别失败: ' + e.message);
-    }
-    isBusy = false;
-    if (voiceChatActive && mediaRecorder && mediaRecorder.state === 'inactive') mediaRecorder.start();
+function setTtsStatus(state) {
+    const el = $('topbar-tts-status');
+    if (el) el.textContent = state;
 }
 
 async function sendToChat(text, withTTS) {
     const aiNode = appendChatNode(voiceMessages, 'ai');
     aiNode.querySelector('.message-content').textContent = '思考中...';
+    const doTTS = withTTS && $('voice-tts').checked;
+    const voice = $('voice-voice') ? $('voice-voice').value : 'Vivian';
     let full = '';
+    let sentenceBuf = '';
+    let firstSentence = true;
+    let currentTurnId = null;   // V10.1.7: 当前 turn (旧 turn 事件丢弃)
+    let currentSeq = null;      // V10.1.7: 当前 sequence (防乱序)
+    if (doTTS) streamPlayer.reset();
     try {
         const resp = await fetch('/api/chat/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text, tts_enabled: withTTS && $('voice-tts').checked })
+            // tts_enabled=false: 后端只流式文本 (快), TTS 播放由前端 streamPlayer 独立负责
+            body: JSON.stringify({ message: text, tts_enabled: false })
         });
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
@@ -2270,16 +2840,81 @@ async function sendToChat(text, withTTS) {
                 if (line.startsWith('data: ')) {
                     try {
                         const data = JSON.parse(line.slice(6));
-                        if (data.content) { full += data.content; aiNode.querySelector('.message-content').textContent = full; }
-                        if (data.is_done && data.full_content) { full = data.full_content; aiNode.querySelector('.message-content').textContent = full; }
+                        // V10.1.7 事件协议: 按 turn_id + sequence 渲染 (旧 turn 不覆盖)
+                        if (data.event_type) {
+                            if (data.event_type === 'START') {
+                                // 新 turn 开始: 设置当前 turn (旧 turn 后续事件将被丢弃)
+                                currentTurnId = data.turn_id;
+                                currentSeq = data.sequence;
+                                aiNode.querySelector('.message-content').textContent = '';
+                                setConvStatus('STREAMING');
+                            } else {
+                                // 非 START 事件: 校验 turn 归属
+                                if (data.turn_id && data.turn_id !== currentTurnId) {
+                                    continue;  // 旧 turn 事件 → 丢弃
+                                }
+                                if (data.sequence && currentSeq !== null &&
+                                    data.sequence <= currentSeq) {
+                                    continue;  // sequence 防乱序
+                                }
+                                if (data.sequence) currentSeq = data.sequence;
+                            }
+                            if (data.event_type === 'TOKEN' && data.payload) {
+                                const chunk = data.payload.content || '';
+                                if (chunk) {
+                                    full += chunk;
+                                    aiNode.querySelector('.message-content').textContent = full;
+                                    // DEMO 流模式: 句级切分 → 并行预合成 (不等上句播完)
+                                    if (doTTS && !streamPlayer._interrupted) {
+                                        sentenceBuf += chunk;
+                                        const sentences = splitTextForStreaming(sentenceBuf, 4);
+                                        if (sentences.length > 1) {
+                                            const ready = sentences[0];
+                                            sentenceBuf = sentences.slice(1).join('');
+                                            if (firstSentence) {
+                                                firstSentence = false;
+                                                streamPlayer.preSynth(ready, voice);
+                                            } else {
+                                                streamPlayer.preSynth(ready, voice);
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (data.event_type === 'COMPLETE' && data.payload) {
+                                full = data.payload.full_content || full;
+                                aiNode.querySelector('.message-content').textContent = full;
+                                setConvStatus('COMPLETED');
+                                if (doTTS) setTtsStatus('播放中');
+                            } else if (data.event_type === 'ERROR') {
+                                aiNode.querySelector('.message-content').textContent =
+                                    '错误: ' + ((data.payload && data.payload.error) || '未知');
+                            } else if (data.event_type === 'INTERRUPTED') {
+                                aiNode.querySelector('.message-content').textContent = full || '(已中断)';
+                            }
+                        } else {
+                            // 旧格式兜底 (兼容)
+                            if (data.content) {
+                                full += data.content;
+                                aiNode.querySelector('.message-content').textContent = full;
+                            }
+                            if (data.is_done && data.full_content) {
+                                full = data.full_content;
+                                aiNode.querySelector('.message-content').textContent = full;
+                            }
+                        }
                     } catch (e) {}
                 }
             }
+        }
+        // 收尾: 剩余句子也预合成
+        if (doTTS && sentenceBuf.trim() && !streamPlayer._interrupted) {
+            streamPlayer.preSynth(sentenceBuf.trim(), voice);
         }
         if (!full) aiNode.querySelector('.message-content').textContent = '无响应';
     } catch (e) {
         aiNode.querySelector('.message-content').textContent = '连接失败: ' + e.message;
     }
+    if (full) lastAIReplyText = full;  // 记录供防回声
     voiceMessages.scrollTop = voiceMessages.scrollHeight;
 }
 
@@ -2439,6 +3074,373 @@ setInterval(() => {
     const s = elapsed % 60;
     $('uptime').textContent = h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
 }, 1000);
+
+// ===== 声音克隆 (V2.2) =====
+function voiceCloneSubmit() {
+    const audioInput = $('vc-audio');
+    const name = $('vc-name').value.trim();
+    const engine = $('vc-engine').value;
+    const voiceId = $('vc-voice-id').value.trim();
+    const language = $('vc-language').value;
+    const metadata = $('vc-metadata').value.trim();
+    const btn = $('vc-clone-btn');
+
+    if (!audioInput.files.length) { alert('请选择参考音频文件'); return; }
+    if (!name) { alert('请填写声音名称'); return; }
+
+    const fd = new FormData();
+    fd.append('audio', audioInput.files[0]);
+    fd.append('name', name);
+    fd.append('engine', engine);
+    if (voiceId) fd.append('voice_id', voiceId);
+    fd.append('language', language);
+    if (metadata) fd.append('metadata', metadata);
+
+    btn.disabled = true; btn.textContent = '克隆中...';
+    $('vc-result-card').style.display = 'none';
+
+    fetch('/api/voice/clone', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            btn.disabled = false; btn.textContent = '开始克隆';
+            $('vc-result-card').style.display = '';
+            const c = $('vc-result-content');
+            if (d.success) {
+                c.innerHTML = `
+                    <div class="form-row"><label class="form-label">Voice ID:</label><span style="font-family:Consolas,monospace">${d.voice_id}</span></div>
+                    <div class="form-row"><label class="form-label">状态:</label><span style="color:var(--accent-dark)">${d.status}</span></div>
+                    <div class="form-row"><label class="form-label">引擎:</label>${d.engine}</div>
+                    <div class="form-row"><label class="form-label">适配器:</label>${d.adapter || '未触发'}</div>
+                    <div class="form-row"><label class="form-label">质量评分:</label>${d.quality_score !== null && d.quality_score !== undefined ? d.quality_score : 'N/A'}</div>
+                    <div class="form-row"><label class="form-label">缓存路径:</label><span style="word-break:break-all">${d.cache_path || '无'}</span></div>
+                    <div class="form-row"><label class="form-label">embedding_hash:</label><span style="font-family:Consolas,monospace">${d.embedding_hash || 'N/A'}</span></div>
+                    ${d.warnings && d.warnings.length ? `<div class="form-row"><label class="form-label">警告:</label><span style="color:var(--warning-dark)">${d.warnings.join('; ')}</span></div>` : ''}
+                `;
+                $('vc-synth-vid').value = d.voice_id;
+            } else {
+                c.innerHTML = `<div style="color:var(--danger)">克隆失败 [${d.stage || 'unknown'}]: ${d.error}</div>`;
+            }
+        })
+        .catch(e => {
+            btn.disabled = false; btn.textContent = '开始克隆';
+            $('vc-result-card').style.display = '';
+            $('vc-result-content').innerHTML = `<div style="color:var(--danger)">请求异常: ${e}</div>`;
+        });
+}
+
+function voiceCloneReset() {
+    $('vc-audio').value = '';
+    $('vc-name').value = '';
+    $('vc-voice-id').value = '';
+    $('vc-metadata').value = '';
+    $('vc-result-card').style.display = 'none';
+}
+
+function voiceSynthesizeTest() {
+    const vid = $('vc-synth-vid').value.trim();
+    const text = $('vc-synth-text').value.trim();
+    const out = $('vc-synth-result');
+    if (!vid) { alert('请填写 Voice ID'); return; }
+    if (!text) { alert('请填写测试文本'); return; }
+    out.innerHTML = '<span style="color:var(--text-secondary)">合成中...</span>';
+    fetch('/api/voice/synthesize', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `voice_id=${encodeURIComponent(vid)}&text=${encodeURIComponent(text)}&language=zh`,
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            out.innerHTML = `<span style="color:var(--accent-dark)">合成成功:</span> <span style="word-break:break-all;font-family:Consolas,monospace">${d.audio_path}</span>`;
+        } else {
+            out.innerHTML = `<span style="color:var(--danger)">合成失败: ${d.error}</span>`;
+        }
+    })
+    .catch(e => { out.innerHTML = `<span style="color:var(--danger)">请求异常: ${e}</span>`; });
+}
+
+// ===== 声音管理 (Phase 2.1 + 2.2) =====
+function voiceManageLoad() {
+    const tbody = $('vm-tbody');
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999">加载中...</td></tr>';
+    fetch('/api/voice/list')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success) { tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger)">${d.error||'加载失败'}</td></tr>`; return; }
+            if (!d.items || d.items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999">暂无声音</td></tr>';
+                return;
+            }
+            tbody.innerHTML = d.items.map(it => {
+                const statusClass = it.status === 'ready' ? 'active' : (it.status === 'deleted' ? 'inactive' : 'pending');
+                return `<tr>
+                    <td>${it.voice_id}</td><td>${it.name||''}</td><td>${it.engine||''}</td>
+                    <td><span class="status-pill ${statusClass}">${it.status||''}</span></td>
+                    <td>${it.created_time||''}</td><td>${it.language||''}</td>
+                    <td><button class="btn btn-small btn-accent" onclick="voicePlayById('${it.voice_id}')">试听</button>
+                        <button class="btn btn-small btn-danger" onclick="voiceDeleteById('${it.voice_id}')">删除</button></td>
+                </tr>`;
+            }).join('');
+        })
+        .catch(e => { tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger)">请求异常: ${e}</td></tr>`; });
+}
+
+function voicePlayById(vid) {
+    $('vm-play-id').value = vid;
+    voicePlayAudio();
+}
+
+function voicePlayAudio() {
+    const vid = $('vm-play-id').value.trim();
+    if (!vid) { alert('请输入 voice_id'); return; }
+    const audio = $('vm-audio');
+    audio.src = `/api/voice/audio/${vid}`;
+    audio.play().catch(e => alert('试听失败: ' + e));
+}
+
+function voiceDeleteById(vid) {
+    if (!confirm(`确认删除声音 ${vid}?`)) return;
+    fetch(`/api/voice/${vid}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) { alert('已删除'); voiceManageLoad(); }
+            else { alert('删除失败: ' + (d.error || '')); }
+        })
+        .catch(e => alert('请求异常: ' + e));
+}
+
+function voiceCleanupTtl() {
+    fetch('/api/voice/uploads/cleanup', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                const s = d.stats;
+                alert(`TTL清理完成: 扫描=${s.scanned} 删除=${s.deleted} 释放=${s.freed_mb}MB`);
+            } else { alert('清理失败: ' + (d.error || '')); }
+        })
+        .catch(e => alert('请求异常: ' + e));
+}
+
+function voiceCleanupAll() {
+    if (!confirm('确认清空所有上传音频?')) return;
+    fetch('/api/voice/uploads/cleanup-all', { method: 'DELETE' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                const s = d.stats;
+                alert(`已清空: 删除=${s.deleted} 释放=${s.freed_mb}MB`);
+            } else { alert('清理失败: ' + (d.error || '')); }
+        })
+        .catch(e => alert('请求异常: ' + e));
+}
+
+// ===== 质量评估 (Phase 1.3) =====
+function voiceQualityEval() {
+    const refFile = $('vq-ref').files[0];
+    const synFile = $('vq-syn').files[0];
+    if (!refFile || !synFile) { alert('请选择参考音频和合成音频'); return; }
+    const out = $('vq-result');
+    out.textContent = '评估中...';
+    const fd = new FormData();
+    fd.append('reference_audio', refFile);
+    fd.append('synthesized_audio', synFile);
+    fd.append('reference_text', $('vq-text').value || '');
+    fd.append('use_asr', $('vq-use-asr').checked ? 'true' : 'false');
+    fetch('/api/voice/quality/evaluate', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                out.textContent = JSON.stringify(d.report, null, 2);
+            } else {
+                out.innerHTML = `<span style="color:var(--danger)">评估失败: ${d.error||''}</span>`;
+            }
+        })
+        .catch(e => { out.innerHTML = `<span style="color:var(--danger)">请求异常: ${e}</span>`; });
+}
+
+// ===== Adapter 面板 (Phase 2.3) =====
+function adapterDashboardLoad() {
+    const tbody = $('ad-tbody');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999">加载中...</td></tr>';
+    fetch('/api/voice/adapters/dashboard')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success) { tbody.innerHTML = `<tr><td colspan="4" style="color:var(--danger)">${d.error||'加载失败'}</td></tr>`; return; }
+            if (!d.adapters || d.adapters.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999">暂无 Adapter</td></tr>';
+                return;
+            }
+            tbody.innerHTML = d.adapters.map(a => {
+                const serveClass = a.can_serve ? 'active' : 'inactive';
+                const healthOk = a.health && a.health.ok;
+                const healthClass = healthOk ? 'active' : 'inactive';
+                return `<tr>
+                    <td>${a.name}</td><td>${a.mode||''}</td>
+                    <td><span class="status-pill ${serveClass}">${a.can_serve?'是':'否'}</span></td>
+                    <td><span class="status-pill ${healthClass}">${healthOk?'正常':'异常'}</span></td>
+                </tr>`;
+            }).join('');
+        })
+        .catch(e => { tbody.innerHTML = `<tr><td colspan="4" style="color:var(--danger)">请求异常: ${e}</td></tr>`; });
+}
+
+// ===== Phase 3.1 批量克隆 =====
+function voiceBatchSubmit() {
+    const items = $('vb-items').value.trim();
+    if (!items) { $('vb-submit-result').textContent = '请输入任务项 JSON'; return; }
+    const fd = new FormData();
+    fd.append('items_json', items);
+    fd.append('owner', 'system');
+    $('vb-submit-result').textContent = '提交中...';
+    fetch('/api/voice/clone/batch', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                $('vb-submit-result').innerHTML = `<span style="color:var(--success)">提交成功: ${d.task.task_id} (共 ${d.task.total} 项)</span>`;
+                voiceBatchList();
+            } else {
+                $('vb-submit-result').innerHTML = `<span style="color:var(--danger)">失败: ${d.error||''}</span>`;
+            }
+        })
+        .catch(e => { $('vb-submit-result').innerHTML = `<span style="color:var(--danger)">请求异常: ${e}</span>`; });
+}
+function voiceBatchList() {
+    const tbody = $('vb-tbody');
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999">加载中...</td></tr>';
+    fetch('/api/voice/clone/batch?limit=50')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success || !d.items || d.items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999">暂无任务</td></tr>';
+                return;
+            }
+            tbody.innerHTML = d.items.map(t => `<tr>
+                <td title="${t.task_id}">${t.task_id.substring(0,20)}...</td>
+                <td><span class="status-pill ${t.status==='completed'?'active':t.status==='failed'?'inactive':''}">${t.status}</span></td>
+                <td>${t.total}</td><td>${t.success_count}</td><td>${t.failed_count}</td>
+                <td>${t.created_at||''}</td><td>${t.ended_at||''}</td>
+                <td><button class="btn btn-sm btn-accent" onclick="$('vb-detail-id').value='${t.task_id}';voiceBatchDetail()">详情</button></td>
+            </tr>`).join('');
+        })
+        .catch(e => { tbody.innerHTML = `<tr><td colspan="8" style="color:var(--danger)">请求异常: ${e}</td></tr>`; });
+}
+function voiceBatchDetail() {
+    const taskId = $('vb-detail-id').value.trim();
+    if (!taskId) { $('vb-detail-result').textContent = '请输入任务ID'; return; }
+    $('vb-detail-result').textContent = '查询中...';
+    fetch('/api/voice/clone/batch/' + encodeURIComponent(taskId))
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                $('vb-detail-result').textContent = JSON.stringify(d.task, null, 2);
+            } else {
+                $('vb-detail-result').textContent = '失败: ' + (d.error || '');
+            }
+        })
+        .catch(e => { $('vb-detail-result').textContent = '请求异常: ' + e; });
+}
+function voiceBatchCancel() {
+    const taskId = $('vb-detail-id').value.trim();
+    if (!taskId) { $('vb-detail-result').textContent = '请输入任务ID'; return; }
+    fetch('/api/voice/clone/batch/' + encodeURIComponent(taskId) + '/cancel', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            $('vb-detail-result').textContent = d.success ? '取消成功' : ('失败: ' + (d.error || ''));
+            if (d.success) voiceBatchList();
+        })
+        .catch(e => { $('vb-detail-result').textContent = '请求异常: ' + e; });
+}
+
+// ===== Phase 3.2 声音去重 =====
+function voiceDedupCheck() {
+    const fileInput = $('dd-file');
+    if (!fileInput.files || !fileInput.files[0]) { $('dd-result').textContent = '请选择音频文件'; return; }
+    const threshold = $('dd-threshold').value || '0.85';
+    const useFeature = $('dd-feature').checked ? 'false' : 'true';
+    const fd = new FormData();
+    fd.append('audio', fileInput.files[0]);
+    fd.append('threshold', threshold);
+    fd.append('skip_asr', useFeature);
+    $('dd-result').textContent = '检测中...';
+    fetch('/api/voice/duplicate/check', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                const r = d.result;
+                const color = r.is_duplicate ? 'var(--warning)' : 'var(--success)';
+                $('dd-result').innerHTML = `<span style="color:${color};font-weight:bold">重复: ${r.is_duplicate?'是':'否'} | 置信度: ${r.confidence} | 匹配类型: ${r.match_type}</span>\n匹配声音: ${r.matched_voice_id||'无'} (${r.matched_name||''})\n音频哈希: ${r.audio_hash||''}\n\n完整结果:\n` + JSON.stringify(r, null, 2);
+            } else {
+                $('dd-result').textContent = '失败: ' + (d.error || '');
+            }
+        })
+        .catch(e => { $('dd-result').textContent = '请求异常: ' + e; });
+}
+
+// ===== Phase 3.3 安全审计 =====
+function voiceAuditQuery() {
+    const params = new URLSearchParams();
+    const vid = $('au-voice-id').value.trim();
+    const evt = $('au-event-type').value;
+    const actor = $('au-actor-id').value.trim();
+    const limit = $('au-limit').value || '100';
+    if (vid) params.append('voice_id', vid);
+    if (evt) params.append('event_type', evt);
+    if (actor) params.append('actor_id', actor);
+    params.append('limit', limit);
+    const tbody = $('au-tbody');
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999">加载中...</td></tr>';
+    fetch('/api/voice/audit/log?' + params.toString())
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success || !d.items || d.items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999">暂无记录</td></tr>';
+                return;
+            }
+            tbody.innerHTML = d.items.map(e => `<tr>
+                <td>${e.id}</td><td>${e.event_type}</td>
+                <td>${e.voice_id||''}</td><td>${e.actor_id}</td><td>${e.owner_id||''}</td>
+                <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${JSON.stringify(e.detail||{}).substring(0,80)}</td>
+                <td>${e.created_at||''}</td>
+            </tr>`).join('');
+        })
+        .catch(e => { tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger)">请求异常: ${e}</td></tr>`; });
+}
+function voiceAuditCount() {
+    const params = new URLSearchParams();
+    const vid = $('au-voice-id').value.trim();
+    const evt = $('au-event-type').value;
+    const actor = $('au-actor-id').value.trim();
+    if (vid) params.append('voice_id', vid);
+    if (evt) params.append('event_type', evt);
+    if (actor) params.append('actor_id', actor);
+    fetch('/api/voice/audit/count?' + params.toString())
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                $('au-tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--accent)">总条数: ${d.count}</td></tr>`;
+            }
+        })
+        .catch(e => { $('au-tbody').innerHTML = `<tr><td colspan="7" style="color:var(--danger)">请求异常: ${e}</td></tr>`; });
+}
+function voicePermissionCheck() {
+    const vid = $('ap-voice-id').value.trim();
+    if (!vid) { $('ap-result').textContent = '请输入 voice_id'; return; }
+    const actor = $('ap-actor-id').value || 'system';
+    const action = $('ap-action').value;
+    const params = new URLSearchParams({ actor_id: actor, action: action });
+    $('ap-result').textContent = '检查中...';
+    fetch('/api/voice/audit/permission/' + encodeURIComponent(vid) + '?' + params.toString())
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                const color = d.allowed ? 'var(--success)' : 'var(--danger)';
+                $('ap-result').innerHTML = `<span style="color:${color};font-weight:bold">允许: ${d.allowed?'是':'否'}</span>\nvoice_id: ${d.voice_id}\n操作者: ${d.actor_id}\n动作: ${d.action}\n归属者: ${d.owner_id}`;
+            } else {
+                $('ap-result').textContent = '失败: ' + (d.error || '');
+            }
+        })
+        .catch(e => { $('ap-result').textContent = '请求异常: ' + e; });
+}
 
 // ===== 初始化 =====
 buildSidebar();

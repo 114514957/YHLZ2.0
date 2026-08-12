@@ -1,0 +1,251 @@
+# YHLZ AI伙伴 V8.1 下一步开发Prompt
+# Embodied Partner Integration (具身伙伴集成)
+
+> 依据：YHLZ Engineering Development Convention Prompt V3.0
+> 来源：V8.0 Constitution Engine 完成报告
+> 日期：2026-08-09
+
+---
+
+## 1. 当前系统状态分析
+
+### 已交付能力（V2.1 ~ V8.0，全部 Failed=0）
+
+```
+有声音     Voice Infrastructure V2.1~V2.3 (TTS 三适配器 + 克隆 + 身份)
+能思考     Agent Core V3.0 (ReAct/Planner/Tool/LLM 双模式)
+有视觉     采集+感知+真实引擎+认知集成 (V6.3~6.4)
+能行动     Embodied AI V4.0~V4.7 (受控)
+有人格     Companion V5.0~V5.6 (铁哥们)
+有记忆     V5.7 + 连续 V6.0 + 网关 V6.3 + 认知 V6.4
+能创造     Creative Intelligence V5.9
+有情绪     Emotion V6.1.1 + 反思联动 V6.6
+能表达     Expression V6.2 + 具身表达 V7.0
+能理解     Cognitive Reflection V6.5 + 情绪集成 V6.6
+能成长     受控成长 V6.5 + 闭环自动化 V6.6 + 趋势 V6.6
+能调度     Hybrid Intelligence V6.8 (本地/云端/成本/隐私/审计)
+能存在     Embodied Presence V7.0 (表达状态机/连续性/守护)
+能治理     Constitution Engine V8.0 (原则/仲裁/验证/总账)
+```
+
+### 当前测试基线
+
+```
+embodied:        6394   Failed=0 (Skipped=2 Tesseract 保护)
+vision:           136   Failed=0
+action:           151   Failed=0
+agent:            131   Failed=0
+personality:      137   Failed=0
+voice_identity:   181   Failed=0
+TOTAL:           7130   Failed=0 ✅
+```
+
+### V8.0 完成后 YHLZ 状态
+
+```
+元 (Foundation): Identity ✅ + 宪法治理 ✅
+亨 (Growth):     记忆/反思/连续/节律/情绪/认知反思/反思联动情绪 ✅
+贞 (Integrity):  验证/恢复/审计/权限/批准/身份守护/治理总账 ✅
+利 (Creation):   创造智能 ✅
+调度:            混合智能层 ✅ (纯 Mock 端点)
+存在:            具身表达 ✅ (状态机就绪, 无推送)
+治理:            宪法引擎 ✅ (原则/仲裁/验证/总账)
+真实接入:        模型端点 Mock ❌ ← 本阶段
+形象推送:        WebSocket 预留 ❌ ← 本阶段
+```
+
+---
+
+## 2. 本阶段开发判断（为什么做这个，不做那个）
+
+### 为什么做"具身伙伴集成"
+
+V8.0 完成最高治理后，YHLZ 已有完整能力栈但缺三块落地：
+1. **HIL 全部 Mock**（模型端点无真实调用，config 已有 api_key）
+2. **形象无推送**（Presence 状态机就绪，无外部消费接口）
+3. **感知不调度**（视觉/语音任务未走 HIL 路由）
+
+V8.1 三主线：
+1. **HIL 真实模型接入**：OpenAI/Claude/Gemini/本地 真实 Adapter
+   （Mock ↔ Real 双模式，失败降级 Mock）
+2. **形象推送接口**：Presence 状态 → 推送事件（WebSocket 预留，
+   状态快照 + 事件序列）
+3. **感知-调度联动**：视觉任务 → HIL 路由（本地实时/云端增强）
+
+### 为什么不做（V8.1 明确不包含）
+
+- 不做 3D 渲染引擎（状态驱动，GPU 不做）
+- 不做自动应用成长（growth_auto_apply 保持 false）
+- 不做云端成为核心（身份/记忆/安全永远本地）
+- 不做多智能体协作调度（V9 Constitution 深化）
+
+---
+
+## 3. 本版本目标
+
+**V8.1 Embodied Partner Integration**
+
+1. **HIL 真实模型接入** `hybrid/cloud/adapters/`
+   - CloudAdapter 接口 + 真实 Adapter（openai/claude/gemini/local）
+   - ModelEndpoint.handler 注入（现有接口不变）
+   - 真实调用失败 → 降级 Mock（不崩溃）
+2. **形象推送接口** `embodied_presence/`
+   - Presence 事件序列（状态变化 → 事件）
+   - 推送接口预留（WebSocket 通道可注册）
+3. **感知-调度联动**
+   - VisionService 任务入口 → HIL.route（本地/云端）
+   - 权限模型不变（screen/camera 默认 false）
+4. **演化建议持久化**：constitution_state 快照域
+
+---
+
+## 4. 架构设计要求
+
+### 分层铁律（保持）
+
+```
+Interface → Service → Manager → Storage / Adapter
+```
+
+### HIL 真实接入
+
+```
+backend/embodied/companion/hybrid/cloud/adapters/
+├── base.py                (CloudAdapter 接口)
+├── openai_adapter.py      (OpenAI 真实)
+├── claude_adapter.py      (Claude 真实)
+├── gemini_adapter.py      (Gemini 真实)
+├── local_adapter.py       (本地模型)
+└── mock_adapter.py        (Mock 默认)
+```
+
+- 测试默认 Mock（YHLZ_RUN_REAL_TESTS=true 切真实）
+- 真实调用失败 → 降级 Mock（结构化错误帧）
+
+### 形象推送
+
+```
+backend/embodied/companion/embodied_presence/presence_stream.py
+```
+
+- 状态变化 → 事件序列（可回放）
+- 推送通道注册（WebSocket 预留接口）
+
+### 感知联动
+
+- VisionService 任务 → HIL route → 执行
+- 权限模型不变
+
+---
+
+## 5. 开发任务
+
+### P0（必须）
+
+1. `hybrid/cloud/adapters/`：CloudAdapter 接口 + 5 Adapter（≥80 测试）
+2. `presence_stream.py`：事件序列 + 推送接口（≥80 测试）
+3. 感知-调度联动（vision → HIL）（≥60 测试）
+4. Service API：`companion_hybrid_adapter_status` /
+   `companion_presence_stream` / `companion_hybrid_vision_task`
+
+### P1（尽力）
+
+5. 演化建议持久化（constitution_state 快照域）
+6. 推送通道 WebSocket 预留
+7. HIL 成本记录入治理总账
+
+---
+
+## 6. 开发要求
+
+### 必须
+
+- 真实 Adapter 与 Mock 同一接口（行为一致）
+- 真实调用失败降级 Mock（不崩溃）
+- 形象推送事件可回放（可审计）
+- 感知联动不改变权限模型
+- 配置驱动（`companion_hybrid_*` / `companion_presence_*` 前缀）
+- 中文 docstring / 类型注解 / RLock / 完整日志 / 测试 CRLF
+- 版本断言批量更新用 Python 脚本
+
+### 禁止
+
+- 禁止破坏 V8.0 及以前 API
+- 禁止自动应用成长（growth_auto_apply 恒 false 语义）
+- 禁止云端结果直接改变身份（宪法验证铁律保持）
+- 禁止跨层调用 / 静默吞异常 / 黑盒 / 临时方案
+
+---
+
+## 7. 测试验收 Prompt
+
+执行：
+
+```bash
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+```
+
+### 功能验收
+
+- **真实接入**：Mock ↔ Real 双模式切换；失败降级
+- **形象推送**：状态变化 → 事件序列；推送通道可注册
+- **感知联动**：视觉任务 → 正确路由（本地/云端）
+- **安全**：宪法验证铁律 / 成本铁律 / 身份稳定
+- **兼容**：V8.0 及以前全部 API
+
+### 测试要求
+
+- 新增 ≥400（专项 ≥6794）
+- 覆盖：Adapter / Stream / VisionLink / Security / Compat
+- 验收标准：Failed = 0
+
+---
+
+## 8. 开发完成返回 Prompt
+
+输出：**YHLZ AI伙伴 V8.1 完成报告**
+
+```
+版本信息: Version / Commit / Date
+新增模块: 列表
+接入统计: 真实调用次数 / 降级次数 / 成本
+推送统计: 事件数 / 通道数 / 回放数
+测试结果: Total / Passed / Failed / Skipped
+集成验证: 真实接入 / 形象推送 / 感知联动 / 身份稳定 / 兼容
+```
+
+---
+
+## 9. 最终原则
+
+```
+稳定开发 增量迭代 可测试 可维护 可扩展
+小步推进 持续验证 保持架构健康
+```
+
+**YHLZ 进化路径：**
+
+| 能力 | 状态 |
+|------|------|
+| 有声音 | ✓ |
+| 有视觉 | ✓ → 感知 ✓ → 认知 ✓ |
+| 有记忆 | ✓ → 长期连续 ✓ |
+| 有人格 | ✓ (铁哥们) |
+| 有情绪 | ✓ → 反思联动 ✓ |
+| 能思考 | ✓ |
+| 能创造 | ✓ |
+| 能表达 | ✓ → 形象表达 ✓ → 推送 ← 本阶段 |
+| 能感知 | ✓ → 调度联动 ← 本阶段 |
+| 能理解 | ✓ |
+| 能成长 | ✓ |
+| 能调度 | ✓ → 真实模型接入 ← 本阶段 |
+| 能存在 | ✓ |
+| 能治理 | ✓ |
+
+让 YHLZ 持续成为：
+
+**有声音 / 有视觉 / 有记忆 / 有人格 / 有情绪 / 能思考 / 能创造 / 能表达 / 能感知 / 能理解 / 能成长 / 能调度 / 能存在 / 能治理**
+
+持续进化的 AI 伙伴。
+
+**YHLZ · 元 · 亨 · 利 · 贞**

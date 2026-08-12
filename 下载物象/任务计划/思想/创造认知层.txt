@@ -1,0 +1,130 @@
+YHLZ AI伙伴
+
+当前方向：
+长期智能伙伴架构
+
+已确认重点：
+
+1. 记忆系统
+- 不是简单数据库
+- 需要经历→提炼→反思→成长
+- 防止记忆膨胀
+- 多模态记忆节点化
+- 记忆来源可追溯
+- 记忆冲突处理
+- 记忆生命周期管理
+
+
+2. 多模态方向
+- 多模态不是单纯输入
+- 应作为经历形成来源
+- Vision / Audio / Text 共同形成 Experience Memory
+- 需要事件化压缩
+- 需要语义融合
+
+
+3. 认知探索方向（暂存）
+
+保留你的思想：
+
+- 思维存储
+- 思维对接
+- 思维火花
+- 冗余观点重组
+- 思维断口
+- 突破未知
+- 独特组合产生新观点
+
+
+经过工程化筛选：
+
+高价值：
+✓ Thought Buffer（未完成思维暂存）
+✓ Knowledge Gap Detection（知识断口检测）
+✓ Knowledge Recombination（知识重组）
+✓ Reflection Memory（反思记忆）
+
+
+需要谨慎：
+△ Thought Spark（候选思想生成）
+△ Unique Thought（新颖组合）
+
+不能直接声称：
+× AI拥有真实体验
+× AI拥有意识
+× AI真正产生灵感
+
+
+4. 当前架构判断
+
+推荐未来增加：
+
+Cognitive Exploration Layer
+
+认知探索层
+
+
+结构：
+
+Experience Memory
+
+↓
+
+Reflection
+
+↓
+
+Thought Buffer
+
+↓
+
+Knowledge Graph
+
+↓
+
+Gap Detection
+
+↓
+
+Candidate Generation
+
+↓
+
+Verification
+
+↓
+
+New Knowledge
+
+
+5. 工程原则
+
+必须保持：
+
+- 可执行
+- 可验证
+- 可回滚
+- 可审计
+- 防幻觉
+- 不自我修改核心身份
+
+
+6. 当前版本规划调整
+
+暂定：
+
+V6.4
+经验形成
+
+V6.5
+经验理解与成长建议
+
+V6.6
+多模态经验记忆 + 统一管理
+
+V7.0
+伙伴Alpha
+
+后续：
+认知探索层
+主动创造能力

@@ -1,0 +1,405 @@
+YHLZ Vision Understanding V1.0 工程级开发 Prompt / 验收 Prompt / 返回
+Prompt
+
+依据： - YHLZ AI工程开发习惯 Prompt V1.0 - YHLZ Multimodal AI Companion
+蓝图 - YHLZ Vision Perception V1.0 验收通过
+
+================================================ 一、开发执行 Prompt
+================================================
+
+角色：
+
+你是长期维护 YHLZ 多模态 AI Companion 的高级工程师。
+
+必须遵循：
+
+稳定开发 增量迭代 接口兼容 可测试 可维护 可扩展
+
+================================================ 当前系统状态
+================================================
+
+已有：
+
+Vision Foundation V1.0：
+
+-   Vision Interface
+-   VisionFrame
+-   Screen Adapter
+-   Camera Adapter
+-   Vision Service
+-   Permission
+-   Logging
+
+Vision Perception V1.0：
+
+-   Perception Core Framework
+-   PerceptionResult Schema
+-   OCR Adapter
+-   Detection Adapter
+-   Vision Service Integration
+-   Agent Tool Registry
+
+当前能力：
+
+Image Input
+
+↓
+
+Vision Perception
+
+↓
+
+Structured Result
+
+当前缺口：
+
+系统可以感知视觉信息， 但不能理解场景并回答视觉问题。
+
+================================================ 版本目标
+================================================
+
+版本：
+
+YHLZ Vision Understanding V1.0
+
+目标：
+
+建立视觉理解层。
+
+数据流：
+
+Image
+
+↓
+
+Vision Foundation
+
+↓
+
+Vision Perception
+
+↓
+
+Vision Understanding
+
+↓
+
+Agent Brain
+
+↓
+
+Response
+
+================================================ 开发范围
+================================================
+
+P0：
+
+1.  Vision Understanding Interface
+
+2.  Understanding Result Schema
+
+3.  Scene Understanding 基础框架
+
+4.  Visual Question Answer 接口
+
+5.  Agent Vision Query Tool
+
+P1：
+
+6.  VLM Adapter设计
+
+7.  多模型兼容接口
+
+8.  性能统计
+
+================================================ 禁止范围
+================================================
+
+禁止：
+
+-   绑定单一VLM
+-   删除Perception层
+-   修改Agent Core内部逻辑
+-   自动电脑控制
+-   Vision Memory
+-   人格推理
+
+================================================ 架构要求
+================================================
+
+保持：
+
+Interface
+
+↓
+
+Service
+
+↓
+
+Manager
+
+↓
+
+Adapter
+
+↓
+
+Provider
+
+新增：
+
+vision/understanding/
+
+-   interface.py
+-   service.py
+-   manager.py
+-   schema.py
+-   adapters/
+-   providers/
+-   tests/
+
+================================================ 核心开发任务
+================================================
+
+任务1：
+
+Understanding Schema
+
+设计：
+
+UnderstandingResult
+
+包含：
+
+id timestamp source question answer scene objects context confidence
+processing_time
+
+任务2：
+
+Understanding Interface
+
+接口：
+
+understand(image, context)
+
+要求：
+
+不绑定模型。
+
+支持：
+
+Mock
+
+Cloud VLM
+
+Local VLM
+
+任务3：
+
+Scene Understanding
+
+输入：
+
+PerceptionResult
+
+输出：
+
+SceneDescription
+
+任务4：
+
+Agent集成
+
+新增：
+
+vision_query
+
+流程：
+
+User
+
+↓
+
+Agent
+
+↓
+
+Vision Tool
+
+↓
+
+Understanding Service
+
+↓
+
+Response
+
+要求：
+
+不修改Agent Core。
+
+================================================ 测试验收 Prompt
+================================================
+
+执行：
+
+YHLZ Vision Understanding V1.0 验收。
+
+架构：
+
+检查：
+
+[ ] 模块独立 [ ] 不破坏Perception [ ] Adapter隔离 [ ] 配置驱动 [ ]
+日志完整
+
+接口：
+
+验证：
+
+Image
+
+↓
+
+Understanding
+
+↓
+
+Result
+
+功能：
+
+测试：
+
+-   场景描述
+-   视觉问答
+-   Mock理解
+
+集成：
+
+验证：
+
+Agent
+
+↓
+
+Vision Tool
+
+↓
+
+Understanding
+
+↓
+
+Response
+
+异常：
+
+测试：
+
+-   空输入
+-   Provider失败
+-   超时
+-   权限关闭
+
+性能：
+
+记录：
+
+-   延迟
+-   CPU
+-   Memory
+
+标准：
+
+Failed = 0
+
+================================================ 返回 Prompt
+================================================
+
+完成后返回：
+
+版本：
+
+任务：
+
+状态：
+
+完成内容：
+
+新增：
+
+修改：
+
+删除：
+
+测试：
+
+Total:
+
+Passed:
+
+Failed:
+
+Skipped:
+
+问题：
+
+现象：
+
+原因：
+
+解决：
+
+架构影响：
+
+影响模块：
+
+兼容情况：
+
+扩展能力：
+
+下一阶段：
+
+生成：
+
+YHLZ Vision Memory V1.0 开发Prompt
+
+目标：
+
+建立：
+
+-   Visual Event Storage
+-   Memory Interface连接
+-   场景历史记录
+-   环境记忆
+
+================================================ 最终原则
+================================================
+
+不要堆功能。
+
+保持：
+
+小步开发
+
+持续验证
+
+架构健康
+
+让YHLZ逐步成为：
+
+有声音
+
+有视觉
+
+有记忆
+
+有人格
+
+能思考
+
+能行动
+
+持续进化的AI Companion。

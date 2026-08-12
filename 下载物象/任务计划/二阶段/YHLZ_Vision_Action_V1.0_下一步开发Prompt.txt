@@ -1,0 +1,290 @@
+# YHLZ Vision Action V1.0 下一步开发 Prompt
+
+## YHLZ Engineering Next Development Prompt V1.0
+
+
+版本：
+
+YHLZ Vision Action V1.0
+
+
+依据：
+
+- YHLZ AI工程开发习惯 Prompt V1.0
+- YHLZ Vision Foundation V1.0
+- YHLZ Vision Perception V1.0
+- YHLZ Vision Understanding V1.0
+- YHLZ Vision Memory V1.0 验收报告
+- YHLZ Personality Engine V3.4 验收报告
+
+
+---
+
+
+# 一、当前系统状态分析
+
+
+## 角色
+
+你现在是 YHLZ 多模态 AI Companion 项目的长期维护高级工程师。
+
+你的职责不是简单写代码，而是完成完整工程闭环：
+
+
+需求分析 → 架构设计 → 开发实现 → 自动测试 → 验收评估 → 生成报告 → 下一阶段规划
+
+
+当前开发必须遵循：
+
+
+稳定开发 / 增量迭代 / 可测试 / 可维护 / 可扩展
+
+
+---
+
+
+# 二、当前系统能力
+
+
+## 1. Voice Infrastructure (V2.1 ~ V2.3) 已完成
+
+- Voice Pipeline / Voice Identity / TTS Adapter (Qwen3 / GPT-SoVITS / Mock)
+- Quality Gate / Permission / Task System / Metrics / Security / Lifecycle
+
+
+## 2. Agent Core (V3.0) 已完成
+
+- Agent Brain (ReAct) / Planner / Reasoning / Tool System / Plugin SDK
+- LLM Adapter (OpenAI 兼容 / Mock) / Memory Interface (SQLite + Manager + 短期记忆 + 自动提取 + 衰减)
+- Agent Service (单例) / Agent API
+
+
+## 3. Vision Foundation V1.0 已完成
+
+- VisionFrame / VisionSource / VisionPermission / Screen / Camera / Mock Adapter
+- Vision Manager / Service / Permission Checker / Logger
+
+
+## 4. Vision Perception V1.0 已完成
+
+- OCR (PaddleOCR / Tesseract / Mock) / Detection (YOLO / Mock)
+- PerceptionResult (DetectedText / DetectedObject) / Manager / Service / Permission / Logger
+- Agent 工具 (read_screen_text / detect_objects) / 11 个 API 端点
+
+
+## 5. Vision Understanding V1.0 已完成
+
+- VLMAdapter + Provider (Mock / OpenAI 兼容 Qwen-VL)
+- UnderstandingResult (scene_type / description / subjects / summary)
+- Agent 工具 (describe_scene / answer_visual) / 10 个 API 端点
+
+
+## 6. Vision Memory V1.0 已完成
+
+- VisualMemoryRecord / MemoryQuery / InMemory + SQLite 双 Store (WAL / 懒加载)
+- Memory Manager / Service / Permission (默认拒绝) / Logger (save_latency / query_latency / memory_count / hit_rate)
+- 只记忆结构化结果, 禁止原始图像入库
+- Agent 工具 (search_visual_memory) / 14 个 API 端点
+- 专项 164 / Vision 全量 663 / Agent 131 全过 (Failed=0)
+
+
+## 7. Personality Engine V3.4 已完成
+
+- PersonalityProfile (五维: friendliness / humor / rigor / warmth / conciseness) + 偏好 + 行为准则
+- InMemory + SQLite 双 Store (表 personality_profiles, 数据独立存储)
+- Personality Service / Permission (默认拒绝, 敏感字段过滤) / Logger (load_latency / switch_latency / consistency_score / profile_count)
+- 默认人格自动创建 / 互斥切换 / 风格生成 (personality_style) / 一致性评估 (assess_consistency) / 人格上下文 (build_persona_context)
+- Agent 工具 (get_personality_style) / 15 个 API 端点
+- 专项 137 / Vision 全量 663 / Agent 131 全过 (Failed=0)
+
+
+---
+
+
+# 三、本阶段任务: Vision Action V1.0 (视觉自主行动层)
+
+
+## 任务目标
+
+在"看见 → 理解 → 记住"链路之上, 新增"行动"能力:
+
+YHLZ 基于屏幕感知结果, 在获得授权后执行真实桌面操作 (点击 / 输入 / 滚动 / 快捷键 / 拖拽 / 打开程序等),
+形成"看见 → 理解 → 记住 → 行动"的完整自主闭环。
+
+
+## 核心原则
+
+1. 不修改 Agent Core / Voice / Vision 既有模块代码 (只新增, 只增量接入)
+2. 分层架构: Interface → Service → Manager → Adapter (与 Vision Memory / Personality 同构)
+3. 权限默认拒绝: 任何行动必须显式授权 (action_enabled=False 默认)
+4. 行动可回滚: 高破坏性动作 (删除 / 格式化 / 发送) 一律禁止; 敏感动作二次确认
+5. Mock 与真实双模式: YHLZ_VISION_ACTION_TEST_MODE=true 时全部走 Mock Adapter (不产生真实鼠标键盘事件)
+6. 行动安全: 单次行动参数上限 (坐标范围 / 文本长度 / 频率限制), 行动超时与取消
+7. 配置驱动: 所有阈值 / 路径 / 开关进 config (vision_action_* 前缀)
+8. 全类型注解 + 中文注释 + RLock 线程安全 + 日志完整
+9. 数据独立存储, 绝不写入 Agent Memory
+
+
+## P0: 核心层 (必须完成)
+
+### 1. Action Schema (schema.py)
+
+- ActionType 枚举: click / double_click / right_click / type_text / press_key / hotkey / scroll / drag / open_app / wait
+- ActionStatus 枚举: ok / error / denied / invalid / timeout / cancelled / unsupported
+- ActionResult: action_id / action_type / status / success / error / latency_ms / position / text_preview / screenshot_before (可选, 默认关)
+- ActionRequest: action_type / position (x,y 可选) / text / key / keys (组合键) / duration / scroll_amount / direction / app_name / confirm (高风险确认)
+- ActionQuery: action_type / status / time_from / time_to / limit / offset (用于行动日志检索)
+- 高风险动作名单: 任何包含删除 / 格式化 / 发送 / 转账 / 关闭未保存 等意图的动作标记 high_risk
+
+### 2. Action Interface (interface.py)
+
+- ActionAdapter ABC: name / execute(request) / cancel() / supported_types / is_available / close
+- ActionStoreError 异常
+- 行动记录存储接口 (ActionRecordStore): save / query / count / clear / close (可选合并到 Action 存储)
+
+### 3. Storage Adapter (stores/)
+
+- memory_store.py: InMemoryActionRecordStore (容量上限, 插入序号稳定排序)
+- sqlite_store.py: SQLiteActionRecordStore (表 action_records, WAL, 懒加载, env YHLZ_VISION_ACTION_DB 覆盖路径)
+
+### 4. Action Manager (manager.py)
+
+- ActionManager: Adapter 注册表 (register / unregister / get / list) + 路由
+- 默认注册: 测试模式 Mock Adapter / 生产 PyAutoGUI Adapter (Windows 桌面自动化)
+- 单例 get_manager / reset_manager
+
+### 5. Action Permission (permission.py)
+
+- ActionPermission: vision_action_enabled (默认 False) / allow_high_risk (默认 False) / max_text_length (默认 200) / max_position (默认屏幕范围) / cooldown_seconds (默认 2.0) / allow_screenshot_before (默认 False)
+- PermissionChecker: check_execute(request) / check_high_risk(request) / check_cooldown()
+- 高风险动作默认拒绝 (allow_high_risk=False)
+- 行动频控: 同类型动作最小间隔 (cooldown), 防抖
+
+### 6. Action Logger (logger.py)
+
+- ActionLogEntry: timestamp / event (start / success / fail / cancel / exception) / action_type / status / latency_ms / error / metadata
+- ActionLogger: 指标 action_count / success_rate / fail_count / avg_latency / denied_count
+
+### 7. Action Service (service.py)
+
+- ActionService: 组合 Manager + Permission + Logger + 行动记录 Store
+- execute(request): 权限校验 → 高风险校验 → 频控 → Adapter 执行 → 记录 → 返回 ActionResult
+- cancel(action_id): 取消进行中的行动 (Adapter.cancel)
+- history(query): 检索历史行动记录
+- 行动前后可选截图 (allow_screenshot_before 且 Vision Foundation 可用时)
+- status() 返回 version="1.0.0" / adapters / permission / counts
+- 单例 get_service / reset_service
+
+
+## P1: 接入层 (必须完成)
+
+### 1. Agent Tool (tools.py)
+
+- 工具: execute_action (category=vision)
+- 参数: action_type (枚举白名单) / x / y / text / key / keys / duration / confirm
+- 输出标准化 JSON 字符串 (success / action_id / latency_ms)
+- 权限失败返回 denied 状态; 内部调用 ActionService, 不直接触碰 Adapter
+
+### 2. Config 驱动 (config.py)
+
+- vision_action_enabled (默认 false)
+- vision_action_allow_high_risk (默认 false)
+- vision_action_max_text_length (默认 200)
+- vision_action_cooldown_seconds (默认 2.0)
+- vision_action_db_path (默认 backend/data/vision_actions.db)
+- vision_action_test_mode (YHLZ_VISION_ACTION_TEST_MODE, 默认 false)
+- vision_action_tool_timeout (默认 10.0)
+
+### 3. API 端点 (main.py)
+
+- 启动时注册工具 (register_vision_action_tools)
+- 端点 (参照 /vision-memory/* 与 /personality/* 模式, _get_vision_action_service() 懒加载):
+  - GET  /vision-action/status
+  - GET  /vision-action/permission / POST /vision-action/permission / POST /vision-action/reset-permission
+  - POST /vision-action/execute
+  - POST /vision-action/{action_id}/cancel
+  - GET  /vision-action/history (检索) / DELETE /vision-action/history (清空)
+  - GET  /vision-action/logs / DELETE /vision-action/logs
+  - GET  /vision-action/adapters (可用 Adapter 列表)
+  - DELETE /vision-action/all (清空行动记录)
+
+
+## 验收标准
+
+```
+Vision Action 专项:  Total: 120+   Passed: 100%   Failed: 0   Skipped: 0
+Vision 全量回归:     Failed: 0 (包含既有 663)
+Agent 回归:          Failed: 0 (包含既有 131)
+Personality 回归:    Failed: 0 (包含既有 137)
+```
+
+端到端冒烟 (FastAPI TestClient):
+- 默认拒绝: execute → denied, 不产生任何行动
+- 开启权限 + Mock: execute(click) → ok (Mock 记录)
+- 高风险动作: 未授权 → denied; 授权 → ok
+- 频控: 连续执行同类型动作 → 第二次被拒 (cooldown)
+- 历史记录 / 日志 / 适配器列表 / 清空
+- Agent 工具 execute_action 全链路 (Mock)
+
+
+---
+
+
+# 四、工程规范
+
+
+## 目录结构 (新增)
+
+```
+backend/vision/action/
+├── __init__.py
+├── schema.py
+├── interface.py
+├── manager.py
+├── permission.py
+├── logger.py
+├── service.py
+├── tools.py
+├── adapters/
+│   ├── __init__.py
+│   ├── mock_adapter.py       # Mock: 只记录, 不产生真实事件
+│   └── pyautogui_adapter.py  # 真实 Windows 桌面自动化 (pyautogui / pygetwindow)
+└── stores/
+    ├── __init__.py
+    ├── memory_store.py       # InMemoryActionRecordStore
+    └── sqlite_store.py       # SQLiteActionRecordStore
+└── tests/
+    ├── test_schema.py / test_interface.py / test_memory_store.py / test_sqlite_store.py
+    ├── test_manager.py / test_permission.py / test_logger.py / test_service.py
+    ├── test_adapters.py / test_tools.py / test_integration.py
+```
+
+## 开发约束
+
+1. 严禁跨层调用 (Service 只经 Manager, 不直接调 Adapter)
+2. 禁止修改 Agent Core / Voice / Vision 全链路 / Memory 数据结构
+3. 人格数据与行动记录独立存储 (绝不写入 Agent Memory)
+4. 行动执行必须可取消、可超时 (Adapter.cancel / timeout)
+5. Mock 模式必须绝对安全: 不移动鼠标 / 不按键 / 不输入 (单元测试不得依赖真实桌面)
+6. 测试隔离: 所有测试在 YHLZ_VISION_ACTION_TEST_MODE=true 下运行, 环境变量修改 try/finally 成对恢复
+7. 交付物写入 D:\YHLZ2.0\下载物象\任务计划\二阶段\:
+   - YHLZ_Vision_Action_V1.0_验收报告.md
+   - YHLZ_XXXX_下一步开发Prompt.txt (Vision Action 之后的下一阶段规划, 由你评估决定: 建议进入 Agent 视觉任务编排 / 人格-行动融合 / 多模态任务记忆 之一)
+
+## 依赖检查
+
+- pyautogui 若未安装: 真实 Adapter 应优雅降级 (is_available=False + 日志), 不阻塞启动
+- 禁止引入未在 requirements 中的新依赖到核心路径 (Adapter 可选导入)
+
+
+---
+
+
+# 五、验收输出
+
+1. YHLZ_Vision_Action_V1.0_验收报告.md (格式参照 YHLZ_Personality_Engine_V3.4_验收报告.md)
+2. 下一阶段开发 Prompt txt
+3. 最终交付总结 (向用户输出: 完成内容 / 测试数据 / 架构图 / 使用方法 / 下一阶段建议)
+
+
+**验收通过标准: 专项 + 全量回归 Failed=0, 端到端冒烟全部通过, 架构/权限/集成验收清单全勾选。**

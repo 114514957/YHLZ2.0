@@ -1,0 +1,178 @@
+YHLZ Embodied AI V5.0 下一步开发 Prompt
+Adaptive Companion Architecture 自适应 AI 伙伴架构
+(Internal Multi-Agent System 内部多智能体系统)
+
+一、当前系统状态分析
+
+已完成版本 (全部 Failed=0):
+- V4.0: AI 能行动 (Action / Environment Foundation)
+- V4.1: AI 理解环境 (Environment Intelligence)
+- V4.2: AI 理解原因 (Environment Reasoning: 因果/预测/事件)
+- V4.3: AI 积累经验 (Experience Learning: 记录/复用/评估)
+- V4.4: AI 选择最佳经验 (Adaptive Strategy Layer)
+- V4.5: AI 管理策略体系 (Meta Strategy Management)
+- V4.6: AI 跨目标统筹规划 (Cross-Goal Strategic Planning)
+- V4.7: AI 管理长期任务 (Long Horizon Planning Layer:
+  LongGoal/Milestone/依赖/进度/调整/风险/时间/快照/审计/Dry Run)
+
+V4.7 专项: 1313 tests, Failed=0
+全量回归: embodied 1313 + vision 136 + action 151 + agent 131 +
+          personality 137 + voice_identity 181 = 2049 tests, Failed=0
+
+二、本阶段开发判断
+
+为什么做 Internal Multi-Agent System:
+- V4.0~V4.7 已建立完整单体智能 (感知→推理→经验→策略→规划→长期任务)
+- 但所有能力集中在单一 EmbodiedService, 职责耦合
+- 现实 AI 伙伴需要分工协作: 每个领域由专业子系统处理,
+  但保持一个统一人格 / 一个核心意识 / 一个决策中心
+
+V5.0 引入:
+- Main Companion Agent (主伙伴 Agent): 统一人格 / 统一决策中心 / 统一入口
+- Specialist Agents (专业 Agent): 按能力域分工 (感知/推理/经验/规划/执行)
+- 内部消息路由: 主 Agent 分派任务 → 专业 Agent 处理 → 结果汇总返回
+
+例如:
+- 用户问"帮我整理房间" → 主 Agent 理解意图
+  → 分派 Long Horizon Agent (任务拆解)
+  → 分派 Cross-Goal Agent (子规划)
+  → 分派 Strategy Agent (策略选择)
+  → 汇总为完整执行方案返回
+
+为什么不做 (本阶段边界):
+- 不做跨进程分布式多 Agent (内部多 Agent 在同一进程)
+- 不做 Agent 间自由对话/协商 (确定性路由 + 规则分派)
+- 不做强化学习 / 神经网络 / 黑盒优化
+- 不改 Agent Brain / Vision Interface / Memory Interface
+- 不控制真实设备 / 机器人 / 自动驾驶
+- 不做自我目标生成
+
+三、本版本目标
+
+YHLZ Embodied AI V5.0
+Adaptive Companion Architecture
+自适应 AI 伙伴架构
+
+核心目标:
+从:
+    单体智能 (V4.0~V4.7)
+升级:
+    内部多智能体协作 (V5.0)
+
+保持:
+    一个人格 / 一个核心意识 / 一个决策中心
+
+四、本版本不包含 (明确边界)
+
+- 禁止神经网络训练 / 梯度更新 / 黑盒优化
+- 禁止自主修改策略内容 (内容修改仍仅来自经验学习规则)
+- 禁止绕过 Permission Layer
+- 禁止写入 Agent Memory
+- 禁止真实设备控制
+- 禁止修改 Agent Brain / Vision Interface / Memory Interface
+- 禁止自我目标生成 (目标仍由外部提供)
+- 禁止跨子系统调用 (只改 Embodied 模块)
+- 禁止分布式多进程 Agent (内部单进程多 Agent)
+
+五、架构设计要求
+
+分层: Interface → Service → Manager → Storage/Adapter (保持)
+
+新增模块建议:
+- backend/embodied/companion/  (自适应伙伴架构, 新建包)
+  - main_agent.py      Main Companion Agent (统一入口/统一人格/决策中心)
+  - specialist.py      Specialist Agent 注册中心 (能力域分派)
+  - router.py          内部消息路由 (任务 → 专业 Agent, 确定性规则)
+  - delegate.py        任务委派与结果汇总 (可解释)
+  - __init__.py        门面类 (Service 唯一接入点)
+
+专业 Agent 能力域 (建议, 对接既有模块):
+- perception_agent:    感知 (World Model / Observe / Scene)
+- reasoning_agent:     推理 (Causal / Prediction / Events)
+- experience_agent:    经验 (Policy Table / Strategy Selection)
+- planning_agent:      规划 (Cross Goal Planner / Budget)
+- long_horizon_agent:  长期任务 (Long Horizon Planner / Milestone)
+- governance_agent:    治理 (Strategy Governance / Health)
+
+配置项 (全部 backend/config.py, companion_* 前缀, COMPANION_* 环境变量):
+- companion_enabled (默认 False, 权限默认拒绝)
+- companion_agent_timeout (默认 10.0)
+- companion_route_rule_version (默认 "v1", 路由规则版本)
+
+数据模型:
+- CompanionResponse: {request_id, intent, assigned_agents, results,
+  aggregated, explainable_reason, mode: rule_based}
+
+API (Service 层新增, 保持 V4.7 兼容):
+- companion_handle(request)    主入口: 意图 → 分派 → 汇总
+- companion_agents()           专业 Agent 清单 (能力域/状态)
+- companion_route(request)     路由分析 (任务 → 专业 Agent)
+- companion_dry_run(request)   预演 (不执行, 复用 dry_run 风格)
+
+六、开发任务
+
+P0:
+1. Specialist Agent 注册中心: 能力域注册/查询/生命周期
+2. 内部路由: 意图关键词 → 专业 Agent 映射 (确定性规则, 可解释)
+3. Main Companion Agent: 统一入口 + 委派 + 结果汇总 (聚合为完整响应)
+4. companion_handle() 主入口 + 可解释输出
+5. 单元测试 (新增 >=100 用例, 目标专项 >= 1413)
+
+P1:
+6. 多 Agent 协同场景: 长期任务 → 子规划 → 策略 → 汇总 (端到端)
+7. 路由回退: 无法识别意图 → 默认委派 (可解释)
+8. 伙伴架构 Dry Run (复用 SystemSnapshot 风格)
+
+七、开发要求
+
+必须:
+- 先读后写 / 接口先行 / 配置驱动 / 向后兼容
+- 中文注释 (模块/类/函数 docstring) / 类型注解 / 完整日志
+- RLock 线程安全 / 单例 + reset (get_service/reset_service)
+- Mock 与真实双模式 / 默认测试模式
+- 异常分层隔离 (Service 捕获返回结构化错误)
+- 无测试不交付 (每功能配单元测试)
+
+禁止:
+- 硬编码 (魔法数字/路径/阈值全进 config)
+- 跨层调用 (Adapter 不调 Service)
+- 临时方案进入主架构
+- 静默吞异常
+- 破坏 V4.7 既有 API (只新增不修改)
+
+八、测试验收 Prompt
+
+专项 (必须 >=1413 cases, Failed=0):
+venv\Scripts\python.exe -m unittest discover -s backend.embodied.tests
+
+全量 (全部 Failed=0):
+- embodied / vision / action / agent / personality / voice_identity
+- voice_identity 需显式模块运行 (tests 无 __init__.py)
+
+验收报告: YHLZ_Embodied_AI_V5.0_验收报告.md
+(完成状态/修改内容/测试结果/问题风险/架构影响/下一阶段建议)
+
+九、开发完成返回 Prompt
+
+完成后返回:
+1. 专项测试统计 (Total/Passed/Failed/Skipped)
+2. 全量回归统计 (各子系统)
+3. 验收报告路径
+4. 下一阶段建议 (V5.1 方向)
+
+十、最终原则
+
+稳定开发 / 增量迭代 / 可测试 / 可维护 / 可扩展
+小步推进 / 持续验证 / 保持架构健康
+
+V5.0 进化路径:
+V4.7 AI 管理长期任务 → V5.0 AI 内部多智能体协作
+(单体智能 → 自适应伙伴架构)
+
+一个人格 / 一个核心意识 / 一个决策中心:
+Main Companion Agent 保持统一人格 (铁哥们 / 随意亲切),
+专业 Agent 只处理能力域任务, 不拥有独立人格,
+所有决策经主 Agent 汇总输出。
+
+让 YHLZ 持续成为: 有声音 / 有视觉 / 有记忆 / 有人格 / 能思考 / 能行动
+持续进化的 AI 伙伴。

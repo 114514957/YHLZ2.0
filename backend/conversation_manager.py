@@ -246,19 +246,19 @@ class ConversationManager:
         """生成本地回退响应"""
         import random
         
-        greetings = ["你好！", "嗨！", "你好呀！", "很高兴见到你！"]
-        questions = ["你好！我是你的AI助手。", "你好！有什么我可以帮助你的吗？", "你好！很高兴为你服务。"]
-        
+        greetings = ["嘿！", "哟！", "嗨！", "哥们儿！"]
+        questions = ["哥们儿, 有啥事儿？", "哟, 来啦！咋了？", "嘿哥们, 说吧！"]
+
         user_lower = user_input.lower()
-        
+
         if any(g in user_lower for g in ["你好", "hello", "hi", "嗨"]):
-            return random.choice(greetings) + " 我是你的AI助手，有什么可以帮助你的吗？"
-        
+            return random.choice(greetings) + " 哥们儿, 有啥事儿？"
+
         elif any(q in user_lower for q in ["什么", "怎么", "为什么", "怎么样"]):
-            return "这是一个很好的问题！我可以帮你解答。不过由于当前未连接LLM服务，详细解答需要连接API后才能提供。"
-        
+            return "这问题问得好！不过现在没连上大脑, 等连上了咱再聊。"
+
         elif any(q in user_lower for q in ["名字", "叫什么"]):
-            return "我叫元亨，是你的AI助手！"
+            return "我叫元亨, 你的铁哥们！"
         
         elif any(q in user_lower for q in ["天气", "温度"]):
             return "今天天气看起来不错！具体天气信息需要连接LLM服务后查询。"

@@ -1,0 +1,86 @@
+{
+  "vad_interrupt_call1": {
+    "http": 200,
+    "body": "{\"success\":true,\"has_speech\":false,\"interrupted\":false,\"message\":\"未检测到语音\"}"
+  },
+  "vad_interrupt_call2": {
+    "http": 500,
+    "body": "{\"detail\":\"'AudioBufferManager' object has no attribute 'set_interrupted'\"}"
+  },
+  "modules_status": {
+    "success": true,
+    "modules": {
+      "asr": {
+        "name": "语音识别",
+        "status": "stopped",
+        "description": "离线语音转文字"
+      },
+      "tts": {
+        "name": "语音合成",
+        "status": "running",
+        "description": "文字转语音"
+      },
+      "vad": {
+        "name": "语音活动检测",
+        "status": "running",
+        "description": "实时语音打断检测"
+      },
+      "llm": {
+        "name": "大语言模型",
+        "status": "running",
+        "description": "AI对话引擎"
+      }
+    }
+  },
+  "tts_engines": {
+    "success": true,
+    "engines": [
+      {
+        "name": "qwen3-tts-customvoice",
+        "description": "Qwen3-TTS CustomVoice 本地引擎 (faster-qwen3-tts, CUDA graph 加速)",
+        "requires_gpu": false,
+        "loaded": false
+      },
+      {
+        "name": "qwen3-tts",
+        "description": "Qwen3-TTS 本地引擎 (0.6B Base, 语音克隆, 多声音缓存)",
+        "requires_gpu": false,
+        "loaded": false
+      },
+      {
+        "name": "gpt-sovits",
+        "description": "GPT-SoVITS 引擎 (Gradio 服务, 高保真)",
+        "requires_gpu": false,
+        "loaded": false
+      },
+      {
+        "name": "edge-tts",
+        "description": "Edge-TTS 引擎 (在线, 免费, 无需GPU)",
+        "requires_gpu": false,
+        "loaded": true
+      }
+    ],
+    "current_engine": "edge-tts"
+  },
+  "tts_switch_edge": {
+    "http": 200,
+    "body": "{\"success\":true,\"message\":\"已切换到TTS引擎: edge-tts\"}"
+  },
+  "tts_synth_edge": {
+    "http": 200,
+    "latency_s": 0.05,
+    "samples": 24000,
+    "rms": 0.0175,
+    "sr": 24000
+  },
+  "sse_abort": {
+    "got_first_chunk_s": 0.55,
+    "chunk_len": 184
+  },
+  "sse_after_abort": {
+    "http": 200,
+    "complete": true,
+    "latency_s": 1.69,
+    "len": 19748
+  }
+}
