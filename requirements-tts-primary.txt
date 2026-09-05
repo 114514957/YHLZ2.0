@@ -1,0 +1,35 @@
+# YHLZ target-chain TTS primary profile (Python 3.12 / Windows / NVIDIA CUDA)
+# Keep this profile separate from requirements.txt and from the NEKO environment.
+# qwen-tts and qwen-tts-hf both install the qwen_tts namespace; do not install
+# them together.  This profile uses qwen-tts-hf because the current YHLZ
+# CustomVoice adapter requires faster-qwen3-tts true audio streaming.
+
+--index-url https://download.pytorch.org/whl/cu128
+--extra-index-url https://pypi.org/simple
+
+# CUDA runtime: the 2.7.1 cu128 pair is available for cp312/win_amd64 and is
+# compatible with the installed 576.57 driver (reported CUDA 12.9).
+torch==2.7.1+cu128
+torchaudio==2.7.1+cu128
+
+# Primary streaming provider.
+faster-qwen3-tts==0.4.0
+qwen-tts-hf==0.1.1.post1
+transformers==5.15.1
+accelerate==1.12.0
+huggingface-hub==1.5.0
+
+# Dependencies declared by the Qwen compatibility package, pinned for a
+# repeatable Windows setup.
+gradio==5.50.0
+librosa==0.10.2.post1
+soundfile==0.13.1
+sox==1.5.0
+onnxruntime==1.20.1
+einops==0.8.0
+numpy==2.2.6
+
+# Target-chain audio and controlled B fallback support.
+edge-tts==7.2.8
+sounddevice==0.5.2
+psutil==7.0.0

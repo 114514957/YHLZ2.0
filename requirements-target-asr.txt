@@ -1,0 +1,5 @@
+# YHLZ 目标语音链路 - ASR Provider 侧依赖（独立于根 requirements.txt）
+# 用途：FunASR paraformer-zh-streaming 流式 ASR（官方 README 流式用法，台账 0134）
+# 兼容注意：funasr==1.4.13 官方 pin numpy<2，故全链 numpy 基线切到 1.26.4（台账 0135）
+numpy==1.26.4
+funasr==1.4.13

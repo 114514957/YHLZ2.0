@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "filename": "silero_vad.onnx",
+      "version": "v6.2.1",
+      "source": "https://raw.githubusercontent.com/snakers4/silero-vad/v6.2.1/src/silero_vad/data/silero_vad.onnx",
+      "license": "MIT",
+      "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+      "input_contract": "input:float32[batch,576],state:float32[2,batch,128],sr:int64[]",
+      "output_contract": "probability:float32[batch,1],state:float32[2,batch,128]"
+    }
+  ]
+}

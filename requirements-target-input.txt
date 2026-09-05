@@ -1,0 +1,7 @@
+# Isolated target input profile. Keep separate from legacy requirements.txt.
+# This profile contains only direct dependencies of the VAD/capture/resampling
+# path and intentionally does not select or download an ASR model.
+numpy==2.2.6
+scipy==1.18.1
+onnxruntime==1.20.1
+sounddevice==0.5.2

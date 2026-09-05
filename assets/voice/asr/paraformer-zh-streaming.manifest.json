@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "provider": {
+    "id": "funasr-paraformer-online",
+    "package": "funasr==1.4.13",
+    "execution_provider": "cpu",
+    "sample_rate": 16000,
+    "channels": 1,
+    "input_contract": "continuous float32 mono PCM at 16000 Hz",
+    "output_contract": "ephemeral partial/final text; only metrics and fingerprints may be persisted"
+  },
+  "assets": [
+    {
+      "directory": "paraformer-zh-streaming",
+      "version": "paraformer-zh-streaming",
+      "source": "https://modelscope.cn/models/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online",
+      "license": "Model License Agreement (FunASR MODEl_LICENSE)",
+      "runtime_files": [
+        {
+          "filename": ".DS_Store",
+          "bytes": 6148,
+          "sha256": "0ccc5b058cec2a2323d5c6428f27c8891d47b5b69a253ee7cb75325b036f8825"
+        },
+        {
+          "filename": ".gitattributes",
+          "bytes": 1459,
+          "sha256": "5cd9f0d173e5306f8e5293f648207af8a8b44951f6b643f299d1c564519b0c39"
+        },
+        {
+          "filename": "am.mvn",
+          "bytes": 11203,
+          "sha256": "29b3c740a2c0cfc6b308126d31d7f265fa2be74f3bb095cd2f143ea970896ae5"
+        },
+        {
+          "filename": "config.yaml",
+          "bytes": 2940,
+          "sha256": "35e6bf41f8c7eaf9a0f787af7fdc8fc5ed75fa8009ade7d3c2f3ef5bce20c648"
+        },
+        {
+          "filename": "configuration.json",
+          "bytes": 472,
+          "sha256": "1aae0f45e3e503f52512eee4798d241611a44cc732a7a91d2e2d2f65dd9755be"
+        },
+        {
+          "filename": "model.pt",
+          "bytes": 880716041,
+          "sha256": "4fdfb48ed4471777c9a511e96a2acae17f77cac9d709cc756634622769192a64"
+        },
+        {
+          "filename": "README.md",
+          "bytes": 13440,
+          "sha256": "e424224c75e4d803f2177d916ea614e40b19345bb080b0edb9cc28b45b33133c"
+        },
+        {
+          "filename": "seg_dict",
+          "bytes": 8287834,
+          "sha256": "59a2ef803a3f1648ad03a2e1480db1c1ee0c0d7dc4ef4dbd16cea33944329022"
+        },
+        {
+          "filename": "tokens.json",
+          "bytes": 93676,
+          "sha256": "2b20c2b12572d682afff84ce1c8d560f67b8b32a4c1f21567411d141ed352127"
+        }
+      ]
+    }
+  ]
+}
