@@ -127,7 +127,8 @@ class TestTurnOrchestrator(unittest.TestCase):
         self.assertEqual(
             names,
             {"ledger_search", "memory_recall", "memory_save", "system_time",
-             "diary_write", "diary_list", "diary_delete"},
+             "diary_write", "diary_list", "diary_delete",
+             "file_list", "file_read", "web_fetch", "web_search"},
         )
 
 

@@ -30,14 +30,19 @@ def build_openai_compatible_llm_turn(
     client: Any = None,
     temperature: float = 0.1,
     max_tokens: int = 500,
+    fallback_base_url: Optional[str] = None,
+    fallback_model: Optional[str] = None,
 ) -> LLMTurn:
     """Factory for the shared real-model turn path (OpenAI-compatible HTTP).
 
-    Removes per-script httpx boilerplate; the orchestrator and any entry layer
-    reuse one tested implementation (ledger 0150: unified adapter path).
+    Dual-rail (ledger 0168): if the primary provider is unreachable, retry the
+    same payload on the local fallback (Ollama OpenAI-compatible), so the
+    daemon keeps serving when the cloud goes down.
     """
     if api_key is None:
         api_key = os.getenv("DEEPSEEK_API_KEY", "")
+    fallback_url = fallback_base_url
+    fb_model = fallback_model
 
     async def _llm_turn(
         messages: list[dict[str, Any]],
@@ -54,19 +59,29 @@ def build_openai_compatible_llm_turn(
             payload["tool_choice"] = "auto"
         headers = {"Authorization": f"Bearer {api_key}"}
 
-        async def _post(c: Any) -> dict[str, Any]:
-            r = await c.post(base_url, headers=headers, json=payload)
-            body = r.json()
-            if "choices" not in body:
-                raise RuntimeError(json.dumps(body, ensure_ascii=False)[:200])
-            return body["choices"][0]["message"]
+        async def _post(c: Any, url: str, hdrs: dict, body: dict) -> dict[str, Any]:
+            r = await c.post(url, headers=hdrs, json=body)
+            r.raise_for_status()
+            out = r.json()
+            if "choices" not in out:
+                raise RuntimeError(json.dumps(out, ensure_ascii=False)[:200])
+            return out["choices"][0]["message"]
 
-        if client is not None:
-            return await _post(client)
         import httpx
 
         async with httpx.AsyncClient(timeout=60) as c:
-            return await _post(c)
+            try:
+                return await _post(c, base_url, headers, payload)
+            except Exception:
+                if fallback_url:
+                    fb_payload = dict(payload)
+                    fb_payload["model"] = fb_model or fb_payload["model"]
+                    try:
+                        return await _post(c, fallback_url, {}, fb_payload)
+                    except Exception as exc2:
+                        raise RuntimeError(
+                            f"dual-rail failed: {type(exc2).__name__}") from exc2
+                raise
 
     return _llm_turn
 
@@ -191,7 +206,7 @@ class TurnOrchestrator:
                 if denied:
                     continue
                 t0 = time.perf_counter()
-                out = self.registry.execute_openai(name, args)
+                out = await self.registry.execute_openai_async(name, args)
                 use = ToolUse(
                     name=name,
                     arguments=args,

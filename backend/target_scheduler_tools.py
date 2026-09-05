@@ -14,6 +14,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from backend.agent.tool_registry import get_registry, ToolRegistry
+from backend.target_access import file_list, file_read, web_fetch, web_search  # noqa: F401
 from backend.target_capability_registry import Capability, CapabilityRegistry
 from backend.target_memory import TargetMemoryService
 
@@ -329,6 +330,44 @@ def scheduler_capabilities() -> list[Capability]:
             side_effect=True,
             risk="medium",
             verify=_verify_nonempty,
+        ),
+        Capability(
+            name="file.list",
+            handler=lambda p: file_list(str(p.get("path", ".")),
+                                        int(p.get("limit", 30) or 30)),
+            input=("path",),
+            optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+        ),
+        Capability(
+            name="file.read",
+            handler=lambda p: file_read(str(p.get("path", "")),
+                                        int(p.get("max_chars", 4000) or 4000)),
+            input=("path",),
+            optional_input=("max_chars",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+        ),
+        Capability(
+            name="web.fetch",
+            handler=web_fetch,
+            input=("url",),
+            optional_input=("max_chars",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+        ),
+        Capability(
+            name="web.search",
+            handler=web_search,
+            input=("query",),
+            optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
         ),
     ]
 

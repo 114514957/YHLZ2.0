@@ -30,44 +30,56 @@ _registry = setup_scheduler_capabilities()
 mcp = FastMCP("yhlz")
 
 
-def _call(name: str, params: dict) -> str:
-    res = _registry.execute_openai(name, params)
+async def _call_async(name: str, params: dict) -> str:
+    res = await _registry.execute_openai_async(name, params)
     if not res.get("ok"):
         raise RuntimeError(f"{name} failed: {res.get('error', 'unknown')}")
     return str(res.get("output", ""))
 
 
 @mcp.tool()
-def ledger_search(query: str, limit: int = 5) -> str:
+async def ledger_search(query: str, limit: int = 5) -> str:
     """Search the YHLZ project ledger (docs/上下文台账.md keyword index).
     Use for project history, decisions, record numbers, plans. Query in
     1-3 keywords (Chinese ok); returns matching lines with record ids."""
-    return _call("ledger_search", {"query": query, "limit": limit})
+    return await _call_async("ledger_search", {"query": query, "limit": limit})
 
 
 @mcp.tool()
-def memory_recall(query: str, limit: int = 5) -> str:
+async def memory_recall(query: str, limit: int = 5) -> str:
     """Recall long-term memory entries (user preferences/decisions saved from
     conversations). Read-only; never deletes."""
-    return _call("memory_recall", {"query": query, "limit": limit})
+    return await _call_async("memory_recall", {"query": query, "limit": limit})
 
 
 @mcp.tool()
-def system_time() -> str:
+async def system_time() -> str:
     """Current local date/time and day of week."""
-    return _call("system_time", {})
+    return await _call_async("system_time", {})
 
 
 @mcp.tool()
-def memory_save(content: str, kind: str = "preference", importance: int = 0) -> str:
+async def memory_save(content: str, kind: str = "preference", importance: int = 0) -> str:
     """WRITE operation: save a notable user preference/fact into long-term
     memory.  Kind: preference|fact|event|decision.  Content is checked by the
     constitution gate and deduplicated against existing memory.  Calling this
     tool records into the user's memory store — make sure the user asked for
     it."""
     _registry.grant_policy_once(SAVE_APPROVAL_POLICY)  # opencode call = user consent
-    return _call("memory_save", {"content": content, "kind": kind,
-                                 "importance": importance})
+    return await _call_async("memory_save", {"content": content, "kind": kind,
+                                        "importance": importance})
+
+
+@mcp.tool()
+async def diary_read(limit: int = 5) -> str:
+    """Read Yuanheng's diary (docs/元亨的日记.md), newest entries first."""
+    return await _call_async("diary_list", {"limit": limit})
+
+
+@mcp.tool()
+async def diary_append(content: str) -> str:
+    """Append an entry to Yuanheng's diary (her own notebook; shared access)."""
+    return await _call_async("diary_write", {"content": content})
 
 
 if __name__ == "__main__":

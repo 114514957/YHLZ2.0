@@ -11,6 +11,7 @@ input / timeout / rollback).  All metadata per ADR-007 §4.
 
 from __future__ import annotations
 
+import inspect
 import threading
 import time
 from dataclasses import dataclass
@@ -202,6 +203,61 @@ class CapabilityRegistry:
             except Exception:
                 return False, f"policy error: {req_id}"
         return True, ""
+
+    async def execute_async(self, name: str,
+                            params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+        """Async execution path (await async handlers). Mirrors execute()."""
+        import asyncio
+
+        cap = self.get(name)
+        if cap is None:
+            return {"ok": False, "error": "unknown capability", "name": name}
+        params = dict(params or {})
+        if cap.input_model is not None:
+            try:
+                validated = cap.input_model(**params)
+                params = validated.model_dump()
+            except Exception as exc:
+                detail = str(exc).replace("\n", " ")[:200]
+                return {"ok": False, "error": f"invalid arguments: {detail}",
+                        "name": name}
+        else:
+            missing = [p for p in cap.input if params.get(p) in (None, "")]
+            if missing:
+                return {"ok": False,
+                        "error": "missing input: " + ",".join(missing), "name": name}
+        ok, reason = self._check_for_execute(name)
+        if not ok:
+            return {"ok": False, "error": reason, "name": name}
+        started = time.perf_counter()
+        try:
+            output = cap.handler(params)
+            if inspect.isawaitable(output):
+                output = await output
+        except Exception as exc:
+            self._safe_rollback(cap)
+            return {"ok": False,
+                    "error": f"{type(exc).__name__}: {str(exc)[:160]}"[:200],
+                    "name": name}
+        if cap.verify is not None:
+            try:
+                if not cap.verify(output):
+                    self._safe_rollback(cap)
+                    return {"ok": False, "error": "verify failed", "name": name}
+            except Exception:
+                self._safe_rollback(cap)
+                return {"ok": False, "error": "verify error", "name": name}
+        record = {"ok": True, "output": output, "name": name,
+                  "elapsed_ms": round((time.perf_counter() - started) * 1000, 1)}
+        self._emit_commit(record)
+        return record
+
+    async def execute_openai_async(self, openai_name: str,
+                                   params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+        cap = self.get_by_openai_name(str(openai_name))
+        if cap is None:
+            return {"ok": False, "error": "unknown capability", "name": openai_name}
+        return await self.execute_async(cap.name, params)
 
     def execute(self, name: str, params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         cap = self.get(name)
