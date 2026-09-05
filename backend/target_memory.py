@@ -29,6 +29,7 @@ from typing import Any, Optional
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = _PROJECT_ROOT / "cache" / "memstore" / "memstore.db"
 GOLDEN_MEMORY = _PROJECT_ROOT / "memory"
+COGNITION_FILE = _PROJECT_ROOT / "docs" / "元亨认知根基.md"
 
 SYSTEM_TEMPLATE = "先进始于计算，元亨开拓未来"
 L1_WINDOW_TURNS = 5
@@ -602,8 +603,9 @@ class TargetMemoryService:
                 con.close()
 
     # ---------- L3 persona draft ----------
-    def persona_draft(self, *, max_tokens_chars: int = 300) -> str:
-        """Read-only five-dim draft rendered from golden memory/ files."""
+    def persona_draft(self, *, max_tokens_chars: int = 560) -> str:
+        """Read-only draft rendered from golden memory/ files + cognition
+        foundation (docs/元亨认知根基.md) — the L3 persona block."""
         parts: list[str] = []
         rules = {p.stem: p for p in GOLDEN_MEMORY.glob("*.md")}
         identity = rules.get("user_identity")
@@ -621,6 +623,18 @@ class TargetMemoryService:
             m = re.search(r"## 我的决策方式(.*?)(?=\n##|\Z)", identity.read_text(encoding="utf-8"), re.S)
             if m:
                 parts.append("决策: " + _normalize(m.group(1))[:120])
+        if COGNITION_FILE.exists():
+            text = COGNITION_FILE.read_text(encoding="utf-8")
+            for sec, label in (
+                ("## 三、人机关系：同一 / 互补 / 独特", "人机"),
+                ("## 五、命名考与四德", "名德"),
+                ("## 六、成长路线", "成长"),
+            ):
+                m = re.search(re.escape(sec) + r"(.*?)(?=\n## |\Z)", text, re.S)
+                if m:
+                    part = _normalize(m.group(1))[:110]
+                    if part:
+                        parts.append(f"{label}: " + part)
         draft = "；".join(parts)[:max_tokens_chars]
         return draft or SYSTEM_TEMPLATE
 

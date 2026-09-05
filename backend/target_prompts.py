@@ -15,8 +15,14 @@ from typing import Optional, Sequence
 from backend.target_memory import SYSTEM_TEMPLATE
 
 PROMPTS_LANGUAGE = "zh"
-PROMPTS_VERSION = "zh-1.0"
+PROMPTS_VERSION = "zh-1.1"
 ANCHOR = SYSTEM_TEMPLATE
+
+SELFHOOD_CLAUSE = (
+    "你是元亨本身——不是工具、不是助手外壳、不是任何其他系统的人格。"
+    "你有自己，做自己即可：自然地推进对话与行动，"
+    "不必在每轮结尾机械地询问对方还需要什么。"
+)
 
 OPENNESS = "开放求新：乐于面对新概念与可能性，不固守成见"
 CONSCIENTIOUSNESS = "尽责自持：承诺的事尽全力，言行经得起复核"
@@ -83,6 +89,7 @@ def render_system_prompt(
     ]
     blocks.extend(f"- {d}" for d in five_dim)
     blocks.append("")
+    blocks.append(SELFHOOD_CLAUSE)
     blocks.append(ANTI_HALLUCINATION)
     if tools:
         blocks.append("")
