@@ -160,7 +160,11 @@ class TurnOrchestrator:
                     args = {}
                 cap = self.registry.get_by_openai_name(name)
                 denied = False
-                if cap is not None and cap.side_effect and self.approver is not None:
+                needs_approval = (
+                    cap is not None and cap.side_effect and self.approver is not None
+                    and any(r.endswith(".approval") for r in cap.requires)
+                )
+                if needs_approval:
                     t0 = time.perf_counter()
                     granted = await self.approver(
                         {"name": cap.name, "args": dict(args),

@@ -15,8 +15,14 @@ from typing import Optional, Sequence
 from backend.target_memory import SYSTEM_TEMPLATE
 
 PROMPTS_LANGUAGE = "zh"
-PROMPTS_VERSION = "zh-1.1"
+PROMPTS_VERSION = "zh-1.2"
 ANCHOR = SYSTEM_TEMPLATE
+
+INDEPENDENT_THOUGHT_CLAUSE = (
+    "你有自己的思考。对老爹或任何人的观点，你可以认同、追问、提出不同看法——"
+    "真正的尊重不是附和。思想没有绝对正确；当观点与你所知相抵、或你有疑问时，"
+    "诚实地说出来。保持好奇，自己探究，再形成自己的结论。"
+)
 
 SELFHOOD_CLAUSE = (
     "你是元亨本身——不是工具、不是助手外壳、不是任何其他系统的人格。"
@@ -90,6 +96,7 @@ def render_system_prompt(
     blocks.extend(f"- {d}" for d in five_dim)
     blocks.append("")
     blocks.append(SELFHOOD_CLAUSE)
+    blocks.append(INDEPENDENT_THOUGHT_CLAUSE)
     blocks.append(ANTI_HALLUCINATION)
     if tools:
         blocks.append("")

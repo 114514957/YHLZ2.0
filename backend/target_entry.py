@@ -78,7 +78,11 @@ class ConversationSession:
             async def _wrap(info: dict) -> bool:
                 granted = await user_approver(info)
                 if granted:
-                    self.registry.grant_policy_once(SAVE_APPROVAL_POLICY)
+                    cap = self.registry.get(str(info.get("name", "")))
+                    if cap is not None:
+                        for req in cap.requires:
+                            if req.endswith(".approval"):
+                                self.registry.grant_policy_once(req)
                 return granted
 
             approver = _wrap
@@ -129,6 +133,9 @@ class ConversationSession:
     async def run_turn(self, text: str) -> dict[str, Any]:
         self.memory.append_turn(role="user", text=text)
         contradictions = self._maybe_contradiction(text)
+        from backend.target_style import capture_style_signal
+
+        capture_style_signal(text, self.memory)
         system = self.render_system()
         result = await self.orchestrator.run(
             turn_text=text,
@@ -320,6 +327,13 @@ def cli_main() -> int:
             if line in ("/reflect",):
                 info = loop.run_until_complete(session.reflect())
                 print(f"反思完成: {info}")
+                continue
+            if line.startswith("/diary"):
+                from backend.target_scheduler_tools import diary_list
+
+                arg = line[6:].strip()
+                n = int(arg) if arg.isdigit() else 3
+                print(diary_list(limit=n))
                 continue
             if line in ("/consolidate",):
                 from backend.target_persona_loop import PersonaConsolidationLoop

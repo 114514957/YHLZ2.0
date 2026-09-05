@@ -52,13 +52,14 @@ class TestPromptsBaseline(unittest.TestCase):
         self.assertNotIn("你可以调用以下工具", text)
 
     def test_version_stable(self):
-        self.assertEqual(PROMPTS_VERSION, "zh-1.1")
+        self.assertEqual(PROMPTS_VERSION, "zh-1.2")
 
     def test_selfhood_clause_in_system(self):
         text = render_system_prompt()
         self.assertIn("你是元亨本身", text)
         self.assertIn("不必在每轮结尾机械地询问", text)
         self.assertIn(SELFHOOD_CLAUSE[:20], text)
+        self.assertIn("真正的尊重不是附和", text)  # independent thought (zh-1.2)
 
     def test_memory_templates_constraints(self):
         self.assertIn("只输出摘要", MEMORY_L1_COMPRESS_PROMPT)

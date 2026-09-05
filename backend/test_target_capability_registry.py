@@ -170,7 +170,8 @@ class TestSchedulerCapabilities(unittest.TestCase):
         caps = {c.name: c for c in scheduler_capabilities()}
         self.assertEqual(
             set(caps),
-            {"ledger.search", "memory.recall", "memory.save", "system.time"},
+            {"ledger.search", "memory.recall", "memory.save", "system.time",
+             "diary.write", "diary.list", "diary.delete"},
         )
         for name, cap in caps.items():
             if name in ("ledger.search", "memory.recall"):
@@ -196,16 +197,17 @@ class TestSchedulerCapabilities(unittest.TestCase):
         reg = setup_scheduler_capabilities()
         tools = reg.export_openai_tools()
         names = {t["function"]["name"] for t in tools}
-        self.assertEqual(names, {"ledger_search", "memory_recall", "memory_save", "system_time"})
+        self.assertEqual(names, {"ledger_search", "memory_recall", "memory_save", "system_time",
+              "diary_write", "diary_list", "diary_delete"})
 
     def test_internal_names_stay_dotted(self):
         reg = setup_scheduler_capabilities()
-        self.assertEqual(reg.names(), ["ledger.search", "memory.recall", "memory.save", "system.time"])
+        self.assertEqual(reg.names(), ["diary.delete", "diary.list", "diary.write", "ledger.search", "memory.recall", "memory.save", "system.time"])
 
     def test_agent_core_registry_view(self):
         rt = ToolRegistry()
         names = setup_scheduler_tools(rt)
-        self.assertEqual(sorted(names), ["ledger_search", "memory_recall", "memory_save", "system_time"])
+        self.assertEqual(sorted(names), ["diary_delete", "diary_list", "diary_write", "ledger_search", "memory_recall", "memory_save", "system_time"])
         exported = rt.export_openai_tools()
         self.assertTrue(any(t["function"]["name"] == "system_time" for t in exported))
 

@@ -124,7 +124,11 @@ class TestTurnOrchestrator(unittest.TestCase):
         orch = TurnOrchestrator(reg)
         tools = orch._export_tools()
         names = {t["function"]["name"] for t in tools}
-        self.assertEqual(names, {"ledger_search", "memory_recall", "memory_save", "system_time"})
+        self.assertEqual(
+            names,
+            {"ledger_search", "memory_recall", "memory_save", "system_time",
+             "diary_write", "diary_list", "diary_delete"},
+        )
 
 
 if __name__ == "__main__":

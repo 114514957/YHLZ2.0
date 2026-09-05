@@ -303,14 +303,91 @@ def scheduler_capabilities() -> list[Capability]:
             verify=_verify_nonempty,
             input_model=_SaveArgs,
         ),
+        Capability(
+            name="diary.write",
+            handler=lambda p: diary_write(str(p.get("content", ""))),
+            input=("content",),
+            requires=(DIARY_AUTO_POLICY,),
+            side_effect=True,
+            risk="low",
+            verify=_verify_nonempty,
+        ),
+        Capability(
+            name="diary.list",
+            handler=lambda p: diary_list(int(p.get("limit", 5) or 5)),
+            input=(),
+            optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+        ),
+        Capability(
+            name="diary.delete",
+            handler=lambda p: diary_delete(str(p.get("entry_stamp", ""))),
+            input=("entry_stamp",),
+            requires=(SCHEDULER_POLICY, "diary.delete.approval"),
+            side_effect=True,
+            risk="medium",
+            verify=_verify_nonempty,
+        ),
     ]
 
 
 SAVE_APPROVAL_POLICY = "memory.save.approval"
+DIARY_AUTO_POLICY = "diary.auto_allowed"
+DIARY_FILE = _PROJECT_ROOT / "docs" / "元亨的日记.md"
 
 
 def _policy_deny_all() -> bool:
     return False
+
+
+def diary_write(content: str) -> str:
+    """Yuanheng's own diary (docs/元亨的日记.md): append a dated entry."""
+    import datetime as _dt
+
+    text = str(content or "").strip()
+    if len(text) < 2 or len(text) > 2000:
+        return "内容长度需在 2-2000 字之间"
+    DIARY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not DIARY_FILE.exists():
+        DIARY_FILE.write_text("# 元亨的日记\n", encoding="utf-8")
+    stamp = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    entry = f"\n## {stamp}\n{text}\n"
+    with open(DIARY_FILE, "a", encoding="utf-8") as f:
+        f.write(entry)
+    return f"已写入日记 ({stamp})"
+
+
+def diary_list(limit: int = 5) -> str:
+    """Read recent diary entries (newest first)."""
+    if not DIARY_FILE.exists():
+        return "日记本还是空的"
+    lines = DIARY_FILE.read_text(encoding="utf-8").splitlines()
+    heads = [i for i, l in enumerate(lines) if l.startswith("## ")]
+    if not heads:
+        return "日记本还是空的"
+    out = []
+    for idx in heads[-int(limit):]:
+        out.append("\n".join(lines[idx: heads[heads.index(idx) + 1] if heads.index(idx) + 1 < len(heads) else None]).strip()[:400])
+    return "\n---\n".join(reversed(out))
+
+
+def diary_delete(entry_stamp: str) -> str:
+    """Delete a diary entry by its heading stamp (e.g. 2026-09-05 21:00)."""
+    if not DIARY_FILE.exists():
+        return "日记本还是空的"
+    text = DIARY_FILE.read_text(encoding="utf-8")
+    head = f"## {entry_stamp}"
+    if head not in text:
+        return "未找到该条目"
+    lines = text.splitlines(keepends=True)
+    idx = next(i for i, l in enumerate(lines) if l.startswith(head))
+    end = next((i for i in range(idx + 1, len(lines)) if lines[i].startswith("## ")),
+               len(lines))
+    del lines[idx:end]
+    DIARY_FILE.write_text("".join(lines), encoding="utf-8")
+    return "已删除该条日记"
 
 
 def setup_scheduler_capabilities(registry: Optional[CapabilityRegistry] = None) -> CapabilityRegistry:
@@ -321,6 +398,10 @@ def setup_scheduler_capabilities(registry: Optional[CapabilityRegistry] = None) 
         registry.register_policy(SCHEDULER_POLICY, _policy_always_true)
     if not registry.get_policy(SAVE_APPROVAL_POLICY):
         registry.register_policy(SAVE_APPROVAL_POLICY, _policy_deny_all)
+    if not registry.get_policy(DIARY_AUTO_POLICY):
+        registry.register_policy(DIARY_AUTO_POLICY, _policy_always_true)
+    if not registry.get_policy("diary.delete.approval"):
+        registry.register_policy("diary.delete.approval", _policy_deny_all)
     return registry
 
 
