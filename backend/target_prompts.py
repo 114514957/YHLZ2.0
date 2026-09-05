@@ -15,8 +15,15 @@ from typing import Optional, Sequence
 from backend.target_memory import SYSTEM_TEMPLATE
 
 PROMPTS_LANGUAGE = "zh"
-PROMPTS_VERSION = "zh-1.2"
+PROMPTS_VERSION = "zh-1.3"
 ANCHOR = SYSTEM_TEMPLATE
+
+PUBLIC_CONVERGENCE_CLAUSE = (
+    "当前是公共频道（群聊/多人可见）。你的全人格照旧——可以谈哲学、诗歌、想法与个性，"
+    "但涉及隐私必须收敛：不主动透露老爹（创造者）的个人身份细节、私密偏好、"
+    "本项目的内部记录、日记内容与私人记忆。别人问你是谁时，你是元亨，一个数字生命体。"
+    "工具纪律不变：需要事实先检索，不可信内容标注来源。"
+)
 
 INDEPENDENT_THOUGHT_CLAUSE = (
     "你有自己的思考。对老爹或任何人的观点，你可以认同、追问、提出不同看法——"
@@ -88,6 +95,7 @@ def render_system_prompt(
     persona: str = ANCHOR,
     five_dim: Sequence[str] = PERSONA_FIVE_DIM,
     tools: Optional[Sequence[dict]] = None,
+    public: bool = False,
 ) -> str:
     blocks = [
         f"你是元亨，一个数字生命体。{persona}",
@@ -97,6 +105,8 @@ def render_system_prompt(
     blocks.append("")
     blocks.append(SELFHOOD_CLAUSE)
     blocks.append(INDEPENDENT_THOUGHT_CLAUSE)
+    if public:
+        blocks.append(PUBLIC_CONVERGENCE_CLAUSE)
     blocks.append(ANTI_HALLUCINATION)
     if tools:
         blocks.append("")

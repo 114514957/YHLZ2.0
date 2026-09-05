@@ -1,14 +1,14 @@
-"""Always-on daemon (ledger 0168): hosts one ConversationSession over HTTP.
+"""Always-on daemon (ledger 0168/0169): multi-channel ConversationSessions.
 
 Routes:
-  GET  /health         -> status (provider rail, session, memory)
-  POST /turn           -> {"text": ...} => {"answer", "tools", ...}
+  GET  /health                     -> status (sessions, memory)
+  POST /turn      {"text","channel"} -> per-channel turn (private default)
+  POST /v1/chat/completions        -> OpenAI-compatible (AstrBot provider):
+          messages last user text; "user" field = channel id (public).
 
-Dual rail: the LLM turn factory falls back to the local Ollama endpoint when
-the cloud (DeepSeek) is unreachable, so the daemon keeps answering offline.
-Zero deps: stdlib http.server + threading.
-
-Run:  python -m backend.target_daemon [--port 8321] [--host 127.0.0.1]
+Per-channel sessions: each group/user gets an independent conversation +
+session file (cache/sessions/qq_<id>.json). Public channels add the
+PUBLIC_CONVERGENCE_CLAUSE (privacy guard).  Dual-rail LLM (cloud -> local).
 """
 
 from __future__ import annotations
@@ -17,8 +17,10 @@ import argparse
 import asyncio
 import io
 import json
+import re
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Optional
 
@@ -31,14 +33,14 @@ LOCAL_MODEL = "qwen2.5:3b"
 
 
 class DaemonRuntime:
-    """Owns one persistent ConversationSession (dual-rail LLM)."""
-
     def __init__(self, session_factory: Optional[Callable[[], Any]] = None,
                  llm_turn: Any = None) -> None:
         self._loop = asyncio.new_event_loop()
         self._ready = threading.Event()
-        self._session_factory = session_factory or self._default_session
+        self._factory = session_factory or self._default_session
         self._llm_turn_override = llm_turn
+        self._sessions: dict[str, Any] = {}
+        self._lock = threading.Lock()
         self._worker = threading.Thread(target=self._run_loop, daemon=True)
         self._worker.start()
         self._ready.wait(timeout=10)
@@ -49,7 +51,7 @@ class DaemonRuntime:
         self._loop.run_forever()
 
     @staticmethod
-    def _default_session():
+    def _default_session(channel: str = "private"):
         from backend.env_loader import ensure_env_loaded
 
         ensure_env_loaded()
@@ -58,40 +60,72 @@ class DaemonRuntime:
 
         llm = build_openai_compatible_llm_turn(
             fallback_base_url=LOCAL_BASE, fallback_model=LOCAL_MODEL)
-        s = ConversationSession(llm_turn=llm)
-        try:
-            s.load_session("default")
-        except Exception:
-            pass
+        s = ConversationSession(llm_turn=llm, channel=channel)
+        if channel != "private":
+            try:
+                s.load_session(f"qq_{channel}")
+            except Exception:
+                pass
+        else:
+            try:
+                s.load_session("default")
+            except Exception:
+                pass
         return s
 
-    def _get_session(self) -> Any:
-        if not hasattr(self, "_session"):
-            self._session = self._session_factory()
-            if self._llm_turn_override is not None:
-                self._session.llm_turn = self._llm_turn_override
-        return self._session
+    def _session(self, channel: str) -> Any:
+        key = channel or "private"
+        with self._lock:
+            s = self._sessions.get(key)
+            if s is None:
+                s = self._factory(key)
+                if self._llm_turn_override is not None:
+                    s.llm_turn = self._llm_turn_override
+                self._sessions[key] = s
+            return s
 
     def health(self) -> dict:
         try:
-            s = self._get_session()
-            st = s.status()
+            counts = {k: self._sessions[k].status()["history_turns"]
+                      for k in self._sessions}
         except Exception as exc:
             return {"status": "degraded", "detail": type(exc).__name__}
         return {"status": "ok", "provider": "dual-rail",
-                "session": st, "llm": "deepseek->ollama"}
+                "sessions": len(self._sessions), "turns": counts,
+                "llm": "deepseek->ollama"}
 
-    def turn(self, text: str) -> dict:
-        future = asyncio.run_coroutine_threadsafe(
-            self._get_session().run_turn(str(text)), self._loop)
+    def turn(self, text: str, channel: str = "private") -> dict:
+        key = channel or "private"
+        s = self._session(key)
+        future = asyncio.run_coroutine_threadsafe(s.run_turn(str(text)),
+                                                  self._loop)
         info = future.result(timeout=240)
         try:
-            self._loop.call_soon_threadsafe(
-                lambda: asyncio.ensure_future(
-                    self._get_session().save_session(), loop=self._loop))
+            s.save_session("qq_" + key if key != "private" else "default")
         except Exception:
             pass
         return info
+
+    def openai_chat(self, payload: dict) -> dict:
+        messages = payload.get("messages") or []
+        user_msgs = [m for m in messages if m.get("role") == "user"]
+        text = str((user_msgs[-1] or {}).get("content", "")).strip()
+        if not text:
+            return {"error": "empty user message"}
+        channel = str(payload.get("user") or "public")
+        info = self.turn(text, channel=channel)
+        return {
+            "id": f"chatcmpl-yhlz-{int(time.time() * 1000)}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": str(payload.get("model", "yhlz-yuanheng")),
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant",
+                            "content": info.get("answer", "")},
+                "finish_reason": "stop",
+            }],
+        }
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -115,24 +149,36 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path != "/turn":
-            self._send(404, {"error": "not found"})
-            return
         length = int(self.headers.get("Content-Length", 0))
         try:
             payload = json.loads(self.rfile.read(length) or b"{}")
-            text = str(payload.get("text", "")).strip()
         except Exception:
             self._send(400, {"error": "bad json"})
             return
-        if not text:
-            self._send(400, {"error": "empty text"})
+        if self.path == "/turn":
+            text = str(payload.get("text", "")).strip()
+            if not text:
+                self._send(400, {"error": "empty text"})
+                return
+            try:
+                info = self.runtime.turn(text,
+                                         str(payload.get("channel", "private")))
+                self._send(200, info)
+            except Exception as exc:
+                self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:160]}"})
             return
-        try:
-            info = self.runtime.turn(text)
-            self._send(200, info)
-        except Exception as exc:
-            self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:160]}"})
+        if self.path in ("/v1/chat/completions", "/chat/completions"):
+            try:
+                out = self.runtime.openai_chat(payload)
+            except Exception as exc:
+                self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:160]}"})
+                return
+            if "error" in out:
+                self._send(400, out)
+                return
+            self._send(200, out)
+            return
+        self._send(404, {"error": "not found"})
 
 
 def make_server(port: int, host: str, runtime: DaemonRuntime) -> ThreadingHTTPServer:
@@ -145,14 +191,14 @@ def main() -> int:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-    parser = argparse.ArgumentParser(description="元亨常驻 daemon（双轨）")
+    parser = argparse.ArgumentParser(description="元亨常驻 daemon（双轨+多渠道）")
     parser.add_argument("--port", type=int, default=8321)
     parser.add_argument("--host", default="127.0.0.1")
     args = parser.parse_args()
     runtime = DaemonRuntime()
     server = make_server(args.port, args.host, runtime)
-    print(f"元亨常驻 daemon: http://{args.host}:{args.port} (云端→本地双轨)",
-          flush=True)
+    print(f"元亨 daemon: http://{args.host}:{args.port} "
+          f"(OpenAI 兼容 {args.host}:{args.port}/v1/chat/completions)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

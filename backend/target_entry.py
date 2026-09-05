@@ -67,8 +67,10 @@ class ConversationSession:
         approver: Optional[Approver] = None,
         max_tool_rounds: int = 2,
         history_limit: int = HISTORY_LIMIT,
+        channel: str = "private",
     ) -> None:
         self.memory = memory or TargetMemoryService()
+        self.channel = str(channel or "private")
         self.registry = registry if registry is not None else setup_scheduler_capabilities()
         bind_memory_save_service(self.registry, self.memory)
         self.llm_turn = llm_turn or build_openai_compatible_llm_turn()
@@ -107,7 +109,10 @@ class ConversationSession:
             from backend.target_prompts import ANCHOR
 
             persona_arg = None if draft == ANCHOR else draft
-        return render_system_prompt(persona=persona_arg, tools=tools)
+        return render_system_prompt(
+            persona=persona_arg, tools=tools,
+            public=(self.channel != "private"),
+        )
 
     # ---------- contradiction trigger (M3: old-kernel contradiction -> belief) ----------
     _NEGATION = ("其实我不", "我不喜欢", "不喜欢", "不是", "不要再", "我改主意", "错了", "相反", "其实不是")
