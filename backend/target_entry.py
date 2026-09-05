@@ -321,6 +321,13 @@ def cli_main() -> int:
                 info = loop.run_until_complete(session.reflect())
                 print(f"反思完成: {info}")
                 continue
+            if line in ("/consolidate",):
+                from backend.target_persona_loop import PersonaConsolidationLoop
+
+                pc = PersonaConsolidationLoop(session.llm_turn, session.memory)
+                info = loop.run_until_complete(pc.consolidate_once())
+                print(f"沉淀闭环: {info}")
+                continue
             if line in ("/think", "/proactive"):
                 try:
                     info = loop.run_until_complete(session.proactive_tick())
