@@ -42,8 +42,9 @@
 
 - `webui_server.py`(52KB): Flask 控制台(端口 8001 / 5060), 管理 avatar / 服务 / 记忆 / 工具 / API 代理。
 - `backend\main.py` 的 `/ws/avatar`、`/ws/stream` WebSocket 做实时语音流。
-- 桌面挂件: `live2d_desktop_avatar.py`、`live2d_pygame_avatar.py`、`live2d_qt_avatar.py`、`live2d_renderer.py`。
-- 入口与 GUI 变体: `avatar_main.py`、`gui_*.py`。
+- 桌面挂件与 GUI（2026-09-02 起统一归档到 `apps/`）: `apps/live2d_desktop_avatar.py`、`apps/live2d_pygame_avatar.py`、`apps/live2d_qt_avatar.py`、`apps/live2d_renderer.py`、`apps/avatar_main.py`、`apps/gui_*.py`、`apps/desktop_avatar/`（Electron 客户端）。
+- 临时/诊断脚本（`tools/`）: `_quick_test*.py`、`_debug_clone.py`、`decompile_311.py`、`install_ffmpeg.py`、`pcm_latency_test.py`、`create_shortcut.py`。
+- 历史交接文档移入 `docs/handover/`（HANDOVER_V4.5~V6.5）。
 
 ## 四、数据与资源目录
 

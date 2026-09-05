@@ -62,3 +62,6 @@ desktop_avatar/package-lock.json
 
 # 嵌套仓库(空)与本地预留
 GPT-SoVITS/
+
+# Probe outputs
+artifacts/

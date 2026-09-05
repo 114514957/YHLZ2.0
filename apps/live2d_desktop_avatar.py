@@ -14,7 +14,8 @@ import threading
 import http.server
 import socketserver
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 logging.basicConfig(level=logging.DEBUG)
@@ -30,7 +31,7 @@ def _start_live2d_server():
     """启动Live2D查看器HTTP服务器"""
     global _live2d_server, _live2d_server_thread
     
-    live2d_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'live2d')
+    live2d_dir = os.path.join(PROJECT_ROOT, 'assets', 'live2d')
     
     os.chdir(live2d_dir)
     
@@ -488,7 +489,7 @@ class ServiceManager:
         self.running = False
     
     def _load_config(self):
-        config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "launcher_config.json")
+        config_file = os.path.join(PROJECT_ROOT, "launcher_config.json")
         default = {
             "port": 8000,
             "host": "0.0.0.0",
@@ -514,7 +515,7 @@ class ServiceManager:
         return default
     
     def save_config(self):
-        config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "launcher_config.json")
+        config_file = os.path.join(PROJECT_ROOT, "launcher_config.json")
         try:
             with open(config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
@@ -1003,7 +1004,7 @@ class DesktopAvatar(QWidget):
         self._context_menu.addAction(quit_action)
     
     def _populate_model_menu(self, menu):
-        live2d_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'live2d')
+        live2d_dir = os.path.join(PROJECT_ROOT, 'assets', 'live2d')
         if os.path.exists(live2d_dir):
             for item in os.listdir(live2d_dir):
                 item_path = os.path.join(live2d_dir, item)
@@ -1283,7 +1284,7 @@ class Live2DControlAPI:
     
     def switch_model(self, model_name):
         if self._avatar:
-            live2d_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'live2d', model_name)
+            live2d_dir = os.path.join(PROJECT_ROOT, 'assets', 'live2d', model_name)
             if os.path.exists(live2d_dir):
                 self._avatar._switch_model(live2d_dir)
                 return {"success": True, "message": f"已切换模型: {model_name}"}
@@ -1342,7 +1343,7 @@ class Live2DControlAPI:
         return {"success": False, "message": "Live2D未初始化"}
     
     def get_available_models(self):
-        live2d_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'live2d')
+        live2d_dir = os.path.join(PROJECT_ROOT, 'assets', 'live2d')
         models = []
         if os.path.exists(live2d_dir):
             for item in os.listdir(live2d_dir):
