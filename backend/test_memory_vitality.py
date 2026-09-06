@@ -53,6 +53,28 @@ class MemoryVitalityTest(unittest.TestCase):
         con.close()
         self.assertGreater(up, 0)
 
+    def test_review_reinforce_refreshes_important_idle(self):
+        import time as _t
+
+        now = _t.time()
+        con = sqlite3.connect(str(self.db))
+        # t1 importance=5 (below gate) -> not reinforced; make an important idle one
+        self.svc.store_item(L2Item(
+            id="t_imp", tier="L2", type="decision", importance=8,
+            summary="重要决策条目", content_hash="h", keywords="重要",
+            status="active", created_at=now - 10 * 86400,
+        ))
+        con.execute("UPDATE l2_items SET belief_updated=? WHERE id='t_imp'",
+                    (now - 10 * 86400,))
+        con.execute("UPDATE l2_items SET belief_updated=? WHERE id='t1'",
+                    (now - 10 * 86400,))  # low importance + idle -> not reinforced
+        con.commit()
+        n = self.svc.review_reinforce(min_importance=7, stale_days=3.0, now=now)
+        self.assertEqual(n, 1)
+        up = con.execute("SELECT belief_updated FROM l2_items WHERE id='t_imp'").fetchone()[0]
+        self.assertAlmostEqual(up, now, delta=5)
+        con.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS kb_items (
     source TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'active',
     created REAL NOT NULL,
-    updated REAL NOT NULL
+    updated REAL NOT NULL,
+    uses INTEGER NOT NULL DEFAULT 0,
+    quality INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS kb_fts (
     sid TEXT PRIMARY KEY,
@@ -36,7 +38,19 @@ CREATE TABLE IF NOT EXISTS kb_fts (
     category TEXT NOT NULL
 );
 """
+
+_COLUMN_ADD = [
+    ("uses", "INTEGER NOT NULL DEFAULT 0"),
+    ("quality", "INTEGER NOT NULL DEFAULT 0"),
+]
 _lock = threading.RLock()
+
+
+def _migrate(con: sqlite3.Connection) -> None:
+    cols = {r[1] for r in con.execute("PRAGMA table_info(kb_items)").fetchall()}
+    for name, decl in _COLUMN_ADD:
+        if name not in cols:
+            con.execute(f"ALTER TABLE kb_items ADD COLUMN {name} {decl}")
 
 
 def _db() -> sqlite3.Connection:
@@ -49,6 +63,7 @@ def _init() -> None:
     DEFAULT_KB_DB.parent.mkdir(parents=True, exist_ok=True)
     with _lock, _db() as con:
         con.executescript(_SCHEMA)
+        _migrate(con)
         con.commit()
 
 
@@ -162,6 +177,30 @@ def kb_list(category: str = "", limit: int = 50) -> list[dict]:
             ).fetchall()
     return [{"id": r[0], "category": r[1], "summary": r[2], "detail": r[3] or "",
              "source": r[4], "created": r[5]} for r in rows]
+
+
+def kb_note_hit(item_id: str) -> None:
+    """B2 (ledger 0193): count a real use of a KB item (skills)."""
+    _init()
+    with _lock, _db() as con:
+        con.execute("UPDATE kb_items SET uses=uses+1, updated=? WHERE id=?",
+                    (time.time(), item_id))
+        con.commit()
+
+
+def kb_feedback(item_id: str, good: bool) -> str:
+    """B3 (ledger 0193): owner feedback on a skill/item. good=True rewards,
+    good=False flags the item for review (quality may go negative)."""
+    _init()
+    delta = 1 if good else -1
+    with _lock, _db() as con:
+        row = con.execute("SELECT id, summary FROM kb_items WHERE id=?", (item_id,)).fetchone()
+        if row is None:
+            return f"条目不存在：{item_id}"
+        con.execute("UPDATE kb_items SET quality=quality+?, updated=? WHERE id=?",
+                    (delta, time.time(), item_id))
+        con.commit()
+    return f"已记录{'正向' if good else '负向'}反馈（quality{'+' if good else ''}{delta}）→ {row[1][:30]}"
 
 
 def kb_stats() -> dict:

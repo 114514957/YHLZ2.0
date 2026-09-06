@@ -469,6 +469,18 @@ def scheduler_capabilities() -> list[Capability]:
             risk="high",
         ),
         Capability(
+            name="skill.feedback",
+            description="技能效果反馈（B3）：老爹判断某技能无效/过时时用 good=false 标记待审降级；有效用 good=true 奖励。参数 query=技能名，good=true|false。",
+            handler=lambda p: skill_feedback(str(p.get("query", "")),
+                                              str(p.get("good", "true")).lower() in ("true", "1", "yes", "是")),
+            input=("query",),
+            optional_input=("good",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="low",
+            verify=_verify_nonempty,
+        ),
+        Capability(
             name="skill.search",
             description="检索技能库：输入你想做的事或场景（如：导出QQ群历史），返回可用的技能及其要点。做复杂多步操作前先用它找现成流程。",
             handler=lambda p: skill_search(str(p.get("query", "")),
@@ -740,10 +752,26 @@ def skill_search(query: str, limit: int = 3) -> str:
             return f"未精确匹配，技能库现有：\n{names}"
     lines = []
     for h in hits:
+        try:
+            from backend.yuanheng_kb import kb_note_hit
+
+            kb_note_hit(str(h["id"]))  # B2: real use counts
+        except Exception:
+            pass
         lines.append(f"[{h['id']}] {h['summary']}")
         if h.get("detail"):
             lines.append("   步骤：" + h["detail"][:300].replace(chr(10), "；"))
     return chr(10).join(lines)
+
+
+def skill_feedback(query: str, good: bool) -> str:
+    """B3: owner feedback on a skill (good=True reward / False flag-review)."""
+    from backend.yuanheng_kb import kb_feedback, kb_query
+
+    hits = kb_query(str(query or ""), limit=1, category="skill")
+    if not hits:
+        return "技能库中未找到该技能（可尝试更精确的名称）"
+    return kb_feedback(hits[0]["id"], bool(good))
 
 
 def skill_add(name: str, trigger: str, steps: str) -> str:

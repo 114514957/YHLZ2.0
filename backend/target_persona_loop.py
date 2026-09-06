@@ -63,6 +63,82 @@ class PersonaConsolidationError(Exception):
     pass
 
 
+
+# ---- A3 refutation linkage (ledger 0193) ----
+REFUTE_TRIGGERS = ("改主意", "说错了", "错了", "之前错", "推翻", "不是那样",
+                   "取消之前", "不再那么想", "我之前说的不对", "更正", "收回",
+                   "以前那条不对", "换个说法")
+
+
+def _foundation_claim_lines(text: str) -> list[tuple[int, str]]:
+    """Return (line_no, text) of every '- [...] claim' line in the foundation."""
+    lines = (text or "").splitlines()
+    out = []
+    for i, ln in enumerate(lines):
+        s = ln.strip()
+        if s.startswith("- [") and "]" in s:
+            out.append((i, s[s.index("]") + 1:].strip()))
+    return out
+
+
+def _norm_tokens(s: str):
+    """CJK character trigrams (no whitespace in Chinese; overlap on 3-char
+    n-grams is the robust similarity signal)."""
+    import re as _re
+
+    s2 = _re.sub(r"[^\u4e00-\u9fffA-Za-z0-9]", "", s or "")
+    return {s2[k:k + 3] for k in range(max(0, len(s2) - 2))}
+
+
+def find_foundation_match(foundation: str, text: str, min_share: int = 1):
+    """Locate the foundation claim most similar to `text` by shared trigrams."""
+    tx = _norm_tokens(text)
+    best, best_score = None, 0
+    for i, claim in _foundation_claim_lines(foundation):
+        share = len(tx & _norm_tokens(claim))
+        if share > best_score:
+            best, best_score = (i, claim), share
+    if best and best_score >= min_share:
+        return best
+    return None
+
+
+def maybe_open_refute_proposal(foundation: str, dad_text: str,
+                               pending_file: Path = PENDING_FILE) -> str:
+    """A3: when the owner states a correction that matches a foundation claim,
+    file a refute proposal (owner approves later) — never edits the foundation
+    directly. Returns a human message ('' if nothing matched)."""
+    import json as _json
+
+    if not any(tg in dad_text for tg in REFUTE_TRIGGERS):
+        return ""
+    hit = find_foundation_match(foundation, dad_text)
+    if hit is None:
+        return ""
+    line_no, orig = hit
+    entry = {
+        "claim": "（老爹更正声明）" + str(dad_text)[:200],
+        "kind": "refute",
+        "tier": "core",
+        "item_ids": [],
+        "refutes_foundation": orig,
+        "refutes_line": line_no,
+    }
+    pending = []
+    if pending_file.exists():
+        try:
+            pending = _json.loads(pending_file.read_text(encoding="utf-8"))
+        except Exception:
+            pending = []
+    if not any(e.get("refutes_foundation") == orig for e in pending):
+        pending.append(entry)
+        pending_file.parent.mkdir(parents=True, exist_ok=True)
+        pending_file.write_text(_json.dumps(pending, ensure_ascii=False, indent=1),
+                                encoding="utf-8")
+        return f"已就“{orig[:40]}…”生成证伪提案（待你确认，/review-cognition 或对话 owner.approve）"
+    return f"该根基条目“{orig[:30]}…”已有待批证伪提案"
+
+
 class PersonaConsolidationLoop:
     def __init__(self, llm_turn: Any, memory: Any,
                  cognition_file: Path = COGNITION_FILE,
@@ -171,7 +247,11 @@ class PersonaConsolidationLoop:
                 continue
             tier = _tier_of(d)
             tag = {"new": "新增", "refine": "深化", "refute": "证伪修订"}.get(kind, "新增")
-            lines.append(f"- [{tag}|{tier}] {claim}")
+            orig = str(d.get("refutes_foundation", "")).strip()
+            if kind == "refute" and orig:
+                lines.append(f"- [{tag}|{tier}] 原“{orig}”→ {claim}")
+            else:
+                lines.append(f"- [{tag}|{tier}] {claim}")
         if len(lines) == 2:
             return 0
         body = self._foundation_text().rstrip() + "\n" + "\n".join(lines) + "\n"

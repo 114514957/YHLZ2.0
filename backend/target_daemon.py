@@ -151,11 +151,35 @@ class DaemonRuntime:
             answer = str(info.get("answer", ""))
             if key == "private" and answer:
                 try:
+                    from backend.target_signals import capture as _sig_capture
+
+                    _sig_capture(str(text), channel=key)
+                except Exception:
+                    pass
+                try:
                     from backend.target_scheduler_tools import skill_hint
 
                     hint = skill_hint(str(text), [u.get("name", "") for u in (info.get("tool_uses") or [])])
                     if hint:
                         info["answer"] = answer + hint
+                except Exception:
+                    pass
+                try:
+                    from backend.target_persona_loop import (
+                        PENDING_FILE, maybe_open_refute_proposal)
+
+                    s = self._session(key)
+                    from backend.target_persona_loop import COGNITION_FILE
+
+                    msg = ""
+                    try:
+                        msg = maybe_open_refute_proposal(
+                            COGNITION_FILE.read_text(encoding="utf-8"),
+                            str(text), pending_file=PENDING_FILE)
+                    except Exception:
+                        msg = ""
+                    if msg:
+                        info["answer"] = info.get("answer", "") + "\n\n（证伪联动）" + msg
                 except Exception:
                     pass
             if key == "private" and notify_should(answer, info.get("tool_uses") or []):
@@ -244,14 +268,15 @@ class DaemonRuntime:
                 from backend.target_memory import TargetMemoryService
 
                 svc = TargetMemoryService()
+                reinforced = svc.review_reinforce()
                 decayed = svc.apply_belief_decay()
                 downgraded = svc.apply_belief_downgrades()
                 stamp_file.write_text(
-                    json.dumps({"date": today, "decayed": decayed,
-                                "downgraded": downgraded}),
+                    json.dumps({"date": today, "reinforced": reinforced,
+                                "decayed": decayed, "downgraded": downgraded}),
                     encoding="utf-8")
-                print(f"[memory-upkeep] {today} decayed={decayed} downgraded={downgraded}",
-                      flush=True)
+                print(f"[memory-upkeep] {today} reinforced={reinforced} "
+                      f"decayed={decayed} downgraded={downgraded}", flush=True)
             except Exception as exc:
                 print(f"[memory-upkeep] skip: {type(exc).__name__}", flush=True)
 

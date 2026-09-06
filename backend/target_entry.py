@@ -419,9 +419,10 @@ def cli_main() -> int:
                 from backend.target_memory import TargetMemoryService
 
                 svc = TargetMemoryService()
+                rf = svc.review_reinforce()
                 dec = svc.apply_belief_decay()
                 dg = svc.apply_belief_downgrades()
-                print(f"记忆风化（每周日 12:00 自动；手动触发）：衰减 {dec} 条，降权 {dg} 条（不删除）")
+                print(f"记忆风化（每周日 12:00 自动；手动触发）：巩固 {rf} 条，衰减 {dec} 条，降权 {dg} 条（不删除）")
                 continue
             if line == "/review-cognition":
                 from backend.target_persona_loop import PENDING_FILE

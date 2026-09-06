@@ -411,6 +411,35 @@ class TargetMemoryService:
         con.close()
         return nb
 
+
+    def review_reinforce(self, min_importance: int = 7, stale_days: float = 3.0,
+                         now: Optional[float] = None) -> int:
+        """A2 (ledger 0193): weekly reinforcement — high-importance items that
+        have been idle (no belief update / access for `stale_days`) get their
+        belief_updated refreshed and +1 evidence, so important memories are
+        NOT washed away by time-decay. Zero LLM. Returns count reinforced."""
+        import time as _t
+
+        now = float(now or _t.time())
+        con = sqlite3.connect(str(self.db_path))
+        rows = con.execute(
+            "SELECT id FROM l2_items "
+            "WHERE status='active' AND importance>=? AND belief_updated>0 "
+            "AND (? - belief_updated) > (?*86400.0)",
+            (int(min_importance), now, float(stale_days)),
+        ).fetchall()
+        n = 0
+        for (iid,) in rows:
+            con.execute(
+                "UPDATE l2_items SET belief_updated=?, evidence_count=evidence_count+1, "
+                "last_accessed=? WHERE id=?",
+                (now, now, iid),
+            )
+            n += 1
+        con.commit()
+        con.close()
+        return n
+
     def apply_belief_downgrades(self, hint: float = BELIEF_DOWNGRADE_HINT) -> int:
         """Auto-suggest: active items whose belief fell below the hint (repeated
         contradiction + decay) are marked ``downgraded`` (never deleted).

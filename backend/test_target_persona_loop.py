@@ -154,6 +154,34 @@ class TestConsolidation(unittest.TestCase):
         self.assertEqual(r["status"], "no-approved")
         self.assertNotIn("待证伪", self.cog.read_text(encoding="utf-8"))
 
+    def test_a3_refute_proposal_matches_and_files(self):
+        """A3 (ledger 0193): correction statement that matches a foundation
+        claim files a refute proposal; never edits the foundation directly."""
+        import json
+        import backend.target_persona_loop as pl
+
+        self.cog.write_text("# 认知根基\n\n## 版本\n- [新增|core] 元亨珍视深夜思考\n",
+                            encoding="utf-8")
+        msg = pl.maybe_open_refute_proposal(
+            self.cog.read_text(encoding="utf-8"),
+            "我之前说错了：深夜思考其实不是最重要的",
+            pending_file=pl.PENDING_FILE)
+        self.assertIn("证伪提案", msg)
+        self.assertNotIn("证伪修订", self.cog.read_text(encoding="utf-8"))
+        pend = json.loads(pl.PENDING_FILE.read_text(encoding="utf-8"))
+        self.assertTrue(any(e.get("refutes_foundation", "").startswith("元亨珍视深夜")
+                            for e in pend))
+
+    def test_a3_no_match_does_nothing(self):
+        import backend.target_persona_loop as pl
+
+        self.cog.write_text("# 认知根基\n\n- [新增|core] 元亨珍视深夜思考\n",
+                            encoding="utf-8")
+        msg = pl.maybe_open_refute_proposal(
+            self.cog.read_text(encoding="utf-8"),
+            "我今天心情不错，想聊聊天", pending_file=pl.PENDING_FILE)
+        self.assertEqual(msg, "")
+
 
 if __name__ == "__main__":
     unittest.main()

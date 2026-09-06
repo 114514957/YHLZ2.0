@@ -179,36 +179,18 @@ _DOC_FALLBACKS = [
 
 
 async def web_search(query: str, limit: int = 5) -> str:
-    """Zero-key web search (best-effort DuckDuckGo html + known doc roots)."""
+    """Zero-key web search via the Bing HTML crawler (ledger 0193) with doc-root
+    fallback."""
     q = str(query or "").strip()
     if not q:
         return "无查询词"
-    import httpx
-    from urllib.parse import quote
+    from backend.search_crawler import bing_search
 
-    url = "https://html.duckduckgo.com/html/?q=" + quote(q)
-    try:
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True,
-                                     headers=_BROWSER_HEADERS) as c:
-            r = await c.get(url)
-            body = r.text[: 300_000]
-    except Exception as exc:
-        return f"搜索失败: {type(exc).__name__}"
-    results = []
-    for m in re.finditer(
-        r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>', body, re.S
-    ):
-        href, title = m.group(1), re.sub(r"<[^>]+>", "", m.group(2))
-        if "uddg=" in href:
-            href = re.search(r"uddg=([^&]+)", href)
-            import urllib.parse
-
-            href = urllib.parse.unquote(href.group(1)) if href else ""
-        results.append(f"- {title.strip()}\n  {href}")
-        if len(results) >= int(limit):
-            break
+    results = bing_search(q, limit=int(limit or 5))
     if results:
-        return f"{EXTERNAL_MARKER}\n搜索: {q}\n\n" + "\n".join(results)
+        lines = [f"{r['title']}\n  {r['url']}" + (f"\n  {r['snippet']}" if r.get("snippet") else "")
+                 for r in results]
+        return f"{EXTERNAL_MARKER}\n搜索: {q}\n\n" + "\n".join(lines)
     roots = "\n".join(f"- {name}: {base}" for base, name in _DOC_FALLBACKS)
     return (f"直接搜索无结构化结果（网络受限或反爬）。可尝试直接抓取已知文档源：\n{roots}"
             f"\n（提示：把完整 URL 交给 web.fetch）")
