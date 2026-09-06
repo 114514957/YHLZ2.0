@@ -52,8 +52,16 @@ class TestConsolidation(unittest.TestCase):
         self.cog = self.tmp / "foundation.md"
         self.cog.write_text("## 版本\n- v1 (seed)\n", encoding="utf-8")
         from backend.target_kw_index import KeywordIndex
+        import backend.target_persona_loop as pl
+
+        self._pl = pl
+        self._pending_orig = pl.PENDING_FILE
+        pl.PENDING_FILE = self.tmp / "cognition_pending.json"  # isolate queue
         self.kw = KeywordIndex(self.tmp / "kw.db")
         self.mem = TargetMemoryService(db_path=self.tmp / "mem.db", kw_index=self.kw)
+
+    def tearDown(self):
+        self._pl.PENDING_FILE = self._pending_orig
 
     def _loop(self, llm, approver=None):
         return PersonaConsolidationLoop(llm, self.mem, cognition_file=self.cog,
