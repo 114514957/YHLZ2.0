@@ -82,5 +82,29 @@ async def diary_append(content: str) -> str:
     return await _call_async("diary_write", {"content": content})
 
 
+@mcp.tool()
+async def file_list(path: str, limit: int = 30) -> str:
+    """List a local directory (read-only). Whole-disk browsing allowed."""
+    return await _call_async("file_list", {"path": path, "limit": limit})
+
+
+@mcp.tool()
+async def file_read(path: str, max_chars: int = 4000) -> str:
+    """Read a local text file (read-only; sensitive/binary/huge files refused)."""
+    return await _call_async("file_read", {"path": path, "max_chars": max_chars})
+
+
+@mcp.tool()
+async def web_fetch(url: str, max_chars: int = 4000) -> str:
+    """Fetch a URL's text content (untrusted; category-filtered; source attached)."""
+    return await _call_async("web_fetch", {"url": url, "max_chars": max_chars})
+
+
+@mcp.tool()
+async def web_search(query: str, limit: int = 5) -> str:
+    """Zero-key web search (best-effort; returns sources)."""
+    return await _call_async("web_search", {"query": query, "limit": limit})
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")

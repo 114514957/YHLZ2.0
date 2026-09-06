@@ -23,7 +23,8 @@ class TestMCPRegistration(unittest.TestCase):
         names = asyncio.run(go())
         self.assertTrue(
             {"ledger_search", "memory_recall", "system_time", "memory_save",
-             "diary_read", "diary_append"} <= names
+             "diary_read", "diary_append", "file_list", "file_read",
+             "web_fetch", "web_search"} <= names
         )
 
     def test_ledger_search_real_call(self):
