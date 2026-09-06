@@ -458,6 +458,17 @@ def scheduler_capabilities() -> list[Capability]:
             risk="medium",
         ),
         Capability(
+            name="owner.approve",
+            description="老爹的审批工具：action=list 查看待审（认知条目+技能草稿）；action=yes + index=批准某项；action=no + index=拒绝某项。仅当老爹在对话中明确逐条同意时才批准，绝不自我批准。",
+            handler=lambda p: approve_handle(str(p.get("action", "list")),
+                                              int(p.get("index", 0) or 0)),
+            input=("action",),
+            optional_input=("index",),
+            requires=(APPROVE_POLICY,),
+            side_effect=True,
+            risk="high",
+        ),
+        Capability(
             name="skill.search",
             description="检索技能库：输入你想做的事或场景（如：导出QQ群历史），返回可用的技能及其要点。做复杂多步操作前先用它找现成流程。",
             handler=lambda p: skill_search(str(p.get("query", "")),
@@ -534,6 +545,7 @@ TASK_AUTO_POLICY = "task.self_allowed"
 TASK_FILE = _PROJECT_ROOT / "docs" / "元亨的任务表.md"
 QQOPS_POLICY = "qqops.self_allowed"
 KB_POLICY = "kb.self_allowed"
+APPROVE_POLICY = "approve.owner_allowed"
 
 
 def _policy_deny_all() -> bool:
@@ -588,6 +600,123 @@ def diary_delete(entry_stamp: str) -> str:
     return "已删除该条日记"
 
 
+def approve_list() -> str:
+    """List items awaiting the owner's approval: cognition claims and skill
+    drafts, numbered. Owner approves/rejects via approve (action yes/no)."""
+    import json
+
+    from backend.target_persona_loop import PENDING_FILE
+
+    lines = []
+    idx = 0
+    if PENDING_FILE.exists():
+        try:
+            pend = json.loads(PENDING_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pend = []
+        for d in pend:
+            lines.append(f"[{idx}] 认知[{d.get('tier')}|{d.get('kind')}] {str(d.get('claim'))[:90]}")
+            idx += 1
+    drafts = _skill_draft_files()
+    for f in drafts:
+        name = _skill_draft_meta(f)[0] or f.stem
+        lines.append(f"[{idx}] 技能申请：{name}")
+        idx += 1
+    if not lines:
+        return "当前没有待审批的认知条目或技能草稿"
+    return "待审批清单（对某条说'批准'或'拒绝'，或让元亨用 approve 处理）：\n" + "\n".join(lines)
+
+
+def approve_act(index: int, ok: bool) -> str:
+    """Owner approves (ok=True) or rejects one pending item by index."""
+    import json
+
+    from backend.target_persona_loop import PENDING_FILE
+
+    # cognition entries first
+    pend = []
+    if PENDING_FILE.exists():
+        try:
+            pend = json.loads(PENDING_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pend = []
+    if 0 <= index < len(pend):
+        entry = pend[index]
+        if ok:
+            from backend.target_memory import TargetMemoryService
+            from backend.target_persona_loop import PersonaConsolidationLoop
+
+            svc = TargetMemoryService()
+            pc = PersonaConsolidationLoop(None, svc)
+            version = pc._next_version(pc._foundation_text())
+            used = [str(i) for i in entry.get("item_ids", [])]
+            n = pc._apply([entry], version, used)
+            msg = f"已批准写入认知根基（v{version}）" if n else "写入失败"
+        else:
+            pend.pop(index)
+            PENDING_FILE.write_text(json.dumps(pend, ensure_ascii=False, indent=1),
+                                    encoding="utf-8")
+            msg = "已拒绝该认知条目"
+        if ok:
+            pend.pop(index)
+            PENDING_FILE.write_text(json.dumps(pend, ensure_ascii=False, indent=1),
+                                    encoding="utf-8")
+        return msg
+    # skill drafts next
+    drafts = _skill_draft_files()
+    si = index - len(pend)
+    if 0 <= si < len(drafts):
+        f = drafts[si]
+        name, trig, steps = _skill_draft_meta(f)
+        if ok:
+            from backend.yuanheng_kb import kb_add
+
+            res = kb_add(f"技能：{name}|触发场景：{trig}", category="skill",
+                         detail=steps, source=str(f))
+            approved_dir = _PROJECT_ROOT / "docs" / "技能库" / "已批"
+            approved_dir.mkdir(parents=True, exist_ok=True)
+            f.rename(approved_dir / f.name)
+            return f"技能已批准并入库：{res}"
+        else:
+            rejected_dir = _PROJECT_ROOT / "docs" / "技能库" / "已拒"
+            rejected_dir.mkdir(parents=True, exist_ok=True)
+            f.rename(rejected_dir / f.name)
+            return "已拒绝该技能申请"
+    return "索引无效：请先用 approve(list) 查看当前待审批项"
+
+
+
+def approve_handle(action: str, index: int = 0) -> str:
+    a = str(action or "list").strip().lower()
+    if a in ("list", "show", ""):
+        return approve_list()
+    if a in ("yes", "y", "approve", "ok"):
+        return approve_act(int(index or 0), True)
+    if a in ("no", "n", "reject", "deny"):
+        return approve_act(int(index or 0), False)
+    return f"未知动作 {a}：用 list / yes+index / no+index"
+
+
+
+def _skill_draft_files() -> list:
+    d = _PROJECT_ROOT / "docs" / "技能库" / "待批"
+    if not d.exists():
+        return []
+    return sorted(d.glob("*.md"))
+
+
+def _skill_draft_meta(f: pathlib.Path):
+    import re as _re
+
+    txt = f.read_text(encoding="utf-8")
+    name = _re.search(r"# 技能申请：(.+)", txt)
+    trig = _re.search(r"触发场景：(.+)", txt)
+    steps_m = _re.search(r"步骤：\n(.*?)(?:状态：|$)", txt, _re.S)
+    return (name.group(1).strip() if name else "",
+            trig.group(1).strip() if trig else "",
+            (steps_m.group(1).strip() if steps_m else "")[:3000])
+
+
 def skill_search(query: str, limit: int = 3) -> str:
     """Search registered skills in the KB (category=skill)."""
     from backend.yuanheng_kb import kb_list, kb_query
@@ -640,6 +769,42 @@ def skill_add(name: str, trigger: str, steps: str) -> str:
     return f"技能草稿已提交（老爹批准后入技能库）：{f}"
 
 
+
+
+# ---- skill double-signal (ledger 0187) ----
+_SKILL_PRAISE = ("好", "很好", "不错", "棒", "厉害", "学到了", "学会了",
+                 "记住", "以后就这样", "就这么办", "挺好", "可以", "对，就是这样",
+                 "ok", "OK", "搞定", "漂亮")
+_SKILL_ACTION_TOOLS = ("qq.export", "qq.process", "qq.runbatch", "qq.bootstrap",
+                       "qq.shutdown", "qq.digest", "qq.summarize",
+                       "kb.add", "skill.add", "diary.write", "task.plan",
+                       "memory.save", "file.list", "file.read", "web.fetch",
+                       "web.search")
+
+
+def skill_hint(dad_text: str, tool_names: list[str]) -> str:
+    """Double-signal helper: if the owner praised AND an actionable multi-step
+    tool chain ran this turn, suggest freezing it as a skill draft.
+
+    Returns "" when no hint (most turns). Signal is a soft suggestion only —
+    Yuanheng files the draft via skill.add when the owner then says yes.
+    """
+    dt = str(dad_text or "")
+    if not dt or len(dt) < 2:
+        return ""
+    praised = any(w in dt for w in _SKILL_PRAISE)
+    if not praised:
+        return ""
+    acted = [n for n in (tool_names or []) if n in _SKILL_ACTION_TOOLS]
+    if len(acted) < 2:
+        return ""
+    names = "、".join(dict.fromkeys(acted))
+    return (f"\n（老爹的肯定对应本轮 {names} 多步流程——这套流程值得沉淀成技能。"
+            "若你同意，元亨可用 skill.add 提交草稿，老爹批准后进技能库。）")
+
+
+def _skill_chain_note() -> None:
+    pass
 def kb_add(summary: str, category: str = "tech", source: str = "",
            detail: str = "") -> str:
     """Yuanheng KB: store an objectively useful learned item."""
@@ -1106,6 +1271,8 @@ def setup_scheduler_capabilities(registry: Optional[CapabilityRegistry] = None) 
         registry.register_policy(QQOPS_POLICY, _policy_always_true)
     if not registry.get_policy(KB_POLICY):
         registry.register_policy(KB_POLICY, _policy_always_true)
+    if not registry.get_policy(APPROVE_POLICY):
+        registry.register_policy(APPROVE_POLICY, _policy_always_true)
     if not registry.get_policy("diary.delete.approval"):
         registry.register_policy("diary.delete.approval", _policy_deny_all)
     return registry

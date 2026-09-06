@@ -27,8 +27,8 @@ def _seed(mem: TargetMemoryService, n: int = 3, prefix: str = "") -> list[str]:
 
 
 class _FakeLLM:
-    DEFAULT_CLAIMS = [{"claim": "元亨应保持好奇与求索", "kind": "new", "item_ids": []}]
-    DEFAULT_DECISIONS = [{"claim": "元亨应保持好奇与求索", "kind": "new",
+    DEFAULT_CLAIMS = [{"claim": "元亨应保持好奇与求索", "kind": "new", "tier": "core", "item_ids": []}]
+    DEFAULT_DECISIONS = [{"claim": "元亨应保持好奇与求索", "kind": "new", "tier": "core",
                           "item_ids": ["mem_seed0_a"]}]
 
     def __init__(self, claims=None, decisions=None):
@@ -55,13 +55,14 @@ class TestConsolidation(unittest.TestCase):
         self.kw = KeywordIndex(self.tmp / "kw.db")
         self.mem = TargetMemoryService(db_path=self.tmp / "mem.db", kw_index=self.kw)
 
-    def _loop(self, llm):
-        return PersonaConsolidationLoop(llm, self.mem, cognition_file=self.cog)
+    def _loop(self, llm, approver=None):
+        return PersonaConsolidationLoop(llm, self.mem, cognition_file=self.cog,
+                                        approver=approver)
 
     def test_apply_appends_version_and_stamps(self):
         import asyncio
         ids = _seed(self.mem)
-        loop = self._loop(_FakeLLM())
+        loop = self._loop(_FakeLLM(), approver=lambda c, k, t: True)
         r = asyncio.run(loop.consolidate_once())
         self.assertEqual(r["status"], "ok")
         self.assertGreaterEqual(r["version"], 2)
@@ -82,10 +83,10 @@ class TestConsolidation(unittest.TestCase):
         import asyncio
         ids = _seed(self.mem)
         llm = _FakeLLM(decisions=[
-            {"claim": f"条目{i} 值得沉淀", "kind": "new", "item_ids": [i]}
+            {"claim": f"条目{i} 值得沉淀", "kind": "new", "tier": "method", "item_ids": [i]}
             for i in ids
         ])
-        asyncio.run(self._loop(llm).consolidate_once())
+        asyncio.run(self._loop(llm, approver=lambda c, k, t: True).consolidate_once())
         # all stamped now -> second run idles
         r2 = asyncio.run(self._loop(_FakeLLM()).consolidate_once())
         self.assertEqual(r2["status"], "idle")
@@ -101,13 +102,49 @@ class TestConsolidation(unittest.TestCase):
         import asyncio
         _seed(self.mem)
         llm = _FakeLLM(
-            claims=[{"claim": "旧观点已证伪", "kind": "refute", "item_ids": []}],
-            decisions=[{"claim": "旧观点已证伪", "kind": "refute",
+            claims=[{"claim": "旧观点已证伪", "kind": "refute", "tier": "core", "item_ids": []}],
+            decisions=[{"claim": "旧观点已证伪", "kind": "refute", "tier": "core",
                         "item_ids": ["mem_seed0_a"]}],
         )
-        r = asyncio.run(self._loop(llm).consolidate_once())
+        r = asyncio.run(self._loop(llm, approver=lambda c, k, t: True).consolidate_once())
         self.assertEqual(r["status"], "ok")
         self.assertIn("证伪修订", self.cog.read_text(encoding="utf-8"))
+
+    def test_pending_when_no_approver(self):
+        """A1 (ledger 0187): without an owner approver, core/method claims are
+        parked in the pending queue — never auto-written to the foundation."""
+        import asyncio
+        import json
+
+        import backend.target_persona_loop as pl
+
+        _seed(self.mem)
+        r = asyncio.run(self._loop(_FakeLLM()).consolidate_once())
+        self.assertEqual(r["status"], "pending-approval")
+        self.assertTrue(pl.PENDING_FILE.exists())
+        pending = json.loads(pl.PENDING_FILE.read_text(encoding="utf-8"))
+        self.assertTrue(any("保持好奇" in p["claim"] for p in pending))
+        # foundation untouched
+        self.assertNotIn("元亨自沉淀", self.cog.read_text(encoding="utf-8"))
+
+    def test_declined_not_written(self):
+        import asyncio
+        _seed(self.mem)
+        loop = self._loop(_FakeLLM(), approver=lambda c, k, t: False)
+        r = asyncio.run(loop.consolidate_once())
+        self.assertEqual(r["status"], "no-approved")
+        self.assertNotIn("元亨自沉淀", self.cog.read_text(encoding="utf-8"))
+
+    def test_meta_tier_never_auto_written(self):
+        import asyncio
+        _seed(self.mem)
+        llm = _FakeLLM(
+            decisions=[{"claim": "待证伪的想法", "kind": "new", "tier": "meta",
+                        "item_ids": ["mem_seed0_a"]}],
+        )
+        r = asyncio.run(self._loop(llm, approver=lambda c, k, t: True).consolidate_once())
+        self.assertEqual(r["status"], "no-approved")
+        self.assertNotIn("待证伪", self.cog.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

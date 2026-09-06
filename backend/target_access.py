@@ -41,6 +41,21 @@ _BLOCKED_CATEGORIES = {
 }
 _BLOCKED_HOST_PARTS = ("doubleclick.net", "googlesyndication")
 
+# Realistic PC-Chrome request headers — most public sites reject bare
+# "python-httpx" / a 1-line User-Agent as bot traffic. This is the single
+# highest-leverage fix for "网络受限或反爬" answers Yuanheng was returning.
+_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+}
+
 
 def _is_sensitive_path(path: Path) -> bool:
     low = str(path).lower()
@@ -134,7 +149,7 @@ async def web_fetch(url: str, max_chars: int = 4000) -> str:
     for _attempt in range(2):  # one retry: some hosts reset intermittently
         try:
             async with httpx.AsyncClient(timeout=25, follow_redirects=True,
-                                         headers={"User-Agent": "Mozilla/5.0"}) as c:
+                                         headers=_BROWSER_HEADERS) as c:
                 r = await c.get(url)
                 status = r.status_code
                 if status != 200:
@@ -174,7 +189,7 @@ async def web_search(query: str, limit: int = 5) -> str:
     url = "https://html.duckduckgo.com/html/?q=" + quote(q)
     try:
         async with httpx.AsyncClient(timeout=20, follow_redirects=True,
-                                     headers={"User-Agent": "Mozilla/5.0"}) as c:
+                                     headers=_BROWSER_HEADERS) as c:
             r = await c.get(url)
             body = r.text[: 300_000]
     except Exception as exc:

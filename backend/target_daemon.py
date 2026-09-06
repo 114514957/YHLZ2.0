@@ -147,6 +147,15 @@ class DaemonRuntime:
         self._maybe_consolidate(key)
         try:
             answer = str(info.get("answer", ""))
+            if key == "private" and answer:
+                try:
+                    from backend.target_scheduler_tools import skill_hint
+
+                    hint = skill_hint(str(text), [u.get("name", "") for u in (info.get("tool_uses") or [])])
+                    if hint:
+                        info["answer"] = answer + hint
+                except Exception:
+                    pass
             if key == "private" and notify_should(answer, info.get("tool_uses") or []):
                 tools = [u.get("name", "") for u in (info.get("tool_uses") or [])]
                 head = answer[:150].replace("\n", " ")
@@ -178,6 +187,8 @@ class DaemonRuntime:
                                                       self._loop)
             info = future.result(timeout=180)
             print(f"[auto-consolidate] {info.get('status')}", flush=True)
+            if info.get("status") == "pending-approval":
+                notify_push("有认知提炼待你确认：在 CLI 输入 /review-cognition 逐条 y/n 批准（写进元亨认知根基）")
         except Exception as exc:
             print(f"[auto-consolidate] skip: {type(exc).__name__}", flush=True)
 

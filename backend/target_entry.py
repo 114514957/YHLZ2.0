@@ -398,9 +398,61 @@ def cli_main() -> int:
             if line in ("/consolidate",):
                 from backend.target_persona_loop import PersonaConsolidationLoop
 
-                pc = PersonaConsolidationLoop(session.llm_turn, session.memory)
+                def _review(claim, kind, tier):
+                    while True:
+                        try:
+                            ans = input(f"[{tier}|{kind}] 写入认知根基？\n  “{claim}”\n允许吗？(y/n): ").strip().lower()
+                        except EOFError:
+                            return False
+                        if ans in ("y", "yes", "是"):
+                            return True
+                        if ans in ("n", "no", "否", ""):
+                            return False
+                        print("请输入 y/n")
+
+                pc = PersonaConsolidationLoop(session.llm_turn, session.memory,
+                                              approver=_review)
                 info = loop.run_until_complete(pc.consolidate_once())
                 print(f"沉淀闭环: {info}")
+                continue
+            if line == "/review-cognition":
+                from backend.target_persona_loop import PENDING_FILE
+
+                if not PENDING_FILE.exists():
+                    print("没有待确认的认知条目")
+                    continue
+                import json
+
+                pending = json.loads(PENDING_FILE.read_text(encoding="utf-8"))
+                if not pending:
+                    print("没有待确认的认知条目")
+                    continue
+                approved = []
+                rest = []
+                for d in pending:
+                    while True:
+                        try:
+                            ans = input(f"[{d.get('tier')}|{d.get('kind')}] 写入认知根基？\n  “{d.get('claim')}”\n允许吗？(y/n): ").strip().lower()
+                        except EOFError:
+                            ans = "n"
+                        if ans in ("y", "yes", "是"):
+                            approved.append(d)
+                            break
+                        if ans in ("n", "no", "否", ""):
+                            rest.append(d)
+                            break
+                        print("请输入 y/n")
+                if approved:
+                    from backend.target_persona_loop import PersonaConsolidationLoop
+
+                    pc = PersonaConsolidationLoop(session.llm_turn, session.memory)
+                    version = pc._next_version(pc._foundation_text())
+                    used = [str(i) for d in approved for i in d.get("item_ids", [])]
+                    n = pc._apply(approved, version, used)
+                    print(f"已批准写入 {n} 条 → 认知根基 v{version}")
+                PENDING_FILE.write_text(json.dumps(rest, ensure_ascii=False, indent=1),
+                                        encoding="utf-8")
+                print(f"待确认剩余 {len(rest)} 条")
                 continue
             if line in ("/think", "/proactive"):
                 try:
@@ -420,6 +472,14 @@ def cli_main() -> int:
             for u in info["tool_uses"]:
                 if not u["ok"]:
                     print(f"  [工具失败] {u['name']}: {u['error']}")
+            try:
+                from backend.target_scheduler_tools import skill_hint
+
+                h = skill_hint(line, [u.get("name", "") for u in info["tool_uses"]])
+                if h:
+                    print(h)
+            except Exception:
+                pass
     finally:
         try:
             session.save_session()

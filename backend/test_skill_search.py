@@ -15,6 +15,9 @@ class SkillTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         self._kb = kb.DEFAULT_KB_DB
         kb.DEFAULT_KB_DB = self.tmp / "kb.db"
+        # isolate the pending-drafts directory so tests never pollute the repo
+        self._root = sched._PROJECT_ROOT
+        sched._PROJECT_ROOT = self.tmp
         kb.kb_add("技能：QQ知识捕获与导出运维|触发场景：涉及QQ群知识/导出历史/捕获链路",
                   category="skill", detail="步骤：qq.status看链路；qq.export导历史；qq.process抽取。")
         kb.kb_add("技能：数据口径与汇报规范|触发场景：报数字/说明数据/口径说法",
@@ -22,6 +25,7 @@ class SkillTest(unittest.TestCase):
 
     def tearDown(self):
         kb.DEFAULT_KB_DB = self._kb
+        sched._PROJECT_ROOT = self._root
 
     def test_search_known_fragment(self):
         out = sched.skill_search("导出历史")

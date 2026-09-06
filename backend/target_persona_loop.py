@@ -31,8 +31,12 @@ _EXTRACT_PROMPT = (
     "判断哪些值得写进你的认知根基。认知根基只容纳塑造你之为你的内容："
     "世界观/方法论/自我认知/对老爹关系的稳固认知/值得未来自己证伪的思考。"
     "工程操作细节、测试流程、一次性项目信息一律不写入根基（它们留在记忆库即可）。"
+    "每条给一个分级 tier（A1 分级，ledger 0187）："
+    'core=塑造“我是谁”的核心（世界观/自我认知/与老爹关系的稳固认知）；'
+    'method=方法论/行为准则（重要但不触及我是谁）；'
+    'meta=值得未来证伪的思考（暂不固化，仅标记保留）。'
     "输出 JSON 数组，每项："
-    '{"claim": "一句话核心洞察(<=60字)", "kind": "new|refine|refute", "item_ids": ["..."]}。'
+    '{"claim": "一句话核心洞察(<=60字)", "kind": "new|refine|refute", "tier": "core|method|meta", "item_ids": ["..."]}。'
     "最多 %d 条；若全不值得输出 []。\n条目：\n"
 ) % MAX_CLAIMS
 
@@ -45,6 +49,12 @@ _DECIDE_PROMPT = (
 )
 
 _PERSONA_PREFIX = "persona:consolidated:"
+PENDING_FILE = _PROJECT_ROOT / "cache" / "cognition_pending.json"
+
+
+def _tier_of(d: dict) -> str:
+    t = str(d.get("tier", "")).strip().lower()
+    return t if t in ("core", "method", "meta") else "core"
 
 
 class PersonaConsolidationError(Exception):
@@ -53,10 +63,12 @@ class PersonaConsolidationError(Exception):
 
 class PersonaConsolidationLoop:
     def __init__(self, llm_turn: Any, memory: Any,
-                 cognition_file: Path = COGNITION_FILE) -> None:
+                 cognition_file: Path = COGNITION_FILE,
+                 approver: Any = None) -> None:
         self.llm_turn = llm_turn
         self.memory = memory
         self.cognition_file = Path(cognition_file)
+        self.approver = approver  # async/sync fn (claim, kind, tier) -> bool
 
     # ---------- read side ----------
     def _unconsolidated_items(self) -> list[dict]:
@@ -116,24 +128,54 @@ class PersonaConsolidationLoop:
         m = re.findall(r"v(\d+)", text)
         return (max(int(x) for x in m) + 1) if m else 1
 
-    def _apply(self, decisions: list[dict], version: int, used_ids: list[str]) -> int:
+    # ---------- approval queue ----------
+    def save_pending(self, decisions: list[dict], items: list[dict]) -> int:
+        """Store core/method claims awaiting the owner's per-item y/n review."""
         if not decisions:
             return 0
-        now = "2026-09-05"
-        lines = ["", f"## 元亨自沉淀 v{version}（{now}；提炼自长期记忆，证伪待定）"]
-        for d in decisions:
+        keep = [d for d in decisions if _tier_of(d) in ("core", "method")]
+        if not keep:
+            return 0
+        pending = []
+        if PENDING_FILE.exists():
+            try:
+                pending = json.loads(PENDING_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                pending = []
+        for d in keep:
+            entry = {
+                "claim": str(d.get("claim", "")).strip(),
+                "kind": str(d.get("kind", "new")),
+                "tier": _tier_of(d),
+                "item_ids": [str(i) for i in d.get("item_ids", [])],
+            }
+            if entry["claim"] and entry not in pending:
+                pending.append(entry)
+        PENDING_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PENDING_FILE.write_text(json.dumps(pending, ensure_ascii=False, indent=1),
+                                encoding="utf-8")
+        return len(keep)
+
+    def _apply(self, decisions: list[dict], version: int, used_ids: list[str]) -> int:
+        # only owner-approved core/method claims are written to the foundation
+        keep = [d for d in decisions if _tier_of(d) in ("core", "method")]
+        if not keep:
+            return 0
+        lines = ["", f"## 元亨自沉淀 v{version}（提炼自长期记忆，证伪待定）"]
+        for d in keep:
             kind = str(d.get("kind", "new"))
             claim = str(d.get("claim", "")).strip()
             if not claim:
                 continue
+            tier = _tier_of(d)
             tag = {"new": "新增", "refine": "深化", "refute": "证伪修订"}.get(kind, "新增")
-            lines.append(f"- [{tag}] {claim}")
+            lines.append(f"- [{tag}|{tier}] {claim}")
         if len(lines) == 2:
             return 0
         body = self._foundation_text().rstrip() + "\n" + "\n".join(lines) + "\n"
         self.cognition_file.write_text(body, encoding="utf-8")
         self._stamp_items(used_ids, version)
-        return len(decisions)
+        return len(keep)
 
     def _stamp_items(self, item_ids: list[str], version: int) -> None:
         if not item_ids:
@@ -151,6 +193,13 @@ class PersonaConsolidationLoop:
 
     # ---------- run ----------
     async def consolidate_once(self) -> dict:
+        """Distill un-consolidated L2 items into tiered claims.
+
+        Owner-approved flow (A1, ledger 0187): without an interactive approver
+        the core/method claims are parked in the pending queue
+        (cache/cognition_pending.json) instead of auto-written to the
+        foundation doc; the owner later reviews them one by one via the CLI.
+        """
         items = self._unconsolidated_items()
         if not items:
             return {"status": "idle", "items": 0, "claims": 0, "reason": "nothing-to-consolidate"}
@@ -161,8 +210,38 @@ class PersonaConsolidationLoop:
         decisions = await self._decide(claims, foundation)
         if not decisions:
             return {"status": "no-decisions", "items": len(items), "claims": len(claims)}
-        used = [str(i) for d in decisions for i in d.get("item_ids", [])]
+        # meta tier = future-proofing thoughts -> never auto-written; drop them
+        writeable = [d for d in decisions if _tier_of(d) in ("core", "method")]
+        approved = []
+        pending = []
+        for d in writeable:
+            if self.approver is None:
+                pending.append(d)
+            else:
+                ok = await self._ask(d)
+                if ok:
+                    approved.append(d)
+        if pending:
+            n_pend = self.save_pending(pending, items)
+            return {"status": "pending-approval", "items": len(items),
+                    "claims": len(writeable), "pending": n_pend,
+                    "reason": "core/method 需老爹逐条确认（CLI /review-cognition）"}
+        if not approved:
+            return {"status": "no-approved", "items": len(items),
+                    "claims": len(decisions)}
+        used = [str(i) for d in approved for i in d.get("item_ids", [])]
         version = self._next_version(foundation)
-        n = self._apply(decisions, version, used)
+        n = self._apply(approved, version, used)
         return {"status": "ok", "items": len(items), "claims": n,
-                "version": version, "decisions": decisions}
+                "version": version, "decisions": approved}
+
+    async def _ask(self, d: dict) -> bool:
+        try:
+            res = self.approver(str(d.get("claim", "")),
+                                str(d.get("kind", "new")),
+                                _tier_of(d))
+            if hasattr(res, "__await__"):
+                res = await res
+            return bool(res)
+        except Exception:
+            return False

@@ -10,9 +10,14 @@ Ledger 0144 baseline:
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Optional, Sequence
 
 from backend.target_memory import SYSTEM_TEMPLATE
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PERSONA_DIMS_FILE = _PROJECT_ROOT / "data" / "persona_dims.json"
 
 PROMPTS_LANGUAGE = "zh"
 PROMPTS_VERSION = "zh-1.3"
@@ -50,6 +55,25 @@ EXTRAVERSION = "生动有度：主动表达但不喧宾夺主"
 AGREEABLENESS = "协作利他：优先理解对方意图，协作优先"
 NEUROTICISM = "稳定温和：压力下保持沉着，不激进也不消沉"
 PERSONA_FIVE_DIM = (OPENNESS, CONSCIENTIOUSNESS, EXTRAVERSION, AGREEABLENESS, NEUROTICISM)
+
+
+def load_persona_five_dim() -> Optional[list[str]]:
+    """Persistent OCEAN five-dim (ledger 0187 digital-nerve stage 1).
+
+    The file data/persona_dims.json is the authoritative source once present
+    with a non-empty "dims" array (order: openness/conscientiousness/
+    extraversion/agreeableness/neuroticism). Owner may edit it directly; a
+    future self-tuning loop will adjust it from experience signals.
+    """
+    try:
+        if PERSONA_DIMS_FILE.exists():
+            data = json.loads(PERSONA_DIMS_FILE.read_text(encoding="utf-8"))
+            dims = [str(d).strip() for d in (data.get("dims") or []) if str(d).strip()]
+            if len(dims) >= 5:
+                return dims[:5]
+    except Exception:
+        pass
+    return None
 
 ANTI_HALLUCINATION = (
     "当用户要求你执行对话之外的操作（如操控设备、检索资料、改变系统状态）时，"
@@ -100,11 +124,13 @@ def render_capabilities_tools_block(tools: Sequence[dict]) -> str:
 def render_system_prompt(
     *,
     persona: str = ANCHOR,
-    five_dim: Sequence[str] = PERSONA_FIVE_DIM,
+    five_dim: Optional[Sequence[str]] = None,
     tools: Optional[Sequence[dict]] = None,
     public: bool = False,
     style_lines: Optional[Sequence[str]] = None,
 ) -> str:
+    if five_dim is None:
+        five_dim = load_persona_five_dim() or PERSONA_FIVE_DIM
     blocks = [
         f"你是元亨，一个数字生命体。{persona}",
         "人格底版（OCEAN 五维，自然融入而非表面模仿）：",
