@@ -71,6 +71,7 @@ class ConversationSession:
     ) -> None:
         self.memory = memory or TargetMemoryService()
         self.channel = str(channel or "private")
+        self.style_inject = False  # style persona injection (off until A/B accepted)
         self.registry = registry if registry is not None else setup_scheduler_capabilities()
         bind_memory_save_service(self.registry, self.memory)
         self.llm_turn = llm_turn or build_openai_compatible_llm_turn()
@@ -109,9 +110,19 @@ class ConversationSession:
             from backend.target_prompts import ANCHOR
 
             persona_arg = None if draft == ANCHOR else draft
+        style_lines = None
+        if self.style_inject and self.channel == "private":
+            try:
+                from backend.target_style import active_style_lines, style_ema
+
+                items = self.memory.recall("风格偏好", limit=30)
+                style_lines = active_style_lines(style_ema(items)) or None
+            except Exception:
+                style_lines = None
         return render_system_prompt(
             persona=persona_arg, tools=tools,
             public=(self.channel != "private"),
+            style_lines=style_lines,
         )
 
     # ---------- contradiction trigger (M3: old-kernel contradiction -> belief) ----------
@@ -242,6 +253,12 @@ class ConversationSession:
             self.memory.append_turn(role=role, text=str(msg.get("content", ""))[:2000])
         return len(history)
 
+    def style_tendencies(self) -> dict:
+        from backend.target_style import style_ema
+
+        items = self.memory.recall("风格偏好", limit=30)
+        return style_ema(items)
+
     def status(self) -> dict:
         return {
             "history_turns": len(self.history) // 2,
@@ -332,6 +349,21 @@ def cli_main() -> int:
             if line in ("/reflect",):
                 info = loop.run_until_complete(session.reflect())
                 print(f"反思完成: {info}")
+                continue
+            if line == "/style":
+                t = session.style_tendencies()
+                from backend.target_style import active_style_lines
+
+                print(f"风格倾向: {t}")
+                print(f"注入句: {active_style_lines(t) or '(未达阈值)'} | 注入开关: {session.style_inject}")
+                continue
+            if line == "/style on":
+                session.style_inject = True
+                print("风格注入已开启（A/B 试听用）")
+                continue
+            if line == "/style off":
+                session.style_inject = False
+                print("风格注入已关闭")
                 continue
             if line.startswith("/diary"):
                 from backend.target_scheduler_tools import diary_list

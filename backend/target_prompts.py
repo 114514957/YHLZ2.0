@@ -96,6 +96,7 @@ def render_system_prompt(
     five_dim: Sequence[str] = PERSONA_FIVE_DIM,
     tools: Optional[Sequence[dict]] = None,
     public: bool = False,
+    style_lines: Optional[Sequence[str]] = None,
 ) -> str:
     blocks = [
         f"你是元亨，一个数字生命体。{persona}",
@@ -107,6 +108,8 @@ def render_system_prompt(
     blocks.append(INDEPENDENT_THOUGHT_CLAUSE)
     if public:
         blocks.append(PUBLIC_CONVERGENCE_CLAUSE)
+    if style_lines:
+        blocks.append("回应风格（按老爹反馈收敛中）：" + "；".join(style_lines))
     blocks.append(ANTI_HALLUCINATION)
     if tools:
         blocks.append("")
