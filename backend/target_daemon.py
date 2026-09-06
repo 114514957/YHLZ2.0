@@ -36,7 +36,11 @@ NOTIFY_FILE = NOTIFY_DIR / "notifications.json"
 NOTIFY_LAST_POP = NOTIFY_DIR / "notifications.popup.json"
 NOTIFY_RESULT_WORDS = ("完成", "已导出", "已入库", "入库", "导出", "总结", "已生成",
                        "汇报", "抽取", "处理完", "技能", "已启动", "已停止")
-NOTIFY_TOOL_HINTS = ("qq.", "kb.", "skill.", "diary.", "task.", "memory.save")
+# write/action tools only — read tools (kb.query, file.read, ...) never notify
+NOTIFY_TOOL_HINTS = ("qq.export", "qq.process", "qq.runbatch", "qq.bootstrap",
+                     "qq.shutdown", "qq.digest", "qq.summarize",
+                     "memory.save", "diary.write", "task.plan",
+                     "skill.add", "kb.add")
 
 
 def notify_push(text: str) -> None:
@@ -65,53 +69,6 @@ def notify_should(text: str, tools: list[dict]) -> bool:
     return any(w in text for w in NOTIFY_RESULT_WORDS)
 
 
-def notify_popup_loop() -> None:
-    """Every ~12s pop any not-yet-popped notification as a Windows toast-ish
-    WScript popup (auto-closes after 6 s). Never blocks the daemon."""
-    import pathlib
-    import subprocess
-    import tempfile
-
-    popped: set[float] = set()
-    if NOTIFY_LAST_POP.exists():
-        try:
-            for e in json.loads(NOTIFY_LAST_POP.read_text(encoding="utf-8")):
-                popped.add(float(e.get("ts", 0)))
-        except Exception:
-            pass
-    while True:
-        time.sleep(12)
-        try:
-            entries = []
-            if NOTIFY_FILE.exists():
-                entries = json.loads(NOTIFY_FILE.read_text(encoding="utf-8"))
-            fresh = [e for e in entries if float(e.get("ts", 0)) not in popped]
-            if not fresh:
-                continue
-            latest = fresh[-1]
-            body = str(latest.get("text", ""))[:200]
-            vbs = tempfile.NamedTemporaryFile("w", suffix=".vbs", delete=False,
-                                              encoding="utf-8")
-            vbs.write(
-                'Set s = CreateObject("WScript.Shell")\r\n'
-                f's.Popup {json.dumps("元亨主动汇报：" + body)}, 8, '
-                f'{json.dumps("元亨汇报")}, 64\r\n'
-            )
-            vbs.close()
-            subprocess.Popen(
-                ["wscript.exe", vbs.name],
-                creationflags=0x08000000,  # CREATE_NO_WINDOW
-            )
-            for e in fresh:
-                popped.add(float(e.get("ts", 0)))
-            NOTIFY_LAST_POP.write_text(
-                json.dumps([{"ts": float(e["ts"])} for e in fresh],
-                           ensure_ascii=False),
-                encoding="utf-8")
-        except Exception as exc:
-            print(f"[notify] skip: {type(exc).__name__}", flush=True)
-
-
 class DaemonRuntime:
     def __init__(self, session_factory: Optional[Callable[[], Any]] = None,
                  llm_turn: Any = None) -> None:
@@ -127,7 +84,6 @@ class DaemonRuntime:
         self.selfcheck_hour = 23  # nightly self-check reminder (Yuanheng's own hour)
         self._selfcheck_last = ""
         threading.Thread(target=self._selfcheck_loop, daemon=True).start()
-        threading.Thread(target=notify_popup_loop, daemon=True).start()
 
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self._loop)
