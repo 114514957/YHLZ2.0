@@ -372,6 +372,14 @@ def scheduler_capabilities() -> list[Capability]:
             verify=_verify_nonempty,
         ),
         Capability(
+            name="qq.bootstrap",
+            handler=_qqops_bootstrap,
+            input=(),
+            requires=(QQOPS_POLICY,),
+            side_effect=True,
+            risk="high",
+        ),
+        Capability(
             name="qq.export",
             handler=_qqops_export,
             input=("group_id",),
@@ -567,6 +575,106 @@ def qqops_status() -> str:
     except Exception:
         pass
     return "；".join(parts)
+
+
+async def _qqops_bootstrap(params: dict) -> str:
+    """Cold-start the whole QQ export chain from zero:
+
+    NapCat (QQ auto-login 2258374446) -> QCE plugin API (40653) -> watcher.
+    Returns a step-by-step status report. QQ QR login (if auto-login misses)
+    needs the owner to scan the NapCat window.
+    """
+    import asyncio
+    import json
+    import os
+    import subprocess
+
+    import httpx
+
+    NAPCAT_BAT = r"C:\Users\ACE_WAN——PROJECT\qqwatch\start-napcat.bat"
+    WATCH_BAT = r"C:\Users\ACE_WAN——PROJECT\YHLZ\qqwatch-run.bat"
+    CREATE_NEW_CONSOLE = 0x00000010
+    report: list[str] = []
+
+    def _procs(*names: str) -> bool:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "Get-Process " + ",".join(names) + " -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count"],
+            capture_output=True, text=True, timeout=30,
+        )
+        return out.stdout.strip() not in ("", "0")
+
+    def _procs_cmdline(match: str) -> bool:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+             "Where-Object { $_.CommandLine -match '" + match + "' } | Measure-Object).Count"],
+            capture_output=True, text=True, timeout=30,
+        )
+        return out.stdout.strip() not in ("", "0")
+
+    napcat_up = _procs("NapCatWinBootMain", "QQ")
+    if not napcat_up:
+        if os.path.exists(NAPCAT_BAT):
+            subprocess.Popen(["cmd", "/c", NAPCAT_BAT],
+                             creationflags=CREATE_NEW_CONSOLE)
+            report.append("NapCat 未运行 → 已启动（新控制台窗口，QQ 自动登录中）")
+        else:
+            report.append(f"NapCat 启动脚本缺失：{NAPCAT_BAT}")
+    else:
+        report.append("NapCat 已在运行")
+
+    # wait for QCE API (plugin auto-start) up to 90s
+    qce_ok = False
+    async with httpx.AsyncClient(timeout=10) as c:
+        for _ in range(45):
+            try:
+                r = await c.get("http://127.0.0.1:40653/health")
+                if r.status_code == 200:
+                    qce_ok = True
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(2)
+    if qce_ok:
+        report.append("QCE API (40653) 就绪")
+    else:
+        report.append("QCE API (40653) 未就绪——请查看 NapCat 窗口日志")
+
+    # QQ online check via QCE group list (implies account logged in)
+    online = False
+    if qce_ok:
+        sec = os.path.expanduser("~") + r"\.qq-chat-exporter\security.json"
+        token = ""
+        if os.path.exists(sec):
+            token = json.loads(open(sec, encoding="utf-8").read()).get("accessToken", "")
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        async with httpx.AsyncClient(timeout=15) as c:
+            for _ in range(60):
+                try:
+                    r = await c.get("http://127.0.0.1:40653/api/groups", headers=headers)
+                    data = (r.json().get("data") or {})
+                    if (data.get("groups")):
+                        online = True
+                        break
+                except Exception:
+                    pass
+                await asyncio.sleep(2)
+    if online:
+        report.append("QQ 账号在线（可导出）")
+    else:
+        report.append("QQ 账号未就绪——如需扫码请打开 NapCat 窗口（自动登录态通常免扫）")
+
+    # watcher side chain (best effort, non-blocking)
+    watch_up = _procs_cmdline("qqwatcher watch")
+    if not watch_up:
+        if os.path.exists(WATCH_BAT):
+            subprocess.Popen(["cmd", "/c", WATCH_BAT],
+                             creationflags=CREATE_NEW_CONSOLE)
+            report.append("watcher 未运行 → 已启动")
+
+    report.append("下一步：可用 qq.export(群号) 导出历史，再用 qq.process 抽取。")
+    return "；".join(report)
 
 
 async def _qqops_export(params: dict) -> str:

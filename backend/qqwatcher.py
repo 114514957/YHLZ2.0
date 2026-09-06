@@ -135,6 +135,8 @@ class QqWatcher:
         if ev.get("message_type") != "group":
             return False
         gid = str(ev.get("group_id", ""))
+        if gid in [str(g) for g in (self.cfg.get("blacklist_groups") or [])]:
+            return False
         cfg_groups = [str(g) for g in self.cfg.get("groups") or []]
         if cfg_groups and gid not in cfg_groups:
             return False

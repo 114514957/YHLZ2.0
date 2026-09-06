@@ -22,7 +22,7 @@ MAX_READ_BYTES = 1_000_000
 MAX_FETCH_BYTES = 1_000_000
 MAX_LIST_ENTRIES = 60
 TEXT_EXTS = {
-    ".md", ".txt", ".py", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg",
+    ".md", ".txt", ".py", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".ini", ".cfg",
     ".log", ".csv", ".xml", ".html", ".htm", ".css", ".js", ".ts", ".jsx",
     ".tsx", ".rst", ".bat", ".ps1", ".sh", ".env.example", ".lock", ".gitignore",
 }
