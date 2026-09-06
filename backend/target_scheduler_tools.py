@@ -380,6 +380,22 @@ def scheduler_capabilities() -> list[Capability]:
             risk="high",
         ),
         Capability(
+            name="qq.shutdown",
+            handler=_qqops_shutdown,
+            input=(),
+            requires=(QQOPS_POLICY,),
+            side_effect=True,
+            risk="high",
+        ),
+        Capability(
+            name="qq.runbatch",
+            handler=_qqops_runbatch,
+            input=(),
+            requires=(QQOPS_POLICY,),
+            side_effect=True,
+            risk="medium",
+        ),
+        Capability(
             name="qq.export",
             handler=_qqops_export,
             input=("group_id",),
@@ -684,6 +700,63 @@ async def _qqops_bootstrap(params: dict) -> str:
 
     report.append("下一步：可用 qq.export(群号) 导出历史，再用 qq.process 抽取。")
     return "；".join(report)
+
+
+async def _qqops_shutdown(params: dict) -> str:
+    """Stop the QQ capture chain (NapCat/QQ + watcher). Use when done —
+    Yuanheng lifecycle discipline: start when needed, shut down when finished."""
+    import subprocess
+
+    report: list[str] = []
+
+    def _taskkill(name: str) -> bool:
+        out = subprocess.run(["taskkill", "/F", "/T", "/IM", name],
+                             capture_output=True, text=True, timeout=30)
+        return out.returncode == 0
+
+    napcat = _taskkill("NapCatWinBootMain.exe")
+    qq = _taskkill("QQ.exe")
+    report.append(f"NapCat 停止={'成功' if napcat else '未在运行/已停'}；QQ 停止={'成功' if qq else '未在运行/已停'}")
+
+    # watcher python (qqwatcher watch) by commandline
+    ps = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+         "Where-Object { $_.CommandLine -match 'qqwatcher watch' } | "
+         "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"],
+        capture_output=True, text=True, timeout=60,
+    )
+    report.append(f"watcher 停止请求已发（{ps.returncode == 0}）")
+    # confirm napcat/qq gone
+    import time as _t
+
+    _t.sleep(3)
+    out = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "Get-Process NapCatWinBootMain,QQ -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count"],
+        capture_output=True, text=True, timeout=30,
+    )
+    left = out.stdout.strip()
+    report.append("残留进程 0" if left in ("", "0") else f"仍有 {left} 个进程残留")
+    report.append("QQ 捕获链已停止。下次需要时用 qq.bootstrap 重新启动。")
+    return "；".join(report)
+
+
+async def _qqops_runbatch(params: dict) -> str:
+    """Run the pending-candidate extraction batch (qqwatch-extract.bat) in its
+    own console window; returns immediately — progress lands in
+    cache/qqwatch/extract.log; batch exits by itself when drained (no residue).
+    """
+    import os
+    import subprocess
+
+    BAT = r"C:\Users\ACE_WAN——PROJECT\YHLZ\qqwatch-extract.bat"
+    if not os.path.exists(BAT):
+        return "批处理脚本缺失：" + BAT
+    subprocess.Popen(["cmd", "/c", BAT],
+                     creationflags=0x00000010)  # CREATE_NEW_CONSOLE
+    return ("批量抽取已启动（新窗口）。处理完自动退出；进度见 cache/qqwatch/extract.log，"
+            "完成后可用 qq.status 核对待处理数。注意：抽取用云端 API，有候选才值得跑。")
 
 
 async def _qqops_export(params: dict) -> str:

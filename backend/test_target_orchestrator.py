@@ -130,7 +130,7 @@ class TestTurnOrchestrator(unittest.TestCase):
              "diary_write", "diary_list", "diary_delete",
              "file_list", "file_read", "task_plan", "web_fetch", "web_search",
              "kb_add", "kb_query",
-             "qq_bootstrap", "qq_digest", "qq_export", "qq_process", "qq_status", "qq_summarize"},
+             "qq_bootstrap", "qq_digest", "qq_export", "qq_process", "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize"},
         )
 
 
