@@ -343,6 +343,40 @@ def scheduler_capabilities() -> list[Capability]:
             verify=_verify_nonempty,
         ),
         Capability(
+            name="qq.status",
+            handler=lambda p: qqops_status(),
+            input=(),
+            requires=(QQOPS_POLICY,),
+            side_effect=False,
+            risk="low",
+        ),
+        Capability(
+            name="qq.process",
+            handler=_qqops_process,
+            input=(),
+            optional_input=("max_items",),
+            requires=(QQOPS_POLICY,),
+            side_effect=True,
+            risk="medium",
+        ),
+        Capability(
+            name="qq.digest",
+            handler=_qqops_digest,
+            input=(),
+            optional_input=("date",),
+            requires=(QQOPS_POLICY,),
+            side_effect=True,
+            risk="low",
+        ),
+        Capability(
+            name="qq.summarize",
+            handler=_qqops_summarize,
+            input=(),
+            requires=(QQOPS_POLICY,),
+            side_effect=True,
+            risk="medium",
+        ),
+        Capability(
             name="file.list",
             handler=lambda p: file_list(str(p.get("path", ".")),
                                         int(p.get("limit", 30) or 30)),
@@ -390,6 +424,7 @@ DIARY_AUTO_POLICY = "diary.auto_allowed"
 DIARY_FILE = _PROJECT_ROOT / "docs" / "元亨的日记.md"
 TASK_AUTO_POLICY = "task.self_allowed"
 TASK_FILE = _PROJECT_ROOT / "docs" / "元亨的任务表.md"
+QQOPS_POLICY = "qqops.self_allowed"
 
 
 def _policy_deny_all() -> bool:
@@ -442,6 +477,68 @@ def diary_delete(entry_stamp: str) -> str:
     del lines[idx:end]
     DIARY_FILE.write_text("".join(lines), encoding="utf-8")
     return "已删除该条日记"
+
+
+def qqops_status() -> str:
+    """Live status of the QQ knowledge capture pipeline (watcher/candidates/memory)."""
+    import json
+    import pathlib
+
+    from backend.target_memory import DEFAULT_DB
+
+    base = pathlib.Path(_PROJECT_ROOT)
+    cfg_p = base / "config" / "qqwatch.json"
+    cand_dir = base / "cache" / "qqwatch"
+    parts = ["QQ 捕获链路状态："]
+    if cfg_p.exists():
+        cfg = json.loads(cfg_p.read_text(encoding="utf-8"))
+        groups = cfg.get("groups") or []
+        parts.append(f"白名单 {len(groups)} 群（{','.join(map(str, groups[:4]))}）")
+    all_f = cand_dir / "all.jsonl"
+    if all_f.exists():
+        lines = all_f.read_text(encoding="utf-8").splitlines()
+        st_f = cand_dir / "state.json"
+        cursor = 0
+        if st_f.exists():
+            cursor = int(json.loads(st_f.read_text(encoding="utf-8")).get("processed_lines", 0))
+        parts.append(f"候选 {len(lines)} 条（已抽 {cursor}，待处理 {max(0, len(lines) - cursor)}）")
+    try:
+        import sqlite3
+
+        con = sqlite3.connect(str(DEFAULT_DB))
+        n = con.execute("SELECT COUNT(*) FROM l2_items WHERE type='knowledge' AND status='active'").fetchone()[0]
+        con.close()
+        parts.append(f"长期记忆 knowledge 条目 {n}")
+    except Exception:
+        pass
+    return "；".join(parts)
+
+
+async def _qqops_process(params: dict) -> str:
+    from backend import qqextract
+
+    max_items = int(params.get("max_items") or 12)
+    res = await qqextract.run_batch(max_items=min(int(max_items), 48))
+    import json
+
+    return json.dumps(res, ensure_ascii=False)
+
+
+async def _qqops_digest(params: dict) -> str:
+    from backend import qqextract
+
+    date = str(params.get("date") or "")
+    f = await qqextract.digest_async(date or None)
+    return f"已生成日汇编：{f}"
+
+
+async def _qqops_summarize(params: dict) -> str:
+    from backend import qqextract
+
+    res = await qqextract.summarize()
+    import json
+
+    return json.dumps(res, ensure_ascii=False)
 
 
 def task_plan(content: str, action: str = "add") -> str:
@@ -513,6 +610,8 @@ def setup_scheduler_capabilities(registry: Optional[CapabilityRegistry] = None) 
         registry.register_policy(DIARY_AUTO_POLICY, _policy_always_true)
     if not registry.get_policy(TASK_AUTO_POLICY):
         registry.register_policy(TASK_AUTO_POLICY, _policy_always_true)
+    if not registry.get_policy(QQOPS_POLICY):
+        registry.register_policy(QQOPS_POLICY, _policy_always_true)
     if not registry.get_policy("diary.delete.approval"):
         registry.register_policy("diary.delete.approval", _policy_deny_all)
     return registry

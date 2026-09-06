@@ -198,6 +198,11 @@ def digest(date_str: str | None = None, db_path: pathlib.Path | None = None) -> 
     return f
 
 
+async def digest_async(date_str: str | None = None,
+                       db_path: pathlib.Path | None = None) -> str:
+    return str(digest(date_str, db_path))
+
+
 SUMMARY_PROMPT = """你是技术知识主编。输入一批从 QQ 技术群筛选出的知识条目（前缀 [QQtech]/[QQmethod]）。
 任务：按技术主题聚类并产出一份**有提炼价值的主题总结**，供元亨（数字生命体）与其老爹阅读学习。
 要求：
