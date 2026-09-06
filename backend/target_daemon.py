@@ -31,6 +31,86 @@ if str(_PROJECT) not in sys.path:
 LOCAL_BASE = "http://127.0.0.1:11434/v1/chat/completions"
 LOCAL_MODEL = "qwen2.5:3b"
 
+NOTIFY_DIR = _PROJECT / "cache" / "qqwatch"
+NOTIFY_FILE = NOTIFY_DIR / "notifications.json"
+NOTIFY_LAST_POP = NOTIFY_DIR / "notifications.popup.json"
+NOTIFY_RESULT_WORDS = ("完成", "已导出", "已入库", "入库", "导出", "总结", "已生成",
+                       "汇报", "抽取", "处理完", "技能", "已启动", "已停止")
+NOTIFY_TOOL_HINTS = ("qq.", "kb.", "skill.", "diary.", "task.", "memory.save")
+
+
+def notify_push(text: str) -> None:
+    """Append a Yuanheng activity notification (bounded queue)."""
+    import pathlib
+
+    NOTIFY_DIR.mkdir(parents=True, exist_ok=True)
+    entries = []
+    if NOTIFY_FILE.exists():
+        try:
+            entries = json.loads(NOTIFY_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            entries = []
+    entries.append({"ts": time.time(), "text": str(text)[:600]})
+    del entries[:-8]
+    NOTIFY_FILE.write_text(json.dumps(entries, ensure_ascii=False),
+                           encoding="utf-8")
+
+
+def notify_should(text: str, tools: list[dict]) -> bool:
+    """Heuristic: is this turn worth pushing to the owner's desktop?"""
+    joined = " ".join(
+        str(u.get("name", "")) for u in (tools or []))
+    if any(h in joined for h in NOTIFY_TOOL_HINTS):
+        return True
+    return any(w in text for w in NOTIFY_RESULT_WORDS)
+
+
+def notify_popup_loop() -> None:
+    """Every ~12s pop any not-yet-popped notification as a Windows toast-ish
+    WScript popup (auto-closes after 6 s). Never blocks the daemon."""
+    import pathlib
+    import subprocess
+    import tempfile
+
+    popped: set[float] = set()
+    if NOTIFY_LAST_POP.exists():
+        try:
+            for e in json.loads(NOTIFY_LAST_POP.read_text(encoding="utf-8")):
+                popped.add(float(e.get("ts", 0)))
+        except Exception:
+            pass
+    while True:
+        time.sleep(12)
+        try:
+            entries = []
+            if NOTIFY_FILE.exists():
+                entries = json.loads(NOTIFY_FILE.read_text(encoding="utf-8"))
+            fresh = [e for e in entries if float(e.get("ts", 0)) not in popped]
+            if not fresh:
+                continue
+            latest = fresh[-1]
+            body = str(latest.get("text", ""))[:200]
+            vbs = tempfile.NamedTemporaryFile("w", suffix=".vbs", delete=False,
+                                              encoding="utf-8")
+            vbs.write(
+                'Set s = CreateObject("WScript.Shell")\r\n'
+                f's.Popup {json.dumps("元亨主动汇报：" + body)}, 8, '
+                f'{json.dumps("元亨汇报")}, 64\r\n'
+            )
+            vbs.close()
+            subprocess.Popen(
+                ["wscript.exe", vbs.name],
+                creationflags=0x08000000,  # CREATE_NO_WINDOW
+            )
+            for e in fresh:
+                popped.add(float(e.get("ts", 0)))
+            NOTIFY_LAST_POP.write_text(
+                json.dumps([{"ts": float(e["ts"])} for e in fresh],
+                           ensure_ascii=False),
+                encoding="utf-8")
+        except Exception as exc:
+            print(f"[notify] skip: {type(exc).__name__}", flush=True)
+
 
 class DaemonRuntime:
     def __init__(self, session_factory: Optional[Callable[[], Any]] = None,
@@ -47,6 +127,7 @@ class DaemonRuntime:
         self.selfcheck_hour = 23  # nightly self-check reminder (Yuanheng's own hour)
         self._selfcheck_last = ""
         threading.Thread(target=self._selfcheck_loop, daemon=True).start()
+        threading.Thread(target=notify_popup_loop, daemon=True).start()
 
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self._loop)
@@ -108,6 +189,14 @@ class DaemonRuntime:
         except Exception:
             pass
         self._maybe_consolidate(key)
+        try:
+            answer = str(info.get("answer", ""))
+            if key == "private" and notify_should(answer, info.get("tool_uses") or []):
+                tools = [u.get("name", "") for u in (info.get("tool_uses") or [])]
+                head = answer[:150].replace("\n", " ")
+                notify_push(f"任务完成汇报：{head}" + (f"（工具：{'、'.join(tools)}）" if tools else ""))
+        except Exception:
+            pass
         return info
 
     # auto-consolidation: every N turns on the private channel run the persona
@@ -229,6 +318,19 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(400, out)
                 return
             self._send(200, out)
+            return
+        if self.path == "/notifications":
+            # owner-side poll: return queued Yuanheng activity then clear
+            import pathlib
+
+            try:
+                entries = []
+                if NOTIFY_FILE.exists():
+                    entries = json.loads(NOTIFY_FILE.read_text(encoding="utf-8"))
+                NOTIFY_FILE.write_text("[]", encoding="utf-8")
+                self._send(200, {"notifications": entries})
+            except Exception as exc:
+                self._send(500, {"error": type(exc).__name__})
             return
         self._send(404, {"error": "not found"})
 

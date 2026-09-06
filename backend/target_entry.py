@@ -301,6 +301,28 @@ _HELP = """命令列表:
 直接输入即对话。写类操作（保存记忆）会先征求你 y/n 同意。"""
 
 
+def _print_pending_dynamic(seen_file, shown: int) -> int:
+    """Show Yuanheng's background activity (daemon notifications) before prompt."""
+    import json
+    import time as _t
+
+    import pathlib as _p
+
+    f = _p.Path(__file__).resolve().parent.parent / "cache" / "qqwatch" / "notifications.json"
+    count = 0
+    if f.exists():
+        try:
+            entries = json.loads(f.read_text(encoding="utf-8"))
+            for e in entries:
+                if _t.time() - float(e.get("ts", 0)) > 30:
+                    continue
+                count += 1
+                print(f"[后台动态] {e.get('text', '')[:180]}")
+        except Exception:
+            pass
+    return count
+
+
 def cli_main() -> int:
     """Interactive REPL: python -m backend.target_entry"""
     import sys
@@ -318,6 +340,7 @@ def cli_main() -> int:
     try:
         while True:
             try:
+                _print_pending_dynamic(None, 0)
                 line = input("你> ").strip()
             except (EOFError, KeyboardInterrupt):
                 print()
