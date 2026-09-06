@@ -11,7 +11,7 @@ Write-Host ""
 $up = $false
 try { $h = Invoke-RestMethod "http://127.0.0.1:8321/health" -TimeoutSec 3; $up = $true } catch {}
 if ($up) {
-    Write-Host ("[daemon]  运行中  (8321)  status=" + $h.status + "  sessions=" + $h.sessions) -ForegroundColor Green
+    Write-Host ("[daemon]  运行中 (8321)  status=" + $h.status + "  sessions=" + $h.sessions) -ForegroundColor Green
 } else {
     Write-Host "[daemon]  未运行，正在启动..." -ForegroundColor Yellow
     Start-Process $py -ArgumentList "-B","-m","backend.target_daemon","--port","8321" -WorkingDirectory $root -WindowStyle Hidden
@@ -21,9 +21,15 @@ if ($up) {
 }
 
 # 2) watcher (QQ capture)
-$w = Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.CommandLine -match 'qqwatcher watch' }
-if ($w) {
-    $wids = ($w.ProcessId -join ",');  Write-Host "[watcher] 运行中 (QQ 捕获，pid=$wids)" -ForegroundColor Green
+$w = @(Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.CommandLine -match 'qqwatcher watch' })
+if ($w.Count -gt 0) {
+    $wids = ($w.ProcessId -join ",")
+    Write-Host "[watcher] 运行中 (QQ 捕获，pid=$wids)" -ForegroundColor Green
+    if ($w.Count -gt 1) {
+        $keep = ($w | Sort-Object CreationDate | Select-Object -First 1).ProcessId
+        $w | Where-Object { $_.ProcessId -ne $keep } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Write-Host "[watcher] 发现多实例，已保留最早实例" -ForegroundColor Yellow
+    }
 } else {
     Write-Host "[watcher] 未运行，启动 qqwatch-run.bat..." -ForegroundColor Yellow
     Start-Process cmd.exe -ArgumentList "/c","`"$root\qqwatch-run.bat`""
@@ -32,11 +38,11 @@ if ($w) {
 }
 
 # 3) NapCat / QQ
-$qq = Get-Process NapCatWinBootMain, QQ -ErrorAction SilentlyContinue
-if ($qq) {
+$qq = @(Get-Process NapCatWinBootMain, QQ -ErrorAction SilentlyContinue)
+if ($qq.Count -gt 0) {
     Write-Host "[NapCat]  运行中 (QQ 2258374446 登录)" -ForegroundColor Green
 } else {
-    Write-Host "[NapCat]  未运行 —— 请双击 qqwatch\start-napcat.bat 启动 QQ 捕获底座" -ForegroundColor Yellow
+    Write-Host "[NapCat]  未运行 -- 请双击 qqwatch\start-napcat.bat 启动 QQ 捕获底座" -ForegroundColor Yellow
 }
 
 # 4) knowledge pipeline
