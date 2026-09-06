@@ -332,6 +332,17 @@ def scheduler_capabilities() -> list[Capability]:
             verify=_verify_nonempty,
         ),
         Capability(
+            name="task.plan",
+            handler=lambda p: task_plan(str(p.get("content", "")),
+                                         str(p.get("action", "add"))),
+            input=("content",),
+            optional_input=("action",),
+            requires=(TASK_AUTO_POLICY,),
+            side_effect=True,
+            risk="low",
+            verify=_verify_nonempty,
+        ),
+        Capability(
             name="file.list",
             handler=lambda p: file_list(str(p.get("path", ".")),
                                         int(p.get("limit", 30) or 30)),
@@ -377,6 +388,8 @@ def scheduler_capabilities() -> list[Capability]:
 SAVE_APPROVAL_POLICY = "memory.save.approval"
 DIARY_AUTO_POLICY = "diary.auto_allowed"
 DIARY_FILE = _PROJECT_ROOT / "docs" / "元亨的日记.md"
+TASK_AUTO_POLICY = "task.self_allowed"
+TASK_FILE = _PROJECT_ROOT / "docs" / "元亨的任务表.md"
 
 
 def _policy_deny_all() -> bool:
@@ -431,6 +444,63 @@ def diary_delete(entry_stamp: str) -> str:
     return "已删除该条日记"
 
 
+def task_plan(content: str, action: str = "add") -> str:
+    """Yuanheng's own task board (docs/元亨的任务表.md).
+
+    action=add: append a task under today's date section.
+    action=done: mark the newest open (unchecked) line containing `content` as done.
+    action=list: return today's lines (or the whole board if today is empty).
+    """
+    import datetime as _dt
+
+    text = str(content or "").strip()
+    action = str(action or "add").strip().lower()
+    today = _dt.date.today().isoformat()
+    TASK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not TASK_FILE.exists():
+        TASK_FILE.write_text("# 元亨的任务表\n", encoding="utf-8")
+
+    def _sections() -> tuple[list[str], int]:
+        lines = TASK_FILE.read_text(encoding="utf-8").splitlines()
+        heads = [i for i, l in enumerate(lines) if l.startswith("## ")]
+        return lines, (heads[-1] if heads else -1)
+
+    if action == "list":
+        lines, last = _sections()
+        if lines and last >= 0 and lines[last].startswith("## " + today):
+            return "\n".join(lines[last:]).strip() or "今天还没有任务"
+        body = [l for l in lines if l.startswith("- [")][-15:]
+        return "\n".join(body) if body else "任务表是空的"
+
+    if action == "done":
+        if not text:
+            return "done 需要任务内容片段"
+        lines, _ = _sections()
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i].startswith("- [ ]") and text in lines[i]:
+                lines[i] = lines[i].replace("- [ ]", "- [x]", 1)
+                TASK_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                return f"已完成：{lines[i][6:]}"
+        return "没找到含该内容的未完成任务"
+
+    if action == "add":
+        if not text or len(text) > 200:
+            return "任务内容需在 1-200 字之间"
+        lines = TASK_FILE.read_text(encoding="utf-8").splitlines()
+        if not any(l.startswith("## " + today) for l in lines):
+            if lines and lines[-1] != "":
+                lines.append("")
+            lines.append(f"## {today}")
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i].startswith("## " + today):
+                lines.insert(i + 1, f"- [ ] {text}")
+                break
+        TASK_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return f"已加入任务表（{today}）：{text}"
+
+    return f"未知动作：{action}"
+
+
 def setup_scheduler_capabilities(registry: Optional[CapabilityRegistry] = None) -> CapabilityRegistry:
     registry = registry or CapabilityRegistry()
     for cap in scheduler_capabilities():
@@ -441,6 +511,8 @@ def setup_scheduler_capabilities(registry: Optional[CapabilityRegistry] = None) 
         registry.register_policy(SAVE_APPROVAL_POLICY, _policy_deny_all)
     if not registry.get_policy(DIARY_AUTO_POLICY):
         registry.register_policy(DIARY_AUTO_POLICY, _policy_always_true)
+    if not registry.get_policy(TASK_AUTO_POLICY):
+        registry.register_policy(TASK_AUTO_POLICY, _policy_always_true)
     if not registry.get_policy("diary.delete.approval"):
         registry.register_policy("diary.delete.approval", _policy_deny_all)
     return registry

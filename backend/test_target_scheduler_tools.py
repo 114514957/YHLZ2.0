@@ -64,7 +64,7 @@ class TestSchedulerRegistration(unittest.TestCase):
             sorted(names),
             ["diary_delete", "diary_list", "diary_write",
              "file_list", "file_read", "ledger_search", "memory_recall",
-             "memory_save", "system_time", "web_fetch", "web_search"],
+             "memory_save", "system_time", "task_plan", "web_fetch", "web_search"],
         )
         exported = self.registry.export_openai_tools()
         fn_names = {t["function"]["name"] for t in exported}

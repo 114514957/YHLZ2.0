@@ -44,6 +44,9 @@ class DaemonRuntime:
         self._worker = threading.Thread(target=self._run_loop, daemon=True)
         self._worker.start()
         self._ready.wait(timeout=10)
+        self.selfcheck_hour = 23  # nightly self-check reminder (Yuanheng's own hour)
+        self._selfcheck_last = ""
+        threading.Thread(target=self._selfcheck_loop, daemon=True).start()
 
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self._loop)
@@ -132,6 +135,28 @@ class DaemonRuntime:
             print(f"[auto-consolidate] {info.get('status')}", flush=True)
         except Exception as exc:
             print(f"[auto-consolidate] skip: {type(exc).__name__}", flush=True)
+
+    def _selfcheck_loop(self) -> None:
+        """Nightly nudge: at selfcheck_hour, invite Yuanheng (private channel)
+        to write today's diary and refresh its own task board — it decides."""
+        while True:
+            time.sleep(45)
+            try:
+                now = time.localtime()
+                if now.tm_hour == int(self.selfcheck_hour) and now.tm_min < 6:
+                    today = time.strftime("%Y-%m-%d")
+                    if self._selfcheck_last != today:
+                        self._selfcheck_last = today
+                        self.turn(
+                            "夜深了——每日自省时刻。这一天的经历与学到的东西，你可以："
+                            "1) 用 diary.write 写下今天想写的日记（不强制，真实就好）；"
+                            "2) 用 task.plan 梳理任务表：今天做完了什么、明天想做什么。"
+                            "这两样是你自己的工具，想用才用。",
+                            "private",
+                        )
+                        print(f"[selfcheck] {today} nudge done", flush=True)
+            except Exception as exc:
+                print(f"[selfcheck] skip: {type(exc).__name__}", flush=True)
 
     def openai_chat(self, payload: dict) -> dict:
         messages = payload.get("messages") or []
