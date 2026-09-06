@@ -30,6 +30,10 @@ class QqextractTest(unittest.TestCase):
         db = self.tmp / "mem.db"
         qqextract.L2_DB = db
         self.db = db
+        import backend.yuanheng_kb as kb
+
+        self._kb_orig = kb.DEFAULT_KB_DB
+        kb.DEFAULT_KB_DB = self.tmp / "kb.db"
         (self.tmp / "all.jsonl").write_text(
             "\n".join([
                 json.dumps({"group_id": "1", "text": "x" * 100, "ts": 1}, ensure_ascii=False),
@@ -42,6 +46,9 @@ class QqextractTest(unittest.TestCase):
         qqextract.CAND_DIR = self.old_cand
         qqextract.STATE_FILE = self.old_state
         qqextract.L2_DB = self.old_db
+        import backend.yuanheng_kb as kb
+
+        kb.DEFAULT_KB_DB = self._kb_orig
 
     def test_cursor_pending(self):
         items, total = qqextract.read_pending_candidates(max_items=5)
@@ -72,24 +79,18 @@ class QqextractTest(unittest.TestCase):
         n = qqextract.store_items(refined, group_id="1", ts=123, db_path=self.db)
         self.assertEqual(n, 1)
         import sqlite3
-        con = sqlite3.connect(str(self.db))
-        rows = con.execute("SELECT type, summary, evidence_ref FROM l2_items").fetchall()
+        con = sqlite3.connect(str(self.tmp / "kb.db"))
+        rows = con.execute("SELECT id, category, summary, source FROM kb_items").fetchall()
         con.close()
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0][0], "knowledge")
-        self.assertIn("[QQtech]", rows[0][1])
-        self.assertIn("qq:g1:t123", rows[0][2])
+        self.assertEqual(rows[0][1], "tech")
+        self.assertIn("ollama", rows[0][2])
+        self.assertIn("qq:g1:t123", rows[0][3])
 
     def test_digest(self):
         llm = FakeLLM(json.dumps({"items": [{"point": "知识摘要要点A的内容详细说明", "quote": "q", "cat": "tech"}]}, ensure_ascii=False))
         refined = asyncio.run(qqextract.extract([{"group_id": "1", "text": "x" * 100}], llm))
         qqextract.store_items(refined, group_id="1", ts=int(__import__("time").time()), db_path=self.db)
-        import sqlite3
-        con = sqlite3.connect(str(self.db))
-        con.execute("UPDATE l2_items SET created_at=? WHERE type='knowledge'",
-                    (int(__import__("time").time()),))
-        con.commit()
-        con.close()
         f = qqextract.digest(__import__("time").strftime("%Y-%m-%d"), db_path=self.db)
         content = Path(f).read_text(encoding="utf-8")
         self.assertIn("要点A", content)

@@ -174,7 +174,11 @@ class TestSchedulerCapabilities(unittest.TestCase):
              "task.plan",
              "diary.write", "diary.list", "diary.delete",
              "task.plan",
-             "file.list", "file.read", "task.plan", "web.fetch", "web.search"},
+             "kb.add", "kb.query",
+             "qq.digest", "qq.process", "qq.status", "qq.summarize",
+             "file.list", "file.read", "task.plan", "kb.add", "kb.query",
+             "qq.digest", "qq.process", "qq.status", "qq.summarize",
+             "web.fetch", "web.search"},
         )
         for name, cap in caps.items():
             if name in ("ledger.search", "memory.recall"):
@@ -202,19 +206,23 @@ class TestSchedulerCapabilities(unittest.TestCase):
         names = {t["function"]["name"] for t in tools}
         self.assertEqual(names, {"ledger_search", "memory_recall", "memory_save", "system_time",
               "diary_write", "diary_list", "diary_delete",
-              "file_list", "file_read", "task_plan", "web_fetch", "web_search"})
+              "file_list", "file_read", "task_plan", "kb_add", "kb_query",
+                   "qq_digest", "qq_process", "qq_status", "qq_summarize",
+                   "web_fetch", "web_search"})
 
     def test_internal_names_stay_dotted(self):
         reg = setup_scheduler_capabilities()
         self.assertEqual(reg.names(), ["diary.delete", "diary.list", "diary.write", "file.list", "file.read",
-             "ledger.search", "memory.recall", "memory.save", "system.time",
+             "kb.add", "kb.query", "ledger.search", "memory.recall", "memory.save",
+             "qq.digest", "qq.process", "qq.status", "qq.summarize", "system.time",
              "task.plan", "web.fetch", "web.search"])
 
     def test_agent_core_registry_view(self):
         rt = ToolRegistry()
         names = setup_scheduler_tools(rt)
         self.assertEqual(sorted(names), ["diary_delete", "diary_list", "diary_write", "file_list", "file_read",
-             "ledger_search", "memory_recall", "memory_save", "system_time",
+             "kb_add", "kb_query", "ledger_search", "memory_recall", "memory_save",
+             "qq_digest", "qq_process", "qq_status", "qq_summarize", "system_time",
              "task_plan", "web_fetch", "web_search"])
         exported = rt.export_openai_tools()
         self.assertTrue(any(t["function"]["name"] == "system_time" for t in exported))

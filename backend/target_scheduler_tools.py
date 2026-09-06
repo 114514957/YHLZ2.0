@@ -343,6 +343,35 @@ def scheduler_capabilities() -> list[Capability]:
             verify=_verify_nonempty,
         ),
         Capability(
+            name="kb.add",
+            handler=lambda p: kb_add(
+                str(p.get("summary", "")),
+                category=str(p.get("category", "tech")),
+                source=str(p.get("source", "")),
+                detail=str(p.get("detail", "")),
+            ),
+            input=("summary",),
+            optional_input=("category", "source", "detail"),
+            requires=(KB_POLICY,),
+            side_effect=True,
+            risk="medium",
+            verify=_verify_nonempty,
+        ),
+        Capability(
+            name="kb.query",
+            handler=lambda p: kb_query(
+                str(p.get("query", "")),
+                limit=int(p.get("limit", 6) or 6),
+                category=str(p.get("category", "")),
+            ),
+            input=("query",),
+            optional_input=("limit", "category"),
+            requires=(KB_POLICY,),
+            side_effect=False,
+            risk="low",
+            verify=_verify_nonempty,
+        ),
+        Capability(
             name="qq.status",
             handler=lambda p: qqops_status(),
             input=(),
@@ -425,6 +454,7 @@ DIARY_FILE = _PROJECT_ROOT / "docs" / "元亨的日记.md"
 TASK_AUTO_POLICY = "task.self_allowed"
 TASK_FILE = _PROJECT_ROOT / "docs" / "元亨的任务表.md"
 QQOPS_POLICY = "qqops.self_allowed"
+KB_POLICY = "kb.self_allowed"
 
 
 def _policy_deny_all() -> bool:
@@ -477,6 +507,21 @@ def diary_delete(entry_stamp: str) -> str:
     del lines[idx:end]
     DIARY_FILE.write_text("".join(lines), encoding="utf-8")
     return "已删除该条日记"
+
+
+def kb_add(summary: str, category: str = "tech", source: str = "",
+           detail: str = "") -> str:
+    """Yuanheng KB: store an objectively useful learned item."""
+    from backend.yuanheng_kb import kb_add as _add
+
+    return _add(summary, category=category, source=source, detail=detail)
+
+
+def kb_query(query: str, limit: int = 6, category: str = "") -> list[dict]:
+    """Yuanheng KB: ranked knowledge query."""
+    from backend.yuanheng_kb import kb_query as _query
+
+    return _query(query, limit=limit, category=category)
 
 
 def qqops_status() -> str:
@@ -612,6 +657,8 @@ def setup_scheduler_capabilities(registry: Optional[CapabilityRegistry] = None) 
         registry.register_policy(TASK_AUTO_POLICY, _policy_always_true)
     if not registry.get_policy(QQOPS_POLICY):
         registry.register_policy(QQOPS_POLICY, _policy_always_true)
+    if not registry.get_policy(KB_POLICY):
+        registry.register_policy(KB_POLICY, _policy_always_true)
     if not registry.get_policy("diary.delete.approval"):
         registry.register_policy("diary.delete.approval", _policy_deny_all)
     return registry

@@ -128,7 +128,9 @@ class TestTurnOrchestrator(unittest.TestCase):
             names,
             {"ledger_search", "memory_recall", "memory_save", "system_time",
              "diary_write", "diary_list", "diary_delete",
-             "file_list", "file_read", "task_plan", "web_fetch", "web_search"},
+             "file_list", "file_read", "task_plan", "web_fetch", "web_search",
+             "kb_add", "kb_query",
+             "qq_digest", "qq_process", "qq_status", "qq_summarize"},
         )
 
 

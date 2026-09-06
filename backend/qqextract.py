@@ -98,39 +98,22 @@ async def extract(items: list[dict], llm_turn) -> list[dict]:
 
 def store_items(items: list[dict], *, group_id: str = "", ts: int = 0,
                 db_path: pathlib.Path | None = None) -> int:
-    """Persist refined points as L2 knowledge items. Returns stored count."""
-    import hashlib
-    import sqlite3
+    """Persist refined points into the Yuanheng KB (ledger 0179: knowledge
+    lives in the KB, not in the persona memory pool). Returns stored count."""
+    from backend.yuanheng_kb import kb_add
 
-    from backend.target_memory import L2Item, TargetMemoryService
-
-    svc = TargetMemoryService(db_path=db_path or L2_DB)
-    con = sqlite3.connect(str(svc.db_path))
-    rows = con.execute(
-        "SELECT summary FROM l2_items WHERE type='knowledge' AND status IN ('active','downgraded')"
-    ).fetchall()
-    existing = {r[0] for r in rows}
-    con.close()
     n = 0
     for it in items:
-        summary = f"[QQ{it['cat']}] {it['point']}"
-        if summary in existing:
-            continue
-        item = L2Item(
-            id="qq_" + hashlib.sha256(summary.encode("utf-8")).hexdigest()[:12],
-            tier="L2",
-            type="knowledge",
-            importance=4,
-            summary=summary,
-            content_hash=hashlib.sha256(summary.encode("utf-8")).hexdigest()[:16],
-            keywords=it["point"][:40].replace(" ", ""),
-            evidence_ref=f"qq:g{group_id}:t{ts}:{it['cat']}",
-            created_at=time.time(),
+        cat = str(it.get("cat", "tech")) if it.get("cat") in ("tech", "method") else "tech"
+        res = kb_add(
+            it["point"],
+            category=cat,
+            source=f"qq:g{group_id}:t{ts}",
+            detail=it.get("quote", ""),
+            created_at=float(ts or 0),
         )
-        svc.store_item(item)
-        svc._sync_kw([item])
-        n += 1
-        existing.add(summary)
+        if res.startswith("已入库"):
+            n += 1
     return n
 
 
@@ -156,7 +139,9 @@ async def run_batch(max_items: int = 12, dry: bool = False) -> dict:
     if not items:
         return {"processed": 0, "stored": 0, "lines": total_lines, "reason": "no-candidates"}
     refined = await extract(items, build_llm_turn())
-    stored = 0 if dry else store_items(refined)
+    src_grp = str(items[0].get("group_id", "") or "")
+    src_ts = int(items[0].get("ts", 0) or 0)
+    stored = 0 if dry else store_items(refined, group_id=src_grp, ts=src_ts)
     if not dry:
         # advance cursor by the lines actually consumed (never to file end)
         _save_state({"processed_lines": start_cursor + len(items)})
@@ -164,20 +149,19 @@ async def run_batch(max_items: int = 12, dry: bool = False) -> dict:
 
 
 def digest(date_str: str | None = None, db_path: pathlib.Path | None = None) -> pathlib.Path:
-    """Daily human-readable digest from that day's QQ knowledge items."""
+    """Daily human-readable digest of that day's KB knowledge (QQ-sourced)."""
     import sqlite3
 
-    from backend.target_memory import TargetMemoryService
+    from backend.yuanheng_kb import DEFAULT_KB_DB
 
     date_str = date_str or time.strftime("%Y-%m-%d")
     day_start, day_end = date_str + " 00:00", date_str + " 23:59"
     ts0 = time.mktime(time.strptime(day_start, "%Y-%m-%d %H:%M"))
     ts1 = ts0 + 86400
-    svc = TargetMemoryService(db_path=db_path or L2_DB)
-    con = sqlite3.connect(str(svc.db_path))
+    con = sqlite3.connect(str(DEFAULT_KB_DB))
     rows = con.execute(
-        "SELECT summary, evidence_ref, created_at FROM l2_items "
-        "WHERE type='knowledge' AND created_at>=? AND created_at<? ORDER BY created_at",
+        "SELECT summary, source, category, created FROM kb_items "
+        "WHERE status='active' AND created>=? AND created<? ORDER BY created",
         (ts0, ts1),
     ).fetchall()
     con.close()
@@ -189,10 +173,8 @@ def digest(date_str: str | None = None, db_path: pathlib.Path | None = None) -> 
         if not rows:
             fp.write("（当日无捕获条目）\n")
         cats = {}
-        for summary, ev, ts in rows:
-            cats.setdefault(ev.rsplit(":", 1)[-1] if ev else "fact", []).append(
-                f"- {summary}\n"
-            )
+        for summary, _src, cat, _created in rows:
+            cats.setdefault(cat or "tech", []).append(f"- {summary}\n")
         for cat, lines in cats.items():
             fp.write(f"## {cat}\n\n" + "".join(lines) + "\n")
     return f
@@ -215,21 +197,20 @@ SUMMARY_PROMPT = """你是技术知识主编。输入一批从 QQ 技术群筛�
 
 
 async def summarize(db_path: pathlib.Path | None = None) -> dict:
-    """Cluster all QQ knowledge items into topic summaries (cloud only)."""
+    """Cluster all KB knowledge items into topic summaries (cloud only)."""
     import sqlite3
 
-    from backend.target_memory import TargetMemoryService
+    from backend.yuanheng_kb import DEFAULT_KB_DB
 
-    svc = TargetMemoryService(db_path=db_path or L2_DB)
-    con = sqlite3.connect(str(svc.db_path))
+    con = sqlite3.connect(str(DEFAULT_KB_DB))
     rows = con.execute(
-        "SELECT summary, created_at FROM l2_items "
-        "WHERE type='knowledge' AND status IN ('active','downgraded') ORDER BY created_at"
+        "SELECT summary, category, created FROM kb_items "
+        "WHERE status='active' ORDER BY created"
     ).fetchall()
     con.close()
     if not rows:
         return {"topics": 0, "reason": "no-knowledge"}
-    payload = "\n".join(f"- {s}" for s, _ in rows)
+    payload = "\n".join(f"- [{c}] {s}" for s, c, _ in rows)
     if len(payload) > 60000:
         payload = payload[:60000]
     resp = await build_llm_turn(max_tokens=4000)(
