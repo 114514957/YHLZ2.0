@@ -128,15 +128,23 @@ async def web_fetch(url: str, max_chars: int = 4000) -> str:
         return "拒绝访问：该域名在拦截名单"
     import httpx
 
-    try:
-        async with httpx.AsyncClient(timeout=25, follow_redirects=True,
-                                     headers={"User-Agent": "Mozilla/5.0"}) as c:
-            r = await c.get(url)
-            if r.status_code != 200:
-                return f"HTTP {r.status_code}"
-            raw = r.content[: MAX_FETCH_BYTES]
-    except Exception as exc:
-        return f"抓取失败: {type(exc).__name__}"
+    raw = b""
+    status = 0
+    last_err = ""
+    for _attempt in range(2):  # one retry: some hosts reset intermittently
+        try:
+            async with httpx.AsyncClient(timeout=25, follow_redirects=True,
+                                         headers={"User-Agent": "Mozilla/5.0"}) as c:
+                r = await c.get(url)
+                status = r.status_code
+                if status != 200:
+                    return f"HTTP {status}"
+                raw = r.content[: MAX_FETCH_BYTES]
+                break
+        except Exception as exc:
+            last_err = f"{type(exc).__name__}"
+    if not raw:
+        return f"抓取失败: {last_err or 'empty'}"
     cat = _category_blocked(raw.decode("utf-8", errors="ignore"))
     if cat:
         return f"内容被拦截（类别: {cat}）"
