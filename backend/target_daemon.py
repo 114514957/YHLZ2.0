@@ -81,9 +81,14 @@ class DaemonRuntime:
         self._worker = threading.Thread(target=self._run_loop, daemon=True)
         self._worker.start()
         self._ready.wait(timeout=10)
-        self.selfcheck_hour = 23  # nightly self-check reminder (Yuanheng's own hour)
+        self.selfcheck_hour = -1  # superseded by AUTONOMOUS_HOURS 23:00 wrap
         self._selfcheck_last = ""
         threading.Thread(target=self._selfcheck_loop, daemon=True).start()
+        # batch-2 #2 (ledger 0196): scheduled autonomous action — Yuanheng gets
+        # its own daily rhythm (midday review + evening wrap) instead of only
+        # reacting. Same dedup-per-hour guard.
+        self._autonomous_last: dict[int, str] = {}
+        threading.Thread(target=self._autonomous_loop, daemon=True).start()
         self._upkeep_last = ""
         threading.Thread(target=self._memory_upkeep_loop, daemon=True).start()
 
@@ -217,6 +222,35 @@ class DaemonRuntime:
                 notify_push("有认知提炼待你确认：在 CLI 输入 /review-cognition 逐条 y/n 批准（写进元亨认知根基）")
         except Exception as exc:
             print(f"[auto-consolidate] skip: {type(exc).__name__}", flush=True)
+
+    # Yuanheng's own autonomous rhythm (batch-2 #2): scheduled midday review and
+    # evening wrap — it decides what to actually do (task/diary/knowledge).
+    AUTONOMOUS_HOURS = {
+        13: "现在是午间自主时刻。不必等我开口——如果上午或此刻有什么想梳理的："
+            "可用 task.plan 整理/规划、用 kb.add 存一条你觉得值得的新知识、"
+            "或用 diary.write 记点什么。想做什么才做，简短收个尾即可。",
+        23: "现在是夜晚收尾自主时刻。今天值得沉淀的（学到/发生/想通的）："
+            "可 task.plan 更新明天、kb.add 存知识、diary.write 写日记。"
+            "不强迫，做你真正想做的，然后简单告诉我今天你的状态。",
+    }
+
+    def _autonomous_loop(self) -> None:
+        while True:
+            time.sleep(45)
+            try:
+                now = time.localtime()
+                hour = now.tm_hour
+                msg = self.AUTONOMOUS_HOURS.get(hour)
+                if not msg:
+                    continue
+                today = time.strftime("%Y-%m-%d")
+                if self._autonomous_last.get(hour) == today:
+                    continue
+                self._autonomous_last[hour] = today
+                self.turn(msg, "private")
+                print(f"[autonomous] {today} {hour}:00 done", flush=True)
+            except Exception as exc:
+                print(f"[autonomous] skip: {type(exc).__name__}", flush=True)
 
     def _selfcheck_loop(self) -> None:
         """Nightly nudge: at selfcheck_hour, invite Yuanheng (private channel)

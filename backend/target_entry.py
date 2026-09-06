@@ -424,6 +424,26 @@ def cli_main() -> int:
                 dg = svc.apply_belief_downgrades()
                 print(f"记忆风化（每周日 12:00 自动；手动触发）：巩固 {rf} 条，衰减 {dec} 条，降权 {dg} 条（不删除）")
                 continue
+            if line == "/stabilize":
+                from backend.target_stabilization import cli_print as _stab
+
+                _stab(session.memory)
+                continue
+            if line == "/suggest":
+                from backend.target_signals import suggest as _sugg
+                from backend.env_loader import ensure_env_loaded
+                from backend.target_orchestrator import build_openai_compatible_llm_turn
+                import os, json as _j
+
+                ensure_env_loaded()
+                llm = build_openai_compatible_llm_turn(
+                    api_key=os.getenv("DEEPSEEK_API_KEY", ""), model="deepseek-chat",
+                    temperature=0.2, max_tokens=900,
+                    fallback_base_url="http://127.0.0.1:11434/v1/chat/completions",
+                    fallback_model="qwen2.5:3b")
+                out = loop.run_until_complete(_sugg(llm))
+                print(_j.dumps(out, ensure_ascii=False, indent=1))
+                continue
             if line == "/review-cognition":
                 from backend.target_persona_loop import PENDING_FILE
 

@@ -35,3 +35,38 @@ class SignalTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FakeLLM:
+    async def __call__(self, messages, tools):
+        import json as _j
+        return {"content": _j.dumps({"suggestions": [{
+            "target": "style", "dimension": "concise",
+            "suggestion": "回答更简短直接，少客套",
+            "reason": "多次被批评啰嗦"}]}, ensure_ascii=False)}
+
+
+class SuggestTest(unittest.TestCase):
+    def setUp(self):
+        import asyncio
+        self.tmp = Path(tempfile.mkdtemp()) / "s.jsonl"
+        self._f = sg.SIGNALS_FILE
+        sg.SIGNALS_FILE = self.tmp
+
+    def tearDown(self):
+        sg.SIGNALS_FILE = self._f
+
+    def test_too_few_signals(self):
+        import asyncio
+        out = asyncio.run(sg.suggest(FakeLLM()))
+        self.assertFalse(out["ok"])
+        self.assertIn("太少", out["reason"])
+
+    def test_suggest_parses(self):
+        import asyncio
+        lines = ["praise 很好", "critique 太啰嗦了", "critique 又啰嗦", "praise 简洁就好"]
+        self.tmp.write_text("\n".join(
+            '{"ts": %d, "kind": "%s", "text": "%s", "channel": "p"}' % (i, l.split()[0], l.split()[1]) for i, l in enumerate(lines)), encoding="utf-8")
+        out = asyncio.run(sg.suggest(FakeLLM()))
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["suggestions"][0]["target"], "style")
