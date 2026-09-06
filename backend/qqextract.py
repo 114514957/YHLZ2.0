@@ -134,7 +134,7 @@ def store_items(items: list[dict], *, group_id: str = "", ts: int = 0,
     return n
 
 
-def build_llm_turn():
+def build_llm_turn(max_tokens: int = 1200):
     """Cloud-only (no local fallback) DeepSeek turn for extraction."""
     import os
 
@@ -145,7 +145,7 @@ def build_llm_turn():
     key = os.getenv("DEEPSEEK_API_KEY", "")
     return build_openai_compatible_llm_turn(
         api_key=key, model="deepseek-chat", temperature=0.1,
-        max_tokens=1200, fallback_base_url=None,
+        max_tokens=int(max_tokens), fallback_base_url=None,
     )
 
 
@@ -198,11 +198,68 @@ def digest(date_str: str | None = None, db_path: pathlib.Path | None = None) -> 
     return f
 
 
+SUMMARY_PROMPT = """你是技术知识主编。输入一批从 QQ 技术群筛选出的知识条目（前缀 [QQtech]/[QQmethod]）。
+任务：按技术主题聚类并产出一份**有提炼价值的主题总结**，供元亨（数字生命体）与其老爹阅读学习。
+要求：
+1. 归纳 4-8 个主题（如：模型架构与稀疏化 / 推理部署与工程 / Agent 与记忆设计 / 学习与认知 / …），主题名要精准；
+2. 每主题下列"要点"：把同主题条目浓缩成 2-6 条有信息量的陈述（可保留关键技术名词与数字，丢弃重复与口水）；
+3. 每主题末给一行"启发"：该主题对本项目（数字生命/本地语音智能体）值得借鉴的一句话结论。
+输出纯 JSON（不要 markdown fence）：
+{"topics": [{"topic": "主题名", "points": ["要点1", "要点2"], "takeaway": "一句启发"}]}
+宁精勿滥。"""
+
+
+async def summarize(db_path: pathlib.Path | None = None) -> dict:
+    """Cluster all QQ knowledge items into topic summaries (cloud only)."""
+    import sqlite3
+
+    from backend.target_memory import TargetMemoryService
+
+    svc = TargetMemoryService(db_path=db_path or L2_DB)
+    con = sqlite3.connect(str(svc.db_path))
+    rows = con.execute(
+        "SELECT summary, created_at FROM l2_items "
+        "WHERE type='knowledge' AND status IN ('active','downgraded') ORDER BY created_at"
+    ).fetchall()
+    con.close()
+    if not rows:
+        return {"topics": 0, "reason": "no-knowledge"}
+    payload = "\n".join(f"- {s}" for s, _ in rows)
+    if len(payload) > 60000:
+        payload = payload[:60000]
+    resp = await build_llm_turn(max_tokens=4000)(
+        [{"role": "system", "content": SUMMARY_PROMPT},
+         {"role": "user", "content": payload}],
+        [],
+    )
+    parsed = parse_llm_json(resp.get("content") or "")
+    topics = (parsed.get("topics") or [])[:8]
+    for t in topics:
+        t["points"] = [str(p)[:200] for p in (t.get("points") or [])[:6]]
+        t["takeaway"] = str(t.get("takeaway") or "")[:200]
+    out_dir = BASE / "docs" / "知识汇编"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    f = out_dir / f"QQ-主题总结-{time.strftime('%Y-%m-%d')}.md"
+    with open(f, "w", encoding="utf-8") as fp:
+        fp.write(f"# QQ 技术知识主题总结（{len(rows)} 条 → {len(topics)} 主题）\n\n")
+        for t in topics:
+            fp.write(f"## {t['topic']}\n\n")
+            for p in t["points"]:
+                fp.write(f"- {p}\n")
+            if t["takeaway"]:
+                fp.write(f"\n> 启发：{t['takeaway']}\n\n")
+    return {"topics": len(topics), "source_items": len(rows), "file": str(f)}
+
+
 def main() -> int:
     cmd = sys.argv[1] if len(sys.argv) > 1 else "run"
     if cmd == "digest":
         f = digest(sys.argv[2] if len(sys.argv) > 2 else None)
         print("digest:", f)
+        return 0
+    if cmd == "summarize":
+        res = asyncio.run(summarize())
+        print(json.dumps(res, ensure_ascii=False))
         return 0
     res = asyncio.run(run_batch())
     print("result:", json.dumps(res, ensure_ascii=False))
