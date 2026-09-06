@@ -18,11 +18,11 @@ CAND_DIR = BASE / "cache" / "qqwatch"
 STATE_FILE = CAND_DIR / "state.json"
 L2_DB = BASE / "cache" / "memstore" / "memstore.db"
 
-EXTRACT_PROMPT = """你是知识捕获精炼器。输入来自 QQ 技术/AI 群聊的候选消息（JSONL）。
-从中抽取"客观可复用信息"，例如：技术要点/工具与用法/学习方法/资源链接说明/事实定义。
-忽略：寒暄、情绪、广告宣传、口水、无信息量的零碎。
-输出纯 JSON（不要 markdown fence）：{"items": [{"point": "一句话精炼要点(≤80字)", "quote": "原文字段中支撑它的短引用(≤60字)", "cat": "tech|method|resource|fact"}]}
-宁可少而精。若无值得保留内容输出 {"items": []}。"""
+EXTRACT_PROMPT = """你是技术知识捕获精炼器。输入来自 QQ 技术/AI 群聊的候选消息（JSONL）。
+从中抽取**纯技术/方法论内容**，例如：技术原理与要点、架构与实现方法、工具/框架/模型的用法与参数、踩坑经验、可操作的技术建议。
+严格丢弃一切非技术内容：闲聊、情绪、评价、广告、资源求问（求链接/求资源本身）、生活话题、仅观点无技术量的讨论。
+输出纯 JSON（不要 markdown fence）：{"items": [{"point": "一句话精炼技术要点(≤80字)", "quote": "原文字段中支撑它的短引用(≤60字)", "cat": "tech|method"}]}
+宁可少而精。若无技术内容输出 {"items": []}。"""
 
 SYSTEM_MSG = {"role": "system", "content": EXTRACT_PROMPT}
 
@@ -91,7 +91,7 @@ async def extract(items: list[dict], llm_turn) -> list[dict]:
         out.append({
             "point": point[:120],
             "quote": str(it.get("quote", ""))[:100],
-            "cat": str(it.get("cat", "fact"))[:12] if it.get("cat") in ("tech", "method", "resource", "fact") else "fact",
+            "cat": str(it.get("cat", "tech"))[:12] if it.get("cat") in ("tech", "method") else "tech",
         })
     return out
 
@@ -150,13 +150,16 @@ def build_llm_turn():
 
 
 async def run_batch(max_items: int = 12, dry: bool = False) -> dict:
+    st = _load_state()
+    start_cursor = int(st.get("processed_lines", 0))
     items, total_lines = read_pending_candidates(max_items)
     if not items:
         return {"processed": 0, "stored": 0, "lines": total_lines, "reason": "no-candidates"}
     refined = await extract(items, build_llm_turn())
     stored = 0 if dry else store_items(refined)
     if not dry:
-        _save_state({"processed_lines": total_lines})
+        # advance cursor by the lines actually consumed (never to file end)
+        _save_state({"processed_lines": start_cursor + len(items)})
     return {"processed": len(items), "refined": len(refined), "stored": stored, "lines": total_lines}
 
 
