@@ -34,6 +34,7 @@ class Capability:
     rollback: Optional[Callable[[], Any]] = None
     verify: Optional[Callable[[Any], bool]] = None
     input_model: Any = None  # optional pydantic BaseModel: typed arg contract (R1)
+    description: str = ""  # real tool guidance shown to the model (ledger 0184)
 
     @property
     def all_inputs(self) -> tuple[str, ...]:
@@ -81,8 +82,9 @@ class Capability:
             "type": "function",
             "function": {
                 "name": self.openai_name,
-                "description": ("写入/有副作用的能力" if self.side_effect
-                                else "只读能力"),
+                "description": (self.description or
+                                ("写入/有副作用的能力" if self.side_effect
+                                 else "只读能力")),
                 "parameters": {"type": "object", "properties": props,
                                "required": required},
             },

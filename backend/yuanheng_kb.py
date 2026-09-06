@@ -143,6 +143,27 @@ def kb_query(query: str, limit: int = 6, category: str = "") -> list[dict]:
     return out
 
 
+def kb_list(category: str = "", limit: int = 50) -> list[dict]:
+    """List active items (optionally by category), newest first."""
+    _init()
+    limit = max(1, min(int(limit or 50), 200))
+    with _lock, _db() as con:
+        if category:
+            rows = con.execute(
+                "SELECT id,category,summary,detail,source,created FROM kb_items "
+                "WHERE status='active' AND category=? ORDER BY created DESC LIMIT ?",
+                (str(category)[:12], int(limit)),
+            ).fetchall()
+        else:
+            rows = con.execute(
+                "SELECT id,category,summary,detail,source,created FROM kb_items "
+                "WHERE status='active' ORDER BY created DESC LIMIT ?",
+                (int(limit),),
+            ).fetchall()
+    return [{"id": r[0], "category": r[1], "summary": r[2], "detail": r[3] or "",
+             "source": r[4], "created": r[5]} for r in rows]
+
+
 def kb_stats() -> dict:
     _init()
     with _lock, _db() as con:

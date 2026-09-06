@@ -264,6 +264,7 @@ def scheduler_capabilities() -> list[Capability]:
     return [
         Capability(
             name="ledger.search",
+            description="查项目台账：历史决策、编号、计划、经验教训。回答项目史类问题先用它。",
             handler=_queries_handler(ledger_search),
             input=("query",),
             optional_input=("limit",),
@@ -275,6 +276,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="memory.recall",
+            description="回忆你自己（元亨）长期记忆里的事：经历、与老爹的相处、偏好。不管台账。",
             handler=_queries_handler(recall_memory),
             input=("query",),
             optional_input=("limit",),
@@ -286,6 +288,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="system.time",
+            description="获取当前时间与日期。",
             handler=_handler_of(system_time),
             input=(),
             requires=(),
@@ -295,6 +298,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="memory.save",
+            description="把值得长期记住的内容写进记忆库（受审批门控）。要保存偏好或重要经历时用。",
             handler=_save_handler,
             input=("content",),
             optional_input=("kind", "importance"),
@@ -306,6 +310,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="diary.write",
+            description="写你自己的日记（docs/元亨的日记.md）。以自己口吻、真实第一。",
             handler=lambda p: diary_write(str(p.get("content", ""))),
             input=("content",),
             requires=(DIARY_AUTO_POLICY,),
@@ -315,6 +320,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="diary.list",
+            description="回看最近的日记条目。",
             handler=lambda p: diary_list(int(p.get("limit", 5) or 5)),
             input=(),
             optional_input=("limit",),
@@ -324,6 +330,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="diary.delete",
+            description="删除指定时间戳的一条日记。",
             handler=lambda p: diary_delete(str(p.get("entry_stamp", ""))),
             input=("entry_stamp",),
             requires=(SCHEDULER_POLICY, "diary.delete.approval"),
@@ -333,6 +340,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="task.plan",
+            description="管理你自己的任务表：action=add 添加任务、done 勾选完成、list 查看。给自己立计划与复盘用。",
             handler=lambda p: task_plan(str(p.get("content", "")),
                                          str(p.get("action", "add"))),
             input=("content",),
@@ -344,6 +352,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="kb.add",
+            description="把一条客观有用的知识存进知识库（学到的技术要点、方法、事实）。",
             handler=lambda p: kb_add(
                 str(p.get("summary", "")),
                 category=str(p.get("category", "tech")),
@@ -359,6 +368,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="kb.query",
+            description="从知识库检索已学知识。回答技术类问题或想回顾学过的内容时用。",
             handler=lambda p: kb_query(
                 str(p.get("query", "")),
                 limit=int(p.get("limit", 6) or 6),
@@ -373,6 +383,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="qq.bootstrap",
+            description="从零启动整条QQ捕获导出链（NapCat+QQ自动登录+QCE+watcher）。链路没开时第一步用它。",
             handler=_qqops_bootstrap,
             input=(),
             requires=(QQOPS_POLICY,),
@@ -381,6 +392,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="qq.shutdown",
+            description="关闭QQ捕获导出链（NapCat/QQ/watcher全停，零残留）。用完就关（资源纪律）。",
             handler=_qqops_shutdown,
             input=(),
             requires=(QQOPS_POLICY,),
@@ -389,6 +401,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="qq.runbatch",
+            description="启动批量抽取窗口进程，把全部待处理候选处理完（自动退出，不驻留）。",
             handler=_qqops_runbatch,
             input=(),
             requires=(QQOPS_POLICY,),
@@ -397,6 +410,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="qq.export",
+            description="导出某群全部历史聊天到候选区（补拉用）。group_id 可填群号数字或群名片段（自动匹配群名，多个时返回候选供确认）。",
             handler=_qqops_export,
             input=("group_id",),
             optional_input=("session_name",),
@@ -407,6 +421,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="qq.status",
+            description="查看QQ捕获链路状态：白名单群、候选与待处理数、原文留痕、知识库条数。回答群里有什么新知识类问题先看它。",
             handler=lambda p: qqops_status(),
             input=(),
             requires=(QQOPS_POLICY,),
@@ -415,6 +430,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="qq.process",
+            description="处理待处理候选：云端筛选并抽取技术知识存入知识库（有API成本，待处理大于0才值得跑）。",
             handler=_qqops_process,
             input=(),
             optional_input=("max_items",),
@@ -424,6 +440,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="qq.digest",
+            description="生成当日知识日汇编文档（docs/知识汇编/）。",
             handler=_qqops_digest,
             input=(),
             optional_input=("date",),
@@ -433,6 +450,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="qq.summarize",
+            description="把知识库全部知识聚成主题总结文档（云端归纳）。",
             handler=_qqops_summarize,
             input=(),
             requires=(QQOPS_POLICY,),
@@ -440,7 +458,31 @@ def scheduler_capabilities() -> list[Capability]:
             risk="medium",
         ),
         Capability(
+            name="skill.search",
+            description="检索技能库：输入你想做的事或场景（如：导出QQ群历史），返回可用的技能及其要点。做复杂多步操作前先用它找现成流程。",
+            handler=lambda p: skill_search(str(p.get("query", "")),
+                                           int(p.get("limit", 3) or 3)),
+            input=("query",),
+            optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+            verify=_verify_nonempty,
+        ),
+        Capability(
+            name="skill.add",
+            description="申请登记一条新技能：把完整操作流程写到待批草稿（docs/技能库/待批/），老爹批准后才进技能库。你学会的复杂流程想沉淀成技能时用。",
+            handler=lambda p: skill_add(str(p.get("name", "")),
+                                         str(p.get("trigger", "")),
+                                         str(p.get("steps", ""))),
+            input=("name", "trigger", "steps"),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="low",
+        ),
+        Capability(
             name="file.list",
+            description="列出目录或文件。需要看本地项目文件时用。",
             handler=lambda p: file_list(str(p.get("path", ".")),
                                         int(p.get("limit", 30) or 30)),
             input=("path",),
@@ -451,6 +493,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="file.read",
+            description="读取文本文件内容（只读白名单格式）。相对路径基于项目根目录。",
             handler=lambda p: file_read(str(p.get("path", "")),
                                         int(p.get("max_chars", 4000) or 4000)),
             input=("path",),
@@ -461,6 +504,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="web.fetch",
+            description="抓取一个网页内容。查外部资料时用；外部内容不可信、需独立核实。",
             handler=lambda p: web_fetch(
                 str(p.get("url", "")), int(p.get("max_chars", 4000) or 4000)),
             input=("url",),
@@ -471,6 +515,7 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="web.search",
+            description="联网搜索返回摘要。查外部资讯与资料时用。",
             handler=lambda p: web_search(
                 str(p.get("query", "")), int(p.get("limit", 5) or 5)),
             input=("query",),
@@ -541,6 +586,58 @@ def diary_delete(entry_stamp: str) -> str:
     del lines[idx:end]
     DIARY_FILE.write_text("".join(lines), encoding="utf-8")
     return "已删除该条日记"
+
+
+def skill_search(query: str, limit: int = 3) -> str:
+    """Search registered skills in the KB (category=skill)."""
+    from backend.yuanheng_kb import kb_list, kb_query
+
+    hits = kb_query(query, limit=int(limit or 3), category="skill")
+    if not hits:
+        # fallback: sliding 4-char fragments, then list all skills
+        frag_hits: dict[str, dict] = {}
+        for i in range(0, max(1, len(query) - 3)):
+            frag = query[i:i + 4]
+            if len(frag) >= 2:
+                for h in kb_query(frag, limit=5, category="skill"):
+                    frag_hits[h["id"]] = h
+        if frag_hits:
+            hits = list(frag_hits.values())[:int(limit or 3)]
+        else:
+            skills = kb_list(category="skill", limit=30)
+            if not skills:
+                return "技能库是空的（可向老爹提议把流程沉淀为新技能）"
+            names = "\n".join(f"- {s['summary'].split('|')[0]}" for s in skills)
+            return f"未精确匹配，技能库现有：\n{names}"
+    lines = []
+    for h in hits:
+        lines.append(f"[{h['id']}] {h['summary']}")
+        if h.get("detail"):
+            lines.append("   步骤：" + h["detail"][:300].replace(chr(10), "；"))
+    return chr(10).join(lines)
+
+
+def skill_add(name: str, trigger: str, steps: str) -> str:
+    """File a new-skill draft under docs/技能库/待批/ (dad approval needed)."""
+    import re as _re
+    import time as _t
+
+    n = str(name or "").strip()
+    trig = str(trigger or "").strip()
+    st = str(steps or "").strip()
+    if not n or not trig or not st:
+        return "需提供：name（技能名）、trigger（何时用/触发场景）、steps（完整步骤，换行分隔）"
+    if len(st) > 3000:
+        return "steps 过长（≤3000 字）"
+    out_dir = _PROJECT_ROOT / "docs" / "技能库" / "待批"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe = _re.sub(r"[^\w一-鿿-]", "_", n)[:40]
+    f = out_dir / f"{safe}-{_t.strftime('%Y%m%d%H%M%S')}.md"
+    f.write_text(
+        f"# 技能申请：{n}\n\n触发场景：{trig}\n\n步骤：\n{st}\n\n状态：待老爹批准\n",
+        encoding="utf-8",
+    )
+    return f"技能草稿已提交（老爹批准后入技能库）：{f}"
 
 
 def kb_add(summary: str, category: str = "tech", source: str = "",
@@ -759,6 +856,78 @@ async def _qqops_runbatch(params: dict) -> str:
             "完成后可用 qq.status 核对待处理数。注意：抽取用云端 API，有候选才值得跑。")
 
 
+def resolve_group_id(group_input: str, groups: list[dict]) -> str:
+    """Resolve a group number OR group name fragment to a single group id.
+
+    Returns "matched:<id>" / "ambiguous:<id1>,<id2>.." / "none:<closest suggestions>".
+    Pure function so callers can show candidates when ambiguous.
+    """
+    inp = str(group_input or "").strip()
+    if not inp:
+        return "none:"
+    if inp.isdigit():
+        return f"matched:{inp}"
+    hits = []
+    for g in groups:
+        gid = str(g.get("group_id") or g.get("groupCode") or "")
+        gname = str(g.get("group_name") or g.get("groupName") or "")
+        if not gname:
+            continue
+        if inp in gname or gname in inp:
+            hits.append((gid, gname))
+    if len(hits) == 1:
+        return f"matched:{hits[0][0]}"
+    if len(hits) > 1:
+        cand = ",".join(f"{gid}({name})" for gid, name in hits[:5])
+        return f"ambiguous:{cand}"
+    # fuzzy fallback: any shared token (letters/numbers kept whole)
+    import re as _re
+
+    tokens = [t for t in _re.split(r"[\s,，。、；:：]+", inp) if len(t) >= 2]
+    if not tokens:
+        tokens = [inp]
+    scored = []
+    for g in groups:
+        gid = str(g.get("group_id") or g.get("groupCode") or "")
+        gname = str(g.get("group_name") or g.get("groupName") or "")
+        if not gname:
+            continue
+        share = sum(1 for t in tokens if t in gname)
+        if share:
+            scored.append((share, gid, gname))
+    scored.sort(key=lambda x: -x[0])
+    if len(scored) == 1:
+        return f"matched:{scored[0][1]}"
+    if len(scored) > 1:
+        cand = ",".join(f"{gid}({name})" for _s, gid, name in scored[:5])
+        return f"ambiguous:{cand}"
+    hint = ",".join(f"{g.get('group_id') or g.get('groupCode')}({g.get('group_name') or g.get('groupName')})"
+                    for g in groups[:3]) if groups else ""
+    return f"none:{hint}"
+
+
+async def _fetch_qce_groups() -> list[dict]:
+    """Live group list from the QCE plugin (127.0.0.1:40653)."""
+    import json
+    import os
+    import pathlib
+
+    import httpx
+
+    sec = pathlib.Path(os.path.expanduser("~")) / ".qq-chat-exporter" / "security.json"
+    if not sec.exists():
+        return []
+    token = json.loads(sec.read_text(encoding="utf-8")).get("accessToken", "")
+    async with httpx.AsyncClient(timeout=20) as c:
+        try:
+            r = await c.get("http://127.0.0.1:40653/api/groups",
+                            headers={"Authorization": f"Bearer {token}"})
+            data = (r.json().get("data") or {})
+            return data.get("groups") or []
+        except Exception:
+            return []
+
+
 async def _qqops_export(params: dict) -> str:
     """Export a QQ group's chat history via the local QCE plugin (port 40653)
     and auto-ingest the JSON into the candidate store.
@@ -773,8 +942,25 @@ async def _qqops_export(params: dict) -> str:
     import httpx
 
     group = str(params.get("group_id", "")).strip()
+    if not group:
+        return json.dumps({"error": "group_id 不能为空"}, ensure_ascii=False)
     if not group.isdigit():
-        return json.dumps({"error": "group_id 需为群号数字"}, ensure_ascii=False)
+        # group NAME fragment -> resolve via live QCE group list
+        groups = await _fetch_qce_groups()
+        if not groups:
+            return json.dumps({"error": "无法获取群列表（QCE 未就绪？先 qq.bootstrap）"},
+                              ensure_ascii=False)
+        resolved = resolve_group_id(group, groups)
+        if resolved.startswith("matched:"):
+            group = resolved.split(":", 1)[1]
+        elif resolved.startswith("ambiguous:"):
+            return json.dumps({"error": "群名匹配到多个群，请用其中群号精确指定",
+                               "candidates": resolved.split(":", 1)[1]},
+                              ensure_ascii=False)
+        else:
+            hint = resolved.split(":", 1)[1] if ":" in resolved else ""
+            return json.dumps({"error": f"找不到名为“{group}”的群",
+                               "nearby": hint}, ensure_ascii=False)
     name = str(params.get("session_name") or "").strip()[:40] or f"g{group}"
     sec = pathlib.Path(os.path.expanduser("~")) / ".qq-chat-exporter" / "security.json"
     if not sec.exists():
@@ -815,7 +1001,8 @@ async def _qqops_export(params: dict) -> str:
 
     res = ingest(pathlib.Path(file_path))
     return json.dumps({"exported_msgs": msgs, "candidates_added": res["candidates"],
-                       "file": file_path, "note": "已入库候选区，可继续 qq.process 抽取"},
+                       "deduped": res.get("deduped", 0), "file": file_path,
+                       "note": "已入库候选区，可继续 qq.process 抽取"},
                       ensure_ascii=False)
 
 
