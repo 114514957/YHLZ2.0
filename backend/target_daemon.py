@@ -104,7 +104,34 @@ class DaemonRuntime:
             s.save_session("qq_" + key if key != "private" else "default")
         except Exception:
             pass
+        self._maybe_consolidate(key)
         return info
+
+    # auto-consolidation: every N turns on the private channel run the persona
+    # loop once (idempotent by design — stamped items are never re-proposed).
+    AUTO_CONSOLIDATE_EVERY = 15
+
+    def _maybe_consolidate(self, key: str) -> None:
+        try:
+            if key != "private":
+                return
+            s = self._session(key)
+            st = s.status()
+            if int(st.get("history_turns", 0)) < 1:
+                return
+            counter = getattr(self, "_consolidate_counter", 0) + 1
+            self._consolidate_counter = counter
+            if counter % self.AUTO_CONSOLIDATE_EVERY != 0:
+                return
+            from backend.target_persona_loop import PersonaConsolidationLoop
+
+            pc = PersonaConsolidationLoop(s.llm_turn, s.memory)
+            future = asyncio.run_coroutine_threadsafe(pc.consolidate_once(),
+                                                      self._loop)
+            info = future.result(timeout=180)
+            print(f"[auto-consolidate] {info.get('status')}", flush=True)
+        except Exception as exc:
+            print(f"[auto-consolidate] skip: {type(exc).__name__}", flush=True)
 
     def openai_chat(self, payload: dict) -> dict:
         messages = payload.get("messages") or []

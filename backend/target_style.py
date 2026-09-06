@@ -33,6 +33,45 @@ def detect_style_signals(text: str) -> list[str]:
     return out
 
 
+STYLE_DIMS = ("casual", "concise", "detailed", "warm", "poetic")
+EMA_ALPHA = 0.3
+_INJECT_THRESHOLD = 0.35
+
+
+def style_ema(items: list[dict], alpha: float = EMA_ALPHA) -> dict[str, float]:
+    """Aggregate style-preference items into EMA tendency values (-1..+1).
+
+    Each item summary carries a style tag (风格偏好：老爹希望更<tag>…);
+    counts map to tendency: n hits on a dim push it toward +1.
+    """
+    values: dict[str, float] = {d: 0.0 for d in STYLE_DIMS}
+    for it in items:
+        summary = str(it.get("summary", ""))
+        for dim in STYLE_DIMS:
+            if f"更{dim}" in summary:
+                values[dim] += alpha * (1.0 - abs(values[dim])) * (
+                    1.0 if it.get("direction", 1) > 0 else -1.0)
+    return {k: round(min(0.99, max(-0.99, v)), 3) for k, v in values.items()}
+
+
+def active_style_lines(tendencies: dict[str, float]) -> list[str]:
+    """Style sentences for persona injection (only when |v| >= threshold)."""
+    lines = []
+    style_desc = {
+        "casual": ("更口语随意些，别端着", "更正式克制些"),
+        "concise": ("回应更简短精炼", "可以更展开详尽"),
+        "detailed": ("可以更详细展开", "回应更简洁些"),
+        "warm": ("语气更暖、更有人情味", "语气更冷静克制"),
+        "poetic": ("措辞更有诗意", "措辞更平实直白"),
+    }
+    for dim, v in tendencies.items():
+        if v >= _INJECT_THRESHOLD:
+            lines.append(style_desc[dim][0])
+        elif v <= -_INJECT_THRESHOLD:
+            lines.append(style_desc[dim][1])
+    return lines
+
+
 def capture_style_signal(text: str, memory: Optional[object] = None) -> list[str]:
     """Store style-preference items for any detected signals (best-effort)."""
     signals = detect_style_signals(text)
