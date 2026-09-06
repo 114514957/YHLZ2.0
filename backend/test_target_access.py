@@ -55,6 +55,19 @@ class TestWebDiscipline(unittest.TestCase):
 
         self.assertIn("仅支持", asyncio.run(go()))
 
+    def test_registry_web_fetch_url_passed_through(self):
+        """Regression: handler must unwrap the params dict (bug: dict was fed
+        to web_fetch as its url, failing the scheme check)."""
+        async def go():
+            reg = setup_scheduler_capabilities()
+            r = await reg.execute_openai_async(
+                "web_fetch", {"url": "https://127.0.0.1:9/x", "max_chars": 200})
+            return r
+
+        out = asyncio.run(go())
+        self.assertTrue(out["ok"])  # passed scheme validation
+        self.assertNotIn("仅支持", out["output"])  # not the old false rejection
+
     def test_registry_async_execute_file(self):
         async def go():
             reg = setup_scheduler_capabilities()

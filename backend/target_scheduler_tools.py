@@ -353,7 +353,8 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="web.fetch",
-            handler=web_fetch,
+            handler=lambda p: web_fetch(
+                str(p.get("url", "")), int(p.get("max_chars", 4000) or 4000)),
             input=("url",),
             optional_input=("max_chars",),
             requires=(SCHEDULER_POLICY,),
@@ -362,7 +363,8 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="web.search",
-            handler=web_search,
+            handler=lambda p: web_search(
+                str(p.get("query", "")), int(p.get("limit", 5) or 5)),
             input=("query",),
             optional_input=("limit",),
             requires=(SCHEDULER_POLICY,),
