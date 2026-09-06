@@ -1,0 +1,13 @@
+{
+  "ws_url": "ws://127.0.0.1:3001",
+  "token": "yhlz2026",
+  "groups": [
+    855372167,
+    931057213,
+    681195563
+  ],
+  "self_id": "2258374446",
+  "min_chars": 25,
+  "trusted_users": [],
+  "log_all": false
+}
