@@ -104,6 +104,7 @@ class TargetMemoryService:
         self._pending_dropped: list[dict[str, str]] = []
         self._extractor: Any = None  # cloud candidate generator (Hybrid, local-first)
         self._judge: Any = None  # local judge (importance/adjudication)
+        self._boost_ts: dict[str, float] = {}  # recall-use boost dedup window (ledger 0189)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
@@ -336,7 +337,7 @@ class TargetMemoryService:
             return
 
     # ---------- belief (bayes-style confidence, M2 ledger 0152) ----------
-    BELIEF_LAMBDA_DAY = 1.0 / 45.0
+    BELIEF_LAMBDA_DAY = 1.0 / 8.0  # ~7 days of no use drops belief 0.5 -> <0.22 (cold hint), ledger 0189
     BELIEF_DOWNGRADE_HINT = 0.22
 
     @staticmethod
@@ -364,6 +365,13 @@ class TargetMemoryService:
         """Time-decay all items; returns count updated (never deletes)."""
         now = float(now or time.time())
         con = sqlite3.connect(str(self.db_path))
+        # ledger 0189: legacy rows with belief_updated=0 never decayed; backfill
+        # from created_at so real age counts from the first upkeep on.
+        con.execute(
+            "UPDATE l2_items SET belief_updated=created_at "
+            "WHERE belief_updated=0 AND created_at>0"
+        )
+        con.commit()
         rows = con.execute(
             "SELECT id, belief, belief_updated FROM l2_items WHERE belief_updated > 0"
         ).fetchall()
@@ -504,8 +512,30 @@ class TargetMemoryService:
             return []
         ranked = self._recall_via_kw(q, int(limit))
         if ranked is not None:
+            self._boost_recalled(ranked)
             return ranked
-        return self._recall_via_sqlite(q, int(limit))
+        sql = self._recall_via_sqlite(q, int(limit))
+        self._boost_recalled(sql)
+        return sql
+
+    def _boost_recalled(self, items: list[dict]) -> None:
+        """R1 (ledger 0189): using a memory strengthens it — each recall adds a
+        weak +0.05 evidence to the hits, deduped within a 30 s window so a burst
+        of identical queries cannot inflate belief."""
+        import time as _t
+
+        try:
+            now = _t.time()
+            for h in (items or [])[:5]:
+                iid = str(h.get("id", ""))
+                if not iid:
+                    continue
+                if now - self._boost_ts.get(iid, 0.0) < 30.0:
+                    continue
+                self._boost_ts[iid] = now
+                self.observe_hit(iid, strength=0.05)
+        except Exception:
+            pass
 
     def _recall_via_kw(self, q: str, limit: int) -> Optional[list[dict]]:
         try:

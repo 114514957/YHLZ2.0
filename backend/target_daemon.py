@@ -84,6 +84,8 @@ class DaemonRuntime:
         self.selfcheck_hour = 23  # nightly self-check reminder (Yuanheng's own hour)
         self._selfcheck_last = ""
         threading.Thread(target=self._selfcheck_loop, daemon=True).start()
+        self._upkeep_last = ""
+        threading.Thread(target=self._memory_upkeep_loop, daemon=True).start()
 
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self._loop)
@@ -213,6 +215,45 @@ class DaemonRuntime:
                         print(f"[selfcheck] {today} nudge done", flush=True)
             except Exception as exc:
                 print(f"[selfcheck] skip: {type(exc).__name__}", flush=True)
+
+    def _memory_upkeep_loop(self) -> None:
+        """Weekly memory upkeep (ledger 0189): every Sunday 12:00 run belief
+        time-decay + downgrades (cold) so L2 behaves like a real memory
+        (unused items fade, nothing is ever deleted)."""
+        import pathlib
+
+        stamp_file = pathlib.Path(_PROJECT) / "cache" / "memory_upkeep_last.json"
+        while True:
+            time.sleep(60)
+            try:
+                now = time.localtime()
+                if now.tm_wday != 6 or now.tm_hour != 12:  # Sunday 12:00-12:59
+                    continue
+                today = time.strftime("%Y-%m-%d")
+                if self._upkeep_last == today:
+                    continue
+                try:
+                    if stamp_file.exists():
+                        last = json.loads(stamp_file.read_text(encoding="utf-8")).get("date", "")
+                        if last == today:
+                            self._upkeep_last = today
+                            continue
+                except Exception:
+                    pass
+                self._upkeep_last = today
+                from backend.target_memory import TargetMemoryService
+
+                svc = TargetMemoryService()
+                decayed = svc.apply_belief_decay()
+                downgraded = svc.apply_belief_downgrades()
+                stamp_file.write_text(
+                    json.dumps({"date": today, "decayed": decayed,
+                                "downgraded": downgraded}),
+                    encoding="utf-8")
+                print(f"[memory-upkeep] {today} decayed={decayed} downgraded={downgraded}",
+                      flush=True)
+            except Exception as exc:
+                print(f"[memory-upkeep] skip: {type(exc).__name__}", flush=True)
 
     def openai_chat(self, payload: dict) -> dict:
         messages = payload.get("messages") or []
