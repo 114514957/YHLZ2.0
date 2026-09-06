@@ -543,11 +543,16 @@ def kb_query(query: str, limit: int = 6, category: str = "") -> list[dict]:
 
 
 def qqops_status() -> str:
-    """Live status of the QQ knowledge capture pipeline (watcher/candidates/memory)."""
+    """Live status of the QQ knowledge capture pipeline (watcher/candidates/KB).
+
+    Data vocabulary (ledger 0182, unified):
+    - 白名单群 / 黑名单群：捕获范围
+    - 候选 = cache/qqwatch/all.jsonl（待抽取行；游标=已抽）
+    - 原文留痕 = cache/qqwatch/_skip.jsonl（低价值消息留痕，非候选）
+    - 知识 = data/yuanheng_kb.db（知识库，抽取沉淀的唯一去处）
+    """
     import json
     import pathlib
-
-    from backend.target_memory import DEFAULT_DB
 
     base = pathlib.Path(_PROJECT_ROOT)
     cfg_p = base / "config" / "qqwatch.json"
@@ -556,22 +561,26 @@ def qqops_status() -> str:
     if cfg_p.exists():
         cfg = json.loads(cfg_p.read_text(encoding="utf-8"))
         groups = cfg.get("groups") or []
-        parts.append(f"白名单 {len(groups)} 群（{','.join(map(str, groups[:4]))}）")
+        bl = cfg.get("blacklist_groups") or []
+        parts.append(f"白名单 {len(groups)} 群（{','.join(map(str, groups[:3]))}）"
+                     + (f"，黑名单 {len(bl)} 群" if bl else ""))
     all_f = cand_dir / "all.jsonl"
+    skip_f = cand_dir / "_skip.jsonl"
+    cursor = 0
     if all_f.exists():
         lines = all_f.read_text(encoding="utf-8").splitlines()
         st_f = cand_dir / "state.json"
-        cursor = 0
         if st_f.exists():
             cursor = int(json.loads(st_f.read_text(encoding="utf-8")).get("processed_lines", 0))
-        parts.append(f"候选 {len(lines)} 条（已抽 {cursor}，待处理 {max(0, len(lines) - cursor)}）")
+        parts.append(f"候选 {len(lines)} 条（已抽取 {cursor}，待处理 {max(0, len(lines) - cursor)}）")
+    if skip_f.exists():
+        parts.append(f"原文留痕 {len(skip_f.read_text(encoding='utf-8').splitlines())} 条（低价值，不入库）")
     try:
-        import sqlite3
+        from backend.yuanheng_kb import kb_stats
 
-        con = sqlite3.connect(str(DEFAULT_DB))
-        n = con.execute("SELECT COUNT(*) FROM l2_items WHERE type='knowledge' AND status='active'").fetchone()[0]
-        con.close()
-        parts.append(f"长期记忆 knowledge 条目 {n}")
+        st = kb_stats()
+        cats = ",".join(f"{k}{v}" for k, v in st["by_category"].items())
+        parts.append(f"知识库 {st['items']} 条（{cats}）")
     except Exception:
         pass
     return "；".join(parts)

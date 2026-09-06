@@ -97,15 +97,57 @@ def iter_messages(path: pathlib.Path, *, skip_recalled: bool = True, skip_system
         yield rec
 
 
+def _existing_fingerprints() -> set[str]:
+    """(group_id,user_id,text_norm) fingerprints of everything already stored.
+
+    Unifies the dedup vocabulary across live capture and historical export so
+    re-exporting a group never re-adds overlapping lines (ledger 0182).
+    """
+    import hashlib as _h
+
+    seen: set[str] = set()
+    for name in ("all.jsonl", "_skip.jsonl"):
+        f = CAND_DIR / name
+        if not f.exists():
+            continue
+        for line in f.read_text(encoding="utf-8").splitlines():
+            try:
+                r = json.loads(line)
+            except Exception:
+                continue
+            fp = _fp(r)
+            if fp:
+                seen.add(fp)
+    return seen
+
+
+def _fp(r: dict) -> str:
+    import hashlib as _h
+    import re as _re
+
+    g = str(r.get("group_id", ""))
+    u = str(r.get("user_id", ""))
+    t = _re.sub(r"\s+", "", str(r.get("text", "")))[:300]
+    if not t:
+        return ""
+    return _h.sha256(f"{g}|{u}|{t}".encode("utf-8")).hexdigest()[:24]
+
+
 def ingest(path: pathlib.Path, *, max_messages: int = 0, max_candidates: int = 0) -> dict:
-    """Append to candidate store. Returns counts."""
+    """Append to candidate store (deduped against existing fingerprints)."""
     CAND_DIR.mkdir(parents=True, exist_ok=True)
-    n = n_cand = 0
+    existing = _existing_fingerprints()
+    n = n_cand = n_dup = 0
     with (CAND_DIR / "all.jsonl").open("a", encoding="utf-8") as all_f, \
          (CAND_DIR / "_skip.jsonl").open("a", encoding="utf-8") as skip_f:
         for rec in iter_messages(path):
             if max_messages and n >= max_messages:
                 break
+            fp = _fp(rec)
+            if fp in existing:
+                n_dup += 1
+                continue
+            existing.add(fp)
             f = all_f if rec["candidate"] else skip_f
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             n += 1
@@ -113,7 +155,7 @@ def ingest(path: pathlib.Path, *, max_messages: int = 0, max_candidates: int = 0
                 n_cand += 1
                 if max_candidates and n_cand >= max_candidates:
                     break
-    return {"group_msgs": n, "candidates": n_cand}
+    return {"group_msgs": n, "candidates": n_cand, "deduped": n_dup}
 
 
 def main() -> int:
