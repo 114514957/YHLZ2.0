@@ -372,6 +372,16 @@ def scheduler_capabilities() -> list[Capability]:
             verify=_verify_nonempty,
         ),
         Capability(
+            name="qq.export",
+            handler=_qqops_export,
+            input=("group_id",),
+            optional_input=("session_name",),
+            requires=(QQOPS_POLICY,),
+            side_effect=True,
+            risk="medium",
+            verify=_verify_nonempty,
+        ),
+        Capability(
             name="qq.status",
             handler=lambda p: qqops_status(),
             input=(),
@@ -557,6 +567,66 @@ def qqops_status() -> str:
     except Exception:
         pass
     return "；".join(parts)
+
+
+async def _qqops_export(params: dict) -> str:
+    """Export a QQ group's chat history via the local QCE plugin (port 40653)
+    and auto-ingest the JSON into the candidate store.
+
+    Returns {exported_msgs, candidates_added, file}."""
+    import asyncio
+    import json
+    import os
+    import pathlib
+    import time
+
+    import httpx
+
+    group = str(params.get("group_id", "")).strip()
+    if not group.isdigit():
+        return json.dumps({"error": "group_id 需为群号数字"}, ensure_ascii=False)
+    name = str(params.get("session_name") or "").strip()[:40] or f"g{group}"
+    sec = pathlib.Path(os.path.expanduser("~")) / ".qq-chat-exporter" / "security.json"
+    if not sec.exists():
+        return json.dumps({"error": "QCE 未初始化（请先在 NapCat 插件面板打开 QQ 聊天记录导出）"},
+                          ensure_ascii=False)
+    token = json.loads(sec.read_text(encoding="utf-8")).get("accessToken", "")
+    base = "http://127.0.0.1:40653"
+    headers = {"Authorization": f"Bearer {token}"}
+    async with httpx.AsyncClient(timeout=120) as c:
+        r = await c.post(base + "/api/messages/export", headers=headers, json={
+            "peer": {"chatType": 2, "peerUid": group},
+            "format": "JSON",
+            "options": {},
+            "sessionName": name,
+        })
+        r.raise_for_status()
+        task = r.json().get("data") or {}
+        task_id = task.get("taskId")
+        if not task_id:
+            return json.dumps({"error": "导出任务未创建"}, ensure_ascii=False)
+        file_path = task.get("filePath", "")
+        for _ in range(180):
+            await asyncio.sleep(2)
+            rr = await c.get(base + "/api/tasks/" + task_id, headers=headers)
+            st = (rr.json().get("data") or {})
+            if st.get("status") in ("completed", "failed"):
+                break
+        msgs = int(st.get("messageCount") or task.get("messageCount") or 0)
+        if not file_path or not pathlib.Path(file_path).exists():
+            # locate latest file for this group in the exports dir
+            ex_dir = pathlib.Path(os.path.expanduser("~")) / ".qq-chat-exporter" / "exports"
+            cands = sorted(ex_dir.glob(f"group_{group}_*.json"), key=lambda p: p.stat().st_mtime)
+            file_path = str(cands[-1]) if cands else ""
+    if not file_path:
+        return json.dumps({"error": "导出文件未找到", "task": task_id}, ensure_ascii=False)
+    # ingest into candidate store
+    from backend.qqexport_ingest import ingest
+
+    res = ingest(pathlib.Path(file_path))
+    return json.dumps({"exported_msgs": msgs, "candidates_added": res["candidates"],
+                       "file": file_path, "note": "已入库候选区，可继续 qq.process 抽取"},
+                      ensure_ascii=False)
 
 
 async def _qqops_process(params: dict) -> str:

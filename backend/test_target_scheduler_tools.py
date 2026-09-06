@@ -64,7 +64,7 @@ class TestSchedulerRegistration(unittest.TestCase):
             sorted(names),
             ["diary_delete", "diary_list", "diary_write",
              "file_list", "file_read", "kb_add", "kb_query", "ledger_search",
-             "memory_recall", "memory_save", "qq_digest", "qq_process",
+             "memory_recall", "memory_save", "qq_digest", "qq_export", "qq_process",
              "qq_status", "qq_summarize", "system_time", "task_plan",
              "web_fetch", "web_search"],
         )

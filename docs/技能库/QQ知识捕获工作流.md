@@ -37,6 +37,21 @@ QQ 群消息 ──NapCat(QQ 2258374446, WS 127.0.0.1:3001)──> qqwatcher 摄
 - L2 查询：`sqlite3 cache/memstore/memstore.db "SELECT COUNT(*) FROM l2_items WHERE type='knowledge'"`
 - recall 抽查：元亨/工具 recall("agent 记忆") 命中知识条目
 
+## 六、历史导出补拉（元亨自主链）
+```
+场景: 某群历史漏收/断线期/初次接入 → 补拉
+qq.export(群号)  →  QCE 导出群全量 JSON(chatType=2) + 自动 ingest 入候选区
+                 → 返回 {exported_msgs, candidates_added}
+候选>0 → qq.process(分批云端抽取→yuanheng_kb)
+```
+- 工具：`qq.export`（读 ~/.qq-chat-exporter/security.json token，调 127.0.0.1:40653，轮询任务至完成，产物自动 ingest）。
+- **重复注意**：重复导出=候选区产生与历史重叠的行→处理前应核对 state/待处理数；重叠候选会被 kb 去重拦截（浪费 API）。
+- 产物目录：`~\.qq-chat-exporter\exports\group_<群号>_<时间戳>.json`（QCE 面板导出同）。
+
+## 七、工具选择心智（元亨调用原则）
+场景→工具：台账/历史决策→ledger.search；记忆经历/偏好→memory.recall；时间→system.time；文件→file.list/read；联网→web.fetch/search；知识存取→kb.query/kb.add；日记→diary.write；任务表→task.plan；链路状态/今日新知识→qq.status→(候选>0)qq.process；**群历史补拉→qq.export→qq.process**；日汇编→qq.digest；主题总结→qq.summarize。
+原则：先明意图→选一个→读结果→再下一步；失败重试或换法；拿不准问老爹。
+
 ## 五、本技能对元亨的意义
 1. 知识入口：recall/consolidate 直接吃到真实世界技术动态（与语音/人格记忆同一存储）。
 2. 产出文档（docs/知识汇编/）供人与元亨共读，主题"启发"栏=可内化认知。
