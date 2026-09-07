@@ -314,6 +314,52 @@ class DaemonRuntime:
             except Exception as exc:
                 print(f"[memory-upkeep] skip: {type(exc).__name__}", flush=True)
 
+    def stream_chat(self, payload: dict, sink) -> str:
+        """Dual-rail streaming chat (ledger 0204): cloud DeepSeek first, local
+        Ollama fallback. Emits OpenAI-style SSE frames via `sink(text_chunk,
+        reasoning_chunk=None)`; returns model actually used."""
+        from backend.env_loader import ensure_env_loaded
+
+        messages = payload.get("messages") or []
+        ensure_env_loaded()
+        import os
+
+        key = os.getenv("DEEPSEEK_API_KEY", "")
+
+        async def _stream_to(base_url, api_key, model):
+            from backend.llm_stream import stream_openai_compatible
+
+            async def _on(ev):
+                if ev["kind"] == "delta":
+                    if ev["stage"] == "content":
+                        sink(ev["delta"], None)
+                    else:
+                        sink(None, ev["delta"])
+                # done frame ignored here (client closes on [DONE])
+
+            await stream_openai_compatible(
+                base_url=base_url, api_key=api_key, model=model,
+                messages=messages, on_event=_on,
+                temperature=float(payload.get("temperature", 0.7)),
+                max_tokens=int(payload.get("max_tokens", 1200) or 1200),
+            )
+
+        async def _try_cloud():
+            await _stream_to("https://api.deepseek.com/v1/chat/completions",
+                             key, "deepseek-chat")
+
+        try:
+            fut = asyncio.run_coroutine_threadsafe(_try_cloud(), self._loop)
+            fut.result(timeout=300)
+            return "deepseek-chat"
+        except Exception:
+            async def _try_local():
+                await _stream_to(LOCAL_BASE, "", LOCAL_MODEL)
+
+            fut = asyncio.run_coroutine_threadsafe(_try_local(), self._loop)
+            fut.result(timeout=300)
+            return LOCAL_MODEL
+
     def openai_chat(self, payload: dict) -> dict:
         messages = payload.get("messages") or []
         user_msgs = [m for m in messages if m.get("role") == "user"]
@@ -338,6 +384,56 @@ class DaemonRuntime:
 
 class _Handler(BaseHTTPRequestHandler):
     runtime: DaemonRuntime = None  # type: ignore[assignment]
+
+    def _handle_stream_chat(self, payload: dict) -> None:
+        """SSE streaming chat (ledger 0204): OpenAI-style frames."""
+        import os
+
+        from backend.env_loader import ensure_env_loaded
+
+        ensure_env_loaded()
+        messages = payload.get("messages") or []
+        if not any(m.get("role") == "user" for m in messages):
+            self._send(400, {"error": "empty user message"})
+            return
+        model = str(payload.get("model", "yhlz-yuanheng"))
+        cid = f"chatcmpl-yhlz-{int(time.time() * 1000)}"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+
+        def _frame(obj: dict) -> bytes:
+            return ("data: " + json.dumps(obj, ensure_ascii=False) + "\n\n").encode("utf-8")
+
+        def _sink(text_chunk, reason_chunk):
+            delta = {}
+            if text_chunk:
+                delta["content"] = text_chunk
+            if reason_chunk:
+                delta["reasoning_content"] = reason_chunk
+            if delta:
+                try:
+                    self.wfile.write(_frame({
+                        "id": cid, "object": "chat.completion.chunk", "created": int(time.time()),
+                        "model": model,
+                        "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
+                    }))
+                    self.wfile.flush()
+                except Exception:
+                    pass
+
+        try:
+            used_model = self.runtime.stream_chat(payload, _sink)
+        except Exception:
+            used_model = model
+        self.wfile.write(_frame({
+            "id": cid, "object": "chat.completion.chunk", "created": int(time.time()),
+            "model": used_model or model,
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        }))
+        self.wfile.write(b"data: [DONE]\n\n")
+        self.wfile.flush()
 
     def log_message(self, fmt, *args):
         return
@@ -376,6 +472,9 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:160]}"})
             return
         if self.path in ("/v1/chat/completions", "/chat/completions"):
+            if payload.get("stream"):
+                self._handle_stream_chat(payload)
+                return
             try:
                 out = self.runtime.openai_chat(payload)
             except Exception as exc:
