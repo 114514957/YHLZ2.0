@@ -32,6 +32,7 @@ async def stream_openai_compatible(
     on_event: EventSink,
     temperature: float = 0.7,
     max_tokens: int = 1200,
+    reasoning_effort: Optional[str] = None,
     extra_headers: Optional[dict] = None,
 ) -> None:
     """Consume an OpenAI-compatible stream and emit unified events.
@@ -39,6 +40,9 @@ async def stream_openai_compatible(
     Works for DeepSeek (/v1/chat/completions), Ollama, llama.cpp server —
     all expose the same SSE shape: data:{"choices":[{"delta":{content|
     reasoning_content}}]} ... data:[DONE].
+
+    reasoning_effort: 'none' disables thinking on reasoning models (Gemma/…)
+    -> fast TTFT; None/'low'/'high' keep thinking.
     """
     import httpx
 
@@ -50,6 +54,8 @@ async def stream_openai_compatible(
         "stream": True,
         "stream_options": {"include_usage": True},
     }
+    if reasoning_effort:
+        payload["reasoning_effort"] = reasoning_effort
     headers = {"Authorization": f"Bearer {api_key}"}
     if extra_headers:
         headers.update(extra_headers)
