@@ -132,13 +132,14 @@ def build_llm_turn(max_tokens: int = 1200):
     )
 
 
-async def run_batch(max_items: int = 12, dry: bool = False) -> dict:
+async def run_batch(max_items: int = 12, dry: bool = False,
+                    llm_turn: Any = None) -> dict:
     st = _load_state()
     start_cursor = int(st.get("processed_lines", 0))
     items, total_lines = read_pending_candidates(max_items)
     if not items:
         return {"processed": 0, "stored": 0, "lines": total_lines, "reason": "no-candidates"}
-    refined = await extract(items, build_llm_turn())
+    refined = await extract(items, llm_turn if llm_turn is not None else build_llm_turn())
     src_grp = str(items[0].get("group_id", "") or "")
     src_ts = int(items[0].get("ts", 0) or 0)
     stored = 0 if dry else store_items(refined, group_id=src_grp, ts=src_ts)
