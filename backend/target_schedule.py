@@ -81,28 +81,94 @@ def list_plans() -> str:
     return MIRROR_FILE.read_text(encoding="utf-8")
 
 
+def _validate(time_: str, cadence_type: str, weekday, day) -> str | None:
+    """Return error message or None."""
+    t = (time_ or "").strip()
+    if len(t) != 5 or t[2] != ":" or not t[:2].isdigit() or not t[3:].isdigit():
+        return "time 需为 HH:MM（如 09:30）"
+    hh, mm = int(t[:2]), int(t[3:])
+    if not (0 <= hh < 24 and 0 <= mm < 60):
+        return "time 超出 00:00-23:59"
+    if cadence_type not in ("daily", "weekly", "monthly"):
+        return "cadence_type 必须是 daily | weekly | monthly"
+    if cadence_type == "weekly":
+        if weekday is None or not (0 <= int(weekday) < 7):
+            return "weekly 需要 weekday 0-6（Python weekday: 周一0...周日6）"
+    if cadence_type == "monthly":
+        if day is None or not (1 <= int(day) <= 31):
+            return "monthly 需要 day 1-31"
+    return None
+
+
 def add_plan(name: str, cadence_type: str, time_: str, steps: list[str],
              weekday: int | None = None, day: int | None = None) -> str:
     name = str(name or "").strip()
     if not name or not steps or not str(steps[0]).strip():
         return "需要：name（计划名）、time（HH:MM）、steps（至少一步做什么）"
-    t = str(time_ or "").strip()
-    if len(t) != 5 or t[2] != ":":
-        return "time 需为 HH:MM（如 09:30）"
-    cd = {"type": str(cadence_type or "daily")[:10], "time": t}
-    if cd["type"] not in ("daily", "weekly", "monthly"):
-        cd["type"] = "daily"
+    err = _validate(time_, cadence_type, weekday, day)
+    if err:
+        return err
+    cd = {"type": str(cadence_type or "daily")[:10], "time": str(time_).strip()}
     if cd["type"] == "weekly":
-        cd["weekday"] = int(weekday or 0) % 7
+        cd["weekday"] = int(weekday) % 7
     if cd["type"] == "monthly":
-        cd["day"] = max(1, min(31, int(day or 1)))
+        cd["day"] = max(1, min(31, int(day)))
     plans = _load()
     iid = "plan_" + str(int(time.time() * 1000))
     plans.append({"id": iid, "name": name, "cadence": cd,
                   "steps": [str(s).strip()[:300] for s in steps if str(s).strip()][:6],
                   "enabled": True, "last_run": "", "created": time.time()})
     _save(plans)
-    return f"已加入计划表：{name}（{cd['type']} {t}）→ docs/元亨的计划表.md"
+    return f"已加入计划表：{name}（{cd['type']} {cd['time']}）→ docs/元亨的计划表.md"
+
+
+def get_plan(plan_id: str) -> str:
+    plans = _load()
+    for p in plans:
+        if p.get("id") == str(plan_id).strip():
+            _write_mirror([p])
+            return json.dumps({"plan": p}, ensure_ascii=False, indent=1)
+    return f"未找到计划：{plan_id}"
+
+
+def update_plan(plan_id: str, fields: dict) -> str:
+    """Mutable fields: name, cadence_type, time, steps(list), weekday, day, enabled.
+    Performs full schema validation on the result."""
+    plans = _load()
+    for p in plans:
+        if p.get("id") == str(plan_id).strip():
+            f = fields or {}
+            if "name" in f:
+                p["name"] = str(f["name"]).strip()[:80]
+            if "enabled" in f:
+                p["enabled"] = bool(f["enabled"])
+            if "steps" in f and isinstance(f["steps"], list):
+                p["steps"] = [str(s).strip()[:300] for s in f["steps"] if str(s).strip()][:6]
+            ct = f.get("cadence_type")
+            tm = f.get("time")
+            if ct is not None or tm is not None:
+                cd = dict(p.get("cadence") or {})
+                if ct is not None:
+                    cd["type"] = str(ct)[:10]
+                if tm is not None:
+                    cd["time"] = str(tm).strip()
+                if "weekday" in f and cd.get("type") == "weekly":
+                    cd["weekday"] = int(f["weekday"]) % 7
+                if "day" in f and cd.get("type") == "monthly":
+                    cd["day"] = max(1, min(31, int(f["day"])))
+                p["cadence"] = cd
+            # full schema validation
+            err = _validate(p["cadence"].get("time", ""),
+                            p["cadence"].get("type", "daily"),
+                            p["cadence"].get("weekday") if p["cadence"].get("type") == "weekly" else None,
+                            p["cadence"].get("day") if p["cadence"].get("type") == "monthly" else None)
+            if err:
+                # revert changes not needed (validation post-edit); report error and
+                # keep the plan at its new (invalid) state? Better: refuse and don't save.
+                return f"更新校验失败：{err}（未保存）"
+            _save(plans)
+            return f"已更新计划：{p.get('name')}"
+    return f"未找到计划：{plan_id}"
 
 
 def delete_plan(plan_id: str) -> str:

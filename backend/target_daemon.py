@@ -479,6 +479,27 @@ class _Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:160]}"})
             return
+        if self.path == "/tool/schedule":
+            from backend.target_scheduler_tools import schedule_handle
+            try:
+                pl = payload if isinstance(payload, dict) else {}
+                method = str(pl.get("method") or pl.get("action") or "list")
+                kw = dict(
+                    name=pl.get("name", ""),
+                    time_=pl.get("time") or pl.get("time_", ""),
+                    cadence=pl.get("cadence", "daily"),
+                    steps=pl.get("steps", ""),
+                    plan_id=pl.get("plan_id", ""),
+                    weekday=pl.get("weekday", ""),
+                    day=pl.get("day", ""),
+                    enabled=pl.get("enabled", ""),
+                    fields_json=pl.get("fields_json", ""),
+                )
+                out = schedule_handle(method, **kw)
+                self._send(200, {"ok": True, "output": out})
+            except Exception as exc:
+                self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:160]}"})
+            return
         if self.path in ("/v1/chat/completions", "/chat/completions"):
             if payload.get("stream"):
                 self._handle_stream_chat(payload)

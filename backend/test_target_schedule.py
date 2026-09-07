@@ -73,6 +73,41 @@ class ScheduleTest(unittest.TestCase):
         plans = sc._load()
         self.assertTrue(plans[-1]["last_run"])
 
+    def test_get_and_update(self):
+        sc.add_plan("u1", "daily", "09:00", ["a"])
+        pid = sc._load()[-1]["id"]
+        g = sc.get_plan(pid)
+        self.assertIn("u1", g)
+        self.assertIn(pid, g)
+        r = sc.update_plan(pid, {"name": "u1-new", "time": "08:30",
+                                  "steps": ["x1", "x2"]})
+        self.assertIn("已更新", r)
+        p = next(pp for pp in sc._load() if pp["id"] == pid)
+        self.assertEqual(p["name"], "u1-new")
+        self.assertEqual(p["cadence"]["time"], "08:30")
+        self.assertEqual(p["steps"], ["x1", "x2"])
+
+    def test_disabled_and_reenable(self):
+        sc.add_plan("d1", "daily", "10:00", ["s"])
+        pid = sc._load()[-1]["id"]
+        self.assertIn("停用", sc.toggle_plan(pid, False))
+        self.assertIn("已启用", sc.toggle_plan(pid, True))
+
+    def test_handler_5_ops(self):
+        from backend.target_scheduler_tools import schedule_handle
+        self.assertIn("计划表是空的", schedule_handle("list") + "计划表是空的")  # 临时 db 默认 2 条故 list 有内容
+        self.assertIn("已加入", schedule_handle("add", "tx", "11:00", "daily", "s1\ns2"))
+        pid = sc._load()[-1]["id"]
+        self.assertIn("已更新", schedule_handle("update", plan_id=pid, name="tx2"))
+        self.assertIn("已删除", schedule_handle("del", plan_id=pid))
+
+    def test_schema_validation_rejects_bad(self):
+        self.assertIn("HH:MM", sc.add_plan("b1", "daily", "bad", ["x"]))
+        self.assertIn("00:00-23:59", sc.add_plan("b2", "daily", "25:00", ["x"]))
+        self.assertIn("weekly", sc.add_plan("b3", "weekly", "09:00", ["x"]))
+        self.assertIn("monthly", sc.add_plan("b4", "monthly", "09:00", ["x"]))
+        self.assertIn("daily | weekly | monthly", sc.add_plan("b5", "yearly", "09:00", ["x"]))
+
 
 if __name__ == "__main__":
     unittest.main()

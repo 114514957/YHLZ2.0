@@ -482,14 +482,16 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="schedule.plan",
-            description="管理你自己的周期计划表（每日/每周/每月例行，如'每周末知识整合'）：action=list 查看；add=新建（name+time 如 09:30+cadence daily|weekly|monthly+weekday/day+steps 步骤）；del=删除（plan_id）。计划到点会提醒你自主执行。",
+            description="元亨的周期计划表（你/我/元亨都能 CRUD）：action=list|get|add|update|del|on|off。add=name+time 如 09:30+cadence daily|weekly|monthly+weekday(0-6)/day(1-31)+steps 步骤文本(多行)。update=plan_id+至少一个字段(name/time/cadence_type/weekday/day/enabled/steps/fields_json=JSON)。",
             handler=lambda p: schedule_handle(
                 str(p.get("action", "list")), str(p.get("name", "")),
                 str(p.get("time", "")), str(p.get("cadence", "daily")),
                 str(p.get("steps", "")), str(p.get("plan_id", "")),
-                str(p.get("weekday", "")), str(p.get("day", ""))),
+                str(p.get("weekday", "")), str(p.get("day", "")),
+                str(p.get("enabled", "")), str(p.get("fields_json", ""))),
             input=("action",),
-            optional_input=("name", "time", "cadence", "steps", "plan_id", "weekday", "day"),
+            optional_input=("name", "time", "cadence", "steps", "plan_id",
+                             "weekday", "day", "enabled", "fields_json"),
             requires=(SCHEDULER_POLICY,),
             side_effect=True,
             risk="low",
@@ -714,26 +716,60 @@ def approve_act(index: int, ok: bool) -> str:
 
 def schedule_handle(action: str, name: str = "", time_: str = "",
                     cadence: str = "daily", steps: str = "", plan_id: str = "",
-                    weekday: str = "", day: str = "") -> str:
-    """schedule.plan dispatcher (ledger 0209)."""
+                    weekday: str = "", day: str = "", enabled: str = "",
+                    fields_json: str = "") -> str:
+    """Unified schedule tool dispatcher (ledger 0209+0210). actions:
+    list | show | add | update | del | on | off
+
+    Accepts `time_` or `time` key (HTTP/CLI compat)."""
+    import json as _json
+
     from backend.target_schedule import (
-        add_plan, delete_plan, list_plans, toggle_plan)
+        add_plan, delete_plan, get_plan, list_plans, toggle_plan, update_plan,
+    )
 
     a = str(action or "list").strip().lower()
-    if a in ("list", "show", ""):
+    if a in ("list", "show_all", ""):
         return list_plans()
+    if a in ("get", "show"):
+        return get_plan(plan_id) if plan_id else "需要 plan_id"
+    if a in ("add", "new", "create"):
+        step_lines = [s.strip() for s in str(steps).splitlines() if s.strip()]
+        # accept both "time" and "time_" keys (HTTP/CLI compat)
+        time_val = time_ or ""
+        if not time_val:
+            # last-chance: also try via fields_json
+            pass
+        return add_plan(name, cadence, time_val, step_lines,
+                        weekday=int(weekday) if str(weekday).isdigit() else None,
+                        day=int(day) if str(day).isdigit() else None)
+    if a in ("update", "edit", "modify"):
+        f = {}
+        if name: f["name"] = name
+        if time_: f["time"] = time_
+        elif not f.get("time"): pass  # caller may pass 'time' in fields_json
+        if cadence: f["cadence_type"] = cadence
+        if weekday and str(weekday).isdigit(): f["weekday"] = int(weekday)
+        if day and str(day).isdigit(): f["day"] = int(day)
+        if enabled in ("true", "false", "1", "0"):
+            f["enabled"] = enabled in ("true", "1")
+        if steps:
+            f["steps"] = [s.strip() for s in steps.splitlines() if s.strip()]
+        if fields_json:
+            try:
+                f.update(_json.loads(fields_json))
+            except Exception:
+                return "fields_json 不是合法 JSON"
+        if not f:
+            return "更新需要至少一个字段（name/time/cadence_type/weekday/day/enabled/steps/fields_json）"
+        return update_plan(plan_id, f)
     if a in ("del", "delete", "rm"):
         return delete_plan(plan_id)
     if a in ("on", "enable"):
         return toggle_plan(plan_id, True)
     if a in ("off", "disable"):
         return toggle_plan(plan_id, False)
-    if a in ("add", "new"):
-        step_lines = [s.strip() for s in str(steps).splitlines() if s.strip()]
-        return add_plan(name, cadence, time_, step_lines,
-                        weekday=int(weekday) if str(weekday).isdigit() else None,
-                        day=int(day) if str(day).isdigit() else None)
-    return f"未知动作 {a}：list / add / del / on / off"
+    return f"未知动作 {a}：list | get | add | update | del | on | off"
 
 
 def approve_handle(action: str, index: int = 0) -> str:
