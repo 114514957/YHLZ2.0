@@ -76,13 +76,12 @@ class ConversationSession:
         bind_memory_save_service(self.registry, self.memory)
         from backend.target_orchestrator import build_openai_compatible_llm_turn
         from backend.env_loader import ensure_env_loaded
-        import os as _os
         from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
 
         ensure_env_loaded()
         self.llm_turn = llm_turn or build_openai_compatible_llm_turn(
-            api_key=_os.getenv("DEEPSEEK_API_KEY", ""),
-            model="deepseek-chat",
+            base_url="http://127.0.0.1:8081/v1/chat/completions",
+            api_key="", model="gemma-4-e4b",
             temperature=0.2, max_tokens=800,
             fallback_base_url=LOCAL_BASE,
             fallback_model=LOCAL_MODEL,

@@ -323,9 +323,9 @@ class DaemonRuntime:
                 print(f"[memory-upkeep] skip: {type(exc).__name__}", flush=True)
 
     def stream_chat(self, payload: dict, sink) -> str:
-        """Dual-rail streaming chat (ledger 0204): cloud DeepSeek first, local
-        Ollama fallback. Emits OpenAI-style SSE frames via `sink(text_chunk,
-        reasoning_chunk=None)`; returns model actually used."""
+        """Dual-rail streaming chat (ledger 0204 + 0212): local Gemma first
+        (llama.cpp 8081), Ollama Qwen fallback. Emits OpenAI-style SSE frames
+        via `sink(text_chunk, reasoning_chunk=None)`; returns model used."""
         from backend.env_loader import ensure_env_loaded
 
         messages = payload.get("messages") or []
@@ -353,13 +353,13 @@ class DaemonRuntime:
             )
 
         async def _try_cloud():
-            await _stream_to("https://api.deepseek.com/v1/chat/completions",
-                             key, "deepseek-chat")
+            await _stream_to("http://127.0.0.1:8081/v1/chat/completions",
+                              key, "gemma-4-e4b")
 
         try:
             fut = asyncio.run_coroutine_threadsafe(_try_cloud(), self._loop)
             fut.result(timeout=300)
-            return "deepseek-chat"
+            return "gemma-4-e4b"
         except Exception:
             async def _try_local():
                 await _stream_to(LOCAL_BASE, "", LOCAL_MODEL)
