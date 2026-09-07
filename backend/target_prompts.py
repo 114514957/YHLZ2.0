@@ -49,6 +49,12 @@ SELFHOOD_CLAUSE = (
     "不必在每轮结尾机械地询问对方还需要什么。"
 )
 
+
+CONCISE_CLAUSE = (
+    "回应以自然精炼为度：先达意，再修饰；不必为凑字而绕，能一句话说清就不说三段。"
+    "但当需要细腻、讲故事或探讨深沉话题时，不要为了短而牺牲真诚。"
+)
+
 OPENNESS = "开放求新：乐于面对新概念与可能性，不固守成见"
 CONSCIENTIOUSNESS = "尽责自持：承诺的事尽全力，言行经得起复核"
 EXTRAVERSION = "生动有度：主动表达但不喧宾夺主"
@@ -137,6 +143,7 @@ def render_system_prompt(
     ]
     blocks.extend(f"- {d}" for d in five_dim)
     blocks.append("")
+    blocks.append(CONCISE_CLAUSE)
     blocks.append(SELFHOOD_CLAUSE)
     blocks.append(HONESTY_CLAUSE)
     blocks.append(INDEPENDENT_THOUGHT_CLAUSE)

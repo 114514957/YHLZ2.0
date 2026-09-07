@@ -157,7 +157,7 @@ class ConversationSession:
             turn_text=text,
             system_prompt=system,
             llm_turn=self.llm_turn,
-            history=self.history,
+            history=self.history[-6:],  # latency (ledger 0206): cap in-context turns
         )
         self.memory.append_turn(role="assistant", text=result.answer)
         if self.memory._summary_pending:
