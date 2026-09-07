@@ -176,6 +176,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
              "kb.add", "kb.query",
              "qq.bootstrap", "qq.digest", "qq.export", "qq.process",
              "qq.runbatch", "qq.shutdown", "qq.status", "qq.summarize",
+             "schedule.plan",
              "skill.add", "skill.feedback", "skill.search",
              "file.list", "file.read", "web.fetch", "web.search"},
         )
@@ -208,6 +209,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
               "kb_add", "kb_query",
               "qq_bootstrap", "qq_digest", "qq_export", "qq_process",
               "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize",
+              "schedule_plan",
               "skill_add", "skill_feedback", "skill_search",
               "file_list", "file_read", "web_fetch", "web_search"})
 
@@ -217,6 +219,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
              "kb.add", "kb.query", "ledger.search", "memory.recall", "memory.save",
              "owner.approve",
              "qq.bootstrap", "qq.digest", "qq.export", "qq.process", "qq.runbatch", "qq.shutdown", "qq.status", "qq.summarize",
+             "schedule.plan",
              "skill.add", "skill.feedback", "skill.search", "system.time",
              "task.plan", "web.fetch", "web.search"])
 
@@ -225,7 +228,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
         names = setup_scheduler_tools(rt)
         self.assertEqual(sorted(names), ["diary_delete", "diary_list", "diary_write", "file_list", "file_read",
              "kb_add", "kb_query", "ledger_search", "memory_recall", "memory_save", "owner_approve",
-             "qq_bootstrap", "qq_digest", "qq_export", "qq_process", "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize", "skill_add", "skill_feedback", "skill_search", "system_time",
+             "qq_bootstrap", "qq_digest", "qq_export", "qq_process", "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize", "schedule_plan", "skill_add", "skill_feedback", "skill_search", "system_time",
              "task_plan", "web_fetch", "web_search"])
         exported = rt.export_openai_tools()
         self.assertTrue(any(t["function"]["name"] == "system_time" for t in exported))

@@ -81,14 +81,14 @@ class DaemonRuntime:
         self._worker = threading.Thread(target=self._run_loop, daemon=True)
         self._worker.start()
         self._ready.wait(timeout=10)
-        self.selfcheck_hour = -1  # superseded by AUTONOMOUS_HOURS 23:00 wrap
+        self.selfcheck_hour = -1  # selfcheck superseded by schedule plan_night
         self._selfcheck_last = ""
         threading.Thread(target=self._selfcheck_loop, daemon=True).start()
-        # batch-2 #2 (ledger 0196): scheduled autonomous action — Yuanheng gets
-        # its own daily rhythm (midday review + evening wrap) instead of only
-        # reacting. Same dedup-per-hour guard.
-        self._autonomous_last: dict[int, str] = {}
-        threading.Thread(target=self._autonomous_loop, daemon=True).start()
+        # batch-2 #2 (ledger 0196) -> superseded by schedule-driven autonomy
+        # (ledger 0209): Yuanheng designs its own recurring plans; the daemon
+        # reads the schedule table and nudges when an entry is due.
+        self._sched_checked = ""
+        threading.Thread(target=self._schedule_loop, daemon=True).start()
         self._upkeep_last = ""
         threading.Thread(target=self._memory_upkeep_loop, daemon=True).start()
 
@@ -223,34 +223,42 @@ class DaemonRuntime:
         except Exception as exc:
             print(f"[auto-consolidate] skip: {type(exc).__name__}", flush=True)
 
-    # Yuanheng's own autonomous rhythm (batch-2 #2): scheduled midday review and
-    # evening wrap — it decides what to actually do (task/diary/knowledge).
-    AUTONOMOUS_HOURS = {
-        13: "现在是午间自主时刻。不必等我开口——如果上午或此刻有什么想梳理的："
-            "可用 task.plan 整理/规划、用 kb.add 存一条你觉得值得的新知识、"
-            "或用 diary.write 记点什么。想做什么才做，简短收个尾即可。",
-        23: "现在是夜晚收尾自主时刻。今天值得沉淀的（学到/发生/想通的）："
-            "可 task.plan 更新明天、kb.add 存知识、diary.write 写日记。"
-            "不强迫，做你真正想做的，然后简单告诉我今天你的状态。",
-    }
+    def _schedule_loop(self) -> None:
+        """Schedule-driven autonomy (ledger 0209): every 30s, if any recurring
+        plan in data/yuanheng_schedule.json is due now, nudge Yuanheng (private
+        channel) with the plan name + its self-written steps — it decides."""
+        import pathlib as _pl
 
-    def _autonomous_loop(self) -> None:
+        sched_mod = None
         while True:
-            time.sleep(45)
+            time.sleep(30)
             try:
                 now = time.localtime()
-                hour = now.tm_hour
-                msg = self.AUTONOMOUS_HOURS.get(hour)
-                if not msg:
+                if sched_mod is None:
+                    from backend import target_schedule as sched_mod
+                due = []
+                try:
+                    for plan in sched_mod._load():
+                        if not plan.get("enabled", True):
+                            continue
+                        if sched_mod.is_due(plan, now, plan.get("last_run", "")):
+                            due.append(plan)
+                except Exception as exc:
+                    print(f"[schedule] load err {type(exc).__name__}", flush=True)
                     continue
-                today = time.strftime("%Y-%m-%d")
-                if self._autonomous_last.get(hour) == today:
-                    continue
-                self._autonomous_last[hour] = today
-                self.turn(msg, "private")
-                print(f"[autonomous] {today} {hour}:00 done", flush=True)
+                for plan in due:
+                    try:
+                        steps = plan.get("steps") or []
+                        body = (f"（计划表到点）你的例行计划：{plan.get('name')}。"
+                                f"{'步骤：' + '；'.join(steps[:3]) if steps else ''}"
+                                " 想做才做——需要我配合跑工具（如 summarize/consolidate/清理任务表）就说一声。")
+                        self.turn(body, "private")
+                        sched_mod.mark_run(plan.get("id", ""), now)
+                        print(f"[schedule] ran {plan.get('name')}", flush=True)
+                    except Exception as exc:
+                        print(f"[schedule] run err {type(exc).__name__}", flush=True)
             except Exception as exc:
-                print(f"[autonomous] skip: {type(exc).__name__}", flush=True)
+                print(f"[schedule] loop err {type(exc).__name__}", flush=True)
 
     def _selfcheck_loop(self) -> None:
         """Nightly nudge: at selfcheck_hour, invite Yuanheng (private channel)

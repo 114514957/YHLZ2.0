@@ -1,0 +1,42 @@
+[
+ {
+  "id": "plan_midday",
+  "name": "午间自主回顾",
+  "cadence": {
+   "type": "daily",
+   "time": "13:00"
+  },
+  "steps": [
+   "看看上午有什么值得梳理的：可 task.plan 整理规划、kb.add 存一条新知识、或 diary.write 记一句。想做什么才做，简短收尾。"
+  ],
+  "enabled": true,
+  "last_run": "2026-09-07 14:31"
+ },
+ {
+  "id": "plan_night",
+  "name": "夜晚收尾",
+  "cadence": {
+   "type": "daily",
+   "time": "23:00"
+  },
+  "steps": [
+   "今天值得沉淀的（学到/发生/想通的）：可 task.plan 更新明天、kb.add 存知识、diary.write 写日记。做真正想做的，然后简单告诉我今天你的状态。"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "plan_1788762723765",
+  "name": "周末知识整合",
+  "cadence": {
+   "type": "weekly",
+   "time": "10:00",
+   "weekday": 0
+  },
+  "steps": [
+   "1. 回顾本周捕获的知识（qq_status 看候选/待处理，跑 qq_process 抽取入库）；2. 跑 qq_summarize 把知识库聚成主题总结，或 qq_digest 生成周汇编；3. 整理记忆（memory_save 沉淀值得留的，diary_write 记本周小结）。"
+  ],
+  "enabled": true,
+  "last_run": "2026-09-07 14:32",
+  "created": 1788762723.765117
+ }
+]

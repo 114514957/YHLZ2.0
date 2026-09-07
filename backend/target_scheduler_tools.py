@@ -481,6 +481,20 @@ def scheduler_capabilities() -> list[Capability]:
             verify=_verify_nonempty,
         ),
         Capability(
+            name="schedule.plan",
+            description="管理你自己的周期计划表（每日/每周/每月例行，如'每周末知识整合'）：action=list 查看；add=新建（name+time 如 09:30+cadence daily|weekly|monthly+weekday/day+steps 步骤）；del=删除（plan_id）。计划到点会提醒你自主执行。",
+            handler=lambda p: schedule_handle(
+                str(p.get("action", "list")), str(p.get("name", "")),
+                str(p.get("time", "")), str(p.get("cadence", "daily")),
+                str(p.get("steps", "")), str(p.get("plan_id", "")),
+                str(p.get("weekday", "")), str(p.get("day", ""))),
+            input=("action",),
+            optional_input=("name", "time", "cadence", "steps", "plan_id", "weekday", "day"),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="low",
+        ),
+        Capability(
             name="skill.search",
             description="检索技能库：输入你想做的事或场景（如：导出QQ群历史），返回可用的技能及其要点。做复杂多步操作前先用它找现成流程。",
             handler=lambda p: skill_search(str(p.get("query", "")),
@@ -696,6 +710,30 @@ def approve_act(index: int, ok: bool) -> str:
             return "已拒绝该技能申请"
     return "索引无效：请先用 approve(list) 查看当前待审批项"
 
+
+
+def schedule_handle(action: str, name: str = "", time_: str = "",
+                    cadence: str = "daily", steps: str = "", plan_id: str = "",
+                    weekday: str = "", day: str = "") -> str:
+    """schedule.plan dispatcher (ledger 0209)."""
+    from backend.target_schedule import (
+        add_plan, delete_plan, list_plans, toggle_plan)
+
+    a = str(action or "list").strip().lower()
+    if a in ("list", "show", ""):
+        return list_plans()
+    if a in ("del", "delete", "rm"):
+        return delete_plan(plan_id)
+    if a in ("on", "enable"):
+        return toggle_plan(plan_id, True)
+    if a in ("off", "disable"):
+        return toggle_plan(plan_id, False)
+    if a in ("add", "new"):
+        step_lines = [s.strip() for s in str(steps).splitlines() if s.strip()]
+        return add_plan(name, cadence, time_, step_lines,
+                        weekday=int(weekday) if str(weekday).isdigit() else None,
+                        day=int(day) if str(day).isdigit() else None)
+    return f"未知动作 {a}：list / add / del / on / off"
 
 
 def approve_handle(action: str, index: int = 0) -> str:
