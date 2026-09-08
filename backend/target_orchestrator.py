@@ -174,6 +174,7 @@ class TurnOrchestrator:
         system_prompt: str,
         llm_turn: LLMTurn,
         history: Optional[list[dict[str, Any]]] = None,
+        with_tools: bool = True,
     ) -> TurnResult:
         started = time.perf_counter()
         messages: list[dict[str, Any]] = [
@@ -181,7 +182,10 @@ class TurnOrchestrator:
             *(history or [])[-6:],
             {"role": "user", "content": str(turn_text)},
         ]
-        tools = self._export_tools()
+        # with_tools=False (casual chat): no tool schema at all — keeps the
+        # model in persona voice (ledger 0215: 27-tool schema nudges Gemma
+        # into "assistant executing tasks" framing, killing persona).
+        tools = self._export_tools() if with_tools else []
         tool_uses: list[ToolUse] = []
         answer = ""
         iterations = 0
