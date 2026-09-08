@@ -49,15 +49,49 @@ class MemoryLLMService:
             chunks.append(str(delta or ""))
         return "".join(chunks)
 
-    async def compress(self, dropped: list[dict[str, str]]) -> tuple[str, int]:
+    async def _chat_msgs(self, provider: Any, messages: list[dict],
+                         max_tokens: int = 256) -> str:
+        chunks: list[str] = []
+        async for delta in provider.stream_chat(
+            messages, max_tokens=max_tokens
+        ):
+            chunks.append(str(delta or ""))
+        return "".join(chunks)
+
+    _L1_SUM_SYSTEM = (
+        "你是记忆压缩助手。User 消息里是若干条早前对话（每行 role: 内容）。"
+        "请把它压成一段不超过100字的中文摘要：保留核心实体、达成的结论、待办，"
+        "末尾带一句情绪/关系走向。直接输出摘要正文——禁止任何前缀"
+        "（如『摘要：』『以下是压缩结果』），禁止复述本要求。"
+    )
+
+    @staticmethod
+    def _strip_prefix(text: str) -> str:
+        import re
+
+        t = str(text or "").strip()
+        t = re.sub(r"^[\s>]*", "", t)
+        for bad in ("摘要：", "摘要:", "总结：", "总结:", "以下是", "压缩结果",
+                    "这段对话", "对话摘要", "本段"):
+            if t.startswith(bad):
+                t = t[len(bad):].strip()
+        return t
+
+    async def compress(self, dropped: list[dict[str, str]],
+                       prev: str = "") -> tuple[str, int]:
         payload = "\n".join(f"{t['role']}: {t['text'][:800]}" for t in dropped)
+        user = (f"上一段摘要（接续用，别重复）：{prev}\n\n" if prev else "") + payload
+        msgs = [{"role": "system", "content": self._L1_SUM_SYSTEM},
+                {"role": "user", "content": user}]
         try:
-            text = await self._chat(self.local, _COMPRESS_PROMPT + payload, max_tokens=200)
-            if not text.strip():
-                text = await self._chat(self.hybrid, _COMPRESS_PROMPT + payload, max_tokens=200)
+            text = self._strip_prefix(
+                await self._chat_msgs(self.local, msgs, max_tokens=220))
+            if not text.strip() and self.hybrid is not None:
+                text = self._strip_prefix(
+                    await self._chat_msgs(self.hybrid, msgs, max_tokens=220))
         except Exception:
             text = ""
-        return text.strip(), int(time.time())
+        return (text.strip()[:300] if text.strip() else prev), int(time.time())
 
     async def candidates(self, context: dict) -> list[dict]:
         """Local screening first; cloud fallback only if local fails."""

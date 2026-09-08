@@ -37,33 +37,46 @@ def voice_dialog_once(
     duration_s: float = 12.0,
     print_text: bool = False,
     cap_gain: float = 6.0,
+    engine: str = "sherpa",
 ) -> dict:
     """Run one voice turn: listen until speech+silence, transcribe, answer via
-    the ConversationSession (real LLM), speak the answer on the speaker."""
+    the ConversationSession (real LLM), speak the answer on the speaker.
+
+    engine: 'sherpa' (default, ~2 s load, streaming zipformer) or 'funasr'
+    (paraformer, ~70 s load — keep as fallback)."""
     import numpy as np
     import sounddevice as sd
 
-    from backend.target_funasr_asr import FunasrASRConfig, FunasrOnlineASRProvider
     from backend.target_memory import TargetMemoryService
     from backend.target_scheduler_tools import setup_scheduler_capabilities
     from backend.target_entry import ConversationSession
     from backend.target_vad import TargetVADProvider
     from backend.target_chain import CancellationSignal
     from backend.streaming_asr_bridge import ASRStreamUpdateKind
+    from backend.voice_frontend import VoiceFrontend
 
-    model_dir = _PROJECT_ROOT / "models" / "voice" / "asr" / "paraformer-zh-streaming"
+    if str(engine).lower() in ("funasr", "paraformer"):
+        from backend.target_funasr_asr import FunasrASRConfig, FunasrOnlineASRProvider
+
+        model_dir = _PROJECT_ROOT / "models" / "voice" / "asr" / "paraformer-zh-streaming"
+        asr = FunasrOnlineASRProvider(FunasrASRConfig(model_dir=model_dir))
+    else:
+        from backend.target_sherpa_asr import SherpaOnlineASRConfig, SherpaOnlineASRProvider
+
+        asr = SherpaOnlineASRProvider(SherpaOnlineASRConfig())
+
     vad = TargetVADProvider()
-    asr = FunasrOnlineASRProvider(FunasrASRConfig(model_dir=model_dir))
     vad.start()
     asr.start()
     if print_text:
         print("[ready] 模型已加载，请现在说话…", flush=True)
 
     stream = sd.InputStream(device=1, samplerate=capture_rate, channels=1,
-                            dtype="float32", blocksize=1600)
+                            dtype="float32", blocksize=1600, latency="low")
     stream.start()
     sig = CancellationSignal()
     asr.open_stream("dlg", 1, capture_rate, 1, sig)
+    frontend = VoiceFrontend(sample_rate=capture_rate)
     total = int(duration_s * 10)
     t0 = time.time()
     accum = ""
@@ -74,10 +87,12 @@ def voice_dialog_once(
             break
         data, _ = stream.read(1600)
         mono = np.asarray(data[:, 0] if data.ndim > 1 else data, dtype="float32")
+        enhanced, is_speech = frontend.process(mono)
         if float(cap_gain) != 1.0:
-            mono = np.clip(mono * float(cap_gain), -1.0, 1.0).astype("float32")
-        speech = bool(vad.detect_speech(mono, capture_rate))
-        for upd in asr.push_audio("dlg", mono, capture_rate, sig):
+            # legacy override: manual gain still honoured as an extra boost
+            enhanced = np.clip(enhanced * float(cap_gain), -1.0, 1.0).astype("float32")
+        speech = bool(vad.detect_speech(enhanced, capture_rate)) or is_speech
+        for upd in asr.push_audio("dlg", enhanced, capture_rate, sig):
             if upd.text and len(upd.text) > len(accum):
                 accum = upd.text
                 last_grow = time.time()
@@ -135,9 +150,17 @@ def voice_dialog_once(
 
 
 def main() -> int:
+    import argparse
     import json
 
-    r = voice_dialog_once(print_text=True)
+    ap = argparse.ArgumentParser(description="one voice dialog turn")
+    ap.add_argument("--engine", default="sherpa",
+                    choices=["sherpa", "funasr"])
+    ap.add_argument("--cap-gain", type=float, default=1.0)
+    ap.add_argument("--duration-s", type=float, default=12.0)
+    a = ap.parse_args()
+    r = voice_dialog_once(engine=a.engine, cap_gain=a.cap_gain,
+                          duration_s=a.duration_s, print_text=True)
     print(json.dumps(r, ensure_ascii=False)[:600])
     return 0 if r["status"] == "answered" else 1
 

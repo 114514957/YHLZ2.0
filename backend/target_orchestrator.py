@@ -175,10 +175,16 @@ class TurnOrchestrator:
         llm_turn: LLMTurn,
         history: Optional[list[dict[str, Any]]] = None,
         with_tools: bool = True,
+        early_context: str = "",
     ) -> TurnResult:
         started = time.perf_counter()
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
+        ]
+        if early_context:
+            messages.append({"role": "system",
+                             "content": str(early_context)[:1500]})
+        messages += [
             *(history or [])[-6:],
             {"role": "user", "content": str(turn_text)},
         ]

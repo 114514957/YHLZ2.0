@@ -70,7 +70,24 @@ class ConversationSession:
         channel: str = "private",
     ) -> None:
         self.memory = memory or TargetMemoryService()
+        if memory is None:
+            # Wire the L1 rolling-summary / adjudication hooks (ledger 0217):
+            # they were never connected in production, so long-conversation
+            # early turns were silently dropped instead of being compressed.
+            try:
+                from backend.llm_vllm_provider import LlmVllmProvider
+                from backend.target_memory_llm import MemoryLLMService
+
+                _q = LlmVllmProvider(
+                    base_url="http://127.0.0.1:11434",
+                    model="qwen2.5:3b",
+                )
+                self.memory.set_llm_hooks(MemoryLLMService(_q, local=_q),
+                                          MemoryLLMService(_q, local=_q))
+            except Exception:
+                pass
         self.channel = str(channel or "private")
+        self._ctx_recent: dict[str, float] = {}  # de-dup of auto-recalled memories
         self.style_inject = False  # style persona injection (off until A/B accepted)
         self.registry = registry if registry is not None else setup_scheduler_capabilities()
         bind_memory_save_service(self.registry, self.memory)
@@ -217,12 +234,32 @@ class ConversationSession:
                 on_delta=on_delta,
                 reasoning_effort="none",
             )
+        ctx_lines = []
+        try:
+            sl = self.memory.summary_line()
+            if sl:
+                ctx_lines.append(sl)
+            if not work:
+                import time as _t
+
+                for hit in self.memory.contextual_recall(text, limit=1):
+                    hid = str(hit.get("id", ""))
+                    now = _t.time()
+                    if now - self._ctx_recent.get(hid, 0.0) < 30.0:
+                        continue
+                    self._ctx_recent[hid] = now
+                    ctx_lines.append(
+                        "[此刻自然想起] 你以前提过：" +
+                        str(hit.get("summary", ""))[:150])
+        except Exception:
+            pass
         result = await self.orchestrator.run(
             turn_text=text,
             system_prompt=system,
             llm_turn=llm_turn,
             history=self.history[-6:],  # latency (ledger 0206): cap in-context turns
             with_tools=work,
+            early_context="\n".join(ctx_lines),
         )
         self.memory.append_turn(role="assistant", text=result.answer)
         if self.memory._summary_pending:
@@ -287,15 +324,26 @@ class ConversationSession:
         return {"insights": n, "reason": "ok"}
 
     # ---------- persistence (message-level, cache/sessions) ----------
+    def _session_title(self) -> str:
+        for m in self.history:
+            if m.get("role") == "user":
+                return str(m.get("content", "")).strip().replace("\n", " ")[:40]
+        return "(空会话)"
+
     def save_session(self, name: str = "default") -> Path:
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         path = SESSIONS_DIR / f"{name}.json"
         data = {
             "saved_at": time.time(),
+            "title": self._session_title(),
+            "turns": len(self.history) // 2,
             "history": self.history[-self.history_limit:],
         }
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=1),
-                        encoding="utf-8")
+        # atomic write: never leave a half-written session file
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1),
+                       encoding="utf-8")
+        tmp.replace(path)
         return path
 
     @classmethod
@@ -303,6 +351,25 @@ class ConversationSession:
         if not SESSIONS_DIR.exists():
             return []
         return sorted(p.stem for p in SESSIONS_DIR.glob("*.json"))
+
+    @classmethod
+    def recent_sessions(cls, limit: int = 8) -> list[dict]:
+        """Session archive metadata, newest first: [{name,title,turns,saved_at}]."""
+        if not SESSIONS_DIR.exists():
+            return []
+        out = []
+        for p in SESSIONS_DIR.glob("*.json"):
+            try:
+                d = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            out.append({
+                "name": p.stem,
+                "title": str(d.get("title") or "(未命名)")[:40],
+                "turns": int(d.get("turns", len(d.get("history", [])) // 2)),
+                "saved_at": float(d.get("saved_at", 0)),
+            })
+        return sorted(out, key=lambda x: x["saved_at"], reverse=True)[:limit]
 
     def load_session(self, name: str = "default") -> int:
         path = SESSIONS_DIR / f"{name}.json"
@@ -355,13 +422,17 @@ class ConversationSession:
 
 
 BANNER = """元亨 · 数字生命对话入口 (target-entry v1, ledger 0160)
-可用命令: /help /status /think /exit
+可用命令: /help /status /new /think /exit
 提示: 问项目历史/决策请让我查台账；要保存偏好会征求你同意。"""
 
 _HELP = """命令列表:
   /help            本帮助
   /status          会话与记忆状态
   /think           自主回顾（我主动整理记忆）
+  /save [name]     存档当前会话（默认 default）
+  /load [name]     恢复某个会话
+  /sessions        列出会话档案（最近优先）
+  /new             开始新会话（当前会自动先存档）
   /exit            退出
 直接输入即对话。写类操作（保存记忆）会先征求你 y/n 同意。"""
 
@@ -398,7 +469,14 @@ def cli_main() -> int:
     except Exception:
         pass
     session = ConversationSession(approver=_cli_approver_factory())
+    _resumed = 0
+    try:
+        _resumed = session.load_session("default")
+    except Exception:
+        _resumed = 0
     print(BANNER)
+    if _resumed:
+        print(f"（已续聊上次会话，共 {_resumed} 条消息在档；/new 开新会话）")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     turns = 0
@@ -413,13 +491,29 @@ def cli_main() -> int:
             if not line:
                 continue
             if line in ("/exit", "/quit", "exit", "quit"):
-                print("退出。已保存记忆，回见。")
+                try:
+                    session.save_session("default")
+                except Exception:
+                    pass
+                print("退出。会话已存档，回见。")
                 break
             if line in ("/help", "help", "帮助"):
                 print(_HELP)
                 continue
             if line == "/status":
                 print(session.status())
+                continue
+            if line in ("/new",):
+                try:
+                    session.save_session("default")
+                except Exception:
+                    pass
+                session.history = []
+                try:
+                    session.memory._turns = []
+                except Exception:
+                    pass
+                print("已开新会话（上一段已存入 default 档；/sessions 查看）")
                 continue
             if line.startswith("/load"):
                 name = line.split(maxsplit=1)[1].strip() if " " in line else "default"
@@ -432,7 +526,14 @@ def cli_main() -> int:
                 print(f"已保存会话 {name} → {p}")
                 continue
             if line == "/sessions":
-                print("会话: " + ", ".join(session.list_sessions() or ["(无)"]))
+                rows = ConversationSession.recent_sessions(10)
+                if not rows:
+                    print("还没有会话档案。")
+                else:
+                    import datetime as _dt
+                    for i, r in enumerate(rows, 1):
+                        ts = _dt.datetime.fromtimestamp(r["saved_at"]).strftime("%m-%d %H:%M")
+                        print(f"  {i}. [{r['name']}] {r['turns']}轮 · {ts} · {r['title']}")
                 continue
             if line in ("/reflect",):
                 info = loop.run_until_complete(session.reflect())
@@ -555,12 +656,6 @@ def cli_main() -> int:
                 except Exception as exc:
                     print(f"(自主回顾失败: {type(exc).__name__})")
                 continue
-            try:
-                info = loop.run_until_complete(session.run_turn(line))
-            except Exception as exc:
-                traceback.print_exc()
-                print(f"(本轮处理失败: {type(exc).__name__}；可重试)")
-                continue
             turns += 1
             print("元亨> ", end="", flush=True)
             info = loop.run_until_complete(session.run_turn(
@@ -568,6 +663,10 @@ def cli_main() -> int:
                 on_delta=lambda chunk: (print(chunk, end="", flush=True)),
             ))
             print()
+            try:
+                session.save_session("default")
+            except Exception:
+                pass
             for u in info["tool_uses"]:
                 if not u["ok"]:
                     print(f"  [工具失败] {u['name']}: {u['error']}")

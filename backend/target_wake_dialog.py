@@ -81,6 +81,7 @@ class VoiceprintDialogLoop:
             FunasrOnlineASRProvider,
         )
         from backend.target_vad import TargetVADProvider
+        from backend.voice_frontend import VoiceFrontend
 
         model_dir = _PROJECT_ROOT / "models" / "voice" / "asr" / "paraformer-zh-streaming"
         vad = TargetVADProvider()
@@ -97,27 +98,30 @@ class VoiceprintDialogLoop:
         wake_ts = 0.0
         pending: list[np.ndarray] = []  # voiced frames awaiting embedding
         pending_silent = 0
+        frontend = VoiceFrontend(sample_rate=16000)
         total = int(self.duration_s * 10)
         with sd.InputStream(device=self.device, samplerate=16000, channels=1,
-                            dtype="float32", blocksize=1600) as inp:
+                            dtype="float32", blocksize=1600,
+                            latency="low") as inp:
             for _ in range(total):
                 if time.time() - t0 > self.duration_s:
                     break
                 data, _ = inp.read(1600)
                 mono = np.asarray(data[:, 0] if data.ndim > 1 else data,
                                   dtype="float32")
+                enhanced, is_speech = frontend.process(mono)
                 if self.cap_gain != 1.0:
-                    mono = np.clip(mono * self.cap_gain, -1.0, 1.0).astype("float32")
-                speech = bool(vad.detect_speech(mono, 16000))
+                    enhanced = np.clip(enhanced * self.cap_gain, -1.0, 1.0).astype("float32")
+                speech = bool(vad.detect_speech(enhanced, 16000)) or is_speech
                 # ASR runs always on speech (warm, captures wake phrase too)
                 if speech:
-                    for upd in asr.push_audio("vp", mono, 16000, sig):
+                    for upd in asr.push_audio("vp", enhanced, 16000, sig):
                         if upd.text and len(upd.text) > len(accum):
                             accum = upd.text
                             last_grow = time.time()
                 if not wake_ts:
                     if speech:
-                        pending.append(mono)
+                        pending.append(enhanced)
                         pending_silent = 0
                         if len(pending) >= 10:  # >= 1.0 s voiced -> verify (0.4 s too noisy)
                             win = np.concatenate(pending)

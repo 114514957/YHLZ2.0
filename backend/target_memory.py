@@ -177,7 +177,10 @@ class TargetMemoryService:
                 self._summary_pending = False
             return
         try:
-            raw = extractor.compress(dropped)
+            try:
+                raw = extractor.compress(dropped, prev=self._summary)
+            except TypeError:
+                raw = extractor.compress(dropped)
             if inspect.isawaitable(raw):
                 raw = await raw
             summary_text, version = raw
@@ -191,6 +194,66 @@ class TargetMemoryService:
         finally:
             with self._lock:
                 self._pending_dropped = []
+
+    def summary_line(self) -> str:
+        """Rolling L1 summary as one context line (injected ahead of recent
+        turns so very long conversations don't lose their early arc)."""
+        with self._lock:
+            if not self._summary:
+                return ""
+            return f"[早前对话摘要] {self._summary}"
+
+    def contextual_recall(self, text: str, limit: int = 2) -> list[dict]:
+        """Lightweight topic recall for auto-injection (ledger 0217).
+
+        Distinct from the tool ``recall`` (which is user-triggered with short
+        keywords): this runs on whole casual sentences, so it matches the turn
+        against stored item *keywords* by substring. Returns only solid active
+        items (importance>=4); empty means nothing worth surfacing.
+        """
+        q = str(text or "").strip()
+        if len(q) < 6:  # too short / pure greeting: skip auto-inject
+            return []
+        # char-level relevance: stored keywords/summary are often the whole
+        # sentence (memory_save fills them verbatim), so use shared 2-grams.
+        grams = {q[i:i + 2] for i in range(len(q) - 1)}
+        if not grams:
+            return []
+        # only user-related memories surface casually (not tech facts/knowledge)
+        _INJECT_TYPES = ("preference", "event", "decision")
+        try:
+            with self._lock:
+                con = sqlite3.connect(str(self.db_path))
+                try:
+                    rows = con.execute(
+                        "SELECT id, type, importance, status, keywords, summary "
+                        "FROM l2_items").fetchall()
+                finally:
+                    con.close()
+        except Exception:
+            return []
+        good = []
+        for r in rows:
+            try:
+                if r[1] not in _INJECT_TYPES:
+                    continue
+                if int(r[2] or 0) < 5:
+                    continue
+                if r[3] not in (None, "", "active"):
+                    continue
+                store = str(r[4] or "") or str(r[5] or "")
+                if not any(g in store for g in grams):
+                    continue
+                s = str(r[5] or "").strip()
+            except Exception:
+                continue
+            if s and len(s) >= 4:
+                good.append({"id": r[0], "tier": "L2", "type": r[1],
+                             "importance": r[2], "status": r[3],
+                             "summary": s})
+            if len(good) >= limit:
+                break
+        return good
 
     def context_block(self) -> str:
         with self._lock:
