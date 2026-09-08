@@ -350,6 +350,7 @@ class DaemonRuntime:
                 messages=messages, on_event=_on,
                 temperature=float(payload.get("temperature", 0.7)),
                 max_tokens=int(payload.get("max_tokens", 1200) or 1200),
+                reasoning_effort="none",
             )
 
         async def _try_cloud():

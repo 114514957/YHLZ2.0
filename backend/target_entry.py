@@ -85,6 +85,7 @@ class ConversationSession:
             temperature=0.2, max_tokens=800,
             fallback_base_url=LOCAL_BASE,
             fallback_model=LOCAL_MODEL,
+            reasoning_effort="none",
         )
         if approver is not None:
             user_approver = approver
@@ -157,9 +158,21 @@ class ConversationSession:
         return n
 
     # ---------- turn ----------
+    _WORK_HINTS = (
+        "查", "检索", "搜索", "查找", "分析", "对比", "比较", "总结", "评估",
+        "写", "生成", "做", "处理", "修复", "修", "检查", "测试", "启动",
+        "部署", "配置", "计划", "规划", "怎么", "如何", "为什么", "解释",
+        "看下", "读取", "列出", "整理", "计算", "判断", "建议", "方案",
+    )
+
+    @classmethod
+    def _want_work_mode(cls, text: str) -> bool:
+        t = str(text or "").strip()
+        return any(w in t for w in cls._WORK_HINTS)
+
     async def run_turn(self, text: str,
-                       on_delta: Optional[Callable[[str], None]] = None
-                       ) -> dict[str, Any]:
+                       on_delta: Optional[Callable[[str], None]] = None,
+                       mode: str = "auto") -> dict[str, Any]:
         self.memory.append_turn(role="user", text=text)
         contradictions = self._maybe_contradiction(text)
         from backend.target_style import capture_style_signal
@@ -167,7 +180,12 @@ class ConversationSession:
         capture_style_signal(text, self.memory)
         system = self.render_system()
         llm_turn = self.llm_turn
-        if on_delta is not None:
+        effort: Optional[str] = None
+        if mode == "work":
+            effort = "medium"
+        elif mode == "auto" and self._want_work_mode(text):
+            effort = "medium"
+        if on_delta is not None or effort is not None:
             from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
             from backend.target_orchestrator import (
                 build_openai_compatible_llm_turn,
@@ -176,10 +194,12 @@ class ConversationSession:
             llm_turn = build_openai_compatible_llm_turn(
                 base_url="http://127.0.0.1:8081/v1/chat/completions",
                 api_key="", model="gemma-4-e4b",
-                temperature=0.2, max_tokens=800,
+                temperature=0.2,
+                max_tokens=2000 if (effort == "medium") else 800,
                 fallback_base_url=LOCAL_BASE,
                 fallback_model=LOCAL_MODEL,
                 on_delta=on_delta,
+                reasoning_effort=effort if effort is not None else "none",
             )
         result = await self.orchestrator.run(
             turn_text=text,

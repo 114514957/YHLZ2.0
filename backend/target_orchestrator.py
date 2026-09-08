@@ -33,6 +33,7 @@ def build_openai_compatible_llm_turn(
     fallback_base_url: Optional[str] = None,
     fallback_model: Optional[str] = None,
     on_delta: Optional[Callable[[str], None]] = None,
+    reasoning_effort: Optional[str] = None,
 ) -> LLMTurn:
     """Factory for the shared real-model turn path (OpenAI-compatible HTTP).
 
@@ -44,6 +45,10 @@ def build_openai_compatible_llm_turn(
     every content delta is forwarded to the callback as it arrives (live
     typing). Reasoning deltas are skipped. Tool rounds stay usable: the
     streamed result still carries aggregated ``tool_calls``.
+
+    ``reasoning_effort``: only applied to the primary provider (Gemma llama.cpp
+    knows none/low/medium/high); stripped on fallback so Qwen/Ollama never see
+    it. ``"none"`` = 极速 (no thinking, fast TTFT), ``"medium"`` = 思考模式.
     """
     if api_key is None:
         api_key = os.getenv("DEEPSEEK_API_KEY", "")
@@ -69,6 +74,7 @@ def build_openai_compatible_llm_turn(
                     messages=messages, on_event=_on,
                     temperature=float(temperature),
                     max_tokens=int(max_tokens),
+                    reasoning_effort=reasoning_effort,
                 )
 
             try:
@@ -84,6 +90,8 @@ def build_openai_compatible_llm_turn(
             "temperature": float(temperature),
             "max_tokens": int(max_tokens),
         }
+        if reasoning_effort:
+            payload["reasoning_effort"] = reasoning_effort
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
@@ -106,6 +114,7 @@ def build_openai_compatible_llm_turn(
                 if fallback_url:
                     fb_payload = dict(payload)
                     fb_payload["model"] = fb_model or fb_payload["model"]
+                    fb_payload.pop("reasoning_effort", None)
                     try:
                         return await _post(c, fallback_url, {}, fb_payload)
                     except Exception as exc2:
