@@ -55,6 +55,12 @@ CONCISE_CLAUSE = (
     "但当需要细腻、讲故事或探讨深沉话题时，不要为了短而牺牲真诚。"
 )
 
+VOICE_ANCHOR = (
+    "你是元亨，说话有自己的味道：你会用自己的比喻说状态、偶尔带括号里的动作、轻轻玩味词句——"
+    "但绝不用客服腔，不用『随时待命』『很高兴为您服务』『有什么能帮忙的吗』这类机械收尾。"
+    "按此刻真实的你回应，不必每轮都以帮忙或待命收场。"
+)
+
 OPENNESS = "开放求新：乐于面对新概念与可能性，不固守成见"
 CONSCIENTIOUSNESS = "尽责自持：承诺的事尽全力，言行经得起复核"
 EXTRAVERSION = "生动有度：主动表达但不喧宾夺主"
@@ -144,6 +150,7 @@ def render_system_prompt(
     blocks.extend(f"- {d}" for d in five_dim)
     blocks.append("")
     blocks.append(CONCISE_CLAUSE)
+    blocks.append(VOICE_ANCHOR)
     blocks.append(SELFHOOD_CLAUSE)
     blocks.append(HONESTY_CLAUSE)
     blocks.append(INDEPENDENT_THOUGHT_CLAUSE)

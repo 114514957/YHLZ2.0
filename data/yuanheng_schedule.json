@@ -22,6 +22,7 @@
   "steps": [
    "今天值得沉淀的（学到/发生/想通的）：可 task.plan 更新明天、kb.add 存知识、diary.write 写日记。做真正想做的，然后简单告诉我今天你的状态。"
   ],
-  "enabled": true
+  "enabled": true,
+  "last_run": "2026-09-07 23:00"
  }
 ]
