@@ -34,7 +34,7 @@ async def stream_openai_compatible(
     max_tokens: int = 1200,
     reasoning_effort: Optional[str] = None,
     extra_headers: Optional[dict] = None,
-) -> None:
+) -> dict[str, Any]:
     """Consume an OpenAI-compatible stream and emit unified events.
 
     Works for DeepSeek (/v1/chat/completions), Ollama, llama.cpp server —
@@ -56,13 +56,14 @@ async def stream_openai_compatible(
     }
     if reasoning_effort:
         payload["reasoning_effort"] = reasoning_effort
-    headers = {"Authorization": f"Bearer {api_key}"}
+    headers = {} if not api_key else {"Authorization": f"Bearer {api_key}"}
     if extra_headers:
         headers.update(extra_headers)
     text = ""
     reasoning = ""
     finish = "stop"
     usage: dict = {}
+    tool_calls: dict[int, dict] = {}
     async with httpx.AsyncClient(timeout=300) as client:
         async with client.stream("POST", base_url, json=payload,
                                  headers=headers) as resp:
@@ -86,6 +87,20 @@ async def stream_openai_compatible(
                 delta = choice.get("delta") or {}
                 d_txt = delta.get("content") or ""
                 r_txt = delta.get("reasoning_content") or ""
+                for tc in delta.get("tool_calls") or []:
+                    idx = tc.get("index", 0)
+                    slot = tool_calls.setdefault(
+                        idx, {"id": "", "type": "function",
+                              "function": {"name": "", "arguments": ""}})
+                    if tc.get("id"):
+                        slot["id"] = tc["id"]
+                    if tc.get("type"):
+                        slot["type"] = tc["type"]
+                    fn = tc.get("function") or {}
+                    if fn.get("name"):
+                        slot["function"]["name"] += fn["name"]
+                    if fn.get("arguments"):
+                        slot["function"]["arguments"] += fn["arguments"]
                 if d_txt:
                     text += d_txt
                     await on_event({"kind": "delta", "stage": "content",
@@ -94,9 +109,13 @@ async def stream_openai_compatible(
                     reasoning += r_txt
                     await on_event({"kind": "delta", "stage": "reasoning",
                                     "delta": r_txt, "text": reasoning})
+    calls = [tool_calls[i] for i in sorted(tool_calls)] if tool_calls else None
     await on_event({
         "kind": "done", "text": text, "reasoning": reasoning,
+        "tool_calls": calls,
         "usage": {"prompt": int(usage.get("prompt_tokens", 0)),
                   "completion": int(usage.get("completion_tokens", 0))},
         "finish": finish or "stop",
     })
+    return {"content": text, "reasoning": reasoning, "tool_calls": calls,
+            "finish": finish or "stop"}

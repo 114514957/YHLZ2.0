@@ -157,17 +157,34 @@ class ConversationSession:
         return n
 
     # ---------- turn ----------
-    async def run_turn(self, text: str) -> dict[str, Any]:
+    async def run_turn(self, text: str,
+                       on_delta: Optional[Callable[[str], None]] = None
+                       ) -> dict[str, Any]:
         self.memory.append_turn(role="user", text=text)
         contradictions = self._maybe_contradiction(text)
         from backend.target_style import capture_style_signal
 
         capture_style_signal(text, self.memory)
         system = self.render_system()
+        llm_turn = self.llm_turn
+        if on_delta is not None:
+            from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
+            from backend.target_orchestrator import (
+                build_openai_compatible_llm_turn,
+            )
+
+            llm_turn = build_openai_compatible_llm_turn(
+                base_url="http://127.0.0.1:8081/v1/chat/completions",
+                api_key="", model="gemma-4-e4b",
+                temperature=0.2, max_tokens=800,
+                fallback_base_url=LOCAL_BASE,
+                fallback_model=LOCAL_MODEL,
+                on_delta=on_delta,
+            )
         result = await self.orchestrator.run(
             turn_text=text,
             system_prompt=system,
-            llm_turn=self.llm_turn,
+            llm_turn=llm_turn,
             history=self.history[-6:],  # latency (ledger 0206): cap in-context turns
         )
         self.memory.append_turn(role="assistant", text=result.answer)
@@ -508,7 +525,12 @@ def cli_main() -> int:
                 print(f"(本轮处理失败: {type(exc).__name__}；可重试)")
                 continue
             turns += 1
-            print("元亨> " + info["answer"])
+            print("元亨> ", end="", flush=True)
+            info = loop.run_until_complete(session.run_turn(
+                line,
+                on_delta=lambda chunk: (print(chunk, end="", flush=True)),
+            ))
+            print()
             for u in info["tool_uses"]:
                 if not u["ok"]:
                     print(f"  [工具失败] {u['name']}: {u['error']}")

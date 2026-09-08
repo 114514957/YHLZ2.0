@@ -32,12 +32,18 @@ def build_openai_compatible_llm_turn(
     max_tokens: int = 500,
     fallback_base_url: Optional[str] = None,
     fallback_model: Optional[str] = None,
+    on_delta: Optional[Callable[[str], None]] = None,
 ) -> LLMTurn:
     """Factory for the shared real-model turn path (OpenAI-compatible HTTP).
 
     Dual-rail (ledger 0168): if the primary provider is unreachable, retry the
     same payload on the local fallback (Ollama OpenAI-compatible), so the
     daemon keeps serving when the cloud goes down.
+
+    ``on_delta``: when given, the provider call becomes token-streaming and
+    every content delta is forwarded to the callback as it arrives (live
+    typing). Reasoning deltas are skipped. Tool rounds stay usable: the
+    streamed result still carries aggregated ``tool_calls``.
     """
     if api_key is None:
         api_key = os.getenv("DEEPSEEK_API_KEY", "")
@@ -48,6 +54,30 @@ def build_openai_compatible_llm_turn(
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
     ) -> dict[str, Any]:
+        if on_delta is not None:
+            from backend.llm_stream import stream_openai_compatible
+
+            async def _try_stream(url: str, key: str) -> dict[str, Any]:
+                payload: dict[str, Any] = {"model": model}
+                if url.startswith("http://127.0.0.1:11434"):
+                    payload = {"model": fb_model or model}
+                async def _on(ev: dict[str, Any]) -> None:
+                    if ev["kind"] == "delta" and ev["stage"] == "content":
+                        on_delta(ev["delta"])
+                return await stream_openai_compatible(
+                    base_url=url, api_key=key, model=payload["model"],
+                    messages=messages, on_event=_on,
+                    temperature=float(temperature),
+                    max_tokens=int(max_tokens),
+                )
+
+            try:
+                return await _try_stream(base_url, api_key)
+            except Exception:
+                if fallback_url:
+                    return await _try_stream(fallback_url, "")
+                raise
+
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
