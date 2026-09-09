@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>YHLZ · 形象</title>
+<style>
+  html,body{margin:0;height:100%;background:#101318;overflow:hidden;color:#cfe0d8;
+    font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif;}
+  #wrap{position:absolute;inset:0;}
+  #dbg{position:absolute;left:10px;bottom:10px;max-width:70%;background:rgba(0,0,0,.55);
+    color:#7fdcb6;padding:6px 10px;border-radius:8px;white-space:pre-wrap;font-size:12px;
+    max-height:40vh;overflow-y:auto;}
+  #bar{position:absolute;top:10px;left:10px;display:flex;gap:8px;}
+  button{background:#1a5fd0;color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer;}
+</style>
+</head>
+<body>
+<div id="wrap"></div>
+<div id="bar">
+  <button id="btnEx">换表情</button>
+  <button id="btnTalk">测试口型</button>
+</div>
+<div id="dbg">加载中…</div>
+
+<script src="/live2d/pixi.min.js"></script>
+<script src="/live2d/live2dcubismcore.min.js"></script>
+<script src="/live2d/cubism4.min.js"></script>
+<script>
+const wrap = document.getElementById('wrap');
+const dbg  = document.getElementById('dbg');
+function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; }
+function findGlobal(){
+  const keys = [];
+  for (const k of Object.keys(window)) {
+    if (/live2d|Live2D|cubism/i.test(k)) keys.push(k + (typeof window[k]));
+  }
+  return keys;
+}
+(async () => {
+  log('pixi=' + !!(window.PIXI) + ' core=' + !!(window.Live2DCubismCore));
+  log('globals: ' + findGlobal().join(', ') || '(none)');
+  let LM = window.Live2DModel;
+  if (!LM && window.PIXI) { LM = window.PIXI.Live2DModel || window.PIXI.live2d?.Live2DModel; }
+  if (!LM) { log('未找到 Live2DModel 全局(UMD 名未匹配)'); return; }
+  log('Live2DModel OK');
+  const app = new PIXI.Application({ resizeTo: window, backgroundAlpha: 0, antialias: true });
+  wrap.appendChild(app.view);
+  const model = await LM.from('/live2d-models/YH3/seethrough_output.model3.json');
+  app.stage.addChild(model);
+  const s = Math.min(app.screen.width / model.width, app.screen.height / model.height);
+  model.scale.set(s, s);
+  model.anchor.set(0.5, 0.5);
+  model.x = app.screen.width / 2;
+  model.y = app.screen.height * 0.55;
+  log('模型加载成功 ' + Math.round(model.width) + 'x' + Math.round(model.height));
+  window._model = model;
+  let phase = 0;
+  let talking = 0;
+  app.ticker.add(() => {
+    phase += 0.03;
+    model.rotation = Math.sin(phase) * 0.03;
+    model.y = app.screen.height * 0.55 + Math.sin(phase * 0.7) * 4;
+    if (talking > 0) {
+      talking -= 1;
+      const m = Math.abs(Math.sin(phase * 9)) * 0.6;
+      model.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', m);
+      model.internalModel.coreModel.addParameterValueById('ParamBreath', Math.sin(phase) * 0.03);
+    } else {
+      model.internalModel.coreModel.addParameterValueById('ParamMouthOpenY', -0.1);
+    }
+  });
+  document.getElementById('btnEx').onclick = () => {
+    if (model.internalModel.motionManager) {
+      log('motion: 请求随机动作(若模型有动作集)');
+    }
+  };
+  document.getElementById('btnTalk').onclick = () => { talking = 70; };
+})().catch(e => { log('错误: ' + (e && e.message || e)); });
+</script>
+</body>
+</html>

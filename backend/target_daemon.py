@@ -424,9 +424,10 @@ class _Handler(ConsoleHandler):
         from backend.console_server import GET_UI, POST_UI
 
         p = self.path.split("?", 1)[0]
-        if method == "GET" and p in GET_UI:
-            self.console_do_GET()
-            return True
+        if method == "GET":
+            if p in GET_UI or p.startswith(("/live2d/", "/live2d-models/")):
+                self.console_do_GET()
+                return True
         if method == "POST" and p in POST_UI:
             self.console_do_POST()
             return True

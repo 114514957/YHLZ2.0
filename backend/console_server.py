@@ -98,7 +98,10 @@ def _sse(data: dict) -> bytes:
 
 GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
-          "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions"}
+          "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
+          "/avatar.html", "/avatar.js"}
+MODEL_DIR = _PROJECT_ROOT / "角色皮套"
+VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session"}
 
 
@@ -135,10 +138,48 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     # ---------- routing (shared with daemon _Handler via inheritance) ----------
+    def _serve_under(self, route_prefix: str, base_dir) -> None:
+        p = self.path.split("?", 1)[0]
+        if not p.startswith(route_prefix):
+            self._send_json(404, {"error": "not found"})
+            return
+        rel = p[len(route_prefix):].lstrip("/")
+        target = (base_dir / rel).resolve()
+        try:
+            if not str(target).startswith(str(base_dir.resolve())) or \
+                    not target.is_file():
+                self._send_json(404, {"error": "not found"})
+                return
+        except Exception:
+            self._send_json(404, {"error": "not found"})
+            return
+        ext = target.suffix.lower()
+        ctype = ("image/png" if ext == ".png"
+                 else "application/json" if ext == ".json"
+                 else "image/webp" if ext == ".webp"
+                 else "application/octet-stream")
+        body = target.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def console_do_GET(self):
         p = self.path.split("?", 1)[0]
+        if p.startswith("/live2d/"):
+            self._serve_under("/live2d/", VENDOR_DIR)
+            return
+        if p.startswith("/live2d-models/"):
+            self._serve_under("/live2d-models/", MODEL_DIR)
+            return
         if p in ("/", "/index.html"):
             self._serve_file("index.html")
+        elif p == "/avatar.html":
+            self._serve_file("avatar.html")
+        elif p == "/avatar.js":
+            self._serve_file("avatar.js")
         elif p == "/favicon.png":
             self._serve_file("favicon.png")
         elif p == "/loading.webp":
