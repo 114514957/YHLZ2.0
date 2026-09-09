@@ -93,6 +93,19 @@ async function modelsSubmenu() {
   }
 }
 
+function setPetDrag(on) {
+  if (!win) return;
+  if (on) {
+    win.setIgnoreMouseEvents(false, { forward: true });
+    win.webContents.executeJavaScript(
+      "window.__petSetDrag && window.__petSetDrag(true)");
+  } else {
+    win.webContents.executeJavaScript(
+      "window.__petSetDrag && window.__petSetDrag(false)");
+    win.setIgnoreMouseEvents(true, { forward: true });
+  }
+}
+
 async function makeTray() {
   let icon = path.join(__dirname, "..", "assets", "icons", "yhlz-app2.ico");
   tray = new Tray(nativeImage.createFromPath(icon));
@@ -100,6 +113,12 @@ async function makeTray() {
   const models = await modelsSubmenu();
   const menu = Menu.buildFromTemplate([
     { label: "显示/隐藏桌宠", click: () => { if (win) win.isVisible() ? win.hide() : win.show(); } },
+    { type: "separator" },
+    { label: "锁定（纯展示/穿透）", type: "radio", checked: true,
+      click: () => setPetDrag(false) },
+    { label: "拖动元亨", type: "radio",
+      click: () => setPetDrag(true) },
+    { type: "separator" },
     { label: "对话", click: openChat },
     { label: "切换形象", submenu: models.length ? models : [{ label: "(无模型)", enabled: false }] },
     { label: "打开工作台", click: () => shell.openExternal(CONSOLE_URL) },

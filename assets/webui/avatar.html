@@ -295,9 +295,25 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
   // the tray owns hide/show, model switch, workbench, quit (desktop/main.js
   // sets setIgnoreMouseEvents(true) once at startup)
   void isPet;
+  // drag mode driven from the tray ("拖动元亨" radio): grabs the whole pet
+  let petDragEnabled = false;
+  let pDown = null;
+  window.__petSetDrag = (on) => { petDragEnabled = !!on; if (!on) pDown = null; };
+  window.addEventListener('pointerdown', (e) => {
+    if (!petDragEnabled || e.button !== 0) return;
+    pDown = { ox: model.x - e.clientX, oy: model.y - e.clientY };
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (!petDragEnabled || !pDown) return;
+    const M = 20;
+    model.x = Math.min(Math.max(e.clientX + pDown.ox, M), app.screen.width - M);
+    model.y = Math.min(Math.max(e.clientY + pDown.oy, M), app.screen.height - M);
+  });
+  window.addEventListener('pointerup', () => { pDown = null; });
+  window.addEventListener('pointerleave', () => { pDown = null; });
   window.__petSwitchModel = (rel) => loadModel(rel);
   window._model = () => model;
-  log('就绪：托盘可 隐藏/切形象/打开工作台');
+  log('就绪：托盘 隐藏/拖动/锁定/切形象/对话');
 })().catch(e => log('错误: ' + (e && e.message || e)));
 </script>
 </body>
