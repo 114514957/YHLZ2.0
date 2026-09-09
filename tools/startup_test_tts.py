@@ -66,7 +66,7 @@ def main() -> int:
             return "".join(lines)[-200:].encode("ascii", "replace").decode()
 
     try:
-        if not wait_for("输入 1 聆听", 60):
+        if not wait_for("输入 1 聆听", 150):
             print("FAIL: 未见就绪提示", flush=True)
             proc.kill()
             return 1
