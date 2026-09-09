@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain } = require("electron");
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain, screen } = require("electron");
 const path = require("path");
 
 // Transparent frameless pet window (YHLZ avatar). Page must be transparent
@@ -11,25 +11,31 @@ const CONSOLE_URL = "http://127.0.0.1:8321/";
 const AVATAR_URL = "http://127.0.0.1:8321/avatar.html?pet=1";
 
 function makeWindow() {
+  // Full-work-area transparent overlay: the pet may roam anywhere on screen
+  // and never gets clipped by a small window; blank areas click through.
+  const wa = screen.getPrimaryDisplay().workArea;
   win = new BrowserWindow({
-    width: 460,
-    height: 680,
+    x: wa.x,
+    y: wa.y,
+    width: wa.width,
+    height: wa.height,
     transparent: true,
     frame: false,
     resizable: false,
+    movable: false,
+    fullscreenable: false,
     alwaysOnTop: true,
-    skipTaskbar: false,
+    skipTaskbar: true,
     hasShadow: false,
+    focusable: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(__dirname, "preload.js"),
     },
   });
-  win.setAlwaysOnTop(true, "floating");
+  win.setAlwaysOnTop(true, "screen-saver");
   win.loadURL(AVATAR_URL);
-  // by default let the mouse click through the transparent window; the page
-  // toggles it back on when the pointer is over the model / drag bar
   win.setIgnoreMouseEvents(true, { forward: true });
   win.on("close", (e) => {
     if (!app.isQuiting) { e.preventDefault(); win.hide(); }
