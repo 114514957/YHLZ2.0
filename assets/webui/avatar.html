@@ -89,6 +89,19 @@ function findGlobal(){
   } catch (e) { log('模型列表/加载错误 ' + (e && e.message || e)); }
   // drag to move the model (pet-window feel)
   let drag = null;
+  const centerModel = () => {
+    model.x = app.screen.width / 2;
+    model.y = app.screen.height * 0.58;
+  };
+  if (isPet && window.pet) {
+    // shrink the window to just fit the model (no big transparent box)
+    setTimeout(() => {
+      try { window.pet.setSize(Math.ceil(model.width) + 84,
+                               Math.ceil(model.height) + 60); } catch (e) {}
+      centerModel();
+    }, 350);
+    window.addEventListener('resize', centerModel);
+  }
   model.interactive = true;
   model.on('pointerdown', (e) => {
     drag = { dx: model.x - e.data.global.x, dy: model.y - e.data.global.y };
