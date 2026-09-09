@@ -302,6 +302,7 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
   window.addEventListener('pointerdown', (e) => {
     if (!petDragEnabled || e.button !== 0) return;
     pDown = { ox: model.x - e.clientX, oy: model.y - e.clientY };
+    if (window.pet) window.pet.mouseThrough(false); // claim while dragging
   });
   window.addEventListener('pointermove', (e) => {
     if (!petDragEnabled || !pDown) return;
@@ -309,8 +310,8 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
     model.x = Math.min(Math.max(e.clientX + pDown.ox, M), app.screen.width - M);
     model.y = Math.min(Math.max(e.clientY + pDown.oy, M), app.screen.height - M);
   });
-  window.addEventListener('pointerup', () => { pDown = null; });
-  window.addEventListener('pointerleave', () => { pDown = null; });
+  window.addEventListener('pointerup', () => { pDown = null; if (window.pet) window.pet.mouseThrough(true); });
+  window.addEventListener('pointerleave', () => { pDown = null; if (window.pet) window.pet.mouseThrough(true); });
   window.__petSwitchModel = (rel) => loadModel(rel);
   window._model = () => model;
   log('就绪：托盘 隐藏/拖动/锁定/切形象/对话');

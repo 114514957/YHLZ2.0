@@ -96,7 +96,8 @@ async function modelsSubmenu() {
 function setPetDrag(on) {
   if (!win) return;
   if (on) {
-    win.setIgnoreMouseEvents(false, { forward: true });
+    // renderer claims the mouse only while a drag is held; otherwise the
+    // overlay stays click-through so the desktop is always usable.
     win.webContents.executeJavaScript(
       "window.__petSetDrag && window.__petSetDrag(true)");
   } else {
