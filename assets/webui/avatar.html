@@ -110,9 +110,12 @@ function findGlobal(){
       let nx = e.data.global.x + drag.dx;
       let ny = e.data.global.y + drag.dy;
       if (isPet) {
-        const hw = model.width / 2, hh = model.height / 2;
-        nx = Math.min(Math.max(nx, hw), app.screen.width - hw);
-        ny = Math.min(Math.max(ny, hh), app.screen.height - hh);
+        // clamp by a small fixed margin so the pet can reach screen corners
+        // (Live2D canvas width includes large transparent padding; using it
+        // as the real bound would stop far from the edge)
+        const M = 20;
+        nx = Math.min(Math.max(nx, M), app.screen.width - M);
+        ny = Math.min(Math.max(ny, M), app.screen.height - M);
       }
       model.x = nx; model.y = ny;
     }
