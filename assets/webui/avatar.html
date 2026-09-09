@@ -12,11 +12,15 @@
     max-height:40vh;overflow-y:auto;}
   #bar{position:absolute;top:10px;left:10px;display:flex;gap:8px;}
   button{background:#1a5fd0;color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer;}
+  .chip{padding:6px 14px;border-radius:14px;background:rgba(255,255,255,.12);color:#bfe;
+    font-size:12px;align-self:center;}
+  .chip.live{color:#ffd76e;}
 </style>
 </head>
 <body>
 <div id="wrap"></div>
 <div id="bar">
+  <span id="stage" class="chip">空闲</span>
   <button id="btnEx">换表情</button>
   <button id="btnTalk">测试口型</button>
 </div>
@@ -59,11 +63,23 @@ function findGlobal(){
   window._model = model;
   let phase = 0;
   let talking = 0;
+  let avState = 'idle';
+  if ("BroadcastChannel" in window) {
+    const ch = new BroadcastChannel("yhlz-avatar");
+    ch.onmessage = (e) => {
+      avState = e.data && e.data.stage || 'idle';
+      const el = document.getElementById('stage');
+      const map = { listening: '聆听中…', thinking: '思考中…', speaking: '说话中…', asr: '识别中…', idle: '空闲' };
+      el.textContent = map[avState] || avState;
+      el.classList.toggle('live', avState === 'speaking');
+    };
+  }
   app.ticker.add(() => {
     phase += 0.03;
-    if (talking > 0) {
-      talking -= 1;
-      const m = Math.abs(Math.sin(phase * 9)) * 0.6;
+    const open = (avState === 'speaking' || talking > 0);
+    if (talking > 0) talking -= 1;
+    if (open) {
+      const m = Math.abs(Math.sin(phase * 11)) * 0.7;
       model.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', m);
     } else {
       model.internalModel.coreModel.addParameterValueById('ParamMouthOpenY', -0.1);

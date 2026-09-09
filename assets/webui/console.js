@@ -4,6 +4,8 @@ const $ = (id) => document.getElementById(id);
 const msgs = $("msgs");
 let busy = false;
 let stage = "idle";
+const bc = "BroadcastChannel" in window ? new BroadcastChannel("yhlz-avatar") : null;
+function bcStage(v) { if (bc) { try { bc.postMessage({ stage: v }); } catch (e) {} } }
 
 function setLamp(id, state) {
   const el = $(id);
@@ -31,11 +33,12 @@ function addMsg(role, who, text) {
   return t;
 }
 function busyOn(v) { busy = v; $("send").disabled = v; $("voiceBtn").disabled = v; }
-function setStage(v) { stage = v; setLamp("l-busy", v); }
+function setStage(v) { stage = v; setLamp("l-busy", v); bcStage(v); }
 
 /* ---------- dashboard drawer ---------- */
 $("dashBtn").addEventListener("click", () => $("side").classList.add("open"));
 $("dashClose").addEventListener("click", () => $("side").classList.remove("open"));
+$("avatarBtn").addEventListener("click", () => window.open("/avatar.html", "_blank"));
 $("clearBtn").addEventListener("click", async () => {
   if (!confirm("清空当前对话并开新会话？")) return;
   try { await fetch("/reset", { method: "POST" }); } catch (e) {}
