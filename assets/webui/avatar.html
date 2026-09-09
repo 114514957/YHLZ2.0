@@ -99,7 +99,7 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
     model.y = app.screen.height * (isPet ? 0.72 : 0.55);
     log('模型就绪 ' + rel);
     setTimeout(buildHit, 120);
-    wireModel();
+    // no mouse interactions on the pet: switching/chatting lives in the tray.
   }
 
   // build a coarse alpha mask so taps/drags only work on the visible pet
@@ -291,24 +291,13 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
     model.internalModel.coreModel.addParameterValueById('ParamBreath', Math.sin(phase) * 0.05);
   });
 
-  // dynamic click-through (pet): interact only over visible model pixels
-  if (isPet && window.pet) {
-    const apply = () => {
-      const gx = window.__px ?? -1, gy = window.__py ?? -1;
-      window.pet.mouseThrough(!(hitAt(gx, gy) || gx < 0));
-    };
-    window.__px = -1; window.__py = -1;
-    window.addEventListener('pointermove', (e) => {
-      window.__px = e.clientX; window.__py = e.clientY; apply();
-    }, { passive: true });
-    document.addEventListener('pointerleave', () => window.pet.mouseThrough(true));
-    document.addEventListener('mouseleave', () => window.pet.mouseThrough(true));
-    window.addEventListener('blur', () => window.pet.mouseThrough(true));
-    model.on('pointermove', () => apply());
-  }
+  // dynamic click-through (pet): interactions removed -> always click-through;
+  // the tray owns hide/show, model switch, workbench, quit (desktop/main.js
+  // sets setIgnoreMouseEvents(true) once at startup)
+  void isPet;
   window.__petSwitchModel = (rel) => loadModel(rel);
   window._model = () => model;
-  log('就绪：左键轻点随口回应 · 右键对话框 · 拖动移动');
+  log('就绪：托盘可 隐藏/切形象/打开工作台');
 })().catch(e => log('错误: ' + (e && e.message || e)));
 </script>
 </body>
