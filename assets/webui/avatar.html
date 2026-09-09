@@ -142,6 +142,7 @@ function findGlobal(){
     model.on('pointerup', () => apply());
   }
   window._model = () => model;
+  window.__petSwitchModel = (rel) => { if (rel) return loadModel(rel); };
   let phase = 0;
   let talking = 0;
   let avState = 'idle';

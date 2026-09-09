@@ -54,12 +54,33 @@ ipcMain.on("pet-size", (_e, { w, h }) => {
   }
 });
 
-function makeTray() {
+async function modelsSubmenu() {
+  try {
+    const r = await fetch("http://127.0.0.1:8321/avatar-models");
+    const j = await r.json();
+    return (j.items || []).map((it) => ({
+      label: it.name,
+      click: () => {
+        if (win && win.webContents) {
+          win.webContents.executeJavaScript(
+            "window.__petSwitchModel && " +
+            "window.__petSwitchModel(" + JSON.stringify(it.rel) + ")");
+        }
+      },
+    }));
+  } catch (e) {
+    return [];
+  }
+}
+
+async function makeTray() {
   let icon = path.join(__dirname, "..", "assets", "icons", "yhlz-app2.ico");
   tray = new Tray(nativeImage.createFromPath(icon));
   tray.setToolTip("YHLZ · 元 · 亨 · 利 · 贞");
+  const models = await modelsSubmenu();
   const menu = Menu.buildFromTemplate([
     { label: "显示/隐藏桌宠", click: () => { if (win) win.isVisible() ? win.hide() : win.show(); } },
+    { label: "切换形象", submenu: models.length ? models : [{ label: "(无模型)", enabled: false }] },
     { label: "打开工作台", click: () => shell.openExternal(CONSOLE_URL) },
     { type: "separator" },
     { label: "退出", click: () => { app.isQuiting = true; app.quit(); } },
