@@ -1,25 +1,19 @@
 "use strict";
-// YHLZ workbench: streaming text + voice dialog.
+// YHLZ workbench: streaming text + voice dialog + dashboard drawer.
 const $ = (id) => document.getElementById(id);
 const msgs = $("msgs");
 let busy = false;
+let stage = "idle";
 
 function setLamp(id, state) {
   const el = $(id);
-  const map = { daemon: "daemon", gemma: "gemma", busy: "空闲" };
   el.className = "lamp " + state;
-  if (id === "l-busy") {
-    el.textContent = state === "busy" ? "思考中…"
-      : state === "listening" ? "聆听中…"
-      : state === "speaking" ? "说话中…"
-      : "空闲";
-  } else {
-    const label = map[id] || id;
-    el.textContent = state === "ok" ? label + " 正常"
-      : state === "down" ? label + " 离线" : label + " " + state;
-  }
+  const txt = state === "ok" ? "daemon 正常" : state === "down" ? "daemon 离线"
+    : state === "busy" ? "思考中…" : state === "listening" ? "聆听中…"
+    : state === "speaking" ? "说话中…" : "空闲";
+  if (id === "l-busy") el.textContent = txt;
 }
-function setInfo(t) { $("l-info").textContent = t; }
+function setInfo(t) { /* kept minimal; real data lives in dashboard */ }
 function setVad(level, speech) {
   const w = Math.min(100, Math.max(2, level * 1400)) + "%";
   const b = $("vadbar");
@@ -37,18 +31,48 @@ function addMsg(role, who, text) {
   return t;
 }
 function busyOn(v) { busy = v; $("send").disabled = v; $("voiceBtn").disabled = v; }
+function setStage(v) { stage = v; setLamp("l-busy", v); }
 
-async function poll() {
+/* ---------- dashboard drawer ---------- */
+$("dashBtn").addEventListener("click", () => $("side").classList.add("open"));
+$("dashClose").addEventListener("click", () => $("side").classList.remove("open"));
+$("clearBtn").addEventListener("click", async () => {
+  if (!confirm("清空当前对话并开新会话？")) return;
+  try { await fetch("/reset", { method: "POST" }); } catch (e) {}
+  msgs.innerHTML = "";
+});
+
+function dot(id, ok) { const d = $(id); d.className = "dot " + (ok ? "ok" : "down"); }
+function bar(id, pct) { $(id).style.width = Math.max(0, Math.min(100, pct)) + "%"; }
+
+async function loadDashboard() {
   try {
     const s = await (await fetch("/state", { cache: "no-store" })).json();
-    setLamp("l-gemma", s.gemma === "ok" ? "ok" : "down");
-    setLamp("l-daemon", s.daemon === "ok" ? "ok" : "down");
-    setInfo("历史 " + (s.history ?? "?") + " 轮 · L2 " + (s.l2 ?? "?"));
-  } catch (e) { setLamp("l-daemon", "down"); }
+    dot("s-gemma", s.gemma === "ok");
+    dot("s-daemon", s.daemon === "ok");
+    $("m-turns").textContent = s.history ?? "?";
+    $("m-l2").textContent = s.l2 ?? "?";
+    $("m-persona").textContent = s.persona ? "有" : "-";
+    $("m-stage").textContent = stage === "idle" ? "空闲" : stage;
+  } catch (e) { dot("s-daemon", false); }
+  try {
+    const m = await (await fetch("/monitor", { cache: "no-store" })).json();
+    if (m.gpu) {
+      $("m-gpu").textContent = m.gpu.util + "%";
+      $("m-vram").textContent = m.gpu.used_gb + " / " + m.gpu.total_gb + " GB";
+      bar("m-gpub", m.gpu.util);
+      bar("m-vramb", m.gpu.used_gb / m.gpu.total_gb * 100);
+    } else { $("m-gpu").textContent = "n/a"; }
+    $("m-cpu").textContent = (m.cpu ?? "?") + "%";
+    bar("m-cpub", m.cpu ?? 0);
+    $("m-ram").textContent = (m.ram ? m.ram.used_gb + " / " + m.ram.total_gb : "?") + " GB";
+    $("m-disk").textContent = (m.disk ? m.disk.used_gb + " / " + m.disk.total_gb : "?") + " GB";
+    $("m-work").textContent = "对话链路正常";
+    $("m-chain").textContent = "听→识→思→说";
+  } catch (e) {}
 }
 
 async function streamFetch(path, payload, ev) {
-  // ev: {state, delta, turn_done, voice_text, voice_done, level, error}
   try {
     const r = await fetch(path, {
       method: "POST",
@@ -78,44 +102,40 @@ async function streamFetch(path, payload, ev) {
 }
 
 async function talk(text) {
-  busyOn(true); setLamp("l-busy", "busy");
+  busyOn(true); setStage("busy");
   const box = addMsg("a", "元亨", "");
   await streamFetch("/talk", { text }, {
-    state: (e) => setLamp("l-busy", e.value),
+    state: (e) => setStage(e.value),
     delta: (e) => { box.textContent += e.delta || ""; },
     turn_done: (e) => { if (e.text) box.textContent = e.text; },
     error: (e) => { box.textContent = "(出错) " + (e.message || ""); },
   });
-  busyOn(false); setLamp("l-busy", "idle"); poll();
+  busyOn(false); setStage("idle"); loadDashboard();
 }
 
 async function voice() {
-  busyOn(true); setLamp("l-busy", "listening"); setVad(0, false);
+  busyOn(true); setStage("listening"); setVad(0, false);
   addMsg("u", "你", "(语音) 正在聆听…说完停3秒自动断");
   let box = null;
   await streamFetch("/voice", { speak: 1 }, {
     level: (e) => setVad(e.value, e.speech),
-    state: (e) => setLamp("l-busy", e.value),
+    state: (e) => setStage(e.value),
     voice_text: (e) => {
       if (e.kind === "user") {
-        // replace the placeholder user line with the heard text
         const last = msgs.lastElementChild;
         if (last) { const t = last.querySelector("div:last-child"); if (t) t.textContent = e.text; }
       }
       if (e.kind === "asr") {
-        const t = addMsg("u", "你", "");
-        t.textContent = e.text;
+        addMsg("u", "你", "");
         box = addMsg("a", "元亨", "");
       }
     },
     delta: (e) => { if (!box) box = addMsg("a", "元亨", ""); box.textContent += e.delta || ""; },
     turn_done: (e) => { if (e.text && box) box.textContent = e.text; },
     voice_done: () => setVad(0, false),
-    error: (e) => {
-      const t = addMsg("a", "元亨", ""); t.textContent = "(语音出错) " + (e.message || "");
-    },
+    error: (e) => { const t = addMsg("a", "元亨", ""); t.textContent = "(语音出错) " + (e.message || ""); },
   });
-  busyOn(false); setLamp("l-busy", "idle"); setVad(0, false); poll();
+  busyOn(false); setStage("idle"); setVad(0, false); loadDashboard();
 }
 
 async function loadHistory() {
@@ -127,7 +147,7 @@ async function loadHistory() {
       else if (m.role === "assistant") addMsg("a", "元亨", m.content);
     }
     msgs.scrollTop = msgs.scrollHeight;
-  } catch (e) { /* ignore */ }
+  } catch (e) {}
 }
 
 $("talk").addEventListener("submit", (ev) => {
@@ -141,5 +161,5 @@ $("talk").addEventListener("submit", (ev) => {
 $("voiceBtn").addEventListener("click", () => { if (!busy) voice(); });
 
 loadHistory();
-poll();
-setInterval(poll, 4000);
+loadDashboard();
+setInterval(loadDashboard, 3000);

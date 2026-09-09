@@ -73,6 +73,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, self._state())
         elif p == "/history":
             self._send_json(200, self._history())
+        elif p == "/monitor":
+            self._send_json(200, self._monitor())
         else:
             self._send_json(404, {"error": "not found"})
 
@@ -84,7 +86,57 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         if p == "/voice":
             self._do_voice()
             return
+        if p == "/reset":
+            self._do_reset()
+            return
         self._send_json(404, {"error": "not found"})
+
+    def _do_reset(self):
+        """Clear the console conversation (new chat)."""
+        try:
+            s = self.runtime._session("console")
+            s.history = []
+            try:
+                s.memory._turns = []
+            except Exception:
+                pass
+            s.save_session("console")
+            self._send_json(200, {"ok": True})
+        except Exception as exc:
+            self._send_json(500, {"ok": False,
+                                  "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
+
+    def _monitor(self) -> dict:
+        out = {"ok": True, "now": time.time()}
+        try:
+            import psutil
+            import subprocess
+
+            out["cpu"] = psutil.cpu_percent(interval=None)
+            vm = psutil.virtual_memory()
+            out["ram"] = {"used_gb": round(vm.used / 1e9, 2),
+                          "total_gb": round(vm.total / 1e9, 2)}
+            du = psutil.disk_usage(str(_PROJECT_ROOT))
+            out["disk"] = {"used_gb": round(du.used / 1e9, 1),
+                           "total_gb": round(du.total / 1e9, 1)}
+            try:
+                g = subprocess.run(
+                    ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,"
+                                    "memory.total",
+                     "--format=csv,noheader,nounits"],
+                    capture_output=True, text=True, timeout=8)
+                parts = g.stdout.strip().split(",")
+                if len(parts) == 3:
+                    out["gpu"] = {"util": float(parts[0]),
+                                  "used_gb": round(float(parts[1]) / 1024, 1),
+                                  "total_gb": round(float(parts[2]) / 1024, 1)}
+            except Exception:
+                out["gpu"] = None
+            out["services"] = self._state()
+            out["procs"] = len(psutil.pids())
+        except Exception as exc:
+            out["error"] = f"{type(exc).__name__}: {str(exc)[:100]}"
+        return out
 
     def _do_voice(self):
         """One voice turn over SSE: listen(gated 3s) -> SenseVoice -> LLM

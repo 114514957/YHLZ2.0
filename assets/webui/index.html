@@ -8,29 +8,62 @@
 </head>
 <body>
 <header>
-  <h1>元亨 · 工作台 <span id="ver" class="dim">M1</span></h1>
+  <h1>元亨 · 工作台 <span id="ver" class="dim">v2</span></h1>
   <div id="lamps" class="lamps">
-    <span class="lamp" id="l-daemon">daemon …</span>
-    <span class="lamp" id="l-gemma">gemma …</span>
     <span class="lamp" id="l-busy">空闲</span>
-    <span class="lamp dim" id="l-info">历史 0 轮 · L2 0</span>
+    <button id="clearBtn" class="btn" type="button" title="清空对话，开新会话">清空 / 新对话</button>
+    <button id="dashBtn" class="btn" type="button" title="打开/收起仪表盘">仪表盘 ▸</button>
   </div>
 </header>
-<main>
-  <section id="chat">
-    <div id="msgs"></div>
+
+<aside id="side" class="glass">
+  <div class="side-head">仪表盘 <button id="dashClose" class="btn-mini" type="button">✕ 收起</button></div>
+  <section class="card">
+    <h3>后台情况</h3>
+    <ul class="svc">
+      <li><span class="dot" id="s-gemma"></span>Gemma 8081</li>
+      <li><span class="dot" id="s-daemon"></span>daemon 8321</li>
+      <li><span class="dot" id="s-ollama"></span>ollama 11434</li>
+      <li><span class="dot" id="s-tts"></span>Qwen3-TTS</li>
+    </ul>
   </section>
+  <section class="card">
+    <h3>元亨状态</h3>
+    <p class="kv"><span>当前阶段</span><b id="m-stage">空闲</b></p>
+    <p class="kv"><span>对话轮次</span><b id="m-turns">0</b></p>
+    <p class="kv"><span>记忆 L2</span><b id="m-l2">0</b></p>
+    <p class="kv"><span>persona 草稿</span><b id="m-persona">-</b></p>
+  </section>
+  <section class="card">
+    <h3>工作进度</h3>
+    <p class="kv"><span>进行中</span><b id="m-work">-</b></p>
+    <p class="kv"><span>链状态</span><b id="m-chain">-</b></p>
+  </section>
+  <section class="card">
+    <h3>资源占用</h3>
+    <p class="kv"><span>GPU 利用率</span><b id="m-gpu">-</b></p>
+    <div class="bar"><i id="m-gpub"></i></div>
+    <p class="kv"><span>显存</span><b id="m-vram">-</b></p>
+    <div class="bar"><i id="m-vramb"></i></div>
+    <p class="kv"><span>CPU</span><b id="m-cpu">-</b></p>
+    <div class="bar"><i id="m-cpub"></i></div>
+    <p class="kv"><span>内存</span><b id="m-ram">-</b></p>
+    <p class="kv"><span>磁盘</span><b id="m-disk">-</b></p>
+  </section>
+</aside>
+
+<main>
+  <section id="chat"><div id="msgs"></div></section>
   <footer>
     <div id="bar">
       <form id="talk">
-        <input id="in" type="text" autocomplete="off"
-               placeholder="输入消息，回车发送…">
-        <button id="send" type="submit">发送</button>
+        <input id="in" type="text" autocomplete="off" placeholder="输入消息，回车发送…">
+        <button id="send" class="btn" type="submit">发送</button>
       </form>
-      <button id="voiceBtn" type="button" title="说一句话（说完停3秒自动断）">🎤 语音</button>
+      <button id="voiceBtn" class="btn-gold" type="button" title="说一句话（说完停3秒自动断）">🎤 语音</button>
       <div id="vad"><i id="vadbar"></i></div>
     </div>
-    <p id="hint" class="dim">工作台：文本/语音对话流式。语音=听→识别→元亨→发声(后端)。</p>
+    <p id="hint" class="dim">工作台：文本/语音对话流式 · 记忆/台账/链路设置陆续接入</p>
   </footer>
 </main>
 <script src="/console.js"></script>
