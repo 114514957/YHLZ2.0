@@ -108,6 +108,14 @@ footer { flex:0 0 auto; padding:12px 22px; border-top:1px solid var(--glassline)
 .dot.down { background:var(--down); box-shadow:0 0 6px var(--down); }
 .kv { display:flex; justify-content:space-between; margin:4px 0; font-size:13px; }
 .kv span { color:var(--dim); }
+.qrow { display:flex; gap:6px; margin-bottom:6px; }
+.qrow input { flex:1; background:rgba(255,255,255,.7); border:1px solid rgba(120,90,40,.3);
+              border-radius:7px; padding:5px 8px; font-size:12px; color:#241a08; outline:none; }
+.qrow input:focus { border-color:var(--cobalt2); }
+.ql { list-style:none; margin:0; padding:0; max-height:170px; overflow-y:auto; }
+.ql li { font-size:12px; padding:4px 0; border-bottom:1px dashed rgba(120,90,40,.18); }
+.ql li b { color:#7a3d1a; font-size:11px; display:block; }
+.ql.logs li { color:#4a3a1e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .bar { height:7px; background:rgba(0,0,0,.08); border-radius:4px; overflow:hidden; margin:2px 0 6px; }
 .bar i { display:block; height:100%; width:0%;
          background:linear-gradient(90deg,var(--cobalt1),var(--cobalt3));

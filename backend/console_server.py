@@ -21,7 +21,16 @@ from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = _PROJECT_ROOT / "assets" / "webui"
+LEDGER_FILE = _PROJECT_ROOT / "docs" / "上下文台账.md"
+_LOG_RING: list[dict] = []
+from collections import deque as _deque
+
+_LOG_RING = _deque(maxlen=60)
 _sessions: dict[str, float] = {}
+
+
+def _log(event: str, detail: str = "") -> None:
+    _LOG_RING.append({"t": time.time(), "event": event, "detail": detail[:160]})
 
 
 def _sse(data: dict) -> bytes:
@@ -75,6 +84,12 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, self._history())
         elif p == "/monitor":
             self._send_json(200, self._monitor())
+        elif p == "/ledger":
+            self._send_json(200, self._ledger())
+        elif p == "/mem":
+            self._send_json(200, self._mem())
+        elif p == "/logs":
+            self._send_json(200, {"ok": True, "logs": list(_LOG_RING)})
         else:
             self._send_json(404, {"error": "not found"})
 
@@ -101,6 +116,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass
             s.save_session("console")
+            _log("reset", "新对话")
             self._send_json(200, {"ok": True})
         except Exception as exc:
             self._send_json(500, {"ok": False,
@@ -163,6 +179,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
         try:
             mock_text = str(body.get("text", "") or "").strip()
+            _log("voice", "mock:" + mock_text if mock_text else "listen")
             if mock_text:
                 text = mock_text
             else:
@@ -272,6 +289,64 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             return {"ok": False, "messages": [],
                     "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
 
+    def _ledger(self) -> dict:
+        from urllib.parse import parse_qs, urlparse
+
+        q = (parse_qs(urlparse(self.path).query).get("q", [""])[0]).strip()
+        if not q or not LEDGER_FILE.exists():
+            return {"ok": bool(q), "query": q, "items": []}
+        import re
+
+        lines = LEDGER_FILE.read_text(encoding="utf-8").splitlines()
+        recs: list[tuple[str, list[str]]] = []
+        cur: list[str] | None = None
+        title = ""
+        for ln in lines:
+            m = re.match(r"^## 记录 (\d+)[:：]?\s*(.*)", ln)
+            if m:
+                if cur is not None:
+                    recs.append((title, cur))
+                title = f"记录 {m.group(1)}：{m.group(2).strip()}"
+                cur = []
+            elif cur is not None:
+                cur.append(ln)
+        if cur is not None:
+            recs.append((title, cur))
+        low = q.lower()
+        out = []
+        for title, body in recs:
+            hit = low in title.lower() or any(low in b.lower() for b in body[:60])
+            if not hit:
+                continue
+            first = next((b.strip()[:150] for b in body
+                          if low in b.lower() and b.strip()), body[0].strip()[:150]
+                         if body else "")
+            out.append({"id": title, "text": first})
+            if len(out) >= 10:
+                break
+        out.reverse()  # newest first
+        return {"ok": True, "query": q, "items": out}
+
+    def _mem(self) -> dict:
+        from urllib.parse import parse_qs, urlparse
+
+        q = (parse_qs(urlparse(self.path).query).get("q", [""])[0]).strip()
+        limit = int(parse_qs(urlparse(self.path).query).get("limit", ["8"])[0])
+        if not q:
+            return {"ok": True, "query": q, "items": []}
+        try:
+            s = self.runtime._session("console")
+            hits = s.memory.recall(q, limit=min(limit, 20))
+            items = [{"id": h.get("id"), "type": h.get("type"),
+                      "importance": h.get("importance"),
+                      "status": h.get("status"),
+                      "summary": str(h.get("summary", ""))[:180]}
+                     for h in (hits or [])]
+            return {"ok": True, "query": q, "items": items}
+        except Exception as exc:
+            return {"ok": False, "query": q,
+                    "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
     def _state(self) -> dict:
         out = {"ok": True, "now": time.time()}
         try:
@@ -313,6 +388,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         if not text:
             self._send_json(400, {"error": "empty text"})
             return
+        _log("talk", text[:80])
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")

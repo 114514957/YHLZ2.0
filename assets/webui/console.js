@@ -45,6 +45,58 @@ $("clearBtn").addEventListener("click", async () => {
 function dot(id, ok) { const d = $(id); d.className = "dot " + (ok ? "ok" : "down"); }
 function bar(id, pct) { $(id).style.width = Math.max(0, Math.min(100, pct)) + "%"; }
 
+/* ledger + memory queries */
+async function qLedger() {
+  const q = $("ledgerQ").value.trim();
+  const ul = $("ledgerList");
+  ul.innerHTML = "<li>…</li>";
+  if (!q) { ul.innerHTML = ""; return; }
+  try {
+    const r = await (await fetch("/ledger?q=" + encodeURIComponent(q))).json();
+    ul.innerHTML = "";
+    for (const it of (r.items || [])) {
+      const li = document.createElement("li");
+      li.innerHTML = "<b>" + it.id + "</b>" + (it.text || "");
+      ul.appendChild(li);
+    }
+    if (!(r.items || []).length) ul.innerHTML = "<li>（台账查无）</li>";
+  } catch (e) { ul.innerHTML = "<li>查询失败</li>"; }
+}
+async function qMem() {
+  const q = $("memQ").value.trim();
+  const ul = $("memList");
+  ul.innerHTML = "<li>…</li>";
+  if (!q) { ul.innerHTML = ""; return; }
+  try {
+    const r = await (await fetch("/mem?q=" + encodeURIComponent(q))).json();
+    ul.innerHTML = "";
+    for (const it of (r.items || [])) {
+      const li = document.createElement("li");
+      li.textContent = "[" + (it.importance ?? "?") + "|" + (it.type ?? "") + "] " + it.summary;
+      ul.appendChild(li);
+    }
+    if (!(r.items || []).length) ul.innerHTML = "<li>（记忆查无）</li>";
+  } catch (e) { ul.innerHTML = "<li>查询失败</li>"; }
+}
+async function loadLogs() {
+  try {
+    const r = await (await fetch("/logs", { cache: "no-store" })).json();
+    const ul = $("logsList");
+    ul.innerHTML = "";
+    const logs = (r.logs || []).slice(-8);
+    for (const l of logs) {
+      const li = document.createElement("li");
+      const d = new Date(l.t * 1000);
+      li.textContent = d.toTimeString().slice(0, 8) + " " + l.event + (l.detail ? " " + l.detail : "");
+      ul.appendChild(li);
+    }
+  } catch (e) {}
+}
+$("ledgerBtn").addEventListener("click", qLedger);
+$("ledgerQ").addEventListener("keydown", (e) => { if (e.key === "Enter") qLedger(); });
+$("memBtn").addEventListener("click", qMem);
+$("memQ").addEventListener("keydown", (e) => { if (e.key === "Enter") qMem(); });
+
 async function loadDashboard() {
   try {
     const s = await (await fetch("/state", { cache: "no-store" })).json();
@@ -162,4 +214,5 @@ $("voiceBtn").addEventListener("click", () => { if (!busy) voice(); });
 
 loadHistory();
 loadDashboard();
-setInterval(loadDashboard, 3000);
+loadLogs();
+setInterval(() => { loadDashboard(); loadLogs(); }, 3000);
