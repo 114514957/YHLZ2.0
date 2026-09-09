@@ -70,10 +70,12 @@ def _daemon_turn(text: str, channel: str) -> str:
 
 
 class QQBridge:
-    def __init__(self, ws, uin: str, cfg: pathlib.Path):
+    def __init__(self, ws, uin: str, cfg: pathlib.Path,
+                 masters: set[str] | None = None):
         self.ws_url = ws
         self.uin = str(uin)
         self.cfg = cfg
+        self.masters = masters or {"2258374446"}  # owner QQ (command source)
         self.log_n = 0
 
     def log(self, msg: str) -> None:
@@ -106,6 +108,9 @@ class QQBridge:
         if not text:
             return
         if msg_type == "private":
+            if user_id not in self.masters:
+                self.log(f"忽略非主人私聊 {user_id}")
+                return
             channel = f"qq_p{user_id}"
         elif msg_type == "group":
             if self.uin not in ats:
@@ -162,6 +167,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--uin", default=None)
     ap.add_argument("--config", default=None)
+    ap.add_argument("--master", action="append", default=None,
+                    help="owner QQ uid(s); private from these = commands")
     a = ap.parse_args()
     cfg = pathlib.Path(a.config) if a.config else _find_onebot_config(a.uin)
     s = _ws_settings(cfg)
@@ -170,7 +177,8 @@ def main() -> int:
     url = f"ws://{s['host']}:{s['port']}"
     if s.get("token"):
         url += f"?access_token={s['token']}"
-    bridge = QQBridge(url, s["uin"], cfg)
+    masters = set(a.master or ["2258374446"])
+    bridge = QQBridge(url, s["uin"], cfg, masters=masters)
     try:
         asyncio.run(bridge.run())
     except KeyboardInterrupt:
