@@ -105,7 +105,12 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
   // build a coarse alpha mask so taps/drags only work on the visible pet
   function buildHit() {
     try {
-      const cvs = app.renderer.extract.canvas(model);
+      let ex = app.renderer.extract || (app.renderer.plugins && app.renderer.plugins.extract);
+      if (!ex && window.PIXI && PIXI.Extract) {
+        try { ex = new PIXI.Extract(app.renderer); } catch (e) {}
+      }
+      const cvs = ex ? ex.canvas(model) : null;
+      if (!cvs) { hit = null; return; }
       const gw = 96;
       const cw = cvs.width, ch = cvs.height;
       const gh = Math.max(1, Math.round(ch * gw / cw));
@@ -118,9 +123,13 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
     } catch (e) { hit = null; log('hitmask err ' + (e && e.message || e)); }
   }
   function hitAt(gx, gy) {
-    if (!model || !hit) return false;
+    if (!model) return false;
     const b = model.getBounds();
     if (b.width <= 0 || b.height <= 0) return false;
+    if (!hit) {
+      // fallback: whole model bounding box (keeps drag/right-click usable)
+      return gx >= b.x && gx <= b.right && gy >= b.y && gy <= b.bottom;
+    }
     const ux = (gx - b.x) / b.width, uy = (gy - b.y) / b.height;
     if (ux < 0 || ux > 1 || uy < 0 || uy > 1) return false;
     const col = Math.min(hit.w - 1, Math.max(0, Math.floor(ux * hit.w)));
