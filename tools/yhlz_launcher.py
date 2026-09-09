@@ -149,16 +149,47 @@ class BootHandler(BaseHTTPRequestHandler):
             self._send(404, b"n/a", "text/plain")
 
 
+def _self_test() -> None:
+    """Startup test: boot page serves /, /api/status, /loading.webp and all
+    services respond, then exits (no browser)."""
+    import urllib.request as _u
+
+    srv = ThreadingHTTPServer(("127.0.0.1", BOOT_PORT), BootHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    ok = True
+    try:
+        html = _u.urlopen(f"http://127.0.0.1:{BOOT_PORT}/", timeout=5).read()
+        ok &= b"YHLZ" in html and b"loading.webp" in html
+        st = json.loads(_u.urlopen(
+            f"http://127.0.0.1:{BOOT_PORT}/api/status", timeout=5).read())
+        ok &= all(st.values())
+        wp = _u.urlopen(f"http://127.0.0.1:{BOOT_PORT}/loading.webp",
+                        timeout=5).read()
+        ok &= wp[:4] in (b"RIFF", b"VP8X") or wp[:3] == b"\x00\x00\x00"
+    except Exception as exc:  # noqa: BLE001
+        print("SELFTEST FAIL", type(exc).__name__, str(exc)[:120])
+        ok = False
+    finally:
+        srv.shutdown()
+    print("SELFTEST OK services=", status() if ok else {},
+          flush=True)
+    if not ok:
+        raise SystemExit(1)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-browser", action="store_true",
                     help="do not open browser/workbench")
-    ap.add_argument("--stay", action="store_true",
-                    help="serve boot page but do not open a browser "
-                         "(automated startup test)")
+    ap.add_argument("--self-test", action="store_true",
+                    help="boot services + boot page endpoints, then exit "
+                         "(startup test)")
     a = ap.parse_args()
     ensure_stack()
-    if a.no_browser and not a.stay:
+    if a.self_test:
+        _self_test()
+        return 0
+    if a.no_browser:
         print("services ensured:", status(), flush=True)
         return 0
     try:
@@ -167,8 +198,7 @@ def main() -> int:
         srv = None
     if srv is not None:
         threading.Thread(target=srv.serve_forever, daemon=True).start()
-    if not a.no_browser:
-        webbrowser.open(f"http://127.0.0.1:{BOOT_PORT}/")
+    webbrowser.open(f"http://127.0.0.1:{BOOT_PORT}/")
     # keep alive until all ready, then let the page redirect to the workbench
     for _ in range(120):
         st = status()
@@ -176,9 +206,6 @@ def main() -> int:
             break
         time.sleep(1)
     if srv is not None:
-        # keep the boot page up long enough for its JS to see "all ok" and
-        # redirect to the workbench (even when services were already ready)
-        time.sleep(4)
         srv.shutdown()
     if not a.no_browser:
         try:
