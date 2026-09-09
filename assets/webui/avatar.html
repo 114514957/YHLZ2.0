@@ -6,39 +6,56 @@
 <style>
   html,body{margin:0;height:100%;background:#101318;overflow:hidden;color:#cfe0d8;
     font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif;}
+  html.pet, body.pet{background:transparent !important;}
+  body.pet #bar, body.pet #dbg{display:none;}
+  #dragbar{position:fixed;top:0;left:0;right:0;height:24px;-webkit-app-region:drag;
+    display:none;z-index:99;}
+  body.pet #dragbar{display:block;}
   #wrap{position:absolute;inset:0;}
   #dbg{position:absolute;left:10px;bottom:10px;max-width:70%;background:rgba(0,0,0,.55);
     color:#7fdcb6;padding:6px 10px;border-radius:8px;white-space:pre-wrap;font-size:12px;
     max-height:40vh;overflow-y:auto;}
-  #bar{position:absolute;top:10px;left:10px;display:flex;gap:8px;}
+  #bar{position:absolute;top:10px;left:10px;display:flex;gap:8px;align-items:center;}
   button{background:#1a5fd0;color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer;}
   .chip{padding:6px 14px;border-radius:14px;background:rgba(255,255,255,.12);color:#bfe;
     font-size:12px;align-self:center;}
   .chip.live{color:#ffd76e;}
-  #dragbar{position:fixed;top:0;left:0;right:0;height:24px;-webkit-app-region:drag;
-    display:none;z-index:99;}
-  body.pet #dragbar{display:block;}
-  body.pet #bar, body.pet #dbg{display:none;}
-  html.pet, body.pet{background:transparent !important;}
-  #petMenu{position:fixed;background:rgba(20,22,30,.92);color:#dfe6f0;border-radius:10px;
-    padding:4px;z-index:120;box-shadow:0 6px 18px rgba(0,0,0,.4);min-width:140px;}
-  #petMenu button{display:block;width:100%;background:none;border:0;color:#dfe6f0;
-    text-align:left;padding:6px 10px;border-radius:6px;cursor:pointer;}
-  #petMenu button:hover{background:#1a5fd0;}
-  #bubble{position:fixed;max-width:280px;background:rgba(22,24,32,.88);color:#eef2f8;
+  select.chip{background:rgba(20,22,30,.7);color:#dfe6f0;border:1px solid #3a4152;cursor:pointer;}
+  /* pet panel: input dialog + model switch, opened by right-clicking the pet */
+  #petPanel{position:fixed;width:250px;background:rgba(22,24,32,.94);color:#eef2f8;
+    border:1px solid #3a4152;border-radius:12px;padding:8px;z-index:140;
+    box-shadow:0 8px 24px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:6px;}
+  #petPanel .row{display:flex;gap:6px;align-items:center;}
+  #petPanel input[type=text]{flex:1;background:#0c0f14;border:1px solid #3a4152;color:#eef2f8;
+    border-radius:7px;padding:6px 8px;outline:none;}
+  #petPanel .mini{font-size:11px;color:#9fb0c8;}
+  #petPanel #pOut{background:#0c0f14;border-radius:8px;padding:6px 8px;max-height:150px;
+    overflow-y:auto;white-space:pre-wrap;font-size:12px;line-height:1.5;}
+  #petPanel .x{background:none;border:0;color:#9fb0c8;cursor:pointer;font-size:13px;}
+  #bubble{position:fixed;max-width:280px;background:rgba(22,24,32,.9);color:#eef2f8;
     padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;z-index:130;
     box-shadow:0 8px 20px rgba(0,0,0,.35);white-space:pre-wrap;pointer-events:none;}
 </style>
 </head>
 <body>
 <div id="dragbar"></div>
-<div id="bubble" hidden></div>
-<div id="petMenu" hidden></div>
 <div id="wrap"></div>
+<div id="petPanel" hidden>
+  <div class="row">
+    <span class="mini">换形象</span>
+    <select id="pSel" class="mini"></select>
+    <button class="x" id="pClose" type="button">✕</button>
+  </div>
+  <div class="row">
+    <input id="pIn" type="text" placeholder="和元亨说点什么…（回车发送）">
+    <button id="pSend" type="button">发送</button>
+  </div>
+  <div id="pOut" hidden></div>
+</div>
+<div id="bubble" hidden></div>
 <div id="bar">
   <span id="stage" class="chip">空闲</span>
   <select id="modelSel" class="chip" title="切换模型"></select>
-  <button id="btnEx">换表情</button>
   <button id="btnTalk">测试口型</button>
 </div>
 <div id="dbg">加载中…</div>
@@ -52,26 +69,20 @@ const dbg  = document.getElementById('dbg');
 const isPet = new URLSearchParams(location.search).get('pet') === '1';
 if (isPet) { document.body.classList.add('pet'); document.documentElement.classList.add('pet'); }
 function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; }
-function findGlobal(){
-  const keys = [];
-  for (const k of Object.keys(window)) {
-    if (/live2d|Live2D|cubism/i.test(k)) keys.push(k + (typeof window[k]));
-  }
-  return keys;
-}
+
 (async () => {
   log('pixi=' + !!(window.PIXI) + ' core=' + !!(window.Live2DCubismCore));
-  log('globals: ' + (findGlobal().join(', ') || '(none)'));
   const ns = window.PIXI?.live2d;
-  log('PIXI.live2d keys: ' + (ns ? Object.keys(ns).join(',') : '(无 PIXI.live2d)'));
   let LM = window.Live2DModel;
-  if (!LM && ns) { LM = ns.Live2DModel || ns.default?.Live2DModel; }
-  if (!window.PIXI) { log('PIXI 未加载'); return; }
-  if (!LM) { log('未找到 Live2DModel'); return; }
+  if (!LM && ns) LM = ns.Live2DModel || ns.default?.Live2DModel;
+  if (!window.PIXI || !LM) { log('加载失败：PIXI/Live2DModel 缺失'); return; }
   log('Live2DModel OK');
   const app = new PIXI.Application({ resizeTo: window, backgroundAlpha: 0, antialias: true });
   wrap.appendChild(app.view);
+
   let model = null;
+  let hit = null; // {w,h,a:Uint8ClampedArray} alpha mask grid
+
   async function loadModel(rel) {
     if (model) { app.stage.removeChild(model); try { model.destroy(true); } catch (e) {} }
     const url = '/live2d-models/' + rel.split('/').map(encodeURIComponent).join('/');
@@ -80,160 +91,215 @@ function findGlobal(){
     app.stage.addChild(model);
     model.anchor.set(0.5, 0.5);
     const s = isPet
-      ? Math.min(app.screen.width * 0.5 / model.width,
-                 app.screen.height * 0.6 / model.height)
-      : Math.min(app.screen.width / model.width,
-                 app.screen.height / model.height);
+      ? Math.min(app.screen.width * 0.5 / model.width, app.screen.height * 0.6 / model.height)
+      : Math.min(app.screen.width / model.width, app.screen.height / model.height);
     model.scale.set(s, s);
     model.x = app.screen.width * (isPet ? 0.78 : 0.5);
     model.y = app.screen.height * (isPet ? 0.72 : 0.55);
     log('模型就绪 ' + rel);
+    setTimeout(buildHit, 120);
+    wireModel();
   }
-  const enc = (s) => encodeURIComponent(s);
-  try {
-    const ml = await (await fetch('/avatar-models')).json();
-    const sel = document.getElementById('modelSel');
-    for (const it of (ml.items || [])) {
-      const o = document.createElement('option');
-      o.value = it.rel; o.textContent = it.name;
-      sel.appendChild(o);
-    }
-    sel.onchange = () => { if (sel.value) loadModel(sel.value).catch(e => log('换模型错误 ' + (e && e.message || e))); };
-    await loadModel(sel.value || 'YH3/seethrough_output.model3.json');
-    // build the right-click switch menu too
-    const pm = document.getElementById('petMenu');
-    for (const it of (ml.items || [])) {
-      const b = document.createElement('button');
-      b.textContent = it.name;
-      b.onclick = () => { pm.hidden = true; loadModel(it.rel).catch(e => log('换模型错误 ' + (e && e.message || e))); };
-      pm.appendChild(b);
-    }
-    if (isPet) {
-      const showAt = (x, y) => {
-        pm.style.left = Math.min(x, window.innerWidth - 160) + 'px';
-        pm.style.top = Math.min(y, window.innerHeight - 40) + 'px';
-        pm.hidden = false;
-      };
-      window.addEventListener('pointerdown', (e) => { if (e.button !== 2) pm.hidden = true; }, { passive: true });
-      document.addEventListener('contextmenu', (e) => e.preventDefault());
-      model.on('pointerdown', (e) => {
-        if (e.data.originalEvent && e.data.originalEvent.button === 2)
-          showAt(e.data.global.x, e.data.global.y);
-      });
-    }
-  } catch (e) { log('模型列表/加载错误 ' + (e && e.message || e)); }
-  // drag to move the model (pet-window feel)
+
+  // build a coarse alpha mask so taps/drags only work on the visible pet
+  function buildHit() {
+    try {
+      const cvs = app.renderer.extract.canvas(model);
+      const gw = 96;
+      const cw = cvs.width, ch = cvs.height;
+      const gh = Math.max(1, Math.round(ch * gw / cw));
+      const off = document.createElement('canvas');
+      off.width = gw; off.height = gh;
+      const c = off.getContext('2d');
+      c.drawImage(cvs, 0, 0, gw, gh);
+      const d = c.getImageData(0, 0, gw, gh).data;
+      hit = { w: gw, h: gh, a: d };
+    } catch (e) { hit = null; log('hitmask err ' + (e && e.message || e)); }
+  }
+  function hitAt(gx, gy) {
+    if (!model || !hit) return false;
+    const b = model.getBounds();
+    if (b.width <= 0 || b.height <= 0) return false;
+    const ux = (gx - b.x) / b.width, uy = (gy - b.y) / b.height;
+    if (ux < 0 || ux > 1 || uy < 0 || uy > 1) return false;
+    const col = Math.min(hit.w - 1, Math.max(0, Math.floor(ux * hit.w)));
+    const row = Math.min(hit.h - 1, Math.max(0, Math.floor(uy * hit.h)));
+    return (hit.a[(row * hit.w + col) * 4 + 3]) > 12;
+  }
+
   let drag = null;
+  let downG = null; // {x,y,t} for tap detection
   const bubble = document.getElementById('bubble');
   let bubbleTimer = null;
-  async function doTap(x, y) {
+
+  function wireModel() {
+    model.interactive = true;
+    model.on('pointerdown', (e) => {
+      const g = e.data.global;
+      if (e.data.button === 0) {
+        if (hitAt(g.x, g.y)) {
+          drag = { dx: model.x - g.x, dy: model.y - g.y };
+          downG = { x: g.x, y: g.y, t: performance.now() };
+        }
+      }
+    });
+    model.on('pointermove', (e) => {
+      if (drag) {
+        let nx = e.data.global.x + drag.dx;
+        let ny = e.data.global.y + drag.dy;
+        if (isPet) { const M = 20; nx = Math.min(Math.max(nx, M), app.screen.width - M);
+          ny = Math.min(Math.max(ny, M), app.screen.height - M); }
+        model.x = nx; model.y = ny;
+      }
+    });
+    model.on('pointerup', (e) => {
+      const g = e.data.global;
+      if (drag && e.data.button === 0) {
+        const moved = Math.hypot(g.x - downG.x, g.y - downG.y) < 7;
+        drag = null;
+        if (moved && performance.now() - downG.t < 600) doTap(g.x, g.y);
+      }
+    });
+    model.on('pointerupoutside', () => { drag = null; });
+    model.on('pointerdown', (e) => {
+      if (e.data.button === 2 && e.data.originalEvent) {
+        const g = e.data.global;
+        if (hitAt(g.x, g.y)) showPanel(g.x, g.y);
+      }
+    });
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  async function doTap(gx, gy) {
     try {
       bubble.hidden = false;
       bubble.textContent = '…';
-      bubble.style.left = Math.min(Math.max(12, x - 120), window.innerWidth - 280) + 'px';
-      bubble.style.top = Math.max(8, y - 70) + 'px';
+      bubble.style.left = Math.min(Math.max(12, gx - 140), window.innerWidth - 300) + 'px';
+      bubble.style.top = Math.max(8, gy - 60) + 'px';
       const r = await fetch('/tap', { method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ speak: '0' }) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
-      bubble.textContent = j.answer || '(没有回应)';
+      bubble.textContent = (j.answer || '(没有回应)');
       clearTimeout(bubbleTimer);
       bubbleTimer = setTimeout(() => { bubble.hidden = true; }, 6000);
-    } catch (e) { bubble.textContent = '(连接失败)'; }
+    } catch (e) { bubble.textContent = '(连接失败 ' + (e && e.message || e) + ')'; }
   }
-  let downX = 0, downY = 0, downT = 0;
-  model.on('pointerdown', (e) => {
-    if (e.data.button !== 0) return;
-    downX = e.data.global.x; downY = e.data.global.y; downT = performance.now();
-  });
-  model.on('pointerup', (e) => {
-    if (e.data.button !== 0) return;
-    if (Math.hypot(e.data.global.x - downX, e.data.global.y - downY) < 7 &&
-        performance.now() - downT < 600) doTap(e.data.global.x, e.data.global.y);
-  });
-  const centerModel = () => {
-    model.x = app.screen.width / 2;
-    model.y = app.screen.height * 0.58;
-  };
-  if (isPet && window.pet) {
-    window.addEventListener('resize', centerModel);
+
+  // right-click panel: model switch + text chat
+  const panel = document.getElementById('petPanel');
+  const pIn = document.getElementById('pIn');
+  const pOut = document.getElementById('pOut');
+  function showPanel(x, y) {
+    panel.style.left = Math.min(x, window.innerWidth - 270) + 'px';
+    panel.style.top = Math.min(y, window.innerHeight - 60) + 'px';
+    panel.hidden = false;
+    pIn.focus();
   }
-  model.interactive = true;
-  model.on('pointerdown', (e) => {
-    drag = { dx: model.x - e.data.global.x, dy: model.y - e.data.global.y };
-    e.data.originalEvent.stopPropagation();
-  });
-  model.on('pointermove', (e) => {
-    if (drag) {
-      let nx = e.data.global.x + drag.dx;
-      let ny = e.data.global.y + drag.dy;
-      if (isPet) {
-        // clamp by a small fixed margin so the pet can reach screen corners
-        // (Live2D canvas width includes large transparent padding; using it
-        // as the real bound would stop far from the edge)
-        const M = 20;
-        nx = Math.min(Math.max(nx, M), app.screen.width - M);
-        ny = Math.min(Math.max(ny, M), app.screen.height - M);
+  document.getElementById('pClose').onclick = () => { panel.hidden = true; pOut.hidden = true; };
+  async function pSend() {
+    const t = pIn.value.trim();
+    if (!t) return;
+    pOut.hidden = false;
+    pOut.textContent = '…';
+    try {
+      const resp = await fetch('/talk', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: t }) });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '', acc = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+          for (const ln of frame.split('\n')) {
+            if (!ln.startsWith('data:')) continue;
+            let ev; try { ev = JSON.parse(ln.slice(5)); } catch (e) { continue; }
+            if (ev.type === 'delta') acc += ev.delta || '';
+            else if (ev.type === 'turn_done') acc = ev.text || acc;
+          }
+        }
       }
-      model.x = nx; model.y = ny;
-    }
-  });
-  model.on('pointerup', () => { drag = null; });
-  model.on('pointerupoutside', () => { drag = null; });
-  log('就绪：拖拽形象可移动；控制台语音时口型联动');
-  if (isPet && window.pet) {
-    // dynamic click-through: only intercept mouse over the model or drag bar
-    const apply = () => {
-      const r = model.getBounds();
-      const M = 46; // margin around the model
-      const overModel = x >= r.x - M && x <= r.right + M && y >= r.y - M && y <= r.bottom + M;
-      const overBar = y <= 24;
-      window.pet.mouseThrough(!(overModel || overBar));
-    };
-    let x = -1, y = -1;
-    window.addEventListener('pointermove', (e) => { x = e.clientX; y = e.clientY; apply(); }, { passive: true });
-    // once the pointer leaves the window, always release the mouse
-    document.addEventListener('pointerleave', () => window.pet.mouseThrough(true));
-    document.addEventListener('mouseleave', () => window.pet.mouseThrough(true));
-    window.addEventListener('blur', () => window.pet.mouseThrough(true));
-    model.on('pointerdown', () => apply());
-    model.on('pointerup', () => apply());
+      pOut.textContent = acc.trim() || '(空回复)';
+    } catch (e) { pOut.textContent = '(连接失败 ' + (e && e.message || e) + ')'; }
+    pIn.value = '';
   }
-  window._model = () => model;
-  window.__petSwitchModel = (rel) => { if (rel) return loadModel(rel); };
+  document.getElementById('pSend').onclick = pSend;
+  pIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pSend(); } });
+
+  const enc = (s) => encodeURIComponent(s);
+  try {
+    const ml = await (await fetch('/avatar-models')).json();
+    const items = ml.items || [];
+    const sel = document.getElementById('modelSel');
+    const pSel = document.getElementById('pSel');
+    const fill = (selEl, value) => {
+      if (!selEl) return;
+      for (const it of items) {
+        const o = document.createElement('option');
+        o.value = it.rel; o.textContent = it.name;
+        if (it.rel === value) o.selected = true;
+        selEl.appendChild(o);
+      }
+    };
+    await loadModel((sel.value) || (items[0] && items[0].rel) || 'YH3/seethrough_output.model3.json');
+    fill(sel, model && null);
+    fill(pSel, null);
+    const doSwitch = (rel) => loadModel(rel).catch(e => log('换模型错误 ' + (e && e.message || e)));
+    sel.onchange = () => { if (sel.value) doSwitch(sel.value); };
+    pSel.onchange = () => { if (pSel.value) doSwitch(pSel.value); };
+  } catch (e) { log('列表/加载错误 ' + (e && e.message || e)); }
+
+  // avatar stage from workbench (mouth on speaking etc.)
   let phase = 0;
-  let talking = 0;
   let avState = 'idle';
   if ("BroadcastChannel" in window) {
     const ch = new BroadcastChannel("yhlz-avatar");
     ch.onmessage = (e) => {
       avState = e.data && e.data.stage || 'idle';
-      const el = document.getElementById('stage');
       const map = { listening: '聆听中…', thinking: '思考中…', speaking: '说话中…', asr: '识别中…', idle: '空闲' };
-      el.textContent = map[avState] || avState;
-      el.classList.toggle('live', avState === 'speaking');
+      const el = document.getElementById('stage');
+      if (el) { el.textContent = map[avState] || avState;
+        el.classList.toggle('live', avState === 'speaking'); }
     };
   }
   app.ticker.add(() => {
     phase += 0.03;
-    const open = (avState === 'speaking' || talking > 0);
-    if (talking > 0) talking -= 1;
+    const open = avState === 'speaking';
     if (open) {
       const m = Math.abs(Math.sin(phase * 11)) * 0.7;
       model.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', m);
     } else {
       model.internalModel.coreModel.addParameterValueById('ParamMouthOpenY', -0.1);
     }
-    model.internalModel.coreModel.addParameterValueById('ParamBreath',
-                                                         Math.sin(phase) * 0.05);
+    model.internalModel.coreModel.addParameterValueById('ParamBreath', Math.sin(phase) * 0.05);
   });
-  document.getElementById('btnEx').onclick = () => {
-    if (model.internalModel.motionManager) {
-      log('motion: 请求随机动作(若模型有动作集)');
-    }
-  };
-  document.getElementById('btnTalk').onclick = () => { talking = 70; };
-})().catch(e => { log('错误: ' + (e && e.message || e)); });
+
+  // dynamic click-through (pet): interact only over visible model pixels
+  if (isPet && window.pet) {
+    const apply = () => {
+      const gx = window.__px ?? -1, gy = window.__py ?? -1;
+      window.pet.mouseThrough(!(hitAt(gx, gy) || gx < 0));
+    };
+    window.__px = -1; window.__py = -1;
+    window.addEventListener('pointermove', (e) => {
+      window.__px = e.clientX; window.__py = e.clientY; apply();
+    }, { passive: true });
+    document.addEventListener('pointerleave', () => window.pet.mouseThrough(true));
+    document.addEventListener('mouseleave', () => window.pet.mouseThrough(true));
+    window.addEventListener('blur', () => window.pet.mouseThrough(true));
+    model.on('pointermove', () => apply());
+  }
+  window.__petSwitchModel = (rel) => loadModel(rel);
+  window._model = () => model;
+  log('就绪：左键轻点随口回应 · 右键对话框 · 拖动移动');
+})().catch(e => log('错误: ' + (e && e.message || e)));
 </script>
 </body>
 </html>
