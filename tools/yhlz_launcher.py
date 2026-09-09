@@ -85,6 +85,7 @@ def ensure_stack() -> dict:
 def _boot_html() -> bytes:
     return (f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
 <title>YHLZ · 元 · 亨 · 利 · 贞 · 启动中</title>
+<link rel="icon" href="/favicon.png">
 <style>
 html,body{{margin:0;height:100%;font:14px/1.7 "Segoe UI","Microsoft YaHei",sans-serif;
   color:#241a08;overflow:hidden;
@@ -103,7 +104,7 @@ h1{{margin:0;font-size:22px;letter-spacing:2px}}
 #st{{font-size:12px;opacity:.7;min-height:18px}}
 </style></head><body>
 <div class="wrap">
- <img src="/loading.webp" alt="">
+ <img src="/hero.png" alt="">
  <h1>YHLZ · 元 · 亨 · 利 · 贞</h1>
  <div class="rows" id="rows"></div>
  <div id="st">正在唤醒服务…</div>
@@ -142,6 +143,12 @@ class BootHandler(BaseHTTPRequestHandler):
         elif p == "/loading.webp":
             blob = (_ROOT / "assets" / "webui" / "loading.webp").read_bytes()
             self._send(200, blob, "image/webp")
+        elif p == "/hero.png":
+            blob = (_ROOT / "assets" / "webui" / "hero.png").read_bytes()
+            self._send(200, blob, "image/png")
+        elif p == "/favicon.png":
+            blob = (_ROOT / "assets" / "webui" / "favicon.png").read_bytes()
+            self._send(200, blob, "image/png")
         elif p == "/api/status":
             self._send(200, json.dumps(status()).encode(),
                        "application/json")
@@ -159,7 +166,7 @@ def _self_test() -> None:
     ok = True
     try:
         html = _u.urlopen(f"http://127.0.0.1:{BOOT_PORT}/", timeout=5).read()
-        ok &= b"YHLZ" in html and b"loading.webp" in html
+        ok &= b"YHLZ" in html and b"hero.png" in html
         st = json.loads(_u.urlopen(
             f"http://127.0.0.1:{BOOT_PORT}/api/status", timeout=5).read())
         ok &= all(st.values())
