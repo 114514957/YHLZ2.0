@@ -99,7 +99,7 @@ def _sse(data: dict) -> bytes:
 GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
-          "/avatar.html", "/avatar.js"}
+          "/avatar.html", "/avatar.js", "/avatar-models"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session"}
@@ -200,6 +200,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, self._mem())
         elif p == "/sessions":
             self._send_json(200, self._sessions())
+        elif p == "/avatar-models":
+            self._send_json(200, self._avatar_models())
         elif p == "/logs":
             self._send_json(200, {"ok": True, "logs": list(_LOG_RING)})
         elif p == "/settings":
@@ -493,6 +495,18 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             return {"ok": False,
                     "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
+    def _avatar_models(self) -> dict:
+        items = []
+        try:
+            for p in sorted(MODEL_DIR.rglob("*.model3.json")):
+                rel = p.relative_to(MODEL_DIR).as_posix()
+                name = p.parent.name
+                items.append({"name": name, "rel": rel})
+        except Exception as exc:
+            return {"ok": False, "items": [],
+                    "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+        return {"ok": True, "items": items}
 
     def _ledger(self) -> dict:
         from urllib.parse import parse_qs, urlparse

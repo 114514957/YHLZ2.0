@@ -21,6 +21,7 @@
 <div id="wrap"></div>
 <div id="bar">
   <span id="stage" class="chip">空闲</span>
+  <select id="modelSel" class="chip" title="切换模型"></select>
   <button id="btnEx">换表情</button>
   <button id="btnTalk">测试口型</button>
 </div>
@@ -52,15 +53,33 @@ function findGlobal(){
   log('Live2DModel OK');
   const app = new PIXI.Application({ resizeTo: window, backgroundAlpha: 0, antialias: true });
   wrap.appendChild(app.view);
-  const model = await LM.from('/live2d-models/YH3/seethrough_output.model3.json');
-  app.stage.addChild(model);
-  const s = Math.min(app.screen.width / model.width, app.screen.height / model.height);
-  model.scale.set(s, s);
-  model.anchor.set(0.5, 0.5);
-  model.x = app.screen.width / 2;
-  model.y = app.screen.height * 0.55;
-  log('模型加载成功 ' + Math.round(model.width) + 'x' + Math.round(model.height));
-  window._model = model;
+  let model = null;
+  async function loadModel(rel) {
+    if (model) { app.stage.removeChild(model); try { model.destroy(true); } catch (e) {} }
+    const url = '/live2d-models/' + rel.split('/').map(encodeURIComponent).join('/');
+    log('加载 ' + rel);
+    model = await LM.from(url);
+    app.stage.addChild(model);
+    const s = Math.min(app.screen.width / model.width, app.screen.height / model.height);
+    model.scale.set(s, s);
+    model.anchor.set(0.5, 0.5);
+    model.x = app.screen.width / 2;
+    model.y = app.screen.height * 0.55;
+    log('模型就绪 ' + rel);
+  }
+  const enc = (s) => encodeURIComponent(s);
+  try {
+    const ml = await (await fetch('/avatar-models')).json();
+    const sel = document.getElementById('modelSel');
+    for (const it of (ml.items || [])) {
+      const o = document.createElement('option');
+      o.value = it.rel; o.textContent = it.name;
+      sel.appendChild(o);
+    }
+    sel.onchange = () => { if (sel.value) loadModel(sel.value).catch(e => log('换模型错误 ' + (e && e.message || e))); };
+    await loadModel(sel.value || 'YH3/seethrough_output.model3.json');
+  } catch (e) { log('模型列表/加载错误 ' + (e && e.message || e)); }
+  window._model = () => model;
   let phase = 0;
   let talking = 0;
   let avState = 'idle';
