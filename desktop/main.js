@@ -1,5 +1,8 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell } = require("electron");
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain } = require("electron");
 const path = require("path");
+
+// Transparent frameless pet window (YHLZ avatar). Page must be transparent
+// (avatar.html pet mode makes both html+body transparent).
 
 let win = null;
 let tray = null;
@@ -17,15 +20,25 @@ function makeWindow() {
     alwaysOnTop: true,
     skipTaskbar: false,
     hasShadow: false,
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, "preload.js"),
+    },
   });
   win.setAlwaysOnTop(true, "floating");
   win.loadURL(AVATAR_URL);
+  // by default let the mouse click through the transparent window; the page
+  // toggles it back on when the pointer is over the model / drag bar
+  win.setIgnoreMouseEvents(true, { forward: true });
   win.on("close", (e) => {
-    // close to tray
     if (!app.isQuiting) { e.preventDefault(); win.hide(); }
   });
 }
+
+ipcMain.on("pet-mouse", (_e, on) => {
+  if (win) win.setIgnoreMouseEvents(!!on, { forward: true });
+});
 
 function makeTray() {
   let icon = path.join(__dirname, "..", "assets", "icons", "yhlz-app2.ico");

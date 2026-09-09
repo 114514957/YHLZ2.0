@@ -19,7 +19,7 @@
     display:none;z-index:99;}
   body.pet #dragbar{display:block;}
   body.pet #bar, body.pet #dbg{display:none;}
-  body.pet{background:transparent !important;}
+  html.pet, body.pet{background:transparent !important;}
 </style>
 </head>
 <body>
@@ -40,7 +40,7 @@
 const wrap = document.getElementById('wrap');
 const dbg  = document.getElementById('dbg');
 const isPet = new URLSearchParams(location.search).get('pet') === '1';
-if (isPet) document.body.classList.add('pet');
+if (isPet) { document.body.classList.add('pet'); document.documentElement.classList.add('pet'); }
 function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; }
 function findGlobal(){
   const keys = [];
@@ -100,6 +100,20 @@ function findGlobal(){
   model.on('pointerup', () => { drag = null; });
   model.on('pointerupoutside', () => { drag = null; });
   log('就绪：拖拽形象可移动；控制台语音时口型联动');
+  if (isPet && window.pet) {
+    // dynamic click-through: only intercept mouse over the model or drag bar
+    const apply = () => {
+      const r = model.getBounds();
+      const M = 46; // margin around the model
+      const overModel = x >= r.x - M && x <= r.right + M && y >= r.y - M && y <= r.bottom + M;
+      const overBar = y <= 24;
+      window.pet.mouseThrough(!(overModel || overBar));
+    };
+    let x = -1, y = -1;
+    window.addEventListener('pointermove', (e) => { x = e.clientX; y = e.clientY; apply(); }, { passive: true });
+    model.on('pointerdown', () => apply());
+    model.on('pointerup', () => apply());
+  }
   window._model = () => model;
   let phase = 0;
   let talking = 0;
