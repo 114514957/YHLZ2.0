@@ -38,10 +38,13 @@ function findGlobal(){
 }
 (async () => {
   log('pixi=' + !!(window.PIXI) + ' core=' + !!(window.Live2DCubismCore));
-  log('globals: ' + findGlobal().join(', ') || '(none)');
+  log('globals: ' + (findGlobal().join(', ') || '(none)'));
+  const ns = window.PIXI?.live2d;
+  log('PIXI.live2d keys: ' + (ns ? Object.keys(ns).join(',') : '(无 PIXI.live2d)'));
   let LM = window.Live2DModel;
-  if (!LM && window.PIXI) { LM = window.PIXI.Live2DModel || window.PIXI.live2d?.Live2DModel; }
-  if (!LM) { log('未找到 Live2DModel 全局(UMD 名未匹配)'); return; }
+  if (!LM && ns) { LM = ns.Live2DModel || ns.default?.Live2DModel; }
+  if (!window.PIXI) { log('PIXI 未加载'); return; }
+  if (!LM) { log('未找到 Live2DModel'); return; }
   log('Live2DModel OK');
   const app = new PIXI.Application({ resizeTo: window, backgroundAlpha: 0, antialias: true });
   wrap.appendChild(app.view);
