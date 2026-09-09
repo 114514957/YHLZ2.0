@@ -25,6 +25,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
+SRC_DIR = Path(r"C:\Users\ACE_WAN——PROJECT\Desktop\图片素材")
 BOOT_PORT = 8577
 OLLAMA = r"C:\Users\ACE_WAN——PROJECT\AppData\Local\Programs\Ollama\ollama.exe"
 LLAMA = (r"C:\Users\ACE_WAN——PROJECT\AppData\Local\Microsoft\WinGet\Packages"
@@ -88,23 +89,21 @@ def _boot_html() -> bytes:
 <link rel="icon" href="/favicon.png">
 <style>
 html,body{{margin:0;height:100%;font:14px/1.7 "Segoe UI","Microsoft YaHei",sans-serif;
-  color:#241a08;overflow:hidden;
-  background:#fdf3e0 radial-gradient(at 20% 15%, #ffe9a8 0, transparent 45%),
-             radial-gradient(at 85% 25%, #ffb3ad 0, transparent 40%),
-             radial-gradient(at 70% 80%, #cdb8ff 0, transparent 45%);}}
-.wrap{{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;}}
-img{{width:min(46vh,300px);filter:drop-shadow(0 14px 34px rgba(120,60,10,.4));
-  animation:pu 1.7s ease-in-out infinite;}}
-@keyframes pu{{0%,100%{{transform:scale(1)}}50%{{transform:scale(1.06)}}}}
-h1{{margin:0;font-size:22px;letter-spacing:2px}}
+  color:#fff;overflow:hidden;
+  background:#131318 url(/bg.png) center/cover no-repeat;}}
+.wrap{{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  background:rgba(10,8,20,.25);backdrop-filter:blur(2px);}}
+video{{width:min(64vh,420px);height:auto;border-radius:14px;
+  box-shadow:0 18px 44px rgba(0,0,0,.45);}}
+h1{{margin:0;font-size:22px;letter-spacing:2px;text-shadow:0 2px 8px #000}}
 .rows{{display:flex;gap:22px;font-weight:600}}
-.s{{padding:4px 14px;border-radius:14px;background:rgba(255,255,255,.5);}}
-.s b{{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:#aaa;}}
-.s.ok b{{background:#1f9d55;box-shadow:0 0 8px #1f9d55}}
-#st{{font-size:12px;opacity:.7;min-height:18px}}
+.s{{padding:4px 14px;border-radius:14px;background:rgba(255,255,255,.14);}}
+.s b{{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:#888;}}
+.s.ok b{{background:#4fd1a5;box-shadow:0 0 8px #4fd1a5}}
+#st{{font-size:12px;opacity:.75;min-height:18px}}
 </style></head><body>
 <div class="wrap">
- <img src="/hero.png" alt="">
+ <video src="/boot.mp4" autoplay muted loop playsinline></video>
  <h1>YHLZ · 元 · 亨 · 利 · 贞</h1>
  <div class="rows" id="rows"></div>
  <div id="st">正在唤醒服务…</div>
@@ -140,12 +139,12 @@ class BootHandler(BaseHTTPRequestHandler):
         p = self.path.split("?", 1)[0]
         if p == "/":
             self._send(200, _boot_html(), "text/html; charset=utf-8")
-        elif p == "/loading.webp":
-            blob = (_ROOT / "assets" / "webui" / "loading.webp").read_bytes()
-            self._send(200, blob, "image/webp")
-        elif p == "/hero.png":
-            blob = (_ROOT / "assets" / "webui" / "hero.png").read_bytes()
+        elif p == "/bg.png":
+            blob = (SRC_DIR / "背景.png").read_bytes()
             self._send(200, blob, "image/png")
+        elif p == "/boot.mp4":
+            blob = (SRC_DIR / "加载动画.mp4").read_bytes()
+            self._send(200, blob, "video/mp4")
         elif p == "/favicon.png":
             blob = (_ROOT / "assets" / "webui" / "favicon.png").read_bytes()
             self._send(200, blob, "image/png")
@@ -166,13 +165,13 @@ def _self_test() -> None:
     ok = True
     try:
         html = _u.urlopen(f"http://127.0.0.1:{BOOT_PORT}/", timeout=5).read()
-        ok &= b"YHLZ" in html and b"hero.png" in html
+        ok &= b"YHLZ" in html and b"boot.mp4" in html
         st = json.loads(_u.urlopen(
             f"http://127.0.0.1:{BOOT_PORT}/api/status", timeout=5).read())
         ok &= all(st.values())
-        wp = _u.urlopen(f"http://127.0.0.1:{BOOT_PORT}/loading.webp",
+        wp = _u.urlopen(f"http://127.0.0.1:{BOOT_PORT}/boot.mp4",
                         timeout=5).read()
-        ok &= wp[:4] in (b"RIFF", b"VP8X") or wp[:3] == b"\x00\x00\x00"
+        ok &= wp[:12] == b"\x00\x00\x00\x18ftypmp42" or len(wp) > 100000
     except Exception as exc:  # noqa: BLE001
         print("SELFTEST FAIL", type(exc).__name__, str(exc)[:120])
         ok = False
