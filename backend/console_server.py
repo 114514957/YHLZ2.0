@@ -71,6 +71,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._serve_file("console.js")
         elif p == "/state":
             self._send_json(200, self._state())
+        elif p == "/history":
+            self._send_json(200, self._history())
         else:
             self._send_json(404, {"error": "not found"})
 
@@ -79,9 +81,145 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         if p == "/talk":
             self._do_talk()
             return
+        if p == "/voice":
+            self._do_voice()
+            return
         self._send_json(404, {"error": "not found"})
 
+    def _do_voice(self):
+        """One voice turn over SSE: listen(gated 3s) -> SenseVoice -> LLM
+        stream -> TTS speak. {text} present => mock mode (skip mic, use text)."""
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except Exception:
+            self._send_json(400, {"error": "bad json"})
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+
+        def emit(data: dict) -> None:
+            try:
+                self.wfile.write(_sse(data))
+                self.wfile.flush()
+            except Exception:
+                pass
+
+        import time as _t
+
+        try:
+            mock_text = str(body.get("text", "") or "").strip()
+            if mock_text:
+                text = mock_text
+            else:
+                emit({"type": "state", "value": "listening"})
+                r = self._listen(body)
+                if not r.get("started"):
+                    emit({"type": "state", "value": "idle"})
+                    emit({"type": "voice_done",
+                          "status": "no-speech"})
+                    return
+                audio = r["audio"]
+                emit({"type": "voice_text", "kind": "asr",
+                      "text": "(语音已采集，识别中…)"})
+                from tools.tts_test_start import _get_sv, release_sv
+
+                emit({"type": "state", "value": "asr"})
+                sv = _get_sv()
+                res = sv.generate(input=audio, language="zh",
+                                  use_itn=True, batch_size_s=60)
+                raw = str((res[0] or {}).get("text") or "") if res else ""
+                import re
+
+                text = re.sub(r"<\|[^|]+\|>", "", raw).strip()
+                release_sv()
+                emit({"type": "voice_text", "kind": "user", "text": text})
+            emit({"type": "state", "value": "thinking"})
+            if not text:
+                emit({"type": "state", "value": "idle"})
+                return
+            info = self.runtime.console_turn_stream(
+                text, lambda c: emit({"type": "delta", "delta": c}))
+            answer = str(info.get("answer", ""))
+            emit({"type": "turn_done", "text": answer,
+                  "tool_uses": len(info.get("tool_uses") or [])})
+            speak = str(body.get("speak", "1")) not in ("0", "false", "off")
+            if speak and answer.strip():
+                emit({"type": "state", "value": "speaking"})
+                self._speak(answer)
+            emit({"type": "state", "value": "idle"})
+            emit({"type": "voice_done", "status": "ok"})
+        except Exception as exc:  # noqa: BLE001
+            emit({"type": "error", "message": f"{type(exc).__name__}: "
+                                              f"{str(exc)[:200]}"})
+            emit({"type": "state", "value": "idle"})
+
+    # ---------- voice helpers ----------
+    def _listen(self, body) -> dict:
+        from tools.tts_test_start import _capture_loop
+
+        device = int(body.get("device", 1))
+        dur = float(body.get("duration", 60.0))
+        denoise = str(body.get("denoise", "rnnoise"))
+        emit = self._emit_level
+
+        def on_level(level, is_speech):
+            try:
+                emit(level, is_speech)
+            except Exception:
+                pass
+
+        return _capture_loop(device, 1.0, dur, denoise, None, False, False,
+                             on_level=on_level)
+
+    def _emit_level(self, level, is_speech):
+        self.wfile.write(_sse({"type": "level", "value": round(float(level), 4),
+                               "speech": bool(is_speech)}))
+        self.wfile.flush()
+
+    def _speak(self, text: str) -> None:
+        import torch
+
+        import numpy as np
+        import sounddevice as sd
+        from faster_qwen3_tts import FasterQwen3TTS
+
+        t0 = time.time()
+        m = FasterQwen3TTS.from_pretrained(
+            str(_PROJECT_ROOT / "models" / "qwen3-tts" /
+                "Qwen3-TTS-12Hz-1.7B-CustomVoice"),
+            device="cuda", dtype=torch.bfloat16)
+        wavs, sr = m.generate_custom_voice(
+            text=str(text)[:180], language="Chinese", speaker="Vivian",
+            instruct="自然地说，像和亲近的人聊天，别播音腔。")
+        samples = np.asarray(wavs[0], dtype="float32")
+        sd.play(samples, int(sr))
+        sd.wait()
+        del m
+        import gc
+
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print(f"[console][tts] ok {time.time()-t0:.0f}s", flush=True)
+
     # ---------- logic ----------
+    def _history(self) -> dict:
+        """Console session dialogue history (persisted per turn in cache/sessions/
+        console.json) so a page refresh restores the conversation."""
+        try:
+            s = self.runtime._session("console")
+            msgs = [
+                {"role": m.get("role"), "content": str(m.get("content", ""))}
+                for m in (s.history or [])
+            ]
+            return {"ok": True, "messages": msgs}
+        except Exception as exc:
+            return {"ok": False, "messages": [],
+                    "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
     def _state(self) -> dict:
         out = {"ok": True, "now": time.time()}
         try:

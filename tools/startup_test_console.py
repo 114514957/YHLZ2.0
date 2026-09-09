@@ -62,8 +62,34 @@ def main() -> int:
         if frames >= 3 and deltas >= 1 and done:
             print(f"OK: talk stream frames={frames} deltas={deltas} done=Y",
                   flush=True)
+        else:
+            print(f"FAIL: talk stream frames={frames} deltas={deltas} done={done}",
+                  flush=True)
+            return 1
+        # voice mock chain (skip mic/TTS): text -> LLM stream -> voice_done
+        body = json.dumps({"text": "说三个字", "speak": "0"}).encode()
+        req = urllib.request.Request("http://127.0.0.1:8332/voice",
+                                     data=body,
+                                     headers={"Content-Type": "application/json"})
+        r = urllib.request.urlopen(req, timeout=120)
+        vok = vdone = False
+        vdeltas = 0
+        for raw in r:
+            line = raw.decode("utf-8", "replace").strip()
+            if not line.startswith("data:"):
+                continue
+            ev = json.loads(line[5:])
+            if ev["type"] == "delta":
+                vdeltas += 1
+            elif ev["type"] == "voice_done":
+                vok = ev.get("status") == "ok"
+                vdone = True
+            elif ev["type"] == "state" and ev["value"] == "idle":
+                pass
+        if vok and vdone and vdeltas >= 1:
+            print(f"OK: voice mock deltas={vdeltas} done=Y", flush=True)
             return 0
-        print(f"FAIL: talk stream frames={frames} deltas={deltas} done={done}",
+        print(f"FAIL: voice mock ok={vok} done={vdone} deltas={vdeltas}",
               flush=True)
         return 1
     finally:

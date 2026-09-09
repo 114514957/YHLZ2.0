@@ -111,22 +111,25 @@ def _clean(text: str) -> str:
 
 
 def _capture_loop(device: int, cap_gain: float, duration_s: float,
-                  denoise: str, gate, verbose_gate: bool, debug: bool) -> dict:
+                  denoise: str, gate, verbose_gate: bool, debug: bool,
+                  on_level=None) -> dict:
     """Try rnnoise (48k) capture; on any audio-layer failure degrade to raw
-    16k so the test entry always runs and prints what went wrong."""
+    16k so the test entry always runs and prints what went wrong.
+    on_level(level, is_speech) optional per-~500ms activity callback."""
     if denoise == "rnnoise":
         try:
             return _capture_impl(device, cap_gain, duration_s, "rnnoise",
-                                 gate, verbose_gate, debug)
+                                 gate, verbose_gate, debug, on_level)
         except Exception as exc:  # noqa: BLE001
             print(f"[warn] rnnoise 采集失败({type(exc).__name__}: "
                   f"{str(exc)[:90]})，降级 raw 16k", flush=True)
     return _capture_impl(device, cap_gain, duration_s, "off",
-                         gate, verbose_gate, debug)
+                         gate, verbose_gate, debug, on_level)
 
 
 def _capture_impl(device: int, cap_gain: float, duration_s: float,
-                  denoise: str, gate, verbose_gate: bool, debug: bool) -> dict:
+                  denoise: str, gate, verbose_gate: bool, debug: bool,
+                  on_level=None) -> dict:
     import numpy as np
     import sounddevice as sd
 
@@ -196,6 +199,16 @@ def _capture_impl(device: int, cap_gain: float, duration_s: float,
                     lead = 0
                     seg = []
                     seg_len_s = 0.0
+
+            if on_level is not None:
+                _lvl_t = globals().get("_last_level_t", 0.0)
+                if time.time() - _lvl_t >= 0.5:
+                    globals()["_last_level_t"] = time.time()
+                    try:
+                        on_level(float(np.sqrt(np.mean(enhanced * enhanced))),
+                                 bool(is_speech))
+                    except Exception:
+                        pass
 
             seg_ready = (len(seg) > 0 and
                          (seg_silent_s >= SEG_CLOSE_SILENCE_S or

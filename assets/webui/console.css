@@ -25,11 +25,19 @@ main { flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
 .msg.thinking { opacity:.6; }
 footer { flex:0 0 auto; border-top:1px solid var(--line); padding:12px 20px;
          background:var(--panel); }
-#talk { display:flex; gap:10px; max-width:860px; margin:0 auto; }
+#bar { display:flex; gap:10px; max-width:860px; margin:0 auto; align-items:center; }
+#talk { display:flex; gap:10px; flex:1; }
 #in { flex:1; background:#0c1016; color:var(--tx); border:1px solid var(--line);
       border-radius:8px; padding:9px 12px; outline:none; font-size:14px; }
 #in:focus { border-color:var(--acc); }
 button { background:var(--acc); color:#04231a; border:0; border-radius:8px;
          padding:9px 18px; cursor:pointer; font-weight:600; }
 button:disabled { opacity:.5; cursor:default; }
+#voiceBtn { background:#f2c14e; color:#3a2c00; white-space:nowrap; }
+#voiceBtn:disabled { opacity:.5; }
+#vad { width:110px; height:10px; background:#0c1016; border:1px solid var(--line);
+       border-radius:5px; overflow:hidden; }
+#vadbar { display:block; width:0%; height:100%; background:var(--acc);
+          transition:width .12s; }
+#vadbar.hot { background:var(--busy); }
 #hint { max-width:860px; margin:6px auto 0; font-size:12px; }

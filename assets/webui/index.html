@@ -21,12 +21,16 @@
     <div id="msgs"></div>
   </section>
   <footer>
-    <form id="talk">
-      <input id="in" type="text" autocomplete="off"
-             placeholder="输入消息，回车发送…">
-      <button id="send" type="submit">发送</button>
-    </form>
-    <p id="hint" class="dim">工作台 M1：文本对话 + 流式 + 状态。语音/监控/台账将接入。</p>
+    <div id="bar">
+      <form id="talk">
+        <input id="in" type="text" autocomplete="off"
+               placeholder="输入消息，回车发送…">
+        <button id="send" type="submit">发送</button>
+      </form>
+      <button id="voiceBtn" type="button" title="说一句话（说完停3秒自动断）">🎤 语音</button>
+      <div id="vad"><i id="vadbar"></i></div>
+    </div>
+    <p id="hint" class="dim">工作台：文本/语音对话流式。语音=听→识别→元亨→发声(后端)。</p>
   </footer>
 </main>
 <script src="/console.js"></script>
