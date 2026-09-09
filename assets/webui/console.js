@@ -97,6 +97,34 @@ $("ledgerQ").addEventListener("keydown", (e) => { if (e.key === "Enter") qLedger
 $("memBtn").addEventListener("click", qMem);
 $("memQ").addEventListener("keydown", (e) => { if (e.key === "Enter") qMem(); });
 
+async function loadSessions() {
+  try {
+    const r = await (await fetch("/sessions", { cache: "no-store" })).json();
+    const ul = $("sessList");
+    ul.innerHTML = "";
+    for (const it of (r.items || []).slice(0, 10)) {
+      const li = document.createElement("li");
+      li.innerHTML = "<b>" + it.name + "</b>";
+      const t = document.createElement("div");
+      t.textContent = it.turns + "轮 · " + it.title;
+      li.appendChild(t);
+      li.style.cursor = "pointer";
+      li.title = "载入此会话";
+      li.addEventListener("click", async () => {
+        if (!confirm("载入会话 " + it.name + "？当前对话将先自动存档。")) return;
+        const rr = await fetch("/session", { method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: it.name }) });
+        const j = await rr.json();
+        if (j.ok) { msgs.innerHTML = ""; loadHistory(); alert("已载入 " + it.name); }
+        else alert("载入失败 " + (j.error || ""));
+      });
+      ul.appendChild(li);
+    }
+    if (!(r.items || []).length) ul.innerHTML = "<li>（暂无档案）</li>";
+  } catch (e) {}
+}
+
 /* link settings */
 async function loadSettings() {
   try {
@@ -253,6 +281,7 @@ $("voiceBtn").addEventListener("click", () => { if (!busy) voice(); });
 
 loadHistory();
 loadSettings();
+loadSessions();
 loadDashboard();
 loadLogs();
 setInterval(() => { loadDashboard(); loadLogs(); }, 3000);

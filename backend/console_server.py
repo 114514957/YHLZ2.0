@@ -98,8 +98,8 @@ def _sse(data: dict) -> bytes:
 
 GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
-          "/ledger", "/mem", "/favicon.png", "/loading.webp"}
-POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control"}
+          "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions"}
+POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session"}
 
 
 class ConsoleHandler(BaseHTTPRequestHandler):
@@ -157,6 +157,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, self._ledger())
         elif p == "/mem":
             self._send_json(200, self._mem())
+        elif p == "/sessions":
+            self._send_json(200, self._sessions())
         elif p == "/logs":
             self._send_json(200, {"ok": True, "logs": list(_LOG_RING)})
         elif p == "/settings":
@@ -198,6 +200,15 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "bad json"})
                 return
             self._send_json(200, self._control(body))
+            return
+        if p == "/session":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                self._send_json(400, {"error": "bad json"})
+                return
+            self._send_json(200, self._session_load(body))
             return
         self._send_json(404, {"error": "not found"})
 
@@ -408,6 +419,38 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             return {"ok": True, "messages": msgs}
         except Exception as exc:
             return {"ok": False, "messages": [],
+                    "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
+    def _sessions(self) -> dict:
+        from backend.target_entry import ConversationSession
+
+        try:
+            rows = ConversationSession.recent_sessions(14)
+            return {"ok": True, "items": rows}
+        except Exception as exc:
+            return {"ok": False, "items": [],
+                    "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
+    def _session_load(self, body: dict) -> dict:
+        name = str(body.get("name", "")).strip()
+        if not name or "/" in name or "\\" in name:
+            return {"ok": False, "error": "bad name"}
+        try:
+            s = self.runtime._session("console")
+            # archive current console first if it has content
+            if s.history:
+                try:
+                    import time as _t
+
+                    s.save_session(f"archive_{int(_t.time())}")
+                except Exception:
+                    pass
+            n = s.load_session(name)
+            s.save_session("console")
+            _log("session", "load " + name)
+            return {"ok": True, "loaded": name, "messages": n}
+        except Exception as exc:
+            return {"ok": False,
                     "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
 
     def _ledger(self) -> dict:
