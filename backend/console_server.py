@@ -99,7 +99,7 @@ def _sse(data: dict) -> bytes:
 GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
-          "/avatar.html", "/avatar.js", "/avatar-models"}
+          "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session",
@@ -206,6 +206,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._serve_file("index.html")
         elif p == "/avatar.html":
             self._serve_file("avatar.html")
+        elif p == "/chat_popup.html":
+            self._serve_file("chat_popup.html")
         elif p == "/avatar.js":
             self._serve_file("avatar.js")
         elif p == "/favicon.png":

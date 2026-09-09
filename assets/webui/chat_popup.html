@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YHLZ · 元 · 亨 · 利 · 贞 · 对话</title>
+<link rel="stylesheet" href="/console.css">
+<link rel="icon" href="/favicon.png">
+<style>
+  /* reuse the workbench theme; this page is dialog-only */
+  body{display:flex;flex-direction:column;}
+  #chat{flex:1 1 auto;}
+  #popbar{display:flex;align-items:center;gap:8px;padding:8px 18px;
+    background:rgba(255,255,255,.35);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--glassline);flex:0 0 auto;}
+  #popbar b{font-size:14px;}
+  #stage{font-size:12px;margin-left:auto;opacity:.8;}
+</style>
+</head>
+<body>
+<div id="popbar"><b>YHLZ · 元 · 亨 · 利 · 贞</b><span id="stage">空闲</span></div>
+<section id="chat"><div id="msgs"></div></section>
+<footer>
+  <div id="bar">
+    <form id="talk">
+      <input id="in" type="text" autocomplete="off" placeholder="和元亨说点什么…（回车发送）">
+      <button id="send" class="btn" type="submit">发送</button>
+    </form>
+  </div>
+</footer>
+<script>
+const $=(id)=>document.getElementById(id);
+const msgs=$("msgs");
+let busy=false;
+function addMsg(role,who,text){
+  const d=document.createElement("div");d.className="msg "+(role==="u"?"u":"a");
+  const w=document.createElement("div");w.className="who";w.textContent=who;
+  const t=document.createElement("div");t.textContent=text;
+  d.appendChild(w);d.appendChild(t);msgs.appendChild(d);
+  msgs.scrollTop=msgs.scrollHeight;return t;
+}
+async function loadHistory(){
+  try{
+    const h=await(await fetch("/history",{cache:"no-store"})).json();
+    if(!h.ok)return;
+    for(const m of h.messages||[]){
+      if(m.role==="user")addMsg("u","你",m.content);
+      else if(m.role==="assistant")addMsg("a","元亨",m.content);
+    }
+    msgs.scrollTop=msgs.scrollHeight;
+  }catch(e){}
+}
+async function talk(text){
+  busy=true;$("send").disabled=true;$("stage").textContent="思考中…";
+  const box=addMsg("a","元亨","");
+  try{
+    const r=await fetch("/talk",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+    if(!r.ok){box.textContent="(请求失败 "+r.status+")";return;}
+    const reader=r.body.getReader();const dec=new TextDecoder();
+    let buf="",acc="";
+    while(true){
+      const{done,value}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf("\n\n"))>=0){
+        const frame=buf.slice(0,i);buf=buf.slice(i+2);
+        for(const ln of frame.split("\n")){
+          if(!ln.startsWith("data:"))continue;
+          let ev;try{ev=JSON.parse(ln.slice(5));}catch(e){continue;}
+          if(ev.type==="delta"){acc+=ev.delta||"";box.textContent=acc;}
+          else if(ev.type==="turn_done"){if(ev.text){box.textContent=ev.text;}acc=ev.text||"";}
+          else if(ev.type==="state"){$("stage").textContent=ev.value;}
+        }
+        msgs.scrollTop=msgs.scrollHeight;
+      }
+    }
+  }catch(e){box.textContent="(连接错误) "+e;}
+  $("stage").textContent="空闲";busy=false;$("send").disabled=false;
+}
+$("talk").addEventListener("submit",(ev)=>{
+  ev.preventDefault();
+  const v=$("in").value.trim();if(!v||busy)return;
+  addMsg("u","你",v);$("in").value="";talk(v);
+});
+loadHistory();
+</script>
+</body>
+</html>

@@ -6,9 +6,29 @@ const path = require("path");
 
 let win = null;
 let tray = null;
+let chatWin = null;
 
 const CONSOLE_URL = "http://127.0.0.1:8321/";
 const AVATAR_URL = "http://127.0.0.1:8321/avatar.html?pet=1";
+const CHAT_URL = "http://127.0.0.1:8321/chat_popup.html";
+
+function openChat() {
+  if (!chatWin || chatWin.isDestroyed()) {
+    chatWin = new BrowserWindow({
+      width: 560,
+      height: 720,
+      title: "YHLZ · 对话",
+      autoHideMenuBar: true,
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    });
+    chatWin.loadURL(CHAT_URL);
+    chatWin.on("closed", () => { chatWin = null; });
+  } else {
+    if (chatWin.isMinimized()) chatWin.restore();
+    chatWin.show();
+    chatWin.focus();
+  }
+}
 
 function makeWindow() {
   // Full-display transparent overlay (includes taskbar strip so the pet can
@@ -80,6 +100,7 @@ async function makeTray() {
   const models = await modelsSubmenu();
   const menu = Menu.buildFromTemplate([
     { label: "显示/隐藏桌宠", click: () => { if (win) win.isVisible() ? win.hide() : win.show(); } },
+    { label: "对话", click: openChat },
     { label: "切换形象", submenu: models.length ? models : [{ label: "(无模型)", enabled: false }] },
     { label: "打开工作台", click: () => shell.openExternal(CONSOLE_URL) },
     { type: "separator" },
