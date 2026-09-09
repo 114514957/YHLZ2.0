@@ -11,14 +11,15 @@ const CONSOLE_URL = "http://127.0.0.1:8321/";
 const AVATAR_URL = "http://127.0.0.1:8321/avatar.html?pet=1";
 
 function makeWindow() {
-  // Full-work-area transparent overlay: the pet may roam anywhere on screen
-  // and never gets clipped by a small window; blank areas click through.
-  const wa = screen.getPrimaryDisplay().workArea;
+  // Full-display transparent overlay (includes taskbar strip so the pet can
+  // roam the whole physical screen); blank areas click through.
+  const disp = screen.getPrimaryDisplay();
+  const b = disp.bounds;
   win = new BrowserWindow({
-    x: wa.x,
-    y: wa.y,
-    width: wa.width,
-    height: wa.height,
+    x: b.x,
+    y: b.y,
+    width: b.width,
+    height: b.height,
     transparent: true,
     frame: false,
     resizable: false,
