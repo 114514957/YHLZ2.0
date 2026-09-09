@@ -88,6 +88,8 @@ class ConversationSession:
                 pass
         self.channel = str(channel or "private")
         self._ctx_recent: dict[str, float] = {}  # de-dup of auto-recalled memories
+        self._last_reviewed = 0          # turns count at last auto review
+        self._reviewing = False
         self.style_inject = False  # style persona injection (off until A/B accepted)
         self.registry = registry if registry is not None else setup_scheduler_capabilities()
         bind_memory_save_service(self.registry, self.memory)
@@ -264,6 +266,13 @@ class ConversationSession:
         self.memory.append_turn(role="assistant", text=result.answer)
         if self.memory._summary_pending:
             self._summary_tasks.append(asyncio.ensure_future(self.memory.process_summary()))
+        if (not self._reviewing and
+                (len(self.history) // 2 - self._last_reviewed) >= 6):
+            try:
+                self._summary_tasks.append(
+                    asyncio.ensure_future(self.review_once("auto")))
+            except Exception:
+                pass
         self.history.append({"role": "user", "content": text})
         self.history.append({"role": "assistant", "content": result.answer})
         if len(self.history) > self.history_limit:
@@ -322,6 +331,49 @@ class ConversationSession:
                 except Exception:
                     pass
         return {"insights": n, "reason": "ok"}
+
+    # ---------- review pipeline (ledger 0226): long-session -> durable memory
+    async def review_once(self, reason: str = "manual") -> dict:
+        """收口复盘：滚动摘要 → L2 候选提取 → 本地裁决入库 → 洞察提炼。
+        可自动(每6轮)或 /review 手动；失败各自降级不抛。"""
+        if self._reviewing:
+            return {"reason": "busy"}
+        self._reviewing = True
+        out = {"reason": reason}
+        try:
+            await self.memory.process_summary()
+        except Exception:
+            pass
+        try:
+            recent = self.history[-16:]
+            transcript = "\n".join(
+                f"{'用户' if m.get('role') == 'user' else '元亨'}: "
+                f"{str(m.get('content', ''))[:300]}"
+                for m in recent)
+            last_user = ""
+            for m in reversed(recent):
+                if m.get("role") == "user":
+                    last_user = str(m.get("content", ""))[:600]
+                    break
+            if transcript.strip():
+                items = await self.memory.submit_candidates(
+                    text=last_user, transcript=transcript,
+                    evidence_ref=f"review:{int(time.time())}", source="review")
+                if items:
+                    kept = await self.memory.adjudicate_async(
+                        items, local_only=True)
+                    out["candidates"] = len(items)
+                    out["kept"] = len(kept or [])
+        except Exception:
+            pass
+        try:
+            out["reflect"] = await self.reflect()
+        except Exception:
+            pass
+        self._last_reviewed = len(self.history) // 2
+        self._reviewing = False
+        return out
+
 
     # ---------- persistence (message-level, cache/sessions) ----------
     def _session_title(self) -> str:
@@ -655,6 +707,10 @@ def cli_main() -> int:
                     print("元亨(自主)> " + info["answer"][:300])
                 except Exception as exc:
                     print(f"(自主回顾失败: {type(exc).__name__})")
+                continue
+            if line in ("/review",):
+                info = loop.run_until_complete(session.review_once("manual"))
+                print(f"[复盘] {info}", flush=True)
                 continue
             turns += 1
             print("元亨> ", end="", flush=True)
