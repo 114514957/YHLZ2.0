@@ -20,10 +20,16 @@
   body.pet #dragbar{display:block;}
   body.pet #bar, body.pet #dbg{display:none;}
   html.pet, body.pet{background:transparent !important;}
+  #petMenu{position:fixed;background:rgba(20,22,30,.92);color:#dfe6f0;border-radius:10px;
+    padding:4px;z-index:120;box-shadow:0 6px 18px rgba(0,0,0,.4);min-width:140px;}
+  #petMenu button{display:block;width:100%;background:none;border:0;color:#dfe6f0;
+    text-align:left;padding:6px 10px;border-radius:6px;cursor:pointer;}
+  #petMenu button:hover{background:#1a5fd0;}
 </style>
 </head>
 <body>
 <div id="dragbar"></div>
+<div id="petMenu" hidden></div>
 <div id="wrap"></div>
 <div id="bar">
   <span id="stage" class="chip">空闲</span>
@@ -90,6 +96,27 @@ function findGlobal(){
     }
     sel.onchange = () => { if (sel.value) loadModel(sel.value).catch(e => log('换模型错误 ' + (e && e.message || e))); };
     await loadModel(sel.value || 'YH3/seethrough_output.model3.json');
+    // build the right-click switch menu too
+    const pm = document.getElementById('petMenu');
+    for (const it of (ml.items || [])) {
+      const b = document.createElement('button');
+      b.textContent = it.name;
+      b.onclick = () => { pm.hidden = true; loadModel(it.rel).catch(e => log('换模型错误 ' + (e && e.message || e))); };
+      pm.appendChild(b);
+    }
+    if (isPet) {
+      const showAt = (x, y) => {
+        pm.style.left = Math.min(x, window.innerWidth - 160) + 'px';
+        pm.style.top = Math.min(y, window.innerHeight - 40) + 'px';
+        pm.hidden = false;
+      };
+      window.addEventListener('pointerdown', (e) => { if (e.button !== 2) pm.hidden = true; }, { passive: true });
+      document.addEventListener('contextmenu', (e) => e.preventDefault());
+      model.on('pointerdown', (e) => {
+        if (e.data.originalEvent && e.data.originalEvent.button === 2)
+          showAt(e.data.global.x, e.data.global.y);
+      });
+    }
   } catch (e) { log('模型列表/加载错误 ' + (e && e.message || e)); }
   // drag to move the model (pet-window feel)
   let drag = null;
