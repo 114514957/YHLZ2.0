@@ -153,9 +153,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-browser", action="store_true",
                     help="do not open browser/workbench")
+    ap.add_argument("--stay", action="store_true",
+                    help="serve boot page but do not open a browser "
+                         "(automated startup test)")
     a = ap.parse_args()
     ensure_stack()
-    if a.no_browser:
+    if a.no_browser and not a.stay:
         print("services ensured:", status(), flush=True)
         return 0
     try:
@@ -164,7 +167,8 @@ def main() -> int:
         srv = None
     if srv is not None:
         threading.Thread(target=srv.serve_forever, daemon=True).start()
-    webbrowser.open(f"http://127.0.0.1:{BOOT_PORT}/")
+    if not a.no_browser:
+        webbrowser.open(f"http://127.0.0.1:{BOOT_PORT}/")
     # keep alive until all ready, then let the page redirect to the workbench
     for _ in range(120):
         st = status()
@@ -172,6 +176,9 @@ def main() -> int:
             break
         time.sleep(1)
     if srv is not None:
+        # keep the boot page up long enough for its JS to see "all ok" and
+        # redirect to the workbench (even when services were already ready)
+        time.sleep(4)
         srv.shutdown()
     if not a.no_browser:
         try:
