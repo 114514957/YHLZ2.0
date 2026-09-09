@@ -61,16 +61,15 @@ function findGlobal(){
   let talking = 0;
   app.ticker.add(() => {
     phase += 0.03;
-    model.rotation = Math.sin(phase) * 0.03;
-    model.y = app.screen.height * 0.55 + Math.sin(phase * 0.7) * 4;
     if (talking > 0) {
       talking -= 1;
       const m = Math.abs(Math.sin(phase * 9)) * 0.6;
       model.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', m);
-      model.internalModel.coreModel.addParameterValueById('ParamBreath', Math.sin(phase) * 0.03);
     } else {
       model.internalModel.coreModel.addParameterValueById('ParamMouthOpenY', -0.1);
     }
+    model.internalModel.coreModel.addParameterValueById('ParamBreath',
+                                                         Math.sin(phase) * 0.05);
   });
   document.getElementById('btnEx').onclick = () => {
     if (model.internalModel.motionManager) {
