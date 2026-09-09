@@ -2,6 +2,8 @@
 
 > 状态：设计稿（未开工）。在 v1（docs/YHLZ_WebUI控制台_设计_v1.md）之上，按用户要求扩展为"NEKO 式桌面部署 + WebUI 控制端"双形态协同。NEKO 依据=项目内研究报告+README(仓库 Project-N-E-K-O/N.E.K.O)。
 
+> **0221 定稿三定**：① 形象素材=`角色皮套/`（当前空，viewer 做成可换模型目录，放入即用）② 桌面壳=首期浏览器无边框 viewer，Electron 后置(M5) ③ 前端=工程化可接受(React/Vue+构建)；**插件/扩展不抄 NEKO plugin SDK=复用 YHLZ capability registry（工具即扩展，控制端按钮/命令即后端 cap UI 化）**。
+
 ## A. 双形态总览（协同同一 daemon）
 ```
 ┌─ WebUI 控制端（浏览器, full）─────────────────────────────┐
@@ -33,7 +35,8 @@
 5. **台账查询**：ledger_search 前端输入+结果(记录号/时间/标签着色)、memory 检索、persona/认知根基浏览（≈NEKO memory_browser，只读+经审批写）
 
 ## C. 桌面虚拟形象（NEKO 借鉴落点）
-- **载体**：本地 HTML viewer（Live2D cubism JS）+ 无边框窗口（首期浏览器整屏模式；Electron 壳列入里程碑 M5 可选）。
+- **载体**：本地 HTML viewer（Live2D cubism JS）+ 无边框窗口（首期浏览器整屏/新窗模式；Electron 壳 M5 可选）。
+- **素材**：`角色皮套/` 目录扫描（.model3.json 等）；可换目录=放入即用。目录空时 viewer 显示占位。
 - **事件订阅**（同 daemon WS，仅形象用）：
   - `{type:"state"}` 阶段灯(听/想/说)
   - `{type:"delta"}` 文字
