@@ -16,7 +16,7 @@ function makeWindow() {
     height: 680,
     transparent: true,
     frame: false,
-    resizable: true,
+    resizable: false,
     alwaysOnTop: true,
     skipTaskbar: false,
     hasShadow: false,
