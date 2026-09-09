@@ -117,8 +117,8 @@ setInterval(async()=>{{
  try{{const r=await fetch('/api/status');const d=await r.json();let all=true;
   for(const k in names){{const e=document.getElementById('s_'+k);if(d[k]){{e.classList.add('ok')}}
     else{{all=false;e.classList.remove('ok')}}}}
-  if(all){{document.getElementById('st').textContent='全部就绪，进入工作台…';
-    setTimeout(()=>location.href='http://127.0.0.1:8321/',400);}}}}
+  if(all){{document.getElementById('st').textContent='全部就绪，即将进入工作台…';
+    setTimeout(()=>location.href='http://127.0.0.1:8321/',2600);}}}}
  catch(e){{}}
 }},700);
 </script></body></html>""").encode("utf-8")
@@ -157,29 +157,25 @@ class BootHandler(BaseHTTPRequestHandler):
 
 
 def _self_test() -> None:
-    """Startup test: boot page serves /, /api/status, /loading.webp and all
-    services respond, then exits (no browser)."""
+    """Startup test: ensure the whole stack and verify the workbench UI is
+    served on 8321 (no boot page anymore)."""
     import urllib.request as _u
 
-    srv = ThreadingHTTPServer(("127.0.0.1", BOOT_PORT), BootHandler)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    ok = True
+    ensure_stack()
+    for _ in range(60):
+        st = status()
+        if all(st.values()):
+            break
+        time.sleep(1)
+    ok = all(status().values())
     try:
-        html = _u.urlopen(f"http://127.0.0.1:{BOOT_PORT}/", timeout=5).read()
-        ok &= b"YHLZ" in html and b"boot.mp4" in html
-        st = json.loads(_u.urlopen(
-            f"http://127.0.0.1:{BOOT_PORT}/api/status", timeout=5).read())
-        ok &= all(st.values())
-        wp = _u.urlopen(f"http://127.0.0.1:{BOOT_PORT}/boot.mp4",
-                        timeout=5).read()
-        ok &= wp[:12] == b"\x00\x00\x00\x18ftypmp42" or len(wp) > 100000
+        html = _u.urlopen("http://127.0.0.1:8321/", timeout=5).read()
+        h = html.decode("utf-8", "replace")
+        ok &= "YHLZ" in h
     except Exception as exc:  # noqa: BLE001
-        print("SELFTEST FAIL", type(exc).__name__, str(exc)[:120])
+        print("SELFTEST FAIL workbench", type(exc).__name__, str(exc)[:100])
         ok = False
-    finally:
-        srv.shutdown()
-    print("SELFTEST OK services=", status() if ok else {},
-          flush=True)
+    print("SELFTEST OK services=", status() if ok else {}, flush=True)
     if not ok:
         raise SystemExit(1)
 
@@ -189,37 +185,29 @@ def main() -> int:
     ap.add_argument("--no-browser", action="store_true",
                     help="do not open browser/workbench")
     ap.add_argument("--self-test", action="store_true",
-                    help="boot services + boot page endpoints, then exit "
-                         "(startup test)")
+                    help="ensure services then exit (startup test)")
     a = ap.parse_args()
-    ensure_stack()
     if a.self_test:
         _self_test()
         return 0
-    if a.no_browser:
-        print("services ensured:", status(), flush=True)
-        return 0
-    try:
-        srv = ThreadingHTTPServer(("127.0.0.1", BOOT_PORT), BootHandler)
-    except Exception:
-        srv = None
-    if srv is not None:
-        threading.Thread(target=srv.serve_forever, daemon=True).start()
-    webbrowser.open(f"http://127.0.0.1:{BOOT_PORT}/")
-    # keep alive until all ready, then let the page redirect to the workbench
-    for _ in range(120):
+    ensure_stack()
+    # wait until the whole stack is ready, then open the workbench directly
+    print("等待服务就绪…", flush=True)
+    for _ in range(150):
         st = status()
+        print("  ", st, flush=True)
         if all(st.values()):
             break
         time.sleep(1)
-    if srv is not None:
-        srv.shutdown()
-    if not a.no_browser:
-        try:
-            time.sleep(2)
-            webbrowser.open("http://127.0.0.1:8321/")
-        except Exception:
-            pass
+    if not all(status().values()):
+        print("部分服务未就绪:", status(), flush=True)
+        if not a.no_browser:
+            return 1
+    if a.no_browser:
+        print("services:", status(), flush=True)
+        return 0
+    webbrowser.open("http://127.0.0.1:8321/")
+    print("已打开工作台 http://127.0.0.1:8321", flush=True)
     return 0
 
 
