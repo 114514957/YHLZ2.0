@@ -28,6 +28,65 @@ from collections import deque as _deque
 _LOG_RING = _deque(maxlen=60)
 _sessions: dict[str, float] = {}
 
+SETTINGS_FILE = _PROJECT_ROOT / "data" / "console.json"
+DEFAULT_SETTINGS = {
+    "device": 1,
+    "denoise": "rnnoise",
+    "duration": 60.0,
+    "asr": "sensevoice",
+    "tts_speaker": "Vivian",
+    "tts_speak": True,
+}
+
+
+def _settings_load() -> dict:
+    d = dict(DEFAULT_SETTINGS)
+    try:
+        if SETTINGS_FILE.exists():
+            import json as _j
+
+            d.update(_j.loads(SETTINGS_FILE.read_text(encoding="utf-8")))
+    except Exception:
+        pass
+    return d
+
+
+def _settings_save(patch: dict) -> dict:
+    import json as _j
+
+    cur = _settings_load()
+    for k in list(DEFAULT_SETTINGS):
+        if k in patch:
+            try:
+                if isinstance(DEFAULT_SETTINGS[k], bool):
+                    cur[k] = str(patch[k]).lower() in ("1", "true", "yes", "on")
+                elif isinstance(DEFAULT_SETTINGS[k], float):
+                    cur[k] = float(patch[k])
+                elif isinstance(DEFAULT_SETTINGS[k], int):
+                    cur[k] = int(patch[k])
+                else:
+                    cur[k] = str(patch[k])
+            except Exception:
+                pass
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_FILE.write_text(_j.dumps(cur, ensure_ascii=False, indent=1),
+                             encoding="utf-8")
+    _log("settings", ",".join(k for k in patch if k in DEFAULT_SETTINGS))
+    return cur
+
+
+def _audio_devices() -> list[dict]:
+    try:
+        import sounddevice as sd
+
+        return [
+            {"index": i, "name": d["name"]}
+            for i, d in enumerate(sd.query_devices())
+            if d["max_input_channels"] > 0
+        ]
+    except Exception:
+        return []
+
 
 def _log(event: str, detail: str = "") -> None:
     _LOG_RING.append({"t": time.time(), "event": event, "detail": detail[:160]})
@@ -90,6 +149,10 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, self._mem())
         elif p == "/logs":
             self._send_json(200, {"ok": True, "logs": list(_LOG_RING)})
+        elif p == "/settings":
+            self._send_json(200, {"ok": True, "settings": _settings_load()})
+        elif p == "/devices":
+            self._send_json(200, {"ok": True, "devices": _audio_devices()})
         else:
             self._send_json(404, {"error": "not found"})
 
@@ -103,6 +166,25 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             return
         if p == "/reset":
             self._do_reset()
+            return
+        if p == "/settings":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                self._send_json(400, {"error": "bad json"})
+                return
+            self._send_json(200, {"ok": True,
+                                  "settings": _settings_save(body)})
+            return
+        if p == "/control":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                self._send_json(400, {"error": "bad json"})
+                return
+            self._send_json(200, self._control(body))
             return
         self._send_json(404, {"error": "not found"})
 
@@ -178,13 +260,14 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         import time as _t
 
         try:
+            st = _settings_load()
             mock_text = str(body.get("text", "") or "").strip()
             _log("voice", "mock:" + mock_text if mock_text else "listen")
             if mock_text:
                 text = mock_text
             else:
                 emit({"type": "state", "value": "listening"})
-                r = self._listen(body)
+                r = self._listen(body, st)
                 if not r.get("started"):
                     emit({"type": "state", "value": "idle"})
                     emit({"type": "voice_done",
@@ -214,10 +297,11 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             answer = str(info.get("answer", ""))
             emit({"type": "turn_done", "text": answer,
                   "tool_uses": len(info.get("tool_uses") or [])})
-            speak = str(body.get("speak", "1")) not in ("0", "false", "off")
+            speak_default = "1" if st.get("tts_speak", True) else "0"
+            speak = str(body.get("speak", speak_default)) not in ("0", "false", "off")
             if speak and answer.strip():
                 emit({"type": "state", "value": "speaking"})
-                self._speak(answer)
+                self._speak(answer, st.get("tts_speaker", "Vivian"))
             emit({"type": "state", "value": "idle"})
             emit({"type": "voice_done", "status": "ok"})
         except Exception as exc:  # noqa: BLE001
@@ -226,12 +310,33 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             emit({"type": "state", "value": "idle"})
 
     # ---------- voice helpers ----------
-    def _listen(self, body) -> dict:
+    def _control(self, body: dict) -> dict:
+        action = str(body.get("action", ""))
+        if action == "release_vram":
+            try:
+                from tools.tts_test_start import release_sv
+
+                release_sv()
+                import gc
+                import torch
+
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                _log("control", "release_vram")
+                return {"ok": True, "note": "ASR/TTS cuda 已释放"}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"{type(exc).__name__}"}
+        if action == "reload_settings":
+            return {"ok": True, "settings": _settings_load()}
+        return {"ok": False, "error": "unknown action: " + action}
+
+    def _listen(self, body, st: dict) -> dict:
         from tools.tts_test_start import _capture_loop
 
-        device = int(body.get("device", 1))
-        dur = float(body.get("duration", 60.0))
-        denoise = str(body.get("denoise", "rnnoise"))
+        device = int(body.get("device", st.get("device", 1)))
+        dur = float(body.get("duration", st.get("duration", 60.0)))
+        denoise = str(body.get("denoise", st.get("denoise", "rnnoise")))
         emit = self._emit_level
 
         def on_level(level, is_speech):
@@ -248,7 +353,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                                "speech": bool(is_speech)}))
         self.wfile.flush()
 
-    def _speak(self, text: str) -> None:
+    def _speak(self, text: str, speaker: str = "Vivian") -> None:
         import torch
 
         import numpy as np
@@ -261,7 +366,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 "Qwen3-TTS-12Hz-1.7B-CustomVoice"),
             device="cuda", dtype=torch.bfloat16)
         wavs, sr = m.generate_custom_voice(
-            text=str(text)[:180], language="Chinese", speaker="Vivian",
+            text=str(text)[:180], language="Chinese", speaker=str(speaker),
             instruct="自然地说，像和亲近的人聊天，别播音腔。")
         samples = np.asarray(wavs[0], dtype="float32")
         sd.play(samples, int(sr))

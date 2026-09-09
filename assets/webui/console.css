@@ -109,6 +109,12 @@ footer { flex:0 0 auto; padding:12px 22px; border-top:1px solid var(--glassline)
 .kv { display:flex; justify-content:space-between; margin:4px 0; font-size:13px; }
 .kv span { color:var(--dim); }
 .qrow { display:flex; gap:6px; margin-bottom:6px; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px; }
+.grid2 label { font-size:12px; color:var(--dim); display:flex; flex-direction:column; gap:2px; }
+.grid2 select { background:rgba(255,255,255,.7); border:1px solid rgba(120,90,40,.3);
+                border-radius:7px; padding:5px 6px; font-size:12px; color:#241a08; }
+.grid2 label.ck { flex-direction:row; align-items:center; gap:6px; }
+.grid2 label.ck input { width:auto; }
 .qrow input { flex:1; background:rgba(255,255,255,.7); border:1px solid rgba(120,90,40,.3);
               border-radius:7px; padding:5px 8px; font-size:12px; color:#241a08; outline:none; }
 .qrow input:focus { border-color:var(--cobalt2); }

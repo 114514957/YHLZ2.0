@@ -97,6 +97,45 @@ $("ledgerQ").addEventListener("keydown", (e) => { if (e.key === "Enter") qLedger
 $("memBtn").addEventListener("click", qMem);
 $("memQ").addEventListener("keydown", (e) => { if (e.key === "Enter") qMem(); });
 
+/* link settings */
+async function loadSettings() {
+  try {
+    const r = await (await fetch("/settings", { cache: "no-store" })).json();
+    const s = r.settings || {};
+    const dv = $("cf-device");
+    dv.innerHTML = "";
+    const devs = await (await fetch("/devices", { cache: "no-store" })).json();
+    for (const d of (devs.devices || [])) {
+      const o = document.createElement("option");
+      o.value = d.index; o.textContent = d.index + " " + d.name;
+      if (String(d.index) === String(s.device)) o.selected = true;
+      dv.appendChild(o);
+    }
+    $("cf-denoise").value = s.denoise || "rnnoise";
+    $("cf-duration").value = String(s.duration || 3);
+    $("cf-speaker").value = s.tts_speaker || "Vivian";
+    $("cf-speak").checked = s.tts_speak !== false;
+  } catch (e) {}
+}
+$("cf-save").addEventListener("click", async () => {
+  const body = {
+    device: parseInt($("cf-device").value, 10) || 1,
+    denoise: $("cf-denoise").value,
+    duration: parseFloat($("cf-duration").value) || 3,
+    tts_speaker: $("cf-speaker").value,
+    tts_speak: $("cf-speak").checked,
+  };
+  await fetch("/settings", { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  alert("设置已保存并热生效");
+});
+$("cf-free").addEventListener("click", async () => {
+  await fetch("/control", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "release_vram" }) });
+  alert("已请求释放 ASR/TTS 显存");
+});
+
 async function loadDashboard() {
   try {
     const s = await (await fetch("/state", { cache: "no-store" })).json();
@@ -213,6 +252,7 @@ $("talk").addEventListener("submit", (ev) => {
 $("voiceBtn").addEventListener("click", () => { if (!busy) voice(); });
 
 loadHistory();
+loadSettings();
 loadDashboard();
 loadLogs();
 setInterval(() => { loadDashboard(); loadLogs(); }, 3000);

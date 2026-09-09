@@ -61,6 +61,20 @@
     <ul id="memList" class="ql"></ul>
   </section>
   <section class="card">
+    <h3>链路设置</h3>
+    <div class="grid2">
+      <label>设备<select id="cf-device"></select></label>
+      <label>降噪<select id="cf-denoise"><option>rnnoise</option><option>off</option></select></label>
+      <label>断句秒<select id="cf-duration"><option>2</option><option>3</option><option>5</option><option>8</option></select></label>
+      <label>音色<select id="cf-speaker"><option>Vivian</option><option>Serena</option><option>Ono_Anna</option><option>Sohee</option></select></label>
+      <label class="ck"><input type="checkbox" id="cf-speak"> 回复发声</label>
+    </div>
+    <div class="qrow">
+      <button id="cf-save" class="btn-mini" type="button">保存设置</button>
+      <button id="cf-free" class="btn-mini" type="button">释放显存</button>
+    </div>
+  </section>
+  <section class="card">
     <h3>最近日志</h3>
     <ul id="logsList" class="ql logs"></ul>
   </section>
