@@ -15,9 +15,15 @@
   .chip{padding:6px 14px;border-radius:14px;background:rgba(255,255,255,.12);color:#bfe;
     font-size:12px;align-self:center;}
   .chip.live{color:#ffd76e;}
+  #dragbar{position:fixed;top:0;left:0;right:0;height:24px;-webkit-app-region:drag;
+    display:none;z-index:99;}
+  body.pet #dragbar{display:block;}
+  body.pet #bar, body.pet #dbg{display:none;}
+  body.pet{background:transparent !important;}
 </style>
 </head>
 <body>
+<div id="dragbar"></div>
 <div id="wrap"></div>
 <div id="bar">
   <span id="stage" class="chip">空闲</span>
@@ -33,6 +39,8 @@
 <script>
 const wrap = document.getElementById('wrap');
 const dbg  = document.getElementById('dbg');
+const isPet = new URLSearchParams(location.search).get('pet') === '1';
+if (isPet) document.body.classList.add('pet');
 function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; }
 function findGlobal(){
   const keys = [];

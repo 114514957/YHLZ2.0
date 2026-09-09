@@ -1,0 +1,13 @@
+{
+  "name": "yhlz-pet",
+  "version": "0.1.0",
+  "private": true,
+  "description": "YHLZ 桌面桌宠壳（Electron）",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}
