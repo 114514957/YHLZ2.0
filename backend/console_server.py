@@ -139,11 +139,13 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
     # ---------- routing (shared with daemon _Handler via inheritance) ----------
     def _serve_under(self, route_prefix: str, base_dir) -> None:
+        from urllib.parse import unquote
+
         p = self.path.split("?", 1)[0]
         if not p.startswith(route_prefix):
             self._send_json(404, {"error": "not found"})
             return
-        rel = p[len(route_prefix):].lstrip("/")
+        rel = unquote(p[len(route_prefix):]).lstrip("/")
         target = (base_dir / rel).resolve()
         try:
             if not str(target).startswith(str(base_dir.resolve())) or \
