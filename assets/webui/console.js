@@ -38,7 +38,9 @@ function setStage(v) { stage = v; setLamp("l-busy", v); bcStage(v); }
 /* ---------- dashboard drawer ---------- */
 $("dashBtn").addEventListener("click", () => $("side").classList.add("open"));
 $("dashClose").addEventListener("click", () => $("side").classList.remove("open"));
-$("avatarBtn").addEventListener("click", () => window.open("/avatar.html", "_blank"));
+$("avatarBtn").addEventListener("click", () =>
+  window.open("/avatar.html", "yh_avatar",
+              "width=560,height=800,resizable=yes,scrollbars=no"));
 $("clearBtn").addEventListener("click", async () => {
   if (!confirm("清空当前对话并开新会话？")) return;
   try { await fetch("/reset", { method: "POST" }); } catch (e) {}

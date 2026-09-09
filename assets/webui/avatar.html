@@ -79,6 +79,19 @@ function findGlobal(){
     sel.onchange = () => { if (sel.value) loadModel(sel.value).catch(e => log('换模型错误 ' + (e && e.message || e))); };
     await loadModel(sel.value || 'YH3/seethrough_output.model3.json');
   } catch (e) { log('模型列表/加载错误 ' + (e && e.message || e)); }
+  // drag to move the model (pet-window feel)
+  let drag = null;
+  model.interactive = true;
+  model.on('pointerdown', (e) => {
+    drag = { dx: model.x - e.data.global.x, dy: model.y - e.data.global.y };
+    e.data.originalEvent.stopPropagation();
+  });
+  model.on('pointermove', (e) => {
+    if (drag) { model.x = e.data.global.x + drag.dx; model.y = e.data.global.y + drag.dy; }
+  });
+  model.on('pointerup', () => { drag = null; });
+  model.on('pointerupoutside', () => { drag = null; });
+  log('就绪：拖拽形象可移动；控制台语音时口型联动');
   window._model = () => model;
   let phase = 0;
   let talking = 0;
