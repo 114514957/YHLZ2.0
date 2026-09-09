@@ -96,6 +96,12 @@ def _sse(data: dict) -> bytes:
     return ("data: " + json.dumps(data, ensure_ascii=False) + "\n\n").encode("utf-8")
 
 
+GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
+          "/history", "/monitor", "/settings", "/devices", "/logs",
+          "/ledger", "/mem"}
+POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control"}
+
+
 class ConsoleHandler(BaseHTTPRequestHandler):
     runtime = None
 
@@ -128,8 +134,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    # ---------- routing ----------
-    def do_GET(self):
+    # ---------- routing (shared with daemon _Handler via inheritance) ----------
+    def console_do_GET(self):
         p = self.path.split("?", 1)[0]
         if p in ("/", "/index.html"):
             self._serve_file("index.html")
@@ -156,7 +162,10 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         else:
             self._send_json(404, {"error": "not found"})
 
-    def do_POST(self):
+    def do_GET(self):
+        self.console_do_GET()
+
+    def console_do_POST(self):
         p = self.path.split("?", 1)[0]
         if p == "/talk":
             self._do_talk()
@@ -187,6 +196,9 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, self._control(body))
             return
         self._send_json(404, {"error": "not found"})
+
+    def do_POST(self):
+        self.console_do_POST()
 
     def _do_reset(self):
         """Clear the console conversation (new chat)."""

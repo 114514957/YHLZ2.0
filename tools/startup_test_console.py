@@ -1,7 +1,6 @@
-"""Startup test for the workbench console (M1, ledger 0222).
-
-Spawns an isolated daemon (8331) + console (8332), waits for /state, does one
-streaming /talk and asserts deltas + turn_done arrive, then closes.
+"""Startup test for the workbench UI on the DAEMON port (ledger 0223, port
+consolidation). Spawns an isolated daemon (8331) whose handler now also
+serves the console UI + /talk + /voice; asserts readiness + streams.
 
 Usage: python tools/startup_test_console.py
 """
@@ -16,6 +15,7 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
 _PY = str(_ROOT / ".venv" / "Scripts" / "python.exe")
+PORT = 8331
 
 
 def _wait_state(port: int, timeout: float) -> bool:
@@ -30,67 +30,56 @@ def _wait_state(port: int, timeout: float) -> bool:
     return False
 
 
+def _stream_post(path: str, body: dict, timeout: float = 90) -> dict:
+    payload = json.dumps(body).encode()
+    req = urllib.request.Request(f"http://127.0.0.1:{PORT}{path}",
+                                 data=payload,
+                                 headers={"Content-Type": "application/json"})
+    r = urllib.request.urlopen(req, timeout=timeout)
+    frames = deltas = 0
+    done = ok = False
+    for raw in r:
+        line = raw.decode("utf-8", "replace").strip()
+        if not line.startswith("data:"):
+            continue
+        ev = json.loads(line[5:])
+        frames += 1
+        if ev["type"] == "delta":
+            deltas += 1
+        elif ev["type"] == "turn_done":
+            done = True
+        elif ev["type"] == "voice_done":
+            ok = ev.get("status") == "ok"
+    return {"frames": frames, "deltas": deltas, "done": done, "voice_ok": ok}
+
+
 def main() -> int:
     proc = subprocess.Popen(
-        [_PY, "-B", "-m", "backend.target_daemon", "--port", "8331",
-         "--console-port", "8332"],
+        [_PY, "-B", "-m", "backend.target_daemon", "--port", str(PORT)],
         cwd=str(_ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     try:
-        if not _wait_state(8332, 45):
-            print("FAIL: console /state 未就绪", flush=True)
+        if not _wait_state(PORT, 45):
+            print("FAIL: /state 未就绪", flush=True)
             return 1
-        print("OK: /state ready", flush=True)
-        body = json.dumps({"text": "说三个字"}).encode()
-        req = urllib.request.Request("http://127.0.0.1:8332/talk",
-                                     data=body,
-                                     headers={"Content-Type": "application/json"})
-        r = urllib.request.urlopen(req, timeout=90)
-        frames = 0
-        deltas = 0
-        done = False
-        for raw in r:
-            line = raw.decode("utf-8", "replace").strip()
-            if not line.startswith("data:"):
-                continue
-            ev = json.loads(line[5:])
-            frames += 1
-            if ev["type"] == "delta":
-                deltas += 1
-            elif ev["type"] == "turn_done":
-                done = True
-        if frames >= 3 and deltas >= 1 and done:
-            print(f"OK: talk stream frames={frames} deltas={deltas} done=Y",
-                  flush=True)
+        print("OK: /state on daemon port", flush=True)
+        home = urllib.request.urlopen(f"http://127.0.0.1:{PORT}/",
+                                      timeout=5).read()
+        if "元亨" not in home.decode("utf-8", "replace"):
+            print("FAIL: index 未由 daemon 端口提供", flush=True)
+            return 1
+        print("OK: index.html served on daemon port", flush=True)
+        t = _stream_post("/talk", {"text": "说三个字"})
+        if t["frames"] >= 3 and t["deltas"] >= 1 and t["done"]:
+            print(f"OK: /talk stream deltas={t['deltas']}", flush=True)
         else:
-            print(f"FAIL: talk stream frames={frames} deltas={deltas} done={done}",
-                  flush=True)
+            print(f"FAIL: /talk {t}", flush=True)
             return 1
-        # voice mock chain (skip mic/TTS): text -> LLM stream -> voice_done
-        body = json.dumps({"text": "说三个字", "speak": "0"}).encode()
-        req = urllib.request.Request("http://127.0.0.1:8332/voice",
-                                     data=body,
-                                     headers={"Content-Type": "application/json"})
-        r = urllib.request.urlopen(req, timeout=120)
-        vok = vdone = False
-        vdeltas = 0
-        for raw in r:
-            line = raw.decode("utf-8", "replace").strip()
-            if not line.startswith("data:"):
-                continue
-            ev = json.loads(line[5:])
-            if ev["type"] == "delta":
-                vdeltas += 1
-            elif ev["type"] == "voice_done":
-                vok = ev.get("status") == "ok"
-                vdone = True
-            elif ev["type"] == "state" and ev["value"] == "idle":
-                pass
-        if vok and vdone and vdeltas >= 1:
-            print(f"OK: voice mock deltas={vdeltas} done=Y", flush=True)
+        v = _stream_post("/voice", {"text": "说三个字", "speak": "0"})
+        if v["deltas"] >= 1 and v["voice_ok"]:
+            print(f"OK: /voice mock deltas={v['deltas']}", flush=True)
             return 0
-        print(f"FAIL: voice mock ok={vok} done={vdone} deltas={vdeltas}",
-              flush=True)
+        print(f"FAIL: /voice {v}", flush=True)
         return 1
     finally:
         proc.terminate()

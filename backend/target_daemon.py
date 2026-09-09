@@ -31,6 +31,8 @@ if str(_PROJECT) not in sys.path:
 LOCAL_BASE = "http://127.0.0.1:11434/v1/chat/completions"
 LOCAL_MODEL = "qwen2.5:3b"
 
+from backend.console_server import ConsoleHandler  # noqa: E402 (workbench UI base)
+
 NOTIFY_DIR = _PROJECT / "cache" / "qqwatch"
 NOTIFY_FILE = NOTIFY_DIR / "notifications.json"
 NOTIFY_LAST_POP = NOTIFY_DIR / "notifications.popup.json"
@@ -414,8 +416,21 @@ class DaemonRuntime:
         }
 
 
-class _Handler(BaseHTTPRequestHandler):
+class _Handler(ConsoleHandler):
     runtime: DaemonRuntime = None  # type: ignore[assignment]
+
+    def _ui_route(self, method: str) -> bool:
+        """Workbench UI/API endpoints served on the daemon port (single entry)."""
+        from backend.console_server import GET_UI, POST_UI
+
+        p = self.path.split("?", 1)[0]
+        if method == "GET" and p in GET_UI:
+            self.console_do_GET()
+            return True
+        if method == "POST" and p in POST_UI:
+            self.console_do_POST()
+            return True
+        return False
 
     def _handle_stream_chat(self, payload: dict) -> None:
         """SSE streaming chat (ledger 0204): OpenAI-style frames."""
@@ -479,12 +494,16 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self._ui_route("GET"):
+            return
         if self.path.startswith("/health"):
             self._send(200, self.runtime.health())
         else:
             self._send(404, {"error": "not found"})
 
     def do_POST(self):
+        if self._ui_route("POST"):
+            return
         length = int(self.headers.get("Content-Length", 0))
         try:
             payload = json.loads(self.rfile.read(length) or b"{}")
@@ -568,14 +587,16 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8321)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--no-console", action="store_true",
-                        help="do not start the workbench console (8322)")
-    parser.add_argument("--console-port", type=int, default=8322)
+                        help="(legacy) force console thread off")
+    parser.add_argument("--console-port", type=int, default=0,
+                        help="legacy separate console port (0=off; "
+                             "workbench UI served on the main port)")
     args = parser.parse_args()
     runtime = DaemonRuntime()
     server = make_server(args.port, args.host, runtime)
     print(f"元亨 daemon: http://{args.host}:{args.port} "
           f"(OpenAI 兼容 {args.host}:{args.port}/v1/chat/completions)", flush=True)
-    if not args.no_console:
+    if not args.no_console and args.console_port and args.console_port > 0:
         try:
             from backend.console_server import serve_in_thread
 
