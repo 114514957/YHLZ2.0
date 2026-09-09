@@ -295,23 +295,52 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
   // the tray owns hide/show, model switch, workbench, quit (desktop/main.js
   // sets setIgnoreMouseEvents(true) once at startup)
   void isPet;
-  // drag mode driven from the tray ("拖动元亨" radio): grabs the whole pet
+  // drag mode driven from the tray ("拖动元亨" radio).
+  // Electron forward:true only relays mouse-move (no pointerdown), so we keep
+  // the window click-through and toggle it to interactive ONLY while the
+  // pointer hovers the model (hover -> real events -> press/drag works).
   let petDragEnabled = false;
   let pDown = null;
-  window.__petSetDrag = (on) => { petDragEnabled = !!on; if (!on) pDown = null; };
+  let lastMove = 0;
+  function dragClaim(x, y) {
+    if (!window.pet) return;
+    if (!petDragEnabled) { window.pet.mouseThrough(true); return; }
+    if (pDown) { window.pet.mouseThrough(false); return; }
+    const b = model.getBounds();
+    const inside = b.width > 0 && x >= b.x - 12 && x <= b.right + 12 &&
+                   y >= b.y - 12 && y <= b.bottom + 12;
+    window.pet.mouseThrough(!inside);
+  }
+  window.__petSetDrag = (on) => {
+    petDragEnabled = !!on;
+    if (!on) { pDown = null; if (window.pet) window.pet.mouseThrough(true); }
+  };
+  window.addEventListener('pointermove', (e) => {
+    lastMove = performance.now();
+    dragClaim(e.clientX, e.clientY);
+    if (pDown) {
+      const M = 20;
+      model.x = Math.min(Math.max(e.clientX + pDown.ox, M), app.screen.width - M);
+      model.y = Math.min(Math.max(e.clientY + pDown.oy, M), app.screen.height - M);
+    }
+  }, { passive: true });
   window.addEventListener('pointerdown', (e) => {
     if (!petDragEnabled || e.button !== 0) return;
     pDown = { ox: model.x - e.clientX, oy: model.y - e.clientY };
-    if (window.pet) window.pet.mouseThrough(false); // claim while dragging
+    if (window.pet) window.pet.mouseThrough(false);
   });
-  window.addEventListener('pointermove', (e) => {
-    if (!petDragEnabled || !pDown) return;
-    const M = 20;
-    model.x = Math.min(Math.max(e.clientX + pDown.ox, M), app.screen.width - M);
-    model.y = Math.min(Math.max(e.clientY + pDown.oy, M), app.screen.height - M);
+  window.addEventListener('pointerup', () => {
+    const was = pDown;
+    pDown = null;
+    if (was && window.pet) window.pet.mouseThrough(true);
   });
-  window.addEventListener('pointerup', () => { pDown = null; if (window.pet) window.pet.mouseThrough(true); });
-  window.addEventListener('pointerleave', () => { pDown = null; if (window.pet) window.pet.mouseThrough(true); });
+  window.addEventListener('pointerleave', () => {
+    pDown = null;
+    if (window.pet) window.pet.mouseThrough(true);
+  });
+  setInterval(() => {
+    if (pDown && performance.now() - lastMove > 160) { pDown = null; if (window.pet) window.pet.mouseThrough(true); }
+  }, 400);
   window.__petSwitchModel = (rel) => loadModel(rel);
   window._model = () => model;
   log('就绪：托盘 隐藏/拖动/锁定/切形象/对话');
