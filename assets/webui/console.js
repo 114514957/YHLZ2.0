@@ -256,3 +256,9 @@ loadSettings();
 loadDashboard();
 loadLogs();
 setInterval(() => { loadDashboard(); loadLogs(); }, 3000);
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    const b = $("boot");
+    if (b) { b.classList.add("hide"); setTimeout(() => { b.remove(); }, 550); }
+  }, 900);
+});

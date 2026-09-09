@@ -5,6 +5,14 @@
   --cobalt1:#5b97ff; --cobalt2:#1545c2; --cobalt3:#0a2f96;
   --gold:#ffd36e; --red:#f04f43; --lav:#b79cf2; --ok:#1f9d55; --down:#e5484d;
 }
+/* boot loading overlay */
+#boot { position:fixed; inset:0; z-index:200; display:flex; align-items:center;
+        justify-content:center; pointer-events:none; }
+#bootimg { width:min(46vh,300px); height:auto; opacity:.95;
+           filter:drop-shadow(0 10px 30px rgba(120,60,10,.35));
+           animation: bootpulse 1.6s ease-in-out infinite; }
+@keyframes bootpulse { 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.05);} }
+#boot.hide { opacity:0; transition:opacity .5s; }
 * { box-sizing:border-box; }
 html,body { margin:0; height:100%; }
 body {

@@ -98,7 +98,7 @@ def _sse(data: dict) -> bytes:
 
 GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
-          "/ledger", "/mem"}
+          "/ledger", "/mem", "/favicon.png", "/loading.webp"}
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control"}
 
 
@@ -139,6 +139,10 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         p = self.path.split("?", 1)[0]
         if p in ("/", "/index.html"):
             self._serve_file("index.html")
+        elif p == "/favicon.png":
+            self._serve_file("favicon.png")
+        elif p == "/loading.webp":
+            self._serve_file("loading.webp")
         elif p == "/console.css":
             self._serve_file("console.css")
         elif p == "/console.js":
