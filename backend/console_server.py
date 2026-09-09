@@ -102,7 +102,8 @@ GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/avatar.html", "/avatar.js", "/avatar-models"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
-POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session"}
+POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session",
+           "/tap"}
 
 
 class ConsoleHandler(BaseHTTPRequestHandler):
@@ -168,6 +169,31 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _tap(self, body: dict) -> dict:
+        """Pet tap/greet: Yuanheng answers a short impromptu line."""
+        speak = str(body.get("speak", "0")) not in ("0", "false", "off")
+        text = ("（有人轻轻碰了你一下）用一两句自然、有你自己味道的话回应，"
+                "别太长的总结，说点什么心里话。")
+        try:
+            info = self.runtime.console_turn_stream(
+                text, lambda _c: None)
+            answer = str(info.get("answer", "") or "").strip()
+        except Exception as exc:  # noqa: BLE001
+            answer = ""
+            return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+        if speak and answer:
+            st = _settings_load()
+            try:
+                import threading as _th
+
+                _th.Thread(target=self._speak,
+                           args=(answer, st.get("tts_speaker", "Vivian")),
+                           daemon=True).start()
+            except Exception:
+                pass
+        _log("tap", answer[:60])
+        return {"ok": True, "answer": answer}
+
     def console_do_GET(self):
         p = self.path.split("?", 1)[0]
         if p.startswith("/live2d/"):
@@ -220,6 +246,15 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         p = self.path.split("?", 1)[0]
         if p == "/talk":
             self._do_talk()
+            return
+        if p == "/tap":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                self._send_json(400, {"error": "bad json"})
+                return
+            self._send_json(200, self._tap(body))
             return
         if p == "/voice":
             self._do_voice()

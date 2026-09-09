@@ -25,10 +25,14 @@
   #petMenu button{display:block;width:100%;background:none;border:0;color:#dfe6f0;
     text-align:left;padding:6px 10px;border-radius:6px;cursor:pointer;}
   #petMenu button:hover{background:#1a5fd0;}
+  #bubble{position:fixed;max-width:280px;background:rgba(22,24,32,.88);color:#eef2f8;
+    padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;z-index:130;
+    box-shadow:0 8px 20px rgba(0,0,0,.35);white-space:pre-wrap;pointer-events:none;}
 </style>
 </head>
 <body>
 <div id="dragbar"></div>
+<div id="bubble" hidden></div>
 <div id="petMenu" hidden></div>
 <div id="wrap"></div>
 <div id="bar">
@@ -120,6 +124,33 @@ function findGlobal(){
   } catch (e) { log('模型列表/加载错误 ' + (e && e.message || e)); }
   // drag to move the model (pet-window feel)
   let drag = null;
+  const bubble = document.getElementById('bubble');
+  let bubbleTimer = null;
+  async function doTap(x, y) {
+    try {
+      bubble.hidden = false;
+      bubble.textContent = '…';
+      bubble.style.left = Math.min(Math.max(12, x - 120), window.innerWidth - 280) + 'px';
+      bubble.style.top = Math.max(8, y - 70) + 'px';
+      const r = await fetch('/tap', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ speak: '0' }) });
+      const j = await r.json();
+      bubble.textContent = j.answer || '(没有回应)';
+      clearTimeout(bubbleTimer);
+      bubbleTimer = setTimeout(() => { bubble.hidden = true; }, 6000);
+    } catch (e) { bubble.textContent = '(连接失败)'; }
+  }
+  let downX = 0, downY = 0, downT = 0;
+  model.on('pointerdown', (e) => {
+    if (e.data.button !== 0) return;
+    downX = e.data.global.x; downY = e.data.global.y; downT = performance.now();
+  });
+  model.on('pointerup', (e) => {
+    if (e.data.button !== 0) return;
+    if (Math.hypot(e.data.global.x - downX, e.data.global.y - downY) < 7 &&
+        performance.now() - downT < 600) doTap(e.data.global.x, e.data.global.y);
+  });
   const centerModel = () => {
     model.x = app.screen.width / 2;
     model.y = app.screen.height * 0.58;
