@@ -107,6 +107,15 @@ class DaemonRuntime:
 
         llm = build_openai_compatible_llm_turn(
             fallback_base_url=LOCAL_BASE, fallback_model=LOCAL_MODEL)
+        if str(channel) == "console":
+            # workbench: default (non-injected) llm so run_turn can rebuild a
+            # streaming turn on on_delta (0222); shared L2 db via TargetMemory
+            s = ConversationSession(channel=channel)
+            try:
+                s.load_session("console")
+            except Exception:
+                pass
+            return s
         s = ConversationSession(llm_turn=llm, channel=channel)
         if channel != "private":
             try:
@@ -321,6 +330,20 @@ class DaemonRuntime:
                       f"decayed={decayed} downgraded={downgraded}", flush=True)
             except Exception as exc:
                 print(f"[memory-upkeep] skip: {type(exc).__name__}", flush=True)
+
+    def console_turn_stream(self, text: str, on_delta) -> dict:
+        """Console (workbench) turn with token streaming via on_delta."""
+        s = self._session("console")
+        async def _run():
+            return await s.run_turn(str(text), on_delta=on_delta)
+        fut = asyncio.run_coroutine_threadsafe(_run(), self._loop)
+        info = fut.result(timeout=300)
+        try:
+            s.save_session("console")
+        except Exception:
+            pass
+        self._maybe_consolidate("console")
+        return info
 
     def stream_chat(self, payload: dict, sink) -> str:
         """Dual-rail streaming chat (ledger 0204 + 0212): local Gemma first
@@ -544,11 +567,21 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="元亨常驻 daemon（双轨+多渠道）")
     parser.add_argument("--port", type=int, default=8321)
     parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--no-console", action="store_true",
+                        help="do not start the workbench console (8322)")
+    parser.add_argument("--console-port", type=int, default=8322)
     args = parser.parse_args()
     runtime = DaemonRuntime()
     server = make_server(args.port, args.host, runtime)
     print(f"元亨 daemon: http://{args.host}:{args.port} "
           f"(OpenAI 兼容 {args.host}:{args.port}/v1/chat/completions)", flush=True)
+    if not args.no_console:
+        try:
+            from backend.console_server import serve_in_thread
+
+            serve_in_thread(args.console_port, args.host, runtime)
+        except Exception as exc:
+            print(f"[console] 启动失败(跳过): {type(exc).__name__}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

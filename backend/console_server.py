@@ -1,0 +1,170 @@
+"""YHLZ Workbench console server (ledger 0222, M1): single-page control deck.
+
+Serves assets/webui/* on port 8322 and streams Yuanheng turns back as SSE:
+    GET  /                -> index.html (static)
+    GET  /console.css     -> styles
+    GET  /console.js      -> app
+    GET  /state           -> json status (daemon/gemma/session/memory)
+    POST /talk {text}     -> SSE stream of {state|delta|turn_done|error} frames
+
+Design notes (v2): backend-owned audio/ASR/TTS come in M2+; M1 is the control
+deck shell + streaming text dialog. Rolling back = just stop port 8322.
+"""
+from __future__ import annotations
+
+import json
+import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+STATIC_DIR = _PROJECT_ROOT / "assets" / "webui"
+_sessions: dict[str, float] = {}
+
+
+def _sse(data: dict) -> bytes:
+    return ("data: " + json.dumps(data, ensure_ascii=False) + "\n\n").encode("utf-8")
+
+
+class ConsoleHandler(BaseHTTPRequestHandler):
+    runtime = None
+
+    # ---------- plumbing ----------
+    def log_message(self, fmt, *args):  # quieter
+        pass
+
+    def _send_json(self, code: int, obj: dict) -> None:
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_file(self, name: str) -> None:
+        path = (STATIC_DIR / name).resolve()
+        if not path.is_file() or STATIC_DIR not in path.parents:
+            self.send_error(404)
+            return
+        body = path.read_bytes()
+        ctype = ("text/html; charset=utf-8" if name.endswith(".html")
+                 else "text/css; charset=utf-8" if name.endswith(".css")
+                 else "application/javascript; charset=utf-8"
+                 if name.endswith(".js") else "application/octet-stream")
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    # ---------- routing ----------
+    def do_GET(self):
+        p = self.path.split("?", 1)[0]
+        if p in ("/", "/index.html"):
+            self._serve_file("index.html")
+        elif p == "/console.css":
+            self._serve_file("console.css")
+        elif p == "/console.js":
+            self._serve_file("console.js")
+        elif p == "/state":
+            self._send_json(200, self._state())
+        else:
+            self._send_json(404, {"error": "not found"})
+
+    def do_POST(self):
+        p = self.path.split("?", 1)[0]
+        if p == "/talk":
+            self._do_talk()
+            return
+        self._send_json(404, {"error": "not found"})
+
+    # ---------- logic ----------
+    def _state(self) -> dict:
+        out = {"ok": True, "now": time.time()}
+        try:
+            import urllib.request
+
+            try:
+                g = json.loads(urllib.request.urlopen(
+                    "http://127.0.0.1:8081/health", timeout=3).read())
+                out["gemma"] = "ok" if g.get("status") == "ok" else "down"
+            except Exception:
+                out["gemma"] = "down"
+            out["daemon"] = "ok"
+            st = self.runtime.health() if hasattr(self.runtime, "health") else None
+            out["turns"] = 0
+            if st:
+                try:
+                    counts = {k: v for k, v in (st.get("turns") or {}).items()}
+                    out["turns"] = counts
+                except Exception:
+                    pass
+            try:
+                s = self.runtime._session("console")
+                out["history"] = len(s.history) // 2
+                out["l2"] = s.memory.health().get("l2_items", 0)
+            except Exception:
+                pass
+        except Exception:
+            out["daemon"] = "down"
+        return out
+
+    def _do_talk(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length) or b"{}")
+            text = str(body.get("text", "")).strip()
+        except Exception:
+            self._send_json(400, {"error": "bad json"})
+            return
+        if not text:
+            self._send_json(400, {"error": "empty text"})
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        try:
+            self.wfile.write(_sse({"type": "state", "value": "thinking"}))
+            self.wfile.flush()
+
+            def on_delta(chunk: str) -> None:
+                try:
+                    self.wfile.write(_sse({"type": "delta", "delta": chunk}))
+                    self.wfile.flush()
+                except Exception:
+                    pass
+
+            info = self.runtime.console_turn_stream(text, on_delta)
+            answer = str(info.get("answer", ""))
+            self.wfile.write(_sse({"type": "turn_done", "text": answer,
+                                   "tool_uses": len(info.get("tool_uses") or [])}))
+            self.wfile.write(_sse({"type": "state", "value": "idle"}))
+            self.wfile.flush()
+        except Exception as exc:
+            try:
+                self.wfile.write(_sse({"type": "error",
+                                       "message": f"{type(exc).__name__}: "
+                                                  f"{str(exc)[:160]}"}))
+                self.wfile.write(_sse({"type": "state", "value": "idle"}))
+                self.wfile.flush()
+            except Exception:
+                pass
+
+
+def make_console_server(port: int, host: str, runtime) -> ThreadingHTTPServer:
+    ConsoleHandler.runtime = runtime
+    return ThreadingHTTPServer((host, port), ConsoleHandler)
+
+
+def serve_in_thread(port: int = 8322, host: str = "127.0.0.1",
+                    runtime=None) -> threading.Thread:
+    server = make_console_server(port, host, runtime)
+    t = threading.Thread(target=server.serve_forever, daemon=True,
+                         name="console-web")
+    t.start()
+    print(f"[console] workbench http://{host}:{port}", flush=True)
+    return t
