@@ -153,7 +153,7 @@ class ConversationSession:
                 style_lines = None
         return render_system_prompt(
             persona=persona_arg, tools=tools,
-            public=(self.channel != "private"),
+            public=(self.channel not in ("private", "console")),
             style_lines=style_lines,
         )
 

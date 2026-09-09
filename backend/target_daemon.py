@@ -152,20 +152,30 @@ class DaemonRuntime:
                 "sessions": len(self._sessions), "turns": counts,
                 "llm": "deepseek->ollama"}
 
+    @staticmethod
+    def _norm_ui_channel(channel: str) -> str:
+        """Unified conversation (ledger 0226): all owner text entry points share
+        one session ('console' = console UI / pet chat window / plain /turn)."""
+        c = str(channel or "").strip()
+        if c in ("", "private", "default", "public", "chat", "console"):
+            return "console"
+        return c
+
     def turn(self, text: str, channel: str = "private") -> dict:
-        key = channel or "private"
+        key = self._norm_ui_channel(channel)
         s = self._session(key)
         future = asyncio.run_coroutine_threadsafe(s.run_turn(str(text)),
                                                   self._loop)
         info = future.result(timeout=240)
         try:
-            s.save_session("qq_" + key if key != "private" else "default")
+            s.save_session("console" if key == "console" else
+                           "qq_" + key if key != "private" else "default")
         except Exception:
             pass
         self._maybe_consolidate(key)
         try:
             answer = str(info.get("answer", ""))
-            if key == "private" and answer:
+            if key == "console" and answer:
                 try:
                     from backend.target_signals import capture as _sig_capture
 
@@ -198,7 +208,7 @@ class DaemonRuntime:
                         info["answer"] = info.get("answer", "") + "\n\n（证伪联动）" + msg
                 except Exception:
                     pass
-            if key == "private" and notify_should(answer, info.get("tool_uses") or []):
+            if key == "console" and notify_should(answer, info.get("tool_uses") or []):
                 tools = [u.get("name", "") for u in (info.get("tool_uses") or [])]
                 head = answer[:150].replace("\n", " ")
                 notify_push(f"任务完成汇报：{head}" + (f"（工具：{'、'.join(tools)}）" if tools else ""))
