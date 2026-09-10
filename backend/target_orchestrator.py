@@ -22,6 +22,18 @@ LLMTurn = Callable[
 Approver = Callable[[dict[str, Any]], Awaitable[bool]]
 
 
+def _strip_leaked_toolcall(content: str) -> str:
+    """Remove provider-native tool-call text leaked when no tool schema was
+    given (e.g. '<|tool_call>call:memory_recall{...}<tool_call|>')."""
+    import re
+
+    c = str(content or "")
+    if "<|tool_call" in c or "<tool_call" in c:
+        c = re.sub(r"<\|?tool_call.*?(\|>|>)", " ", c, flags=re.S)
+        c = re.sub(r"<\|?tool_call.*", " ", c, flags=re.S)
+    return c.strip()
+
+
 def _to_data_url(src: str) -> str:
     """Local image path -> data URI; http(s)/data URLs pass through."""
     import base64
@@ -241,7 +253,7 @@ class TurnOrchestrator:
                      "content": "这是最后一轮：请直接根据上面已有的工具结果回答用户，不要再次调用或提及检索。"}
                 ]
             msg = await llm_turn(messages, tools if with_tools else [])
-            content = str(msg.get("content") or "").strip()
+            content = _strip_leaked_toolcall(str(msg.get("content") or ""))
             tcs = msg.get("tool_calls") or []
             if not tcs:
                 cut = content.find("<tool_calls>")

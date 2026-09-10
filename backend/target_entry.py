@@ -198,6 +198,8 @@ class ConversationSession:
         "读取", "列出", "整理", "计算", "判断", "建议", "方案", "记得", "记忆",
         "记住", "保存", "写入", "之前", "上次", "昨天", "记录", "待办", "日程",
         "日记", "安排",
+        "以前", "提过", "说过", "回忆", "想起", "记不记得", "还记得",
+        "哪些", "关系", "问过", "聊过", "提过什么",
     )
 
     @classmethod
@@ -299,6 +301,14 @@ class ConversationSession:
                     ctx_lines.append(sk)
             except Exception:
                 pass
+            try:
+                from backend import entity_graph
+
+                eg = entity_graph.context_for(text)
+                if eg:
+                    ctx_lines.append(eg)
+            except Exception:
+                pass
         result = await self.orchestrator.run(
             turn_text=text,
             system_prompt=system,
@@ -321,6 +331,14 @@ class ConversationSession:
                     [{"name": u.name, "ok": u.ok, "arguments": u.arguments}
                      for u in result.tool_uses],
                     result.answer, self.llm_turn)))
+            except Exception:
+                pass
+        if self._is_owner() and not images:
+            try:
+                from backend import entity_graph
+
+                self._summary_tasks.append(asyncio.ensure_future(
+                    entity_graph.ingest_text(f"{text}。{result.answer}")))
             except Exception:
                 pass
         if self.memory._summary_pending:
