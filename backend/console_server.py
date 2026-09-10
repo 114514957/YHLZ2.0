@@ -580,6 +580,25 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": False, "error": f"{type(exc).__name__}"}
         if action == "reload_settings":
             return {"ok": True, "settings": _settings_load()}
+        if action == "napcat_login":
+            try:
+                import subprocess
+
+                shell = Path(r"C:\Users\ACE_WAN——PROJECT\qqwatch\shell")
+                kill = shell / "KillQQ.bat"
+                launch = shell / "launcher-user.bat"
+                if not launch.exists():
+                    return {"ok": False, "error": "找不到 launcher-user.bat"}
+                if kill.exists():
+                    subprocess.run(["cmd", "/c", str(kill)], cwd=str(shell),
+                                   capture_output=True)
+                subprocess.Popen(["cmd", "/c", str(launch), "3655185302"],
+                                 cwd=str(shell), close_fds=True)
+                _log("control", "napcat_login")
+                return {"ok": True,
+                        "note": "已唤起 NapCat，请在弹出的窗口登录元亨号 3655185302"}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         return {"ok": False, "error": "unknown action: " + action}
 
     def _listen(self, body, st: dict, on_segment=None) -> dict:

@@ -170,6 +170,13 @@ $("cf-free").addEventListener("click", async () => {
     body: JSON.stringify({ action: "release_vram" }) });
   alert("已请求释放 ASR/TTS 显存");
 });
+$("q-wake").addEventListener("click", async () => {
+  const r = await (await fetch("/control", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "napcat_login" }) })).json();
+  alert(r.ok ? (r.note || "已唤起 NapCat，请登录元亨号") : ("唤起失败：" + (r.error || "")));
+  loadDashboard();
+});
 
 async function loadDashboard() {
   try {
