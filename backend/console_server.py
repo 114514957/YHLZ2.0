@@ -438,31 +438,85 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             while rounds < 4:
                 rounds += 1
                 emit({"type": "state", "value": "listening"})
-                r = self._listen(body, st)
+                # streaming recognition worker: transcribe each segment as it
+                # closes, accumulate text, and speculatively prefetch memory
+                # while the user is still speaking (ledger 0226)
+                import queue as _queue
+                import threading as _th
+
+                seg_q: "_queue.Queue" = _queue.Queue()
+                _stop = object()
+                parts: list[str] = []
+                pre: list[str] = []
+
+                def _worker():
+                    import re as _re2
+
+                    try:
+                        sv = _get_sv()
+                    except Exception:
+                        sv = None
+                    acc = ""
+                    last_pre = 0.0
+                    while True:
+                        item = seg_q.get()
+                        if item is _stop:
+                            break
+                        if sv is None:
+                            continue
+                        try:
+                            res = sv.generate(input=item, language="zh",
+                                              use_itn=True, batch_size_s=60)
+                            raw = str((res[0] or {}).get("text") or "")
+                            t = _re2.sub(r"<\|[^|]+\|>", "", raw).strip()
+                        except Exception:
+                            t = ""
+                        if t:
+                            parts.append(t)
+                            acc = "".join(parts)
+                            if len(acc) >= 6 and time.time() - last_pre > 2.0:
+                                last_pre = time.time()
+                                try:
+                                    s = self.runtime._session("console")
+                                    pre[:] = [str(h.get("summary", ""))[:150]
+                                              for h in s.memory.contextual_recall(
+                                                  acc, limit=3)]
+                                except Exception:
+                                    pass
+
+                wt = _th.Thread(target=_worker, daemon=True)
+                wt.start()
+                r = self._listen(body, st, on_segment=seg_q.put)
+                seg_q.put(_stop)
+                wt.join(timeout=8)
                 if not r.get("started"):
                     if rounds == 1:
                         emit({"type": "state", "value": "idle"})
                         emit({"type": "voice_done", "status": "no-speech"})
                         return
                     break
-                audio = r["audio"]
-                emit({"type": "voice_text", "kind": "asr",
-                      "text": "(语音已采集，识别中…)"})
-                emit({"type": "state", "value": "asr"})
-                sv = _get_sv()
-                res = sv.generate(input=audio, language="zh",
-                                  use_itn=True, batch_size_s=60)
-                raw = str((res[0] or {}).get("text") or "") if res else ""
-                import re
+                text = "".join(parts).strip()
+                if not text:
+                    # fallback: whole-segment transcribe (worker produced none)
+                    emit({"type": "state", "value": "asr"})
+                    try:
+                        sv = _get_sv()
+                        res = sv.generate(input=r["audio"], language="zh",
+                                          use_itn=True, batch_size_s=60)
+                        raw = str((res[0] or {}).get("text") or "") if res else ""
+                        import re as _re3
 
-                text = re.sub(r"<\|[^|]+\|>", "", raw).strip()
+                        text = _re3.sub(r"<\|[^|]+\|>", "", raw).strip()
+                    except Exception:
+                        text = ""
                 release_sv()
                 emit({"type": "voice_text", "kind": "user", "text": text})
                 if not text:
                     break
                 emit({"type": "state", "value": "thinking"})
                 info = self.runtime.console_turn_stream(
-                    text, lambda c: emit({"type": "delta", "delta": c}))
+                    text, lambda c: emit({"type": "delta", "delta": c}),
+                    pre_recall=pre or None)
                 answer = str(info.get("answer", ""))
                 emit({"type": "turn_done", "text": answer,
                       "tool_uses": len(info.get("tool_uses") or [])})
@@ -505,7 +559,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             return {"ok": True, "settings": _settings_load()}
         return {"ok": False, "error": "unknown action: " + action}
 
-    def _listen(self, body, st: dict) -> dict:
+    def _listen(self, body, st: dict, on_segment=None) -> dict:
         from tools.tts_test_start import _capture_loop
 
         device = int(body.get("device", st.get("device", 1)))
@@ -520,7 +574,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 pass
 
         return _capture_loop(device, 1.0, dur, denoise, None, False, False,
-                             on_level=on_level)
+                             on_level=on_level, on_segment=on_segment)
 
     def _emit_level(self, level, is_speech):
         self.wfile.write(_sse({"type": "level", "value": round(float(level), 4),

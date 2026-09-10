@@ -390,11 +390,13 @@ class DaemonRuntime:
             except Exception as exc:
                 print(f"[memory-upkeep] skip: {type(exc).__name__}", flush=True)
 
-    def console_turn_stream(self, text: str, on_delta) -> dict:
+    def console_turn_stream(self, text: str, on_delta,
+                            pre_recall: list | None = None) -> dict:
         """Console (workbench) turn with token streaming via on_delta."""
         s = self._session("console")
         async def _run():
-            return await s.run_turn(str(text), on_delta=on_delta)
+            return await s.run_turn(str(text), on_delta=on_delta,
+                                    pre_recall=pre_recall)
         fut = asyncio.run_coroutine_threadsafe(_run(), self._loop)
         info = fut.result(timeout=300)
         try:

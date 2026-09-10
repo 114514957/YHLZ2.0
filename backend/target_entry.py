@@ -195,7 +195,8 @@ class ConversationSession:
 
     async def run_turn(self, text: str,
                        on_delta: Optional[Callable[[str], None]] = None,
-                       mode: str = "auto") -> dict[str, Any]:
+                       mode: str = "auto",
+                       pre_recall: Optional[list] = None) -> dict[str, Any]:
         self.memory.append_turn(role="user", text=text)
         contradictions = self._maybe_contradiction(text)
         from backend.target_style import capture_style_signal
@@ -245,15 +246,21 @@ class ConversationSession:
             if not work:
                 import time as _t
 
-                for hit in self.memory.contextual_recall(text, limit=1):
-                    hid = str(hit.get("id", ""))
-                    now = _t.time()
-                    if now - self._ctx_recent.get(hid, 0.0) < 30.0:
-                        continue
-                    self._ctx_recent[hid] = now
-                    ctx_lines.append(
-                        "[此刻自然想起] 你以前提过：" +
-                        str(hit.get("summary", ""))[:150])
+                if pre_recall is not None:
+                    # speculative prefetch (ledger 0226): recall already ran
+                    # while the user was still speaking — reuse it, no re-query
+                    for s_ in pre_recall[:3]:
+                        ctx_lines.append("[此刻自然想起] 你以前提过：" + str(s_)[:150])
+                else:
+                    for hit in self.memory.contextual_recall(text, limit=3):
+                        hid = str(hit.get("id", ""))
+                        now = _t.time()
+                        if now - self._ctx_recent.get(hid, 0.0) < 30.0:
+                            continue
+                        self._ctx_recent[hid] = now
+                        ctx_lines.append(
+                            "[此刻自然想起] 你以前提过：" +
+                            str(hit.get("summary", ""))[:150])
         except Exception:
             pass
         result = await self.orchestrator.run(
