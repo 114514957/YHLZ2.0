@@ -233,6 +233,26 @@ class TargetMemoryService:
         except Exception:
             return []
         good = []
+        seen: set[str] = set()
+        # 1) semantic candidates (换说法, higher confidence)
+        try:
+            from backend.vector_memory import semantic_l2
+
+            for it in semantic_l2(q, top=limit * 3, min_score=0.42):
+                if int(it.get("importance", 0) or 0) < 5:
+                    continue
+                if it.get("status") not in (None, "", "active"):
+                    continue
+                good.append({"id": it["id"], "tier": "L2",
+                             "type": it.get("type", "fact"),
+                             "importance": it.get("importance", 5),
+                             "status": "active",
+                             "summary": it.get("summary", ""),
+                             "_score": float(it.get("score", 0.0))})
+                seen.add(it["id"])
+        except Exception:
+            pass
+        # 2) literal 2-gram candidates (baseline below semantic)
         for r in rows:
             try:
                 if r[1] not in _INJECT_TYPES:
@@ -247,37 +267,15 @@ class TargetMemoryService:
                 s = str(r[5] or "").strip()
             except Exception:
                 continue
-            if s and len(s) >= 4:
+            if s and len(s) >= 4 and r[0] not in seen:
                 good.append({"id": r[0], "tier": "L2", "type": r[1],
                              "importance": r[2], "status": r[3],
-                             "summary": s})
-            if len(good) >= limit:
-                break
-        # semantic complement (ledger 0226): when literal 2-gram misses, fill
-        # with vector recall so 换说法 still surfaces the memory
-        if len(good) < limit:
-            try:
-                from backend.vector_memory import semantic_l2
-
-                seen = {g["id"] for g in good}
-                for it in semantic_l2(q, top=limit * 2, min_score=0.42):
-                    if it["id"] in seen:
-                        continue
-                    if it.get("importance", 0) and int(it["importance"]) < 5:
-                        continue
-                    if it.get("status") not in (None, "", "active"):
-                        continue
-                    good.append({"id": it["id"], "tier": "L2",
-                                 "type": it.get("type", "fact"),
-                                 "importance": it.get("importance", 5),
-                                 "status": "active",
-                                 "summary": it.get("summary", "")})
-                    seen.add(it["id"])
-                    if len(good) >= limit:
-                        break
-            except Exception:
-                pass
-        return good
+                             "summary": s, "_score": 0.45})
+                seen.add(r[0])
+        good.sort(key=lambda x: x.get("_score", 0.0), reverse=True)
+        for g in good:
+            g.pop("_score", None)
+        return good[:limit]
 
     def context_block(self) -> str:
         with self._lock:
