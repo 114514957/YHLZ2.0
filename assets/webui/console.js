@@ -148,6 +148,7 @@ async function loadSettings() {
     $("cf-duration").value = String(s.duration || 3);
     $("cf-speaker").value = s.tts_speaker || "Vivian";
     $("cf-speak").checked = s.tts_speak !== false;
+    $("cf-ttsmodel").value = s.tts_model || "0.6B";
   } catch (e) {}
 }
 $("cf-save").addEventListener("click", async () => {
@@ -157,6 +158,7 @@ $("cf-save").addEventListener("click", async () => {
     duration: parseFloat($("cf-duration").value) || 3,
     tts_speaker: $("cf-speaker").value,
     tts_speak: $("cf-speak").checked,
+    tts_model: $("cf-ttsmodel").value,
   };
   await fetch("/settings", { method: "POST",
     headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

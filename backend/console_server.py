@@ -36,7 +36,38 @@ DEFAULT_SETTINGS = {
     "asr": "sensevoice",
     "tts_speaker": "Vivian",
     "tts_speak": True,
+    "tts_model": "0.6B",
 }
+
+TTS_DIRS = {
+    "0.6B": _PROJECT_ROOT / "models" / "qwen3-tts" / "Qwen3-TTS-12Hz-0.6B-CustomVoice",
+    "1.7B": _PROJECT_ROOT / "models" / "qwen3-tts" / "Qwen3-TTS-12Hz-1.7B-CustomVoice",
+}
+_TTS = {"model": None, "key": None}
+
+
+def _get_tts(which: str):
+    """Resident TTS model (load once per process; ledger 0226 perf)."""
+    import torch
+    from faster_qwen3_tts import FasterQwen3TTS
+
+    key = str(which or "0.6B")
+    path = TTS_DIRS.get(key) or TTS_DIRS["0.6B"]
+    if _TTS["model"] is None or _TTS["key"] != key:
+        try:
+            if _TTS["model"] is not None:
+                del _TTS["model"]
+                import gc
+
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+        except Exception:
+            pass
+        _TTS["model"] = FasterQwen3TTS.from_pretrained(
+            str(path), device="cuda", dtype=torch.bfloat16)
+        _TTS["key"] = key
+    return _TTS["model"]
 
 
 def _settings_load() -> dict:
@@ -396,7 +427,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                       "tool_uses": len(info.get("tool_uses") or [])})
                 if speak and answer.strip():
                     emit({"type": "state", "value": "speaking"})
-                    self._speak(answer, st.get("tts_speaker", "Vivian"))
+                    self._speak(answer, st.get("tts_speaker", "Vivian"),
+                                st.get("tts_model", "0.6B"))
                 emit({"type": "state", "value": "idle"})
                 emit({"type": "voice_done", "status": "ok"})
                 return
@@ -438,7 +470,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                     emit({"type": "state", "value": "speaking"})
                     rr = self._speak_interruptible(
                         answer, st.get("tts_speaker", "Vivian"),
-                        int(st.get("device", 1) or 1))
+                        int(st.get("device", 1) or 1),
+                        st.get("tts_model", "0.6B"))
                     if rr == "interrupted":
                         emit({"type": "interrupted"})
                         continue  # back to listening (barge-in)
@@ -494,90 +527,102 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                                "speech": bool(is_speech)}))
         self.wfile.flush()
 
+    @staticmethod
+    def _sentences(text: str, maxlen: int = 60) -> list[str]:
+        import re as _re
+
+        t = str(text or "").strip()
+        if not t:
+            return []
+        parts = [p for p in _re.split(r"(?<=[。！？!?；;…])", t) if p.strip()]
+        out, cur = [], ""
+        for p in parts:
+            if len(cur) + len(p) <= maxlen:
+                cur += p
+            else:
+                if cur:
+                    out.append(cur)
+                cur = p if len(p) <= maxlen else p[:maxlen]
+        if cur:
+            out.append(cur)
+        return out[:6] or [t[:maxlen]]
+
     def _speak_interruptible(self, text: str, speaker: str = "Vivian",
-                             device: int = 1) -> str:
-        """Play TTS while listening for barge-in; stop if the user speaks over
-        it (echo-masked: mic rms must exceed the playback level by a margin).
-        Returns 'done' or 'interrupted'."""
+                             device: int = 1,
+                             model_key: str = "0.6B") -> str:
+        """Sentence-by-sentence resident TTS with barge-in (echo-masked).
+        First sentence is synthesized+played immediately (faster first sound);
+        if the user speaks over it, stop and return 'interrupted'."""
         import numpy as np
         import sounddevice as sd
-        import torch
-        from faster_qwen3_tts import FasterQwen3TTS
 
         try:
-            m = FasterQwen3TTS.from_pretrained(
-                str(_PROJECT_ROOT / "models" / "qwen3-tts" /
-                    "Qwen3-TTS-12Hz-1.7B-CustomVoice"),
-                device="cuda", dtype=torch.bfloat16)
-            wavs, sr = m.generate_custom_voice(
-                text=str(text)[:180], language="Chinese", speaker=str(speaker),
-                instruct="自然地说，像和亲近的人聊天，别播音腔。")
-            samples = np.asarray(wavs[0], dtype="float32")
-            del m
-            import gc
-
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            m = _get_tts(model_key)
         except Exception:
             return "done"
-        play_rms = float(np.sqrt(np.mean(samples * samples)) + 1e-9)
-        thr = max(0.05, play_rms * 1.5)  # echo mask: own voice ≈ play*atten
-        sd.play(samples, int(sr))
-        dur = len(samples) / float(sr)
-        t0 = time.time()
-        hot = 0
-        result = "done"
+        chunks = self._sentences(text)
         try:
             with sd.InputStream(device=int(device), samplerate=16000,
                                 channels=1, dtype="float32",
                                 blocksize=1600, latency="low") as inp:
-                while time.time() - t0 < dur + 0.4:
-                    data, _ = inp.read(1600)
-                    mono = np.asarray(
-                        data[:, 0] if data.ndim > 1 else data, dtype="float32")
-                    rms = float(np.sqrt(np.mean(mono * mono)) + 1e-9)
-                    if rms > thr:
-                        hot += 1
-                        if hot >= 2:
-                            result = "interrupted"
-                            break
-                    else:
-                        hot = 0
+                for chunk in chunks:
+                    try:
+                        wavs, sr = m.generate_custom_voice(
+                            text=str(chunk)[:120], language="Chinese",
+                            speaker=str(speaker),
+                            instruct="自然地说，像和亲近的人聊天，别播音腔。")
+                        samples = np.asarray(wavs[0], dtype="float32")
+                    except Exception:
+                        continue
+                    play_rms = float(np.sqrt(np.mean(samples * samples)) + 1e-9)
+                    thr = max(0.05, play_rms * 1.5)
+                    sd.play(samples, int(sr))
+                    dur = len(samples) / float(sr)
+                    t0 = time.time()
+                    hot = 0
+                    while time.time() - t0 < dur + 0.3:
+                        data, _ = inp.read(1600)
+                        mono = np.asarray(
+                            data[:, 0] if data.ndim > 1 else data,
+                            dtype="float32")
+                        rms = float(np.sqrt(np.mean(mono * mono)) + 1e-9)
+                        if rms > thr:
+                            hot += 1
+                            if hot >= 2:
+                                sd.stop()
+                                _log("voice", f"tts interrupted (rms={rms:.3f} "
+                                              f"thr={thr:.3f})")
+                                return "interrupted"
+                        else:
+                            hot = 0
         except Exception:
-            result = "done"
+            pass
         try:
             sd.stop()
         except Exception:
             pass
-        _log("voice", f"tts {result} (play_rms={play_rms:.3f})")
-        return result
+        _log("voice", "tts done")
+        return "done"
 
-    def _speak(self, text: str, speaker: str = "Vivian") -> None:
-        import torch
-
+    def _speak(self, text: str, speaker: str = "Vivian",
+               model_key: str = "0.6B") -> None:
         import numpy as np
         import sounddevice as sd
-        from faster_qwen3_tts import FasterQwen3TTS
 
-        t0 = time.time()
-        m = FasterQwen3TTS.from_pretrained(
-            str(_PROJECT_ROOT / "models" / "qwen3-tts" /
-                "Qwen3-TTS-12Hz-1.7B-CustomVoice"),
-            device="cuda", dtype=torch.bfloat16)
-        wavs, sr = m.generate_custom_voice(
-            text=str(text)[:180], language="Chinese", speaker=str(speaker),
-            instruct="自然地说，像和亲近的人聊天，别播音腔。")
-        samples = np.asarray(wavs[0], dtype="float32")
-        sd.play(samples, int(sr))
-        sd.wait()
-        del m
-        import gc
-
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        print(f"[console][tts] ok {time.time()-t0:.0f}s", flush=True)
+        try:
+            m = _get_tts(model_key)
+        except Exception:
+            return
+        for chunk in self._sentences(text):
+            try:
+                wavs, sr = m.generate_custom_voice(
+                    text=str(chunk)[:120], language="Chinese",
+                    speaker=str(speaker),
+                    instruct="自然地说，像和亲近的人聊天，别播音腔。")
+                sd.play(np.asarray(wavs[0], dtype="float32"), int(sr))
+                sd.wait()
+            except Exception:
+                continue
 
     # ---------- logic ----------
     def _history(self) -> dict:
