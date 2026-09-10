@@ -19,11 +19,17 @@ import json
 import os
 import pathlib
 import sys
+import threading
 import time
 import urllib.request
 
 _PROJECT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT))
+sys.path.insert(0, str(_PROJECT / "tools"))
+try:
+    import dev_runner
+except Exception:  # noqa: BLE001
+    dev_runner = None
 
 CONFIG_DIR = _PROJECT / "cache" / "tmp"  # fallback; use qqwatch path
 QQWATCH_CONFIG = pathlib.Path(
@@ -77,6 +83,7 @@ class QQBridge:
         self.cfg = cfg
         self.masters = masters or {"2258374446"}  # owner QQ (command source)
         self.log_n = 0
+        self.loop = None
 
     def log(self, msg: str) -> None:
         print(f"[qqbot] {msg}", flush=True)
@@ -94,6 +101,79 @@ class QQBridge:
         await ws.send(json.dumps({"action": action, "params": params,
                                   "echo": f"y{int(time.time()*1000)}"}))
 
+    # ---- remote dev channel (opencode headless) ----
+    def _params(self, msg_type, user_id, ev) -> dict:
+        if msg_type == "private":
+            return {"message_type": "private", "user_id": int(user_id)}
+        return {"message_type": "group",
+                "group_id": int(ev.get("group_id", 0))}
+
+    async def _say(self, ws, params: dict, text: str) -> None:
+        for part in [text[i:i + 1400] for i in range(0, len(text), 1400)]:
+            p = dict(params)
+            p["message"] = part
+            await self._send(ws, "send_msg", p)
+
+    async def _dev_report(self, ws, params, status, text) -> None:
+        tag = {"awaiting": "❓ 需要你决定", "done": "✅ 完成",
+               "error": "⚠️ 出错", "running": "⏳ 进行中"}.get(status, status)
+        msg = f"[opencode] {tag}\n{text}"
+        if status == "done":
+            msg += "\n\n回 #y 提交 / #n 不提交 / #push 推送"
+        await self._say(ws, params, msg)
+
+    def _spawn(self, ws, params, fn) -> None:
+        """Run blocking fn() -> (status, text) in a thread, post back to QQ."""
+        loop = self.loop
+
+        def work() -> None:
+            try:
+                status, text = fn()
+            except Exception as e:  # noqa: BLE001
+                status, text = "error", f"{type(e).__name__}: {e}"
+            if loop is not None:
+                asyncio.run_coroutine_threadsafe(
+                    self._dev_report(ws, params, status, text), loop)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    async def _dev_cmd(self, ws, text, msg_type, user_id, ev) -> None:
+        params = self._params(msg_type, user_id, ev)
+        if dev_runner is None:
+            await self._say(ws, params, "[opencode] 运行器不可用")
+            return
+        low = text.strip()
+
+        def _pick(d: dict) -> tuple:
+            return d.get("status", "error"), d.get("text", "")
+
+        if low in ("#devstatus", "#ds"):
+            d = dev_runner._load()
+            await self._say(ws, params,
+                            f"[opencode] 状态={d.get('status')} "
+                            f"任务={d.get('task','')[:60]}")
+        elif low in ("#y", "#commit"):
+            d = dev_runner._load()
+            msg = ("chore(remote-dev): " + d.get("task", "")[:40]).strip()
+            await self._say(ws, params, "[opencode] 正在提交…")
+            self._spawn(ws, params,
+                        lambda: ("done", dev_runner.commit(msg).get("text", "")))
+        elif low == "#n":
+            await self._say(ws, params, "[opencode] 好的，不提交，改动留在工作区。")
+        elif low == "#push":
+            self._spawn(ws, params,
+                        lambda: ("done", dev_runner.push().get("text") or "已推送"))
+        elif low == "#dev" or low.startswith("#dev "):
+            task = low[4:].strip()
+            if not task:
+                await self._say(ws, params, "用法：#dev <任务>")
+                return
+            await self._say(ws, params, f"[opencode] 已开工：{task[:80]}")
+            self._spawn(ws, params, lambda: _pick(dev_runner.start(task)))
+        else:
+            await self._say(ws, params,
+                            "未知指令：#dev <任务> / #y / #n / #push / #devstatus")
+
     async def handle(self, ws, ev: dict) -> None:
         if ev.get("post_type") != "message":
             return
@@ -107,17 +187,37 @@ class QQBridge:
         text, ats = self._text_of(msg)
         if not text:
             return
+        cmd = text.strip().replace("＃", "#")
+        is_master_cmd = user_id in self.masters and cmd.startswith("#")
         if msg_type == "private":
             if user_id not in self.masters:
                 self.log(f"忽略非主人私聊 {user_id}")
                 return
             channel = f"qq_p{user_id}"
         elif msg_type == "group":
-            if self.uin not in ats:
+            if self.uin not in ats and not is_master_cmd:
                 return
             channel = f"qq_g{ev.get('group_id', user_id)}"
         else:
             return
+        # remote dev channel (master only): #dev / #y / #n / #push / #devstatus
+        if dev_runner is not None:
+            if is_master_cmd:
+                self.log(f"开发指令 {user_id}: {cmd[:50]}")
+                await self._dev_cmd(ws, cmd, msg_type, user_id, ev)
+                return
+            if user_id in self.masters:
+                try:
+                    if dev_runner._load().get("status") == "awaiting":
+                        params = self._params(msg_type, user_id, ev)
+                        self.log(f"答复 opencode {user_id}: {text[:50]}")
+                        await self._say(ws, params, "[opencode] 收到答复，继续…")
+                        self._spawn(ws, params, lambda: (
+                            (lambda d: (d.get("status", "error"),
+                                        d.get("text", "")))(dev_runner.answer(text))))
+                        return
+                except Exception as e:  # noqa: BLE001
+                    self.log(f"dev 答复路由异常 {type(e).__name__}: {e}")
         self.log(f"来自 {user_id}: {text[:40]}")
         ans = _daemon_turn(text, channel)
         if not ans:
@@ -136,6 +236,7 @@ class QQBridge:
     async def run(self) -> None:
         import websockets
 
+        self.loop = asyncio.get_running_loop()
         delay = 3
         while True:
             try:

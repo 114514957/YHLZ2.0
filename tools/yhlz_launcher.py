@@ -40,6 +40,12 @@ URLS = {
     "daemon": ("http://127.0.0.1:8321/health", "GET"),
 }
 
+# QQ bridge (optional): kept alive only when NapCat's OneBot WS is up.
+QQBOT_UIN = "3655185302"
+QQBOT_MASTER = "2258374446"
+QQBOT_PORT = 3001
+QQBOT_LOCK = _ROOT / "cache" / "tmp" / "qqbot.lock"
+
 
 def _up(url: str) -> bool:
     try:
@@ -51,6 +57,38 @@ def _up(url: str) -> bool:
 
 def status() -> dict:
     return {name: _up(u) for name, (u, _m) in URLS.items()}
+
+
+def _port_open(host: str, port: int) -> bool:
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=1):
+            return True
+    except Exception:
+        return False
+
+
+def _qqbot_alive() -> bool:
+    """True if a qq_bot process is running (robust: scan cmdlines, since the
+    venv pythonw launcher spawns a child interpreter)."""
+    try:
+        import psutil
+    except Exception:
+        return QQBOT_LOCK.exists()
+    for p in psutil.process_iter(["cmdline"]):
+        try:
+            cl = p.info.get("cmdline") or []
+        except Exception:
+            continue
+        if any("qq_bot.py" in str(x) for x in cl):
+            return True
+    return False
+
+
+def qqbot_status() -> bool:
+    """QQ bridge healthy = NapCat WS up (3001) and bridge alive; when NapCat
+    is not logged in this is simply 'not applicable' (False), never an error."""
+    return _port_open("127.0.0.1", QQBOT_PORT) and _qqbot_alive()
 
 
 def _spawn_ollama():
@@ -71,6 +109,13 @@ def _spawn_daemon():
                       "--port", "8321"], cwd=str(_ROOT), close_fds=True)
 
 
+def _spawn_qqbot():
+    pyw = PY.with_name("pythonw.exe")
+    subprocess.Popen([str(pyw), "-B", str(_ROOT / "tools" / "qq_bot.py"),
+                      "--uin", QQBOT_UIN, "--master", QQBOT_MASTER],
+                     cwd=str(_ROOT), close_fds=True)
+
+
 def ensure_stack() -> dict:
     st = status()
     if not st["ollama"]:
@@ -79,6 +124,9 @@ def ensure_stack() -> dict:
         _spawn_llama()
     if not st["daemon"]:
         _spawn_daemon()
+    # keep the QQ bridge alive, but only if NapCat's OneBot WS is up
+    if _port_open("127.0.0.1", QQBOT_PORT) and not _qqbot_alive():
+        _spawn_qqbot()
     time.sleep(1)
     return status()
 

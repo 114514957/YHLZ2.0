@@ -32,7 +32,7 @@ def _log(msg: str) -> None:
 
 
 def tick() -> dict:
-    from yhlz_launcher import ensure_stack, status
+    from yhlz_launcher import ensure_stack, qqbot_status, status
 
     before = status()
     down = [k for k, v in before.items() if not v]
@@ -41,6 +41,10 @@ def tick() -> dict:
         ensure_stack()
         time.sleep(3)
     after = status()
+    qb = qqbot_status()
+    if qb != getattr(tick, "_last_qb", None):
+        _log(f"QQ桥: {'在线' if qb else '未运行/未登录'}")
+        tick._last_qb = qb
     return after
 
 
