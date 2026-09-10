@@ -112,24 +112,26 @@ def _clean(text: str) -> str:
 
 def _capture_loop(device: int, cap_gain: float, duration_s: float,
                   denoise: str, gate, verbose_gate: bool, debug: bool,
-                  on_level=None) -> dict:
+                  on_level=None, on_segment=None) -> dict:
     """Try rnnoise (48k) capture; on any audio-layer failure degrade to raw
     16k so the test entry always runs and prints what went wrong.
-    on_level(level, is_speech) optional per-~500ms activity callback."""
+    on_level(level, is_speech) optional per-~500ms activity callback.
+    on_segment(audio16k) called per accepted user segment (short pause cut)."""
     if denoise == "rnnoise":
         try:
             return _capture_impl(device, cap_gain, duration_s, "rnnoise",
-                                 gate, verbose_gate, debug, on_level)
+                                 gate, verbose_gate, debug, on_level,
+                                 on_segment)
         except Exception as exc:  # noqa: BLE001
             print(f"[warn] rnnoise 采集失败({type(exc).__name__}: "
                   f"{str(exc)[:90]})，降级 raw 16k", flush=True)
     return _capture_impl(device, cap_gain, duration_s, "off",
-                         gate, verbose_gate, debug, on_level)
+                         gate, verbose_gate, debug, on_level, on_segment)
 
 
 def _capture_impl(device: int, cap_gain: float, duration_s: float,
                   denoise: str, gate, verbose_gate: bool, debug: bool,
-                  on_level=None) -> dict:
+                  on_level=None, on_segment=None) -> dict:
     import numpy as np
     import sounddevice as sd
 
@@ -231,6 +233,11 @@ def _capture_impl(device: int, cap_gain: float, duration_s: float,
                         if not user_started:
                             user_started = True
                             print("…听到你", end="", flush=True)
+                        if on_segment is not None:
+                            try:
+                                on_segment(seg_audio)
+                            except Exception:
+                                pass
                     elif verbose_gate:
                         print(f"(忽略非主人声 sim={sim:.2f})", flush=True)
                     else:
@@ -318,21 +325,35 @@ def main() -> int:
             break
         if line != "1":
             continue
-        print("聆听中…（说完停 3 秒自动断）", flush=True)
+        print("聆听中…（短停顿即分段识别；停 3 秒结束）", flush=True)
+        parts = []
+        seg_no = 0
+
+        def seg_cb(audio):
+            nonlocal seg_no
+            seg_no += 1
+            try:
+                t = _transcribe(audio, asr_info,
+                                sid=f"seg{int(time.time() * 1000)}{seg_no}")
+                if t:
+                    parts.append(t)
+                    print("\n[段已识别] " + t, flush=True)
+            except Exception as exc:  # noqa: BLE001
+                print(f"(段识别错误 {type(exc).__name__}: {str(exc)[:80]})",
+                      flush=True)
+
         r = _capture_loop(a.device, a.cap_gain, a.duration_s, a.denoise,
-                          gate, a.verbose_gate, a.debug)
+                          gate, a.verbose_gate, a.debug, on_segment=seg_cb)
         if not r.get("started"):
             print("\n[未捕捉到语音]", flush=True)
             continue
-        audio = r["audio"]
-        secs = round(float(len(audio)) / 16000.0, 2)
-        print(f"（语音 {secs}s，识别中…）", flush=True)
-        sid = f"cap{int(time.time() * 1000)}"
-        try:
-            text = _transcribe(audio, asr_info, sid=sid)
-        except Exception as exc:  # noqa: BLE001
-            text = ""
-            print(f"[ASR 出错] {type(exc).__name__}: {str(exc)[:120]}", flush=True)
+        text = "".join(parts)
+        if not text and r.get("audio") is not None:
+            try:
+                text = _transcribe(r["audio"], asr_info,
+                                   sid=f"cap{int(time.time() * 1000)}")
+            except Exception:
+                text = ""
         print("\n========================")
         print(f"[识别结果] {text or '(空)'}")
         print("========================", flush=True)
