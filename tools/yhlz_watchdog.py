@@ -72,6 +72,17 @@ def tick() -> dict:
             _log("NapCat 未运行 -> 尝试拉起")
             _spawn_napcat()
             tick._napcat_try = time.time()
+    if ws_up and not online:
+        since = float(ns.get("since") or 0)
+        tries = getattr(tick, "_relogin_tries", 0)
+        if (since and time.time() - since > 120 and tries < 3
+                and time.time() - getattr(tick, "_relogin_try", 0) > 900):
+            _log(f"元亨掉线>2min -> 尝试重启 NapCat 自动登录(第{tries + 1}次)")
+            _spawn_napcat()
+            tick._relogin_try = time.time()
+            tick._relogin_tries = tries + 1
+    elif online:
+        tick._relogin_tries = 0
     state = (online, ws_up)
     if state != getattr(tick, "_napcat", None):
         msg = ("元亨在线" if online else

@@ -79,6 +79,7 @@ async def main() -> int:
         print("[napcat_watch] 已有实例在运行，退出", flush=True)
         return 1
     was_offline = False
+    offline_since = 0.0
     while True:
         try:
             async with websockets.connect(URL, open_timeout=5) as ws:
@@ -92,20 +93,26 @@ async def main() -> int:
                             and ev.get("meta_event_type") == "heartbeat"):
                         on = bool((ev.get("status") or {}).get("online"))
                         _write(on, True)
-                        if on and was_offline:
+                        if not on:
+                            was_offline = True
+                            if not offline_since:
+                                offline_since = time.time()
+                        elif on and was_offline:
+                            mins = int((time.time() - offline_since) / 60) \
+                                if offline_since else 0
+                            dur = f"（约 {mins} 分钟）" if mins >= 1 else ""
                             try:
                                 await ws.send(json.dumps({
                                     "action": "send_msg",
                                     "params": {"message_type": "private",
                                                "user_id": MASTER,
-                                               "message": "（系统）元亨刚才掉线过，"
-                                                          "现已恢复上线。"},
+                                               "message": f"（元亨）我刚才掉线了{dur}，"
+                                                          "现在已经恢复上线啦。"},
                                     "echo": "napcatwatch"}))
                             except Exception:
                                 pass
                             was_offline = False
-                        elif not on:
-                            was_offline = True
+                            offline_since = 0.0
         except Exception:
             _write(False, False)
         await asyncio.sleep(5)
