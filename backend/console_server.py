@@ -123,6 +123,31 @@ def _log(event: str, detail: str = "") -> None:
     _LOG_RING.append({"t": time.time(), "event": event, "detail": detail[:160]})
 
 
+def _bring_qq_front(delay: float = 8.0) -> None:
+    """After NapCat starts, bring the QQ/NapCat login window to the foreground."""
+    import threading
+
+    def _go() -> None:
+        time.sleep(delay)
+        try:
+            import subprocess
+
+            ps = (
+                "Add-Type -Namespace N -Name W -MemberDefinition "
+                "'[DllImport(\"user32.dll\")] public static extern bool "
+                "SetForegroundWindow(IntPtr h);'; "
+                "Get-Process | Where-Object { ($_.ProcessName -like 'QQ*' -or "
+                "$_.ProcessName -like '*NapCat*') -and $_.MainWindowHandle -ne 0 } | "
+                "ForEach-Object { [N.W]::SetForegroundWindow($_.MainWindowHandle) }"
+            )
+            subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                           capture_output=True, timeout=20)
+        except Exception:
+            pass
+
+    threading.Thread(target=_go, daemon=True).start()
+
+
 def _qq_status() -> dict:
     """元亨 QQ / NapCat / bridge status for the workbench."""
     out = {"uin": "3655185302", "name": "元亨", "online": False,
@@ -594,6 +619,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                                    capture_output=True)
                 subprocess.Popen(["cmd", "/c", str(launch), "3655185302"],
                                  cwd=str(shell), close_fds=True)
+                _bring_qq_front()
                 _log("control", "napcat_login")
                 return {"ok": True,
                         "note": "已唤起 NapCat，请在弹出的窗口登录元亨号 3655185302"}
