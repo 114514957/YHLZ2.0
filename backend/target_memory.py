@@ -649,6 +649,64 @@ class TargetMemoryService:
         con.commit()
         con.close()
 
+    def audit_suspicious(self, limit: int = 20) -> dict:
+        """Memory health check (ledger 0226): sample recent active L2 items,
+        ask the local model to flag fabricated / unsupported / contradictory
+        ones, and DOWNGRADE them (never delete)."""
+        import json as _json
+        import urllib.request
+
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            rows = con.execute(
+                "SELECT id, type, importance, summary FROM l2_items "
+                "WHERE status='active' AND type IN ('fact','event') "
+                "AND summary NOT LIKE '认知%' "
+                "ORDER BY created_at DESC LIMIT ?",
+                (max(1, int(limit)),)).fetchall()
+        finally:
+            con.close()
+        if not rows:
+            return {"checked": 0, "flagged": [], "downgraded": 0}
+        listing = "\n".join(f"{r[0]} | {r[3][:120]}" for r in rows)
+        prompt = ("下面是你（元亨）的一些长期记忆条目。请挑出【可能有问题】的："
+                  "凭空编造、缺少依据、或与常理自相矛盾的。没有就返回空数组。"
+                  "只输出 JSON 数组，每项 {\"id\":\"...\",\"reason\":\"...\"}。\n"
+                  + listing)
+        flagged = []
+        try:
+            body = _json.dumps({
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 800, "temperature": 0.2,
+                "reasoning_effort": "none",
+            }).encode()
+            req = urllib.request.Request(
+                "http://127.0.0.1:8081/v1/chat/completions", data=body,
+                headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=120) as r:
+                d = _json.loads(r.read().decode("utf-8", "replace"))
+                txt = str(d["choices"][0]["message"].get("content") or "")
+            import re as _re
+
+            m = _re.search(r"\[.*\]", txt, _re.S)
+            if m:
+                for it in _json.loads(m.group(0)) or []:
+                    iid = str(it.get("id", "")).strip()
+                    if iid and any(iid == r0[0] for r0 in rows):
+                        flagged.append({"id": iid,
+                                        "reason": str(it.get("reason", ""))[:80]})
+        except Exception:
+            flagged = []
+        downgraded = 0
+        for f in flagged:
+            try:
+                self.mark(f["id"], "downgraded")
+                downgraded += 1
+            except Exception:
+                pass
+        return {"checked": len(rows), "flagged": flagged,
+                "downgraded": downgraded}
+
     def recall(self, query: str, limit: int = 5) -> list[dict]:
         """Tool-type recall; never auto-injected.
 

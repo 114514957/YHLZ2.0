@@ -54,5 +54,20 @@
   "enabled": true,
   "last_run": "",
   "created": 1789002806.081084
+ },
+ {
+  "id": "plan_1789006499605",
+  "name": "每周记忆体检",
+  "cadence": {
+   "type": "weekly",
+   "time": "11:00",
+   "weekday": 0
+  },
+  "steps": [
+   "调用 memory.audit 抽查近期事实记忆，可疑的降权（只降不删），并简单汇报老爹。"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1789006499.6055536
  }
 ]

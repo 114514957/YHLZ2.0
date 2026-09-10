@@ -325,6 +325,17 @@ def scheduler_capabilities() -> list[Capability]:
             verify=_verify_nonempty,
         ),
         Capability(
+            name="memory.audit",
+            description="记忆体检：抽样近期记忆，让本地模型挑出可能编造/无据/"
+                        "自相矛盾的条目并降权（只降不删）。定期运行。",
+            handler=lambda p: memory_audit(int(p.get("limit", 20) or 20)),
+            input=(),
+            optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="low",
+        ),
+        Capability(
             name="report.qq_weekly",
             description="生成本周 QQ 技术总结报告（读知识库 tech 条目→汇总→"
                         "写 docs/报告 并通知老爹）。每周例行。",
@@ -943,6 +954,27 @@ def kb_query(query: str, limit: int = 6, category: str = "") -> list[dict]:
     from backend.yuanheng_kb import kb_query as _query
 
     return _query(query, limit=limit, category=category)
+
+
+def memory_audit(limit: int = 20) -> str:
+    """Memory health check via the memory service (downgrade-only)."""
+    import json as _json
+
+    from backend.target_memory import TargetMemoryService
+
+    try:
+        res = TargetMemoryService().audit_suspicious(int(limit))
+    except Exception as exc:  # noqa: BLE001
+        return f"记忆体检失败：{type(exc).__name__}"
+    try:
+        from backend.target_daemon import notify_push
+
+        if res.get("flagged"):
+            notify_push(f"记忆体检：抽查 {res['checked']} 条，可疑 "
+                        f"{len(res['flagged'])} 条已降权")
+    except Exception:
+        pass
+    return "记忆体检：" + _json.dumps(res, ensure_ascii=False)[:600]
 
 
 def qq_weekly_report(days: int = 7) -> str:
