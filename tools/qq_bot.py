@@ -1,4 +1,4 @@
-"""YHLZ QQ bot bridge (ledger 0226): OneBot11 forward WebSocket -> daemon.
+r"""YHLZ QQ bot bridge (ledger 0226): OneBot11 forward WebSocket -> daemon.
 
 Listens on a NapCat OneBot11 WebSocket server and turns private messages /
 group @-mentions into daemon turns (channel qq_p<uid> / qq_g<gid>), then sends
@@ -164,6 +164,48 @@ class QQBridge:
 
 
 def main() -> int:
+    # single-instance lock (avoid duplicate bridges replying twice)
+    import atexit
+    import os as _os
+
+    lock = _PROJECT / "cache" / "tmp" / "qqbot.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+
+    def _pid_alive(pid: int) -> bool:
+        if pid <= 0:
+            return False
+        try:
+            _os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+    if lock.exists():
+        try:
+            old = int(lock.read_text(encoding="utf-8").strip() or "0")
+        except Exception:
+            old = 0
+        if _pid_alive(old):
+            print("[qqbot] 已有实例在运行，退出", flush=True)
+            return 1
+        lock.unlink(missing_ok=True)  # stale (owner gone)
+    try:
+        fd = _os.open(str(lock), _os.O_CREAT | _os.O_EXCL | _os.O_WRONLY)
+        _os.write(fd, str(_os.getpid()).encode())
+        _os.close(fd)
+        atexit.register(lambda: lock.unlink(missing_ok=True))
+    except FileExistsError:
+        print("[qqbot] 已有实例在运行，退出", flush=True)
+        return 1
+
+    # file log (pythonw has no console)
+    _logf = open(_PROJECT / "cache" / "tmp" / "qqbot.log", "a",
+                 encoding="utf-8", buffering=1)
+    sys.stdout = _logf
+    sys.stderr = _logf
+    print(f"=== qqbot start {time.strftime('%Y-%m-%d %H:%M:%S')} pid={_os.getpid()} ===",
+          flush=True)
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--uin", default=None)
     ap.add_argument("--config", default=None)
@@ -177,6 +219,8 @@ def main() -> int:
     url = f"ws://{s['host']}:{s['port']}"
     if s.get("token"):
         url += f"?access_token={s['token']}"
+    print(f"[qqbot] config={cfg} ws={s['host']}:{s['port']} uin={s['uin']}",
+          flush=True)
     masters = set(a.master or ["2258374446"])
     bridge = QQBridge(url, s["uin"], cfg, masters=masters)
     try:
