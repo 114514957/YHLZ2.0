@@ -253,7 +253,6 @@ async function emote(answer) {
 
 async function voice() {
   busyOn(true); setStage("listening"); setVad(0, false);
-  addMsg("u", "你", "(语音) 正在聆听…说完停3秒自动断");
   let box = null;
   await streamFetch("/voice", { speak: 1 }, {
     level: (e) => setVad(e.value, e.speech),
@@ -270,6 +269,7 @@ async function voice() {
     },
     delta: (e) => { if (!box) box = addMsg("a", "元亨", ""); box.textContent += e.delta || ""; },
     turn_done: (e) => { if (e.text && box) box.textContent = e.text; emote(e.text); },
+    interrupted: () => { setStage("listening"); },
     voice_done: () => setVad(0, false),
     error: (e) => { const t = addMsg("a", "元亨", ""); t.textContent = "(语音出错) " + (e.message || ""); },
   });

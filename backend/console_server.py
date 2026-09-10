@@ -385,21 +385,37 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             st = _settings_load()
             mock_text = str(body.get("text", "") or "").strip()
             _log("voice", "mock:" + mock_text if mock_text else "listen")
+            speak_default = "1" if st.get("tts_speak", True) else "0"
+            speak = str(body.get("speak", speak_default)) not in ("0", "false", "off")
             if mock_text:
-                text = mock_text
-            else:
+                emit({"type": "state", "value": "thinking"})
+                info = self.runtime.console_turn_stream(
+                    mock_text, lambda c: emit({"type": "delta", "delta": c}))
+                answer = str(info.get("answer", ""))
+                emit({"type": "turn_done", "text": answer,
+                      "tool_uses": len(info.get("tool_uses") or [])})
+                if speak and answer.strip():
+                    emit({"type": "state", "value": "speaking"})
+                    self._speak(answer, st.get("tts_speaker", "Vivian"))
+                emit({"type": "state", "value": "idle"})
+                emit({"type": "voice_done", "status": "ok"})
+                return
+            from tools.tts_test_start import _get_sv, release_sv
+
+            rounds = 0
+            while rounds < 4:
+                rounds += 1
                 emit({"type": "state", "value": "listening"})
                 r = self._listen(body, st)
                 if not r.get("started"):
-                    emit({"type": "state", "value": "idle"})
-                    emit({"type": "voice_done",
-                          "status": "no-speech"})
-                    return
+                    if rounds == 1:
+                        emit({"type": "state", "value": "idle"})
+                        emit({"type": "voice_done", "status": "no-speech"})
+                        return
+                    break
                 audio = r["audio"]
                 emit({"type": "voice_text", "kind": "asr",
                       "text": "(语音已采集，识别中…)"})
-                from tools.tts_test_start import _get_sv, release_sv
-
                 emit({"type": "state", "value": "asr"})
                 sv = _get_sv()
                 res = sv.generate(input=audio, language="zh",
@@ -410,20 +426,23 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 text = re.sub(r"<\|[^|]+\|>", "", raw).strip()
                 release_sv()
                 emit({"type": "voice_text", "kind": "user", "text": text})
-            emit({"type": "state", "value": "thinking"})
-            if not text:
-                emit({"type": "state", "value": "idle"})
-                return
-            info = self.runtime.console_turn_stream(
-                text, lambda c: emit({"type": "delta", "delta": c}))
-            answer = str(info.get("answer", ""))
-            emit({"type": "turn_done", "text": answer,
-                  "tool_uses": len(info.get("tool_uses") or [])})
-            speak_default = "1" if st.get("tts_speak", True) else "0"
-            speak = str(body.get("speak", speak_default)) not in ("0", "false", "off")
-            if speak and answer.strip():
-                emit({"type": "state", "value": "speaking"})
-                self._speak(answer, st.get("tts_speaker", "Vivian"))
+                if not text:
+                    break
+                emit({"type": "state", "value": "thinking"})
+                info = self.runtime.console_turn_stream(
+                    text, lambda c: emit({"type": "delta", "delta": c}))
+                answer = str(info.get("answer", ""))
+                emit({"type": "turn_done", "text": answer,
+                      "tool_uses": len(info.get("tool_uses") or [])})
+                if speak and answer.strip():
+                    emit({"type": "state", "value": "speaking"})
+                    rr = self._speak_interruptible(
+                        answer, st.get("tts_speaker", "Vivian"),
+                        int(st.get("device", 1) or 1))
+                    if rr == "interrupted":
+                        emit({"type": "interrupted"})
+                        continue  # back to listening (barge-in)
+                break
             emit({"type": "state", "value": "idle"})
             emit({"type": "voice_done", "status": "ok"})
         except Exception as exc:  # noqa: BLE001
@@ -474,6 +493,65 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         self.wfile.write(_sse({"type": "level", "value": round(float(level), 4),
                                "speech": bool(is_speech)}))
         self.wfile.flush()
+
+    def _speak_interruptible(self, text: str, speaker: str = "Vivian",
+                             device: int = 1) -> str:
+        """Play TTS while listening for barge-in; stop if the user speaks over
+        it (echo-masked: mic rms must exceed the playback level by a margin).
+        Returns 'done' or 'interrupted'."""
+        import numpy as np
+        import sounddevice as sd
+        import torch
+        from faster_qwen3_tts import FasterQwen3TTS
+
+        try:
+            m = FasterQwen3TTS.from_pretrained(
+                str(_PROJECT_ROOT / "models" / "qwen3-tts" /
+                    "Qwen3-TTS-12Hz-1.7B-CustomVoice"),
+                device="cuda", dtype=torch.bfloat16)
+            wavs, sr = m.generate_custom_voice(
+                text=str(text)[:180], language="Chinese", speaker=str(speaker),
+                instruct="自然地说，像和亲近的人聊天，别播音腔。")
+            samples = np.asarray(wavs[0], dtype="float32")
+            del m
+            import gc
+
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            return "done"
+        play_rms = float(np.sqrt(np.mean(samples * samples)) + 1e-9)
+        thr = max(0.05, play_rms * 1.5)  # echo mask: own voice ≈ play*atten
+        sd.play(samples, int(sr))
+        dur = len(samples) / float(sr)
+        t0 = time.time()
+        hot = 0
+        result = "done"
+        try:
+            with sd.InputStream(device=int(device), samplerate=16000,
+                                channels=1, dtype="float32",
+                                blocksize=1600, latency="low") as inp:
+                while time.time() - t0 < dur + 0.4:
+                    data, _ = inp.read(1600)
+                    mono = np.asarray(
+                        data[:, 0] if data.ndim > 1 else data, dtype="float32")
+                    rms = float(np.sqrt(np.mean(mono * mono)) + 1e-9)
+                    if rms > thr:
+                        hot += 1
+                        if hot >= 2:
+                            result = "interrupted"
+                            break
+                    else:
+                        hot = 0
+        except Exception:
+            result = "done"
+        try:
+            sd.stop()
+        except Exception:
+            pass
+        _log("voice", f"tts {result} (play_rms={play_rms:.3f})")
+        return result
 
     def _speak(self, text: str, speaker: str = "Vivian") -> None:
         import torch
