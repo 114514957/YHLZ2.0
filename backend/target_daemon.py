@@ -73,13 +73,23 @@ def notify_should(text: str, tools: list[dict]) -> bool:
 
 class DaemonRuntime:
     def __init__(self, session_factory: Optional[Callable[[], Any]] = None,
-                 llm_turn: Any = None) -> None:
+                 llm_turn: Any = None,
+                 autonomy_seconds: Optional[float] = None) -> None:
         self._loop = asyncio.new_event_loop()
         self._ready = threading.Event()
         self._factory = session_factory or self._default_session
         self._llm_turn_override = llm_turn
         self._sessions: dict[str, Any] = {}
         self._lock = threading.Lock()
+        import os as _os
+
+        if autonomy_seconds is None:
+            try:
+                autonomy_seconds = float(
+                    _os.getenv("YHLZ_AUTONOMY_SECONDS", "0")) or 3 * 3600
+            except Exception:
+                autonomy_seconds = 3 * 3600
+        self.autonomy_seconds = float(autonomy_seconds)
         self._worker = threading.Thread(target=self._run_loop, daemon=True)
         self._worker.start()
         self._ready.wait(timeout=10)
@@ -93,6 +103,35 @@ class DaemonRuntime:
         threading.Thread(target=self._schedule_loop, daemon=True).start()
         self._upkeep_last = ""
         threading.Thread(target=self._memory_upkeep_loop, daemon=True).start()
+        self._autonomy_last = 0.0
+        threading.Thread(target=self._autonomy_loop, daemon=True).start()
+
+    def _autonomy_loop(self) -> None:
+        """Unified autonomy cadence (ledger 0226): one self-initiated moment
+        every autonomy_seconds (default 3h). Kept low-frequency so real,
+        grounded content outweighs any hallucinated bits."""
+        while True:
+            time.sleep(self.autonomy_seconds)
+            try:
+                s = self._session("console")
+
+                async def _run():
+                    return await s.proactive_tick(
+                        "这是你的自主时刻（每 3 小时一次）：看看最近有什么值得"
+                        "自己整理、记录，或想对老爹说的。简短、真实；没有就"
+                        "说没有，别硬凑。", extra="")
+
+                fut = asyncio.run_coroutine_threadsafe(_run(), self._loop)
+                info = fut.result(timeout=300)
+                try:
+                    s.save_session("console")
+                except Exception:
+                    pass
+                self._autonomy_last = time.time()
+                print("[autonomy] tick: "
+                      + str(info.get("answer", ""))[:90], flush=True)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[autonomy] skip {type(exc).__name__}", flush=True)
 
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self._loop)
@@ -602,8 +641,11 @@ def main() -> int:
     parser.add_argument("--console-port", type=int, default=0,
                         help="legacy separate console port (0=off; "
                              "workbench UI served on the main port)")
+    parser.add_argument("--autonomy-hours", type=float, default=3.0,
+                        help="self-initiated autonomy cadence (hours)")
     args = parser.parse_args()
-    runtime = DaemonRuntime()
+    runtime = DaemonRuntime(autonomy_seconds=max(60.0,
+                                                 args.autonomy_hours * 3600))
     server = make_server(args.port, args.host, runtime)
     print(f"元亨 daemon: http://{args.host}:{args.port} "
           f"(OpenAI 兼容 {args.host}:{args.port}/v1/chat/completions)", flush=True)
