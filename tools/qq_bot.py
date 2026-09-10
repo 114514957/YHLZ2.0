@@ -1,3 +1,4 @@
+# QQ 机器人相关功能（OneBot11 桥接）
 r"""YHLZ QQ bot bridge (ledger 0226): OneBot11 forward WebSocket -> daemon.
 
 Listens on a NapCat OneBot11 WebSocket server and turns private messages /
