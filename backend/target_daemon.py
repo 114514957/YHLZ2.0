@@ -654,6 +654,12 @@ def main() -> int:
     args = parser.parse_args()
     runtime = DaemonRuntime(autonomy_seconds=max(60.0,
                                                  args.autonomy_hours * 3600))
+    try:
+        from backend.vector_memory import warm_reranker
+
+        warm_reranker()  # background: reranker ready shortly after boot
+    except Exception:
+        pass
     server = make_server(args.port, args.host, runtime)
     print(f"元亨 daemon: http://{args.host}:{args.port} "
           f"(OpenAI 兼容 {args.host}:{args.port}/v1/chat/completions)", flush=True)

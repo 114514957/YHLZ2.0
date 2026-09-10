@@ -203,6 +203,31 @@ class TargetMemoryService:
                 return ""
             return f"[早前对话摘要] {self._summary}"
 
+    def bm25_search(self, query: str, limit: int = 8) -> list[dict]:
+        """FTS5 BM25 search over L2 (fallback-safe; never raises)."""
+        q = str(query or "").strip()
+        if not q:
+            return []
+        import re as _re
+
+        toks = [t for t in _re.split(r"[\s,，。、？！!?;；]+", q) if len(t) >= 2]
+        if not toks:
+            return []
+        match = " OR ".join('"' + t.replace('"', "") + '"' for t in toks[:8])
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            rows = con.execute(
+                "SELECT i.id, i.type, i.importance, i.status, i.summary, "
+                "bm25(l2_fts) AS s FROM l2_fts JOIN l2_items i "
+                "ON l2_fts.sid=i.id WHERE l2_fts MATCH ? "
+                "ORDER BY s LIMIT ?", (match, max(1, int(limit)))).fetchall()
+        except Exception:
+            rows = []
+        finally:
+            con.close()
+        return [{"id": r[0], "type": r[1], "importance": r[2], "status": r[3],
+                 "summary": r[4], "bm25": r[5]} for r in rows]
+
     def contextual_recall(self, text: str, limit: int = 2) -> list[dict]:
         """Lightweight topic recall for auto-injection (ledger 0217).
 
@@ -287,7 +312,44 @@ class TargetMemoryService:
                 seen.add(did)
         except Exception:
             pass
+        # 4) BM25 candidates (lexical strength) then cross-encoder rerank
+        try:
+            for b in self.bm25_search(q, limit=limit * 4):
+                if b["id"] in seen:
+                    continue
+                if b.get("type") not in _INJECT_TYPES:
+                    continue
+                if int(b.get("importance", 0) or 0) < 5:
+                    continue
+                if b.get("status") not in (None, "", "active"):
+                    continue
+                good.append({"id": b["id"], "tier": "L2", "type": b["type"],
+                             "importance": b["importance"],
+                             "status": b["status"],
+                             "summary": b["summary"], "_score": 0.45})
+                seen.add(b["id"])
+        except Exception:
+            pass
+        if len(good) > 1:
+            try:
+                from backend.vector_memory import rerank
+
+                scores = rerank(q, [g["summary"] for g in good])
+                for g, s in zip(good, scores):
+                    g["_score"] = float(s)
+            except Exception:
+                pass
         good.sort(key=lambda x: x.get("_score", 0.0), reverse=True)
+        # de-dup by text (diary/l2 may hold the same sentence)
+        uniq: list[dict] = []
+        seen_txt: set[str] = set()
+        for g in good:
+            t = str(g.get("summary", ""))[:80]
+            if t in seen_txt:
+                continue
+            seen_txt.add(t)
+            uniq.append(g)
+        good = uniq
         for g in good:
             g.pop("_score", None)
         return good[:limit]

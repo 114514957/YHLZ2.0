@@ -181,6 +181,58 @@ def _topic(q: str) -> str:
     return t if len(t) >= 4 else str(q or "")
 
 
+_RERANK_DIR = _PROJECT / "models" / "emb" / "bge-reranker-base"
+_rr = {"model": None, "tok": None, "loading": False}
+
+
+def warm_reranker() -> None:
+    """Load the reranker in the background (never blocks a turn)."""
+    if _rr["model"] is not None or _rr["loading"]:
+        return
+    import threading
+
+    def _load():
+        try:
+            from transformers import (AutoModelForSequenceClassification,
+                                      AutoTokenizer)
+
+            _rr["loading"] = True
+            _rr["tok"] = AutoTokenizer.from_pretrained(str(_RERANK_DIR))
+            _rr["model"] = AutoModelForSequenceClassification.from_pretrained(
+                str(_RERANK_DIR))
+            _rr["model"].eval()
+        except Exception:
+            pass
+        finally:
+            _rr["loading"] = False
+
+    threading.Thread(target=_load, daemon=True).start()
+
+
+def rerank(query: str, docs: list[str]) -> list[float]:
+    """Cross-encoder rerank scores (BAAI/bge-reranker-base, CPU).
+    Non-blocking: on first use it kicks off background loading and returns
+    zeros for now (caller keeps its vector/literal order)."""
+    q = str(query or "").strip()
+    ds = [str(d or "") for d in (docs or [])]
+    if not q or not ds:
+        return [0.0 for _ in ds]
+    if _rr["model"] is None:
+        warm_reranker()
+        return [0.0 for _ in ds]
+    try:
+        import torch
+
+        pairs = [[q, d] for d in ds]
+        with torch.no_grad():
+            enc = _rr["tok"](pairs, padding=True, truncation=True,
+                             max_length=256, return_tensors="pt")
+            logits = _rr["model"](**enc).logits.view(-1)
+            return [float(x) for x in torch.sigmoid(logits)]
+    except Exception:
+        return [0.0 for _ in ds]
+
+
 def semantic_l2(query: str, top: int = 8,
                 min_score: float = 0.35) -> list[dict]:
     """Semantic search over L2 -> full item dicts from the memory db.
