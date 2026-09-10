@@ -177,6 +177,14 @@ $("q-wake").addEventListener("click", async () => {
   alert(r.ok ? (r.note || "已唤起 NapCat，请登录元亨号") : ("唤起失败：" + (r.error || "")));
   loadDashboard();
 });
+async function launch(action, okMsg) {
+  const r = await (await fetch("/control", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action }) })).json();
+  alert(r.ok ? (r.note || okMsg) : ("启动失败：" + (r.error || "")));
+}
+$("petBtn").addEventListener("click", () => launch("launch_pet", "已启动桌宠"));
+$("allBtn").addEventListener("click", () => launch("launch_all", "已启动全家桶"));
 
 async function loadDashboard() {
   try {

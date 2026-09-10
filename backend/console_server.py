@@ -599,6 +599,33 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                         "note": "已唤起 NapCat，请在弹出的窗口登录元亨号 3655185302"}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
+        if action == "launch_pet":
+            try:
+                import subprocess
+
+                desktop = _PROJECT_ROOT / "desktop"
+                exe = desktop / "node_modules" / ".bin" / "electron.cmd"
+                if not exe.exists():
+                    return {"ok": False, "error": "未找到 electron（desktop/node_modules）"}
+                subprocess.Popen(["cmd", "/c", str(exe), "."],
+                                 cwd=str(desktop), close_fds=True)
+                _log("control", "launch_pet")
+                return {"ok": True, "note": "已启动桌宠"}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
+        if action == "launch_all":
+            try:
+                import subprocess
+
+                bat = _PROJECT_ROOT / "YHLZ_全家桶.bat"
+                if not bat.exists():
+                    return {"ok": False, "error": "找不到 YHLZ_全家桶.bat"}
+                subprocess.Popen(["cmd", "/c", str(bat)], cwd=str(_PROJECT_ROOT),
+                                 close_fds=True)
+                _log("control", "launch_all")
+                return {"ok": True, "note": "已启动全家桶"}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         return {"ok": False, "error": "unknown action: " + action}
 
     def _listen(self, body, st: dict, on_segment=None) -> dict:
