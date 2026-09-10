@@ -86,6 +86,82 @@ async def _napcat_call(ws_url: str, action: str, params: dict,
     return None
 
 
+# ---- voice (inbound) ----
+_ASR = None
+_ASR_DEVICE = os.getenv("YHLZ_ASR_DEVICE", "cpu")
+_SENSEVOICE_DIR = _PROJECT / "models" / "voice" / "asr" / "SenseVoiceSmall"
+
+
+def _decode_to_pcm16k(path: str):
+    """Local audio file -> float32 mono 16k numpy (silk via pilk, else ffmpeg).
+
+    Never deletes the source file (writes converted audio to a temp dir).
+    """
+    import tempfile
+
+    import numpy as np
+
+    p = pathlib.Path(path)
+    tmpdir = pathlib.Path(tempfile.mkdtemp(prefix="yhlz_aud_"))
+    try:
+        if p.suffix.lower() == ".silk":
+            import pilk
+
+            out = tmpdir / "a.pcm"
+            pilk.decode(str(p), str(out), 16000)
+            return np.fromfile(str(out), dtype="<i2").astype("float32") / 32768.0
+        import imageio_ffmpeg
+
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        out = tmpdir / "a16.wav"
+        import subprocess
+
+        subprocess.run([exe, "-y", "-i", str(p), "-ac", "1", "-ar", "16000",
+                        str(out)], capture_output=True)
+        import wave
+
+        with wave.open(str(out), "rb") as w:
+            frames = w.readframes(w.getnframes())
+        return np.frombuffer(frames, dtype="<i2").astype("float32") / 32768.0
+    finally:
+        import shutil
+
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _transcribe_audio(audio) -> str:
+    """SenseVoiceSmall (device=YHLZ_ASR_DEVICE, default cpu) -> clean text."""
+    global _ASR
+    import re
+
+    try:
+        if _ASR is None:
+            from funasr import AutoModel
+
+            os.chdir(str(_PROJECT))  # funasr/sentencepiece relative-path quirk
+            _ASR = AutoModel(
+                model=str(_SENSEVOICE_DIR.relative_to(_PROJECT)),
+                device=_ASR_DEVICE, disable_update=True,
+                disable_pbar=True, disable_log=True)
+        r = _ASR.generate(input=audio, language="zh", use_itn=True,
+                          batch_size_s=60)
+        text = str((r[0] or {}).get("text") or "") if r else ""
+    except Exception:
+        return ""
+    text = re.sub(r"\b(SIL|MM|UM|UH|SPK|SPEAKER|NOISE|MUSIC|LAUGH)\b", " ",
+                  text, flags=re.IGNORECASE)
+    text = re.sub(r"[\[<].*?[\]>]", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _warm_asr() -> None:
+    """Load SenseVoice in the background so the first voice msg isn't slow."""
+    try:
+        _transcribe_audio(__import__("numpy").zeros(8000, dtype="float32"))
+    except Exception:
+        pass
+
+
 def _find_onebot_config(uin: str | None) -> pathlib.Path:
     cands = []
     for d in (QQWATCH_CONFIG,
@@ -273,6 +349,50 @@ class QQBridge:
             _cleanup_media()
         return out
 
+    async def _resolve_record(self, seg) -> str:
+        d = seg.get("data") or {}
+        file = str(d.get("file") or "")
+        ev = await _napcat_call(self.ws_url, "get_record",
+                                {"file": file, "out_format": "wav"})
+        r = (ev or {}).get("data") or {}
+        p = str(r.get("file") or "")
+        try:
+            if p and pathlib.Path(p).exists():
+                src = pathlib.Path(p)
+                saved = _save_media(src.read_bytes(),
+                                    src.suffix.lstrip(".") or "wav")
+                self.log(f"语音已存 {saved}")
+                return saved
+        except Exception as e:  # noqa: BLE001
+            self.log(f"语音存盘异常 {type(e).__name__}: {e}")
+        b64 = str(r.get("base64") or "")
+        if b64:
+            import base64 as _b64
+
+            saved = _save_media(_b64.b64decode(b64), "wav")
+            self.log(f"语音已存(base64) {saved}")
+            return saved
+        u = str(r.get("url") or d.get("url") or "")
+        if u.startswith("http"):
+            try:
+                saved = _save_media(urllib.request.urlopen(
+                    urllib.request.Request(
+                        u, headers={"User-Agent": "Mozilla/5.0"}),
+                    timeout=20).read(), "wav")
+                self.log(f"语音已存(url) {saved}")
+                return saved
+            except Exception:
+                pass
+        self.log(f"取语音失败 file={file[:40]} data={str(r)[:120]}")
+        return ""
+
+    def _voice_text(self, path: str) -> str:
+        try:
+            return _transcribe_audio(_decode_to_pcm16k(path))
+        except Exception as e:  # noqa: BLE001
+            self.log(f"语音识别失败 {type(e).__name__}: {e}")
+            return ""
+
     async def handle(self, ws, ev: dict) -> None:
         if ev.get("post_type") != "message":
             return
@@ -317,6 +437,19 @@ class QQBridge:
                     self.log(f"dev 答复路由异常 {type(e).__name__}: {e}")
         imgs = (await self._collect_images(msg)
                 if any(s.get("type") == "image" for s in msg) else [])
+        if any(s.get("type") == "record" for s in msg):
+            heard = []
+            for s in msg:
+                if s.get("type") == "record":
+                    p = await self._resolve_record(s)
+                    if p:
+                        t = await asyncio.to_thread(self._voice_text, p)
+                        if t:
+                            heard.append(t)
+            if heard:
+                text = (text + " " + " ".join(
+                    f"（语音）{h}" for h in heard)).strip()
+                _cleanup_media()
         if not text and not imgs:
             return
         self.log(f"来自 {user_id}: {text[:40]}"
@@ -339,6 +472,7 @@ class QQBridge:
         import websockets
 
         self.loop = asyncio.get_running_loop()
+        threading.Thread(target=_warm_asr, daemon=True).start()
         delay = 3
         while True:
             try:
