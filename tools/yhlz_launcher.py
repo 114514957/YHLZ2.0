@@ -30,8 +30,10 @@ BOOT_PORT = 8577
 OLLAMA = r"C:\Users\ACE_WAN——PROJECT\AppData\Local\Programs\Ollama\ollama.exe"
 LLAMA = (r"C:\Users\ACE_WAN——PROJECT\AppData\Local\Microsoft\WinGet\Packages"
          r"\ggml.llamacpp_Microsoft.Winget.Source_8wekyb3d8bbwe\llama-server.exe")
-GEMMA = _ROOT / "models" / "gemma4" / "gemma4-e4b-aggr-q4km.gguf"
-MMPROJ = _ROOT / "models" / "gemma4" / "mmproj-gemma4-e4b.gguf"
+GEMMA = Path(os.getenv("YHLZ_MODELS_DIR",
+                       r"C:\Users\ACE_WAN——PROJECT\models")) / "gemma4" / "gemma4-e4b-aggr-q4km.gguf"
+MMPROJ = Path(os.getenv("YHLZ_MODELS_DIR",
+                        r"C:\Users\ACE_WAN——PROJECT\models")) / "gemma4" / "mmproj-gemma4-e4b.gguf"
 PY = _ROOT / ".venv" / "Scripts" / "python.exe"
 
 URLS = {

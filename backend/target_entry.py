@@ -196,7 +196,8 @@ class ConversationSession:
     async def run_turn(self, text: str,
                        on_delta: Optional[Callable[[str], None]] = None,
                        mode: str = "auto",
-                       pre_recall: Optional[list] = None) -> dict[str, Any]:
+                       pre_recall: Optional[list] = None,
+                       images: Optional[list] = None) -> dict[str, Any]:
         self.memory.append_turn(role="user", text=text)
         contradictions = self._maybe_contradiction(text)
         from backend.target_style import capture_style_signal
@@ -204,8 +205,9 @@ class ConversationSession:
         capture_style_signal(text, self.memory)
         system = self.render_system()
         llm_turn = self.llm_turn
-        work = mode == "work" or (
-            mode == "auto" and self._want_work_mode(text))
+        # images -> vision chat mode (no tool schema, no work reasoning)
+        work = (not images) and (mode == "work" or (
+            mode == "auto" and self._want_work_mode(text)))
         effort = "medium" if work else "none"
         if not self._llm_injected and work:
             from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
@@ -270,6 +272,7 @@ class ConversationSession:
             history=self.history[-6:],  # latency (ledger 0206): cap in-context turns
             with_tools=work,
             early_context="\n".join(ctx_lines),
+            images=images,
         )
         self.memory.append_turn(role="assistant", text=result.answer)
         if self.memory._summary_pending:

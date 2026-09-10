@@ -35,6 +35,55 @@ CONFIG_DIR = _PROJECT / "cache" / "tmp"  # fallback; use qqwatch path
 QQWATCH_CONFIG = pathlib.Path(
     r"C:\Users\ACE_WAN——PROJECT\qqwatch\shell\config")
 DAEMON = os.getenv("DAEMON", "http://127.0.0.1:8321")
+MEDIA_DIR = _PROJECT / "cache" / "qq_media"
+MEDIA_KEEP_DAYS = 7
+
+
+def _save_media(data: bytes, ext: str) -> str:
+    import hashlib
+
+    day = time.strftime("%Y%m%d")
+    d = MEDIA_DIR / day
+    d.mkdir(parents=True, exist_ok=True)
+    h = hashlib.sha1(data).hexdigest()[:16]
+    p = d / f"{h}.{ext or 'jpg'}"
+    p.write_bytes(data)
+    return str(p)
+
+
+def _cleanup_media(days: int = MEDIA_KEEP_DAYS) -> None:
+    cutoff = time.time() - days * 86400
+    try:
+        for f in MEDIA_DIR.rglob("*"):
+            if f.is_file() and f.stat().st_mtime < cutoff:
+                f.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+async def _napcat_call(ws_url: str, action: str, params: dict,
+                       timeout: float = 15.0) -> dict | None:
+    """One-shot OneBot API call over a short-lived WS connection."""
+    import websockets
+
+    try:
+        async with websockets.connect(ws_url, open_timeout=5) as ws:
+            echo = f"n{int(time.time()*1000)}"
+            await ws.send(json.dumps({"action": action, "params": params,
+                                      "echo": echo}))
+            end = time.time() + timeout
+            while time.time() < end:
+                raw = await asyncio.wait_for(ws.recv(),
+                                             timeout=max(1.0, end - time.time()))
+                try:
+                    ev = json.loads(raw)
+                except Exception:
+                    continue
+                if ev.get("echo") == echo:
+                    return ev
+    except Exception:
+        return None
+    return None
 
 
 def _find_onebot_config(uin: str | None) -> pathlib.Path:
@@ -64,9 +113,12 @@ def _ws_settings(cfg: pathlib.Path) -> dict | None:
     return None
 
 
-def _daemon_turn(text: str, channel: str) -> str:
-    body = json.dumps({"text": str(text)[:1500], "channel": channel}).encode()
-    req = urllib.request.Request(DAEMON + "/turn", data=body,
+def _daemon_turn(text: str, channel: str, images: list | None = None) -> str:
+    body: dict = {"text": str(text)[:1500], "channel": channel}
+    if images:
+        body["images"] = [str(p) for p in images][:4]
+    data = json.dumps(body).encode()
+    req = urllib.request.Request(DAEMON + "/turn", data=data,
                                  headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=120) as r:
@@ -174,6 +226,53 @@ class QQBridge:
             await self._say(ws, params,
                             "未知指令：#dev <任务> / #y / #n / #push / #devstatus")
 
+    async def _resolve_image(self, seg) -> str:
+        d = seg.get("data") or {}
+        url = str(d.get("url") or "")
+        if url.startswith("http"):
+            try:
+                req = urllib.request.Request(
+                    url, headers={"User-Agent": "Mozilla/5.0"})
+                return _save_media(urllib.request.urlopen(req, timeout=20).read(),
+                                   "jpg")
+            except Exception:
+                pass
+        file = str(d.get("file") or d.get("file_id") or "")
+        if not file:
+            return ""
+        ev = await _napcat_call(self.ws_url, "get_image", {"file": file})
+        r = (ev or {}).get("data") or {}
+        p = str(r.get("file") or "")
+        try:
+            if p and pathlib.Path(p).exists():
+                src = pathlib.Path(p)
+                return _save_media(src.read_bytes(),
+                                   src.suffix.lstrip(".") or "jpg")
+        except Exception:
+            pass
+        u = str(r.get("url") or "")
+        if u.startswith("http"):
+            try:
+                return _save_media(urllib.request.urlopen(
+                    urllib.request.Request(
+                        u, headers={"User-Agent": "Mozilla/5.0"}),
+                    timeout=20).read(), "jpg")
+            except Exception:
+                pass
+        self.log(f"取图失败 file={file[:40]}")
+        return ""
+
+    async def _collect_images(self, msg) -> list:
+        out = []
+        for seg in msg or []:
+            if seg.get("type") == "image":
+                p = await self._resolve_image(seg)
+                if p:
+                    out.append(p)
+        if out:
+            _cleanup_media()
+        return out
+
     async def handle(self, ws, ev: dict) -> None:
         if ev.get("post_type") != "message":
             return
@@ -185,8 +284,6 @@ class QQBridge:
         if not isinstance(msg, list):
             return
         text, ats = self._text_of(msg)
-        if not text:
-            return
         cmd = text.strip().replace("＃", "#")
         is_master_cmd = user_id in self.masters and cmd.startswith("#")
         if msg_type == "private":
@@ -218,8 +315,13 @@ class QQBridge:
                         return
                 except Exception as e:  # noqa: BLE001
                     self.log(f"dev 答复路由异常 {type(e).__name__}: {e}")
-        self.log(f"来自 {user_id}: {text[:40]}")
-        ans = _daemon_turn(text, channel)
+        imgs = (await self._collect_images(msg)
+                if any(s.get("type") == "image" for s in msg) else [])
+        if not text and not imgs:
+            return
+        self.log(f"来自 {user_id}: {text[:40]}"
+                 + (f" [+{len(imgs)}图]" if imgs else ""))
+        ans = _daemon_turn(text, channel, images=imgs)
         if not ans:
             return
         ans = ans.strip()

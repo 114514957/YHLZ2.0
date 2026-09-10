@@ -22,6 +22,27 @@ LLMTurn = Callable[
 Approver = Callable[[dict[str, Any]], Awaitable[bool]]
 
 
+def _to_data_url(src: str) -> str:
+    """Local image path -> data URI; http(s)/data URLs pass through."""
+    import base64
+    import pathlib
+
+    s = str(src)
+    if s.startswith(("http://", "https://", "data:")):
+        return s
+    p = pathlib.Path(s)
+    if not p.exists():
+        return ""
+    ext = p.suffix.lower().lstrip(".") or "png"
+    mime = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "gif": "gif",
+            "webp": "webp", "bmp": "bmp"}.get(ext, "png")
+    try:
+        b = base64.b64encode(p.read_bytes()).decode()
+    except Exception:
+        return ""
+    return f"data:image/{mime};base64,{b}"
+
+
 def build_openai_compatible_llm_turn(
     *,
     base_url: str = "https://api.deepseek.com/v1/chat/completions",
@@ -95,7 +116,7 @@ def build_openai_compatible_llm_turn(
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
-        headers = {"Authorization": f"Bearer {api_key}"}
+        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
         async def _post(c: Any, url: str, hdrs: dict, body: dict) -> dict[str, Any]:
             r = await c.post(url, headers=hdrs, json=body)
@@ -176,6 +197,7 @@ class TurnOrchestrator:
         history: Optional[list[dict[str, Any]]] = None,
         with_tools: bool = True,
         early_context: str = "",
+        images: Optional[list[str]] = None,
     ) -> TurnResult:
         started = time.perf_counter()
         messages: list[dict[str, Any]] = [
@@ -184,9 +206,20 @@ class TurnOrchestrator:
         if early_context:
             messages.append({"role": "system",
                              "content": str(early_context)[:1500]})
+        user_content: Any = str(turn_text)
+        if images:
+            parts: list[dict[str, Any]] = [
+                {"type": "text", "text": str(turn_text) or "（看图）"}]
+            for p in images:
+                url = _to_data_url(p)
+                if url:
+                    parts.append({"type": "image_url",
+                                  "image_url": {"url": url}})
+            if len(parts) > 1:
+                user_content = parts
         messages += [
             *(history or [])[-6:],
-            {"role": "user", "content": str(turn_text)},
+            {"role": "user", "content": user_content},
         ]
         # with_tools=False (casual chat): no tool schema at all — keeps the
         # model in persona voice (ledger 0215: 27-tool schema nudges Gemma

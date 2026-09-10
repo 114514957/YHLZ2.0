@@ -126,10 +126,10 @@ class TestTurnOrchestrator(unittest.TestCase):
         names = {t["function"]["name"] for t in tools}
         self.assertEqual(
             names,
-            {"owner_approve", "ledger_search", "memory_recall", "memory_save", "system_time",
+            {             "owner_approve", "ledger_search", "memory_recall", "memory_save", "system_time",
              "diary_write", "diary_list", "diary_delete",
              "file_list", "file_read", "task_plan", "web_fetch", "web_search",
-             "kb_add", "kb_query",
+             "kb_add", "kb_query", "memory_audit", "report_qq_weekly",
              "qq_bootstrap", "qq_digest", "qq_export", "qq_process", "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize",
              "schedule_plan", "skill_add", "skill_feedback", "skill_search"},
         )

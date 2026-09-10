@@ -208,11 +208,12 @@ class DaemonRuntime:
             return "console"
         return c
 
-    def turn(self, text: str, channel: str = "private") -> dict:
+    def turn(self, text: str, channel: str = "private",
+             images: list | None = None) -> dict:
         key = self._norm_ui_channel(channel)
         s = self._session(key)
-        future = asyncio.run_coroutine_threadsafe(s.run_turn(str(text)),
-                                                  self._loop)
+        future = asyncio.run_coroutine_threadsafe(
+            s.run_turn(str(text), images=images), self._loop)
         info = future.result(timeout=240)
         try:
             s.save_session("console" if key == "console" else
@@ -572,12 +573,15 @@ class _Handler(ConsoleHandler):
             return
         if self.path == "/turn":
             text = str(payload.get("text", "")).strip()
-            if not text:
+            imgs = payload.get("images")
+            imgs = [str(x) for x in imgs if x][:4] if isinstance(imgs, list) else None
+            if not text and not imgs:
                 self._send(400, {"error": "empty text"})
                 return
             try:
                 info = self.runtime.turn(text,
-                                         str(payload.get("channel", "private")))
+                                         str(payload.get("channel", "private")),
+                                         images=imgs)
                 self._send(200, info)
             except Exception as exc:
                 self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:160]}"})
