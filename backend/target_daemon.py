@@ -119,12 +119,20 @@ class DaemonRuntime:
                     return await s.proactive_tick(
                         "这是你的自主时刻（每 3 小时一次）：看看最近有什么值得"
                         "自己整理、记录，或想对老爹说的。简短、真实；没有就"
-                        "说没有，别硬凑。", extra="")
+                        "说没有，别硬凑。若你确实想通了值得长期坚持的原则，"
+                        "可以用 memory.save(importance 8-9) 记下，日后可沉淀为"
+                        "你的认知。", extra="")
 
                 fut = asyncio.run_coroutine_threadsafe(_run(), self._loop)
                 info = fut.result(timeout=300)
                 try:
                     s.save_session("console")
+                except Exception:
+                    pass
+                try:
+                    # turn the autonomous thinking into cognition proposals
+                    # (PENDING -> owner approval, ledger 0226)
+                    self._maybe_consolidate("console")
                 except Exception:
                     pass
                 self._autonomy_last = time.time()
