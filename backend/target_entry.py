@@ -453,12 +453,47 @@ class ConversationSession:
         }
 
     # ---------- proactive (autonomous action seed, ledger 0152) ----------
-    async def proactive_tick(self, question: str = "根据最近积累的记忆，有什么值得主动整理或提醒的？") -> dict[str, Any]:
+    def _recall_hints(self, extra: str = "", top: int = 3) -> list[str]:
+        """Semantic 'self recall' material for autonomous moments (ledger 0226):
+        surface related old memories so Yuanheng can bring them up herself."""
+        try:
+            from backend.vector_memory import semantic_l2
+
+            recent = " ".join(
+                str(m.get("content", ""))[:80] for m in self.history[-6:]
+                if m.get("role") == "user")
+            q = (str(extra) + " " + recent).strip()
+            if not q:
+                return []
+            hits = semantic_l2(q, top=top, min_score=0.42)
+            return [str(h.get("summary", ""))[:70] for h in hits
+                    if h.get("summary")]
+        except Exception:
+            return []
+
+    def autonomy_prompt(self, question: str,
+                        extra: str = "") -> str:
+        import datetime as _dt
+
+        now = _dt.datetime.now()
+        lines = [question,
+                 f"（现在是 {now:%Y-%m-%d %H:%M}）"]
+        hints = self._recall_hints(extra or question)
+        if hints:
+            lines.append("也许可以想起这些旧记忆（若相关，自然地想起、带出，"
+                         "或据此整理与提醒，不相关就忽略）：\n- "
+                         + "\n- ".join(hints))
+        return "\n".join(lines)
+
+    async def proactive_tick(self, question: str = "根据最近积累的记忆，有什么值得主动整理或提醒的？",
+                             extra: str = "") -> dict[str, Any]:
         """Self-initiated turn (no user prompt): model reviews memory and may
-        use tools; nothing is executed without gated approval."""
+        use tools; nothing is executed without gated approval.
+        Now includes semantic self-recall material (0226)."""
+        prompt = self.autonomy_prompt(question, extra=extra)
         self.memory.append_turn(role="user", text=f"[自主] {question}")
         result = await self.orchestrator.run(
-            turn_text=question,
+            turn_text=prompt,
             system_prompt=self.render_system(),
             llm_turn=self.llm_turn,
             history=self.history[-4:],
