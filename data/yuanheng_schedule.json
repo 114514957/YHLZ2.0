@@ -69,5 +69,20 @@
   "enabled": true,
   "last_run": "",
   "created": 1789006499.6055536
+ },
+ {
+  "id": "plan_1789006578104",
+  "name": "每周人格调优建议",
+  "cadence": {
+   "type": "weekly",
+   "time": "12:30",
+   "weekday": 0
+  },
+  "steps": [
+   "调用 persona.propose 生成五维调优建议（需老爹 /persona-apply 批准后才生效）。"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1789006578.1048684
  }
 ]

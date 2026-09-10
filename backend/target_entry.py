@@ -753,6 +753,31 @@ def cli_main() -> int:
                 info = loop.run_until_complete(session.review_once("manual"))
                 print(f"[复盘] {info}", flush=True)
                 continue
+            if line in ("/persona-propose",):
+                from backend.persona_tune import propose
+
+                print(f"[人格调优建议] {propose()}", flush=True)
+                continue
+            if line in ("/persona-apply",):
+                from backend.persona_tune import apply, pending
+
+                items = pending()
+                if not items:
+                    print("没有待批的人格调优建议")
+                    continue
+                ok = []
+                for it in items:
+                    try:
+                        ans = input(
+                            f"[维度{it['index']}] {it['old']}\n  → {it['new']}"
+                            f"\n（依据：{it.get('reason','')}）应用？(y/n): "
+                        ).strip().lower()
+                    except EOFError:
+                        ans = "n"
+                    if ans in ("y", "yes", "是"):
+                        ok.append(it["id"])
+                print("[应用结果]", apply(ok), flush=True)
+                continue
             turns += 1
             print("元亨> ", end="", flush=True)
             info = loop.run_until_complete(session.run_turn(
