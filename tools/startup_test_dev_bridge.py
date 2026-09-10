@@ -145,6 +145,14 @@ async def main() -> int:
         print("FAIL 7 non-master dev:", _texts(ws))
         ok = False
 
+    # 8) commit report must NOT re-suggest "#y" (prevents the commit loop)
+    ws.sent.clear()
+    await b.handle(ws, _ev("private", 2258374446, "#y"))
+    await asyncio.sleep(0.6)
+    if any("回 #y" in x for x in _texts(ws)):
+        print("FAIL 8 commit re-suggests #y:", _texts(ws))
+        ok = False
+
     print("OK" if ok else "FAILED")
     return 0 if ok else 1
 

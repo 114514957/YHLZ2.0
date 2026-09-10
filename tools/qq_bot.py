@@ -392,15 +392,16 @@ class QQBridge:
             "data": {"file": self._file_uri(path),
                      "name": pathlib.Path(path).name}})
 
-    async def _dev_report(self, ws, params, status, text) -> None:
+    async def _dev_report(self, ws, params, status, text, hint: bool = True) -> None:
         tag = {"awaiting": "❓ 需要你决定", "done": "✅ 完成",
-               "error": "⚠️ 出错", "running": "⏳ 进行中"}.get(status, status)
+               "error": "⚠️ 出错", "running": "⏳ 进行中",
+               "info": "ℹ️"}.get(status, status)
         msg = f"[opencode] {tag}\n{text}"
-        if status == "done":
+        if status == "done" and hint:
             msg += "\n\n回 #y 提交 / #n 不提交 / #push 推送"
         await self._say(ws, params, msg)
 
-    def _spawn(self, ws, params, fn) -> None:
+    def _spawn(self, ws, params, fn, hint: bool = True) -> None:
         """Run blocking fn() -> (status, text) in a thread, post back to QQ."""
         loop = self.loop
 
@@ -411,7 +412,7 @@ class QQBridge:
                 status, text = "error", f"{type(e).__name__}: {e}"
             if loop is not None:
                 asyncio.run_coroutine_threadsafe(
-                    self._dev_report(ws, params, status, text), loop)
+                    self._dev_report(ws, params, status, text, hint), loop)
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -448,12 +449,14 @@ class QQBridge:
             msg = ("chore(remote-dev): " + d.get("task", "")[:40]).strip()
             await self._say(ws, params, "[opencode] 正在提交…")
             self._spawn(ws, params,
-                        lambda: ("done", dev_runner.commit(msg).get("text", "")))
+                        lambda: ("info", dev_runner.commit(msg).get("text", "")),
+                        hint=False)
         elif low == "#n":
             await self._say(ws, params, "[opencode] 好的，不提交，改动留在工作区。")
         elif low == "#push":
             self._spawn(ws, params,
-                        lambda: ("done", dev_runner.push().get("text") or "已推送"))
+                        lambda: ("info", dev_runner.push().get("text") or "已推送"),
+                        hint=False)
         elif low == "#dev" or low.startswith("#dev "):
             task = low[4:].strip()
             if not task:
