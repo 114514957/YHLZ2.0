@@ -32,6 +32,16 @@
 const $=(id)=>document.getElementById(id);
 const msgs=$("msgs");
 let busy=false;
+const bc = "BroadcastChannel" in window ? new BroadcastChannel("yhlz-avatar") : null;
+async function emote(answer){
+  if(!answer) return;
+  try{
+    const r=await fetch("/emotion?text="+encodeURIComponent(answer.slice(0,300)));
+    const j=await r.json();
+    const em=j&&j.emotion&&j.emotion.emotion;
+    if(em&&bc) bc.postMessage({emotion:em,confidence:(j.emotion&&j.emotion.confidence)||0});
+  }catch(e){}
+}
 function addMsg(role,who,text){
   const d=document.createElement("div");d.className="msg "+(role==="u"?"u":"a");
   const w=document.createElement("div");w.className="who";w.textContent=who;
@@ -68,7 +78,7 @@ async function talk(text){
           if(!ln.startsWith("data:"))continue;
           let ev;try{ev=JSON.parse(ln.slice(5));}catch(e){continue;}
           if(ev.type==="delta"){acc+=ev.delta||"";box.textContent=acc;}
-          else if(ev.type==="turn_done"){if(ev.text){box.textContent=ev.text;}acc=ev.text||"";}
+          else if(ev.type==="turn_done"){if(ev.text){box.textContent=ev.text;}acc=ev.text||"";emote(ev.text);}
           else if(ev.type==="state"){$("stage").textContent=ev.value;}
         }
         msgs.scrollTop=msgs.scrollHeight;

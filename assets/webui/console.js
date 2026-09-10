@@ -231,10 +231,24 @@ async function talk(text) {
   await streamFetch("/talk", { text }, {
     state: (e) => setStage(e.value),
     delta: (e) => { box.textContent += e.delta || ""; },
-    turn_done: (e) => { if (e.text) box.textContent = e.text; },
+    turn_done: (e) => {
+      if (e.text) box.textContent = e.text;
+      emote(e.text || box.textContent);
+    },
     error: (e) => { box.textContent = "(出错) " + (e.message || ""); },
   });
   busyOn(false); setStage("idle"); loadDashboard();
+}
+
+async function emote(answer) {
+  if (!answer) return;
+  try {
+    const r = await fetch("/emotion?text=" + encodeURIComponent(answer.slice(0, 300)));
+    const j = await r.json();
+    const em = j && j.emotion && j.emotion.emotion;
+    if (em && bc) bc.postMessage({ emotion: em,
+      confidence: (j.emotion && j.emotion.confidence) || 0 });
+  } catch (e) {}
 }
 
 async function voice() {
@@ -255,7 +269,7 @@ async function voice() {
       }
     },
     delta: (e) => { if (!box) box = addMsg("a", "元亨", ""); box.textContent += e.delta || ""; },
-    turn_done: (e) => { if (e.text && box) box.textContent = e.text; },
+    turn_done: (e) => { if (e.text && box) box.textContent = e.text; emote(e.text); },
     voice_done: () => setVad(0, false),
     error: (e) => { const t = addMsg("a", "元亨", ""); t.textContent = "(语音出错) " + (e.message || ""); },
   });

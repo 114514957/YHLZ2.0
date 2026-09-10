@@ -20,6 +20,7 @@
   .chip{padding:6px 14px;border-radius:14px;background:rgba(255,255,255,.12);color:#bfe;
     font-size:12px;align-self:center;}
   .chip.live{color:#ffd76e;}
+  .chip.emo{font-size:18px;line-height:1;padding:3px 8px;}
   select.chip{background:rgba(20,22,30,.7);color:#dfe6f0;border:1px solid #3a4152;cursor:pointer;}
   /* pet panel: input dialog + model switch, opened by right-clicking the pet */
   #petPanel[hidden]{display:none;}
@@ -56,6 +57,7 @@
 <div id="bubble" hidden></div>
 <div id="bar">
   <span id="stage" class="chip">空闲</span>
+  <span id="emoji" class="chip emo"></span>
   <select id="modelSel" class="chip" title="切换模型"></select>
   <button id="btnTalk">测试口型</button>
 </div>
@@ -95,6 +97,7 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
       ? Math.min(app.screen.width * 0.5 / model.width, app.screen.height * 0.6 / model.height)
       : Math.min(app.screen.width / model.width, app.screen.height / model.height);
     model.scale.set(s, s);
+    model.__baseS = s;
     model.x = app.screen.width * (isPet ? 0.78 : 0.5);
     model.y = app.screen.height * (isPet ? 0.72 : 0.55);
     log('模型就绪 ' + rel);
@@ -269,10 +272,20 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
   // avatar stage from workbench (mouth on speaking etc.)
   let phase = 0;
   let avState = 'idle';
+  let emoPulse = 0;
+  const EMOJI = { happy: '😊', sad: '😔', angry: '😠', surprised: '😮',
+                  neutral: '' };
   if ("BroadcastChannel" in window) {
     const ch = new BroadcastChannel("yhlz-avatar");
     ch.onmessage = (e) => {
-      avState = e.data && e.data.stage || 'idle';
+      const d = e.data || {};
+      if (d.emotion !== undefined) {
+        const el = document.getElementById('emoji');
+        if (el) el.textContent = EMOJI[d.emotion] || '';
+        if (d.emotion && d.emotion !== 'neutral') emoPulse = 1.0;
+        return;
+      }
+      avState = d.stage || 'idle';
       const map = { listening: '聆听中…', thinking: '思考中…', speaking: '说话中…', asr: '识别中…', idle: '空闲' };
       const el = document.getElementById('stage');
       if (el) { el.textContent = map[avState] || avState;
@@ -289,6 +302,16 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
       model.internalModel.coreModel.addParameterValueById('ParamMouthOpenY', -0.1);
     }
     model.internalModel.coreModel.addParameterValueById('ParamBreath', Math.sin(phase) * 0.05);
+    // emotion pulse (visible feedback when a mood is detected)
+    if (model.__baseS) {
+      if (emoPulse > 0) {
+        emoPulse = Math.max(0, emoPulse - 0.02);
+        const k = 1 + 0.06 * Math.abs(Math.sin(phase * 8)) * emoPulse;
+        model.scale.set(model.__baseS * k, model.__baseS * k);
+      } else if (Math.abs(model.scale.x - model.__baseS) > 1e-4) {
+        model.scale.set(model.__baseS, model.__baseS);
+      }
+    }
   });
 
   // dynamic click-through (pet): interactions removed -> always click-through;

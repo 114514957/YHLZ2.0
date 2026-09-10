@@ -99,7 +99,8 @@ def _sse(data: dict) -> bytes:
 GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
-          "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html"}
+          "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html",
+          "/emotion"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session",
@@ -232,6 +233,18 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, self._sessions())
         elif p == "/avatar-models":
             self._send_json(200, self._avatar_models())
+        elif p == "/emotion":
+            from urllib.parse import parse_qs, urlparse
+
+            q = (parse_qs(urlparse(self.path).query).get("text", [""])[0]).strip()
+            try:
+                from backend.emotion_classifier import classify_emotion
+
+                self._send_json(200, {"ok": True,
+                                      "emotion": classify_emotion(q)})
+            except Exception as exc:
+                self._send_json(200, {"ok": False,
+                                      "error": type(exc).__name__})
         elif p == "/logs":
             self._send_json(200, {"ok": True, "logs": list(_LOG_RING)})
         elif p == "/settings":

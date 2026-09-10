@@ -15,7 +15,7 @@ from backend.tts.voice_style import VoiceStyle, get_style_for_emotion
 logger = logging.getLogger(__name__)
 
 # 情绪五分类 (对齐 NEKO OUTWARD_EMOTION_ANALYSIS_PROMPT)
-EMOTIONS = ["happy", "calm", "sad", "angry", "neutral"]
+EMOTIONS = ["happy", "calm", "sad", "angry", "surprised", "neutral"]
 
 # 关键词规则表 (中文+简单英文)
 _EMOTION_KEYWORDS: Dict[str, list] = {
@@ -36,6 +36,10 @@ _EMOTION_KEYWORDS: Dict[str, list] = {
     "angry": [
         "生气", "愤怒", "气死", "可恶", "讨厌", "滚", "烦人", "受够", "别惹我",
         "恼火", "暴躁", "抓狂", "忍不了", "无语", "神经病",
+    ],
+    "surprised": [
+        "惊讶", "震惊", "竟然", "居然", "没想到", "不可能", "真的吗", "天啊",
+        "哇", "啊这", "想不到", "意外", "吓人", "卧槽",
     ],
 }
 
