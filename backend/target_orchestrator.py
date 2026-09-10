@@ -198,6 +198,7 @@ class TurnOrchestrator:
         with_tools: bool = True,
         early_context: str = "",
         images: Optional[list[str]] = None,
+        allowed_tools: Optional[set] = None,
     ) -> TurnResult:
         started = time.perf_counter()
         messages: list[dict[str, Any]] = [
@@ -225,6 +226,9 @@ class TurnOrchestrator:
         # model in persona voice (ledger 0215: 27-tool schema nudges Gemma
         # into "assistant executing tasks" framing, killing persona).
         tools = self._export_tools() if with_tools else []
+        if allowed_tools is not None:
+            tools = [t for t in tools
+                     if t.get("function", {}).get("name") in allowed_tools]
         tool_uses: list[ToolUse] = []
         answer = ""
         iterations = 0
@@ -251,6 +255,13 @@ class TurnOrchestrator:
             )
             for tc in tcs:
                 name = tc["function"]["name"]
+                if allowed_tools is not None and name not in allowed_tools:
+                    messages.append({
+                        "role": "tool", "tool_call_id": tc["id"],
+                        "name": name,
+                        "content": json.dumps(
+                            {"error": "tool not allowed in this channel"})})
+                    continue
                 try:
                     args = json.loads(tc["function"].get("arguments") or "{}")
                 except Exception:

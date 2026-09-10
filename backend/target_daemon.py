@@ -151,7 +151,7 @@ class DaemonRuntime:
         from backend.env_loader import ensure_env_loaded
 
         ensure_env_loaded()
-        from backend.target_entry import ConversationSession
+        from backend.target_entry import ConversationSession, is_owner_channel
         from backend.target_orchestrator import build_openai_compatible_llm_turn
 
         llm = build_openai_compatible_llm_turn(
@@ -165,7 +165,18 @@ class DaemonRuntime:
             except Exception:
                 pass
             return s
-        s = ConversationSession(llm_turn=llm, channel=channel)
+        if not is_owner_channel(channel):
+            # public/group: isolated small memory db (never touches owner memory)
+            from backend.target_memory import TargetMemoryService
+
+            safe = "".join(ch if (ch.isalnum() or ch in "_-") else "_"
+                           for ch in str(channel or "public"))
+            gdb = _PROJECT / "cache" / "qq_groups" / f"{safe}.db"
+            gdb.parent.mkdir(parents=True, exist_ok=True)
+            s = ConversationSession(llm_turn=llm, channel=channel,
+                                    memory=TargetMemoryService(db_path=gdb))
+        else:
+            s = ConversationSession(llm_turn=llm, channel=channel)
         if channel != "private":
             try:
                 s.load_session(f"qq_{channel}")

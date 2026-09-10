@@ -193,7 +193,10 @@ class TestConversationSession(unittest.TestCase):
         grp = ConversationSession(memory=self.mem, registry=self.reg,
                                   llm_turn=_Cap(), channel="qq_g123")
         asyncio.run(grp.run_turn("帮我读取文件并检索一下"))  # work-hint text
-        self.assertEqual(seen["tools"], [])            # no tools in group
+        gnames = {t["function"]["name"] for t in seen["tools"]}
+        self.assertEqual(gnames, {"web_search", "web_fetch"})  # search only
+        self.assertNotIn("file_read", gnames)
+        self.assertNotIn("memory_save", gnames)
         self.assertIn("公共频道", seen["system"])       # public clause on
         self.assertFalse(grp._is_owner())
 
@@ -201,7 +204,8 @@ class TestConversationSession(unittest.TestCase):
                                     llm_turn=_Cap(),
                                     channel="qq_p2258374446")
         asyncio.run(owner.run_turn("帮我检索一下"))
-        self.assertTrue(seen["tools"])                 # owner keeps tools
+        onames = {t["function"]["name"] for t in seen["tools"]}
+        self.assertIn("memory_save", onames)           # owner keeps full tools
         self.assertNotIn("公共频道", seen["system"])
         self.assertTrue(owner._is_owner())
 

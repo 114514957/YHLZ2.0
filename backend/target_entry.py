@@ -33,6 +33,15 @@ HISTORY_LIMIT = 20
 SAVE_APPROVAL_POLICY = "memory.save.approval"
 SESSIONS_DIR = _PROJECT_ROOT / "cache" / "sessions"
 
+# tools allowed for public/group channels (read-only external search only)
+PUBLIC_TOOLS = frozenset({"web_search", "web_fetch"})
+
+
+def is_owner_channel(channel: str) -> bool:
+    """Owner channels = private/console or the master's QQ private chat."""
+    c = str(channel or "private")
+    return c in ("private", "console") or c.startswith("qq_p")
+
 
 def _cli_approver_factory(prompt_fun: Any = None) -> Approver:
     async def _approve(info: dict[str, Any]) -> bool:
@@ -133,8 +142,7 @@ class ConversationSession:
     def _is_owner(self) -> bool:
         """Owner channels = private/console or the master's QQ private chat.
         Group chats (qq_g*) and any other channel are 'public'."""
-        c = str(self.channel or "private")
-        return c in ("private", "console") or c.startswith("qq_p")
+        return is_owner_channel(self.channel)
 
     def render_system(self) -> str:
         tools = self.registry.export_openai_tools()
@@ -210,10 +218,21 @@ class ConversationSession:
         capture_style_signal(text, self.memory)
         system = self.render_system()
         llm_turn = self.llm_turn
-        # images -> vision chat mode; public/group -> no tools (security)
-        work = (self._is_owner() and not images
+        # images -> vision chat mode; owner -> full tools (work); public/group
+        # -> only read-only search tools (PUBLIC_TOOLS), never file/memory/dev.
+        is_owner = self._is_owner()
+        work = (is_owner and not images
                 and (mode == "work" or (
                     mode == "auto" and self._want_work_mode(text))))
+        if images:
+            use_tools = False
+            allowed_tools = None
+        elif is_owner:
+            use_tools = work
+            allowed_tools = None
+        else:
+            use_tools = True
+            allowed_tools = PUBLIC_TOOLS
         effort = "medium" if work else "none"
         if not self._llm_injected and work:
             from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
@@ -277,9 +296,10 @@ class ConversationSession:
             system_prompt=system,
             llm_turn=llm_turn,
             history=self.history[-6:],  # latency (ledger 0206): cap in-context turns
-            with_tools=work,
+            with_tools=use_tools,
             early_context="\n".join(ctx_lines),
             images=images,
+            allowed_tools=allowed_tools,
         )
         self.memory.append_turn(role="assistant", text=result.answer)
         if self.memory._summary_pending:
