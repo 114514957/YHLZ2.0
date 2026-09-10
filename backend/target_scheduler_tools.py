@@ -882,18 +882,16 @@ def skill_feedback(query: str, good: bool) -> str:
     return kb_feedback(hits[0]["id"], bool(good))
 
 
-def skill_add(name: str, trigger: str, steps: str) -> str:
-    """File a new-skill draft under docs/技能库/待批/ (dad approval needed)."""
+def _write_skill_draft(name: str, trigger: str, steps: str) -> str:
+    """Write a skill draft under docs/技能库/待批/. Returns path or ''."""
     import re as _re
     import time as _t
 
     n = str(name or "").strip()
     trig = str(trigger or "").strip()
     st = str(steps or "").strip()
-    if not n or not trig or not st:
-        return "需提供：name（技能名）、trigger（何时用/触发场景）、steps（完整步骤，换行分隔）"
-    if len(st) > 3000:
-        return "steps 过长（≤3000 字）"
+    if not n or not trig or not st or len(st) > 3000:
+        return ""
     out_dir = _PROJECT_ROOT / "docs" / "技能库" / "待批"
     out_dir.mkdir(parents=True, exist_ok=True)
     safe = _re.sub(r"[^\w一-鿿-]", "_", n)[:40]
@@ -902,7 +900,100 @@ def skill_add(name: str, trigger: str, steps: str) -> str:
         f"# 技能申请：{n}\n\n触发场景：{trig}\n\n步骤：\n{st}\n\n状态：待老爹批准\n",
         encoding="utf-8",
     )
+    return str(f)
+
+
+def skill_add(name: str, trigger: str, steps: str) -> str:
+    """File a new-skill draft under docs/技能库/待批/ (dad approval needed)."""
+    n = str(name or "").strip()
+    if not n or not str(trigger or "").strip() or not str(steps or "").strip():
+        return "需提供：name（技能名）、trigger（何时用/触发场景）、steps（完整步骤，换行分隔）"
+    f = _write_skill_draft(name, trigger, steps)
+    if not f:
+        return "steps 过长（≤3000 字）或参数不完整"
     return f"技能草稿已提交（老爹批准后入技能库）：{f}"
+
+
+# ---- B1: skill learning pipeline (ledger 0235) ----
+_SKILL_SEEN = _PROJECT_ROOT / "cache" / "skill_learned.json"
+SKILL_LEARN_PROMPT = (
+    "下面是一轮**已成功完成**的任务对话。判断是否值得沉淀为「可复用技能」。"
+    "若值得：只输出 JSON，形如 "
+    '{"name":"简短技能名","trigger":"什么情况下用","steps":"分步步骤(换行分隔)"}；'
+    '若只是一次性、无复用价值：输出 {"skip":true}。不要输出别的。\n'
+    "【用户说】<TEXT>\n【执行动作】<ACTS>\n【最终答复】<ANSWER>"
+)
+
+
+def _skill_seen_load() -> list:
+    try:
+        import json as _j
+
+        return _j.loads(_SKILL_SEEN.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def _skill_seen_add(key: str) -> bool:
+    """Return True if newly added, False if already seen (dedup)."""
+    import json as _j
+
+    seen = _skill_seen_load()
+    if key in seen:
+        return False
+    seen.append(key)
+    try:
+        _SKILL_SEEN.parent.mkdir(parents=True, exist_ok=True)
+        _SKILL_SEEN.write_text(_j.dumps(seen[-200:], ensure_ascii=False),
+                               encoding="utf-8")
+    except Exception:
+        pass
+    return True
+
+
+async def skill_learn(dad_text: str, tool_uses: list, answer: str,
+                      llm_turn=None) -> str:
+    """B1: auto-extract a reusable skill draft from a successful multi-tool turn.
+
+    Candidacy: >=2 successful action-tool calls. Extraction: the injected
+    llm_turn returns JSON {name,trigger,steps}. Drafts land in 待批/ for the
+    owner's approval (never auto-registered). Returns draft path or ''.
+    """
+    import hashlib
+    import json as _j
+
+    ok_tools = [u for u in (tool_uses or [])
+                if u.get("ok") and u.get("name") in _SKILL_ACTION_TOOLS]
+    if len(ok_tools) < 2 or llm_turn is None:
+        return ""
+    acts = "\n".join(
+        f"- {u.get('name')}({str(u.get('arguments', ''))[:120]})"
+        for u in ok_tools)
+    key = hashlib.sha1(
+        ("|".join(sorted(str(u.get('name')) for u in ok_tools))
+         + "|" + str(dad_text)[:60]).encode("utf-8")).hexdigest()[:16]
+    if not _skill_seen_add(key):
+        return ""  # already learned this pattern
+    try:
+        content = (SKILL_LEARN_PROMPT
+                   .replace("<TEXT>", str(dad_text)[:400])
+                   .replace("<ACTS>", acts)
+                   .replace("<ANSWER>", str(answer)[:400]))
+        msg = await llm_turn([{"role": "user", "content": content}], [])
+        raw = str(msg.get("content") or "")
+    except Exception:
+        return ""
+    raw = raw.strip().strip("`")
+    if raw.lower().startswith("json"):
+        raw = raw[4:].strip()
+    try:
+        data = _j.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+    except Exception:
+        return ""
+    if data.get("skip"):
+        return ""
+    return _write_skill_draft(data.get("name", ""), data.get("trigger", ""),
+                              data.get("steps", ""))
 
 
 
@@ -911,11 +1002,11 @@ def skill_add(name: str, trigger: str, steps: str) -> str:
 _SKILL_PRAISE = ("好", "很好", "不错", "棒", "厉害", "学到了", "学会了",
                  "记住", "以后就这样", "就这么办", "挺好", "可以", "对，就是这样",
                  "ok", "OK", "搞定", "漂亮")
-_SKILL_ACTION_TOOLS = ("qq.export", "qq.process", "qq.runbatch", "qq.bootstrap",
-                       "qq.shutdown", "qq.digest", "qq.summarize",
-                       "kb.add", "skill.add", "diary.write", "task.plan",
-                       "memory.save", "file.list", "file.read", "web.fetch",
-                       "web.search")
+_SKILL_ACTION_TOOLS = ("qq_export", "qq_process", "qq_runbatch", "qq_bootstrap",
+                       "qq_shutdown", "qq_digest", "qq_summarize",
+                       "kb_add", "skill_add", "diary_write", "task_plan",
+                       "memory_save", "file_list", "file_read", "web_fetch",
+                       "web_search")
 
 
 def skill_hint(dad_text: str, tool_names: list[str]) -> str:

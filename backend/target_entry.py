@@ -302,6 +302,19 @@ class ConversationSession:
             allowed_tools=allowed_tools,
         )
         self.memory.append_turn(role="assistant", text=result.answer)
+        # B1 skill learning: owner turns with a successful multi-tool chain
+        # auto-draft a reusable skill (pending approval) — never auto-registered
+        if self._is_owner() and not images and result.tool_uses:
+            try:
+                from backend.target_scheduler_tools import skill_learn
+
+                self._summary_tasks.append(asyncio.ensure_future(skill_learn(
+                    text,
+                    [{"name": u.name, "ok": u.ok, "arguments": u.arguments}
+                     for u in result.tool_uses],
+                    result.answer, self.llm_turn)))
+            except Exception:
+                pass
         if self.memory._summary_pending:
             self._summary_tasks.append(asyncio.ensure_future(self.memory.process_summary()))
         if (not self._reviewing and
