@@ -176,10 +176,21 @@ async function loadDashboard() {
     const s = await (await fetch("/state", { cache: "no-store" })).json();
     dot("s-gemma", s.gemma === "ok");
     dot("s-daemon", s.daemon === "ok");
+    dot("s-ollama", s.ollama === "ok");
     $("m-turns").textContent = s.history ?? "?";
     $("m-l2").textContent = s.l2 ?? "?";
     $("m-persona").textContent = s.persona ? "有" : "-";
     $("m-stage").textContent = stage === "idle" ? "空闲" : stage;
+    const q = s.qq || {};
+    if ($("s-qq")) dot("s-qq", !!(q.online && q.bridge));
+    $("q-uin").textContent = q.uin ? (q.name ? q.name + " " : "") + q.uin : "-";
+    $("q-online").textContent = q.online ? "在线" : "离线";
+    $("q-ws").textContent = q.ws ? "已连" : "未连";
+    $("q-bridge").textContent = q.bridge ? "运行中" : "未运行";
+    const d = s.dev || {};
+    const dtag = { idle: "空闲", running: "执行中", awaiting: "待你答复",
+                   done: "完成", error: "出错" }[d.status] || d.status || "空闲";
+    $("m-dev").textContent = dtag + (d.task && d.status !== "idle" ? "：" + d.task : "");
   } catch (e) { dot("s-daemon", false); }
   try {
     const m = await (await fetch("/monitor", { cache: "no-store" })).json();

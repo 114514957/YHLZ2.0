@@ -123,6 +123,29 @@ def _log(event: str, detail: str = "") -> None:
     _LOG_RING.append({"t": time.time(), "event": event, "detail": detail[:160]})
 
 
+def _qq_status() -> dict:
+    """元亨 QQ / NapCat / bridge status for the workbench."""
+    out = {"uin": "3655185302", "name": "元亨", "online": False,
+           "ws": False, "bridge": False, "since": 0.0}
+    try:
+        p = _PROJECT_ROOT / "cache" / "tmp" / "napcat_status.json"
+        d = json.loads(p.read_text(encoding="utf-8"))
+        for k in ("online", "ws", "since"):
+            if k in d:
+                out[k] = d[k]
+    except Exception:
+        pass
+    try:
+        import psutil
+
+        out["bridge"] = any(
+            "qq_bot.py" in " ".join(pi.info.get("cmdline") or [])
+            for pi in psutil.process_iter(["cmdline"]))
+    except Exception:
+        pass
+    return out
+
+
 def _sse(data: dict) -> bytes:
     return ("data: " + json.dumps(data, ensure_ascii=False) + "\n\n").encode("utf-8")
 
@@ -807,6 +830,20 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             except Exception:
                 out["gemma"] = "down"
             out["daemon"] = "ok"
+            try:
+                o = json.loads(urllib.request.urlopen(
+                    "http://127.0.0.1:11434/api/tags", timeout=3).read())
+                out["ollama"] = "ok" if "models" in o else "down"
+            except Exception:
+                out["ollama"] = "down"
+            out["qq"] = _qq_status()
+            try:
+                dp = _PROJECT_ROOT / "cache" / "dev" / "state.json"
+                dd = json.loads(dp.read_text(encoding="utf-8"))
+                out["dev"] = {"status": str(dd.get("status", "idle")),
+                              "task": str(dd.get("task", ""))[:60]}
+            except Exception:
+                out["dev"] = {"status": "idle", "task": ""}
             st = self.runtime.health() if hasattr(self.runtime, "health") else None
             out["turns"] = 0
             if st:
