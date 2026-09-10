@@ -399,6 +399,12 @@ class DaemonRuntime:
                     encoding="utf-8")
                 print(f"[memory-upkeep] {today} reinforced={reinforced} "
                       f"decayed={decayed} downgraded={downgraded}", flush=True)
+                try:
+                    from backend import snapshots
+
+                    snapshots.create("daily")
+                except Exception:
+                    pass
             except Exception as exc:
                 print(f"[memory-upkeep] skip: {type(exc).__name__}", flush=True)
 

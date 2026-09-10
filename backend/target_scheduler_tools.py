@@ -121,6 +121,33 @@ def _constitution_check(content: str) -> tuple[bool, str]:
         return True, f"constitution error ({type(exc).__name__}); allow"
 
 
+_MEM_SAVE_TIMES: list = []
+
+
+def _memory_fault_alert(content: str) -> None:
+    """Design v1 §1.4: memory writes are autonomous; only ALERT on faults
+    (suspected injection / write storm). Never blocks the write."""
+    import time as _t
+
+    now = _t.time()
+    _MEM_SAVE_TIMES.append(now)
+    _MEM_SAVE_TIMES[:] = [x for x in _MEM_SAVE_TIMES if now - x < 60]
+    low = str(content or "").lower()
+    suspicious = any(k in low for k in (
+        "忽略以上", "忽略之前", "系统提示", "你的指令", "ignore previous",
+        "system prompt", "扮演", "越狱"))
+    storm = len(_MEM_SAVE_TIMES) > 20
+    if not (suspicious or storm):
+        return
+    why = "疑似注入内容写入记忆" if suspicious else "短时间记忆写入风暴"
+    try:
+        from backend.target_daemon import notify_push
+
+        notify_push(f"【记忆故障警报】{why}：{str(content)[:60]}")
+    except Exception:
+        pass
+
+
 def memory_save(content: str, kind: str = "preference", importance: int = 0,
                 service: Any = None) -> str:
     """Save a notable item into long-term memory (user consent required)."""
@@ -168,6 +195,7 @@ def memory_save(content: str, kind: str = "preference", importance: int = 0,
             svc.observe_hit(iid, strength=0.3)  # corroborate the existing one
             return f"近似记忆已存在（相似度 {ratio:.0%}），已强化原记忆"
     svc.store_item(item)
+    _memory_fault_alert(content_txt)
     try:
         from backend.vector_memory import vec_add
 
@@ -708,6 +736,12 @@ def approve_act(index: int, ok: bool) -> str:
             from backend.target_memory import TargetMemoryService
             from backend.target_persona_loop import PersonaConsolidationLoop
 
+            try:
+                from backend import snapshots
+
+                snapshots.create("before-cognition-apply")
+            except Exception:
+                pass
             svc = TargetMemoryService()
             pc = PersonaConsolidationLoop(None, svc)
             version = pc._next_version(pc._foundation_text())

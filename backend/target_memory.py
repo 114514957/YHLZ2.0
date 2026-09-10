@@ -63,6 +63,7 @@ class L2Item:
     obsolete_of: str = ""
     access_count: int = 0
     last_accessed: float = 0.0
+    salience: float = 0.5  # 0..1 情感/理想显著度：越高越难忘（design v1 §1.1）
 
     def to_dict(self) -> dict:
         return {
@@ -80,6 +81,7 @@ class L2Item:
             "obsolete_of": self.obsolete_of,
             "access_count": self.access_count,
             "last_accessed": self.last_accessed,
+            "salience": self.salience,
         }
 
 
@@ -142,6 +144,7 @@ class TargetMemoryService:
                 ("belief", "REAL NOT NULL DEFAULT 0.5"),
                 ("evidence_count", "INTEGER NOT NULL DEFAULT 0"),
                 ("belief_updated", "REAL NOT NULL DEFAULT 0"),
+                ("salience", "REAL NOT NULL DEFAULT 0.5"),
             ):
                 if name not in cols:
                     con.execute(f"ALTER TABLE l2_items ADD COLUMN {name} {decl}")
@@ -455,20 +458,21 @@ class TargetMemoryService:
                 con.execute(
                     """
                     INSERT INTO l2_items
-                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                       tier=excluded.tier, type=excluded.type,
                       importance=excluded.importance, summary=excluded.summary,
                       content_hash=excluded.content_hash, keywords=excluded.keywords,
                       status=excluded.status, evidence_ref=excluded.evidence_ref,
-                      version=excluded.version, obsolete_of=excluded.obsolete_of
+                      version=excluded.version, obsolete_of=excluded.obsolete_of,
+                      salience=excluded.salience
                     """,
                     (
                         item.id, item.tier, item.type, item.importance, item.summary,
                         item.content_hash, item.keywords, item.status, item.evidence_ref,
                         item.created_at, item.version, item.obsolete_of, 0, 0.0,
-                        0.5, 0, time.time(),
+                        0.5, 0, time.time(), float(getattr(item, "salience", 0.5)),
                     ),
                 )
                 con.execute("INSERT OR REPLACE INTO l2_fts(sid, keywords, summary) VALUES (?,?,?)",
@@ -555,14 +559,16 @@ class TargetMemoryService:
         )
         con.commit()
         rows = con.execute(
-            "SELECT id, belief, belief_updated FROM l2_items WHERE belief_updated > 0"
+            "SELECT id, belief, belief_updated, salience FROM l2_items WHERE belief_updated > 0"
         ).fetchall()
         n = 0
-        for iid, b, updated in rows:
+        for iid, b, updated, sal in rows:
             days = max(0.0, (now - float(updated)) / 86400.0)
             if days <= 0:
                 continue
-            nb = self.belief_step(float(b), 0.0, decay_days=days)
+            s = max(0.0, min(1.0, float(sal if sal is not None else 0.5)))
+            eff_days = days * (1.0 - 0.7 * s)  # high salience -> near-permanent
+            nb = self.belief_step(float(b), 0.0, decay_days=eff_days)
             con.execute(
                 "UPDATE l2_items SET belief=?, belief_updated=? WHERE id=?",
                 (nb, now, iid),
@@ -571,6 +577,15 @@ class TargetMemoryService:
         con.commit()
         con.close()
         return n
+
+    def set_salience(self, item_id: str, value: float) -> None:
+        """Set an item's emotional/ideal salience (0..1). High salience -> the
+        item barely decays (design v1 §1.1: 情感/理想高峰近乎不遗忘)."""
+        v = max(0.0, min(1.0, float(value)))
+        con = sqlite3.connect(str(self.db_path))
+        con.execute("UPDATE l2_items SET salience=? WHERE id=?", (v, item_id))
+        con.commit()
+        con.close()
 
     def _belief_apply(self, item_id: str, evidence: float) -> Optional[float]:
         con = sqlite3.connect(str(self.db_path))
