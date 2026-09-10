@@ -216,7 +216,7 @@ class ConversationSession:
                 base_url="http://127.0.0.1:8081/v1/chat/completions",
                 api_key="", model="gemma-4-e4b",
                 temperature=0.2,
-                max_tokens=2000,
+                max_tokens=3000,
                 fallback_base_url=LOCAL_BASE,
                 fallback_model=LOCAL_MODEL,
                 on_delta=on_delta,

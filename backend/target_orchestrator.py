@@ -278,6 +278,18 @@ class TurnOrchestrator:
                     }
                 )
         if not answer:
+            # one recovery attempt: force a direct, tool-free answer (guards
+            # against empty final content, e.g. reasoning eating all tokens)
+            try:
+                retry_msgs = messages + [
+                    {"role": "system",
+                     "content": "请直接用中文作答，不要调用任何工具，"
+                                "不要输出思考过程。"}]
+                msg2 = await llm_turn(retry_msgs, [])
+                answer = str(msg2.get("content") or "").strip()
+            except Exception:
+                answer = ""
+        if not answer:
             answer = "(本轮未能生成答复)"
         return TurnResult(
             answer=answer,
