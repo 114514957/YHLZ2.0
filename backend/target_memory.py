@@ -253,6 +253,30 @@ class TargetMemoryService:
                              "summary": s})
             if len(good) >= limit:
                 break
+        # semantic complement (ledger 0226): when literal 2-gram misses, fill
+        # with vector recall so 换说法 still surfaces the memory
+        if len(good) < limit:
+            try:
+                from backend.vector_memory import semantic_l2
+
+                seen = {g["id"] for g in good}
+                for it in semantic_l2(q, top=limit * 2, min_score=0.42):
+                    if it["id"] in seen:
+                        continue
+                    if it.get("importance", 0) and int(it["importance"]) < 5:
+                        continue
+                    if it.get("status") not in (None, "", "active"):
+                        continue
+                    good.append({"id": it["id"], "tier": "L2",
+                                 "type": it.get("type", "fact"),
+                                 "importance": it.get("importance", 5),
+                                 "status": "active",
+                                 "summary": it.get("summary", "")})
+                    seen.add(it["id"])
+                    if len(good) >= limit:
+                        break
+            except Exception:
+                pass
         return good
 
     def context_block(self) -> str:
@@ -376,6 +400,26 @@ class TargetMemoryService:
                             (item.id, item.keywords, item.summary))
             con.commit()
             con.close()
+        try:
+            # vector side-table for semantic recall (ledger 0226); lazy model
+            keep = [it for it in items if it.status != "archive" and it.summary]
+            if keep:
+                from backend.vector_memory import _conn as _vc, embed as _emb
+
+                texts = [f"{it.summary} {it.keywords}".strip()[:256]
+                         for it in keep]
+                vs = _emb(texts)
+                vc = _vc()
+                try:
+                    for it, v in zip(keep, vs):
+                        vc.execute(
+                            "INSERT OR REPLACE INTO vec(id,scope,vec)"
+                            " VALUES(?,?,?)", (it.id, "l2", v.tobytes()))
+                    vc.commit()
+                finally:
+                    vc.close()
+        except Exception:
+            pass
         self._sync_kw(items)
         return items
 
