@@ -39,5 +39,20 @@
   "enabled": true,
   "last_run": "",
   "created": 1789001475.3022752
+ },
+ {
+  "id": "plan_1789002806081",
+  "name": "每周QQ技术周报",
+  "cadence": {
+   "type": "weekly",
+   "time": "10:30",
+   "weekday": 0
+  },
+  "steps": [
+   "调用 report.qq_weekly 汇总本周 QQ 技术知识为周报，写 docs/报告 并汇报老爹。"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1789002806.081084
  }
 ]

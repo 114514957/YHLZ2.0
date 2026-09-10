@@ -325,6 +325,17 @@ def scheduler_capabilities() -> list[Capability]:
             verify=_verify_nonempty,
         ),
         Capability(
+            name="report.qq_weekly",
+            description="生成本周 QQ 技术总结报告（读知识库 tech 条目→汇总→"
+                        "写 docs/报告 并通知老爹）。每周例行。",
+            handler=lambda p: qq_weekly_report(int(p.get("days", 7) or 7)),
+            input=(),
+            optional_input=("days",),
+            requires=(KB_POLICY,),
+            side_effect=True,
+            risk="low",
+        ),
+        Capability(
             name="diary.list",
             description="回看最近的日记条目。",
             handler=lambda p: diary_list(int(p.get("limit", 5) or 5)),
@@ -932,6 +943,74 @@ def kb_query(query: str, limit: int = 6, category: str = "") -> list[dict]:
     from backend.yuanheng_kb import kb_query as _query
 
     return _query(query, limit=limit, category=category)
+
+
+def qq_weekly_report(days: int = 7) -> str:
+    """Weekly QQ tech summary: read recent KB tech items, have the local model
+    write a short report, save it under docs/报告, and notify the owner."""
+    import datetime as _dt
+    import json as _json
+    import pathlib
+    import time
+    import urllib.request
+
+    try:
+        from backend.yuanheng_kb import kb_list
+    except Exception:
+        return "知识库不可用"
+    try:
+        items = kb_list(category="tech", limit=200)
+    except Exception:
+        items = []
+    cutoff = time.time() - max(1, int(days)) * 86400
+    recent = []
+    for it in items or []:
+        created = it.get("created") or it.get("created_at") or 0
+        try:
+            created = float(created)
+        except Exception:
+            created = 0.0
+        if created >= cutoff:
+            recent.append(it)
+    if not recent:
+        return f"本周（近 {days} 天）暂无新的 QQ 技术知识可汇总。"
+    bullets = "\n".join(
+        f"- {str(it.get('summary', ''))[:120]}"
+        f"（来源:{str(it.get('source', '') or '未知')[:24]}）"
+        for it in recent[:60])
+    prompt = ("把下面本周从 QQ 群学到的技术要点，汇总成一份简洁的中文周报："
+              "结构=①本周主题（一句话）②要点清单（合并同类、去重）"
+              "③值得继续关注/深挖的 1-3 条。不要客套。\n\n" + bullets)
+    summary = ""
+    try:
+        body = _json.dumps({
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 1200, "temperature": 0.4,
+            "reasoning_effort": "none",
+        }).encode()
+        req = urllib.request.Request(
+            "http://127.0.0.1:8081/v1/chat/completions", data=body,
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=180) as r:
+            d = _json.loads(r.read().decode("utf-8", "replace"))
+            summary = str(d["choices"][0]["message"].get("content") or "").strip()
+    except Exception:
+        summary = ""
+    if not summary:
+        summary = "（模型汇总失败，以下为原始要点）\n" + bullets
+    stamp = _dt.datetime.now().strftime("%Y-%m-%d")
+    outdir = pathlib.Path(__file__).resolve().parent.parent / "docs" / "报告"
+    outdir.mkdir(parents=True, exist_ok=True)
+    path = outdir / f"QQ技术周报_{stamp}.md"
+    path.write_text(f"# QQ 技术周报 {stamp}\n\n（近 {days} 天，共 {len(recent)} 条）\n\n"
+                    + summary + "\n", encoding="utf-8")
+    try:
+        from backend.target_daemon import notify_push
+
+        notify_push(f"本周 QQ 技术周报已生成：{path.name}（{len(recent)} 条）")
+    except Exception:
+        pass
+    return f"周报已生成：{path}（{len(recent)} 条）\n\n{summary[:300]}"
 
 
 def qqops_status() -> str:
