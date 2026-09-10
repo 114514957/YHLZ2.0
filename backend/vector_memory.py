@@ -61,6 +61,12 @@ def _conn() -> sqlite3.Connection:
     con.execute("CREATE TABLE IF NOT EXISTS vec("
                 "id TEXT PRIMARY KEY, scope TEXT NOT NULL, "
                 "vec BLOB NOT NULL)")
+    cols = {r[1] for r in con.execute("PRAGMA table_info(vec)")}
+    if "text" not in cols:
+        try:
+            con.execute("ALTER TABLE vec ADD COLUMN text TEXT")
+        except Exception:
+            pass
     con.commit()
     return con
 
@@ -75,14 +81,62 @@ def vec_add(scope: str, item_id: str, text: str) -> bool:
             con = _conn()
             try:
                 con.execute(
-                    "INSERT OR REPLACE INTO vec(id,scope,vec) VALUES(?,?,?)",
-                    (str(item_id), str(scope), v.tobytes()))
+                    "INSERT OR REPLACE INTO vec(id,scope,vec,text)"
+                    " VALUES(?,?,?,?)",
+                    (str(item_id), str(scope), v.tobytes(), text[:500]))
                 con.commit()
             finally:
                 con.close()
         return True
     except Exception:
         return False
+
+
+def semantic_any(query: str, scopes: list[str] | None = None,
+                 top: int = 6, min_score: float = 0.42) -> list[dict]:
+    """Generic semantic search across scopes (text returned from the vec table,
+    no memory-db join needed) — used for diary / future l1/l3 scopes."""
+    raw = str(query or "").strip()
+    if not raw:
+        return []
+    variants = [raw, _topic(raw)]
+    qvs = []
+    for v in variants:
+        try:
+            qvs.append(embed([v])[0])
+        except Exception:
+            pass
+    if not qvs:
+        return []
+    best: dict[str, float] = {}
+    rows_by_id: dict[str, dict] = {}
+    with _lock:
+        con = _conn()
+        try:
+            for scope in (scopes or ["diary"]):
+                for iid, blob, txt in con.execute(
+                        "SELECT id, vec, text FROM vec WHERE scope=?",
+                        (str(scope),)):
+                    rows_by_id[iid] = {"id": iid, "scope": scope,
+                                       "text": str(txt or "")}
+                    v = np.frombuffer(blob, dtype="float32")
+                    if v.size != DIM:
+                        continue
+                    for qv in qvs:
+                        s = float(np.dot(qv, v))
+                        if s > best.get(iid, -1.0):
+                            best[iid] = s
+        finally:
+            con.close()
+    out = []
+    for iid, s in sorted(best.items(), key=lambda x: x[1], reverse=True):
+        if s < min_score:
+            continue
+        it = dict(rows_by_id[iid]); it["score"] = round(s, 3)
+        out.append(it)
+        if len(out) >= top:
+            break
+    return out
 
 
 def vec_search(scope: str, query: str, top: int = 8) -> list[tuple[str, float]]:

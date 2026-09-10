@@ -272,6 +272,21 @@ class TargetMemoryService:
                              "importance": r[2], "status": r[3],
                              "summary": s, "_score": 0.45})
                 seen.add(r[0])
+        # 3) diary semantic (own words can also be recalled in chat)
+        try:
+            from backend.vector_memory import semantic_any
+
+            for d in semantic_any(q, ["diary"], top=limit, min_score=0.48):
+                did = d.get("id", "")
+                if not did or did in seen:
+                    continue
+                good.append({"id": did, "tier": "diary", "type": "diary",
+                             "importance": 6, "status": "active",
+                             "summary": str(d.get("text", ""))[:120],
+                             "_score": float(d.get("score", 0.0))})
+                seen.add(did)
+        except Exception:
+            pass
         good.sort(key=lambda x: x.get("_score", 0.0), reverse=True)
         for g in good:
             g.pop("_score", None)

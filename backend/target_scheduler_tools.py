@@ -600,6 +600,12 @@ def diary_write(content: str) -> str:
     entry = f"\n## {stamp}\n{text}\n"
     with open(DIARY_FILE, "a", encoding="utf-8") as f:
         f.write(entry)
+    try:
+        from backend.vector_memory import vec_add
+
+        vec_add("diary", "diary_" + stamp, text)
+    except Exception:
+        pass
     return f"已写入日记 ({stamp})"
 
 

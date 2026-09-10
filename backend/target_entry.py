@@ -457,7 +457,7 @@ class ConversationSession:
         """Semantic 'self recall' material for autonomous moments (ledger 0226):
         surface related old memories so Yuanheng can bring them up herself."""
         try:
-            from backend.vector_memory import semantic_l2
+            from backend.vector_memory import semantic_any, semantic_l2
 
             recent = " ".join(
                 str(m.get("content", ""))[:80] for m in self.history[-6:]
@@ -465,9 +465,14 @@ class ConversationSession:
             q = (str(extra) + " " + recent).strip()
             if not q:
                 return []
-            hits = semantic_l2(q, top=top, min_score=0.42)
-            return [str(h.get("summary", ""))[:70] for h in hits
-                    if h.get("summary")]
+            out = [str(h.get("summary", ""))[:70] for h in
+                   semantic_l2(q, top=top, min_score=0.42)
+                   if h.get("summary")]
+            for d in semantic_any(q, ["diary"], top=2, min_score=0.45):
+                t = str(d.get("text", ""))[:70]
+                if t:
+                    out.append("（日记）" + t)
+            return out
         except Exception:
             return []
 

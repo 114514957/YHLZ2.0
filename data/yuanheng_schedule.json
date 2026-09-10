@@ -24,5 +24,20 @@
   ],
   "enabled": true,
   "last_run": "2026-09-09 23:00"
+ },
+ {
+  "id": "plan_1789001475302",
+  "name": "每周QQ知识拉取",
+  "cadence": {
+   "type": "weekly",
+   "time": "10:00",
+   "weekday": 6
+  },
+  "steps": [
+   "qq.status 看导出链是否在线→qq.export 拉最近群消息→qq.process 提炼入库；拉不动就如实说，不勉强。"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1789001475.3022752
  }
 ]
