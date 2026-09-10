@@ -7,8 +7,13 @@ Every hit is stored WITHOUT interrupting the conversation (importance 4).
 
 from __future__ import annotations
 
+import json
+import pathlib
 import re
 from typing import Optional
+
+_PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
+STYLE_COUNTS = _PROJECT_ROOT / "cache" / "style_signals.json"
 
 _PATTERNS: list[tuple[str, list[str]]] = [
     ("casual", ["说人话", "别官方", "别那么严肃", "别太严肃", "太严肃", "随意点",
@@ -54,6 +59,37 @@ def style_ema(items: list[dict], alpha: float = EMA_ALPHA) -> dict[str, float]:
     return {k: round(min(0.99, max(-0.99, v)), 3) for k, v in values.items()}
 
 
+def _load_counts() -> dict:
+    try:
+        return json.loads(STYLE_COUNTS.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _bump_counts(signals: list[str]) -> None:
+    if not signals:
+        return
+    counts = _load_counts()
+    for s in signals:
+        counts[s] = int(counts.get(s, 0)) + 1
+    try:
+        STYLE_COUNTS.parent.mkdir(parents=True, exist_ok=True)
+        STYLE_COUNTS.write_text(json.dumps(counts, ensure_ascii=False),
+                                encoding="utf-8")
+    except Exception:
+        pass
+
+
+def style_tendency() -> dict[str, float]:
+    """Tendency from an accumulating counter file (bypasses memory dedup).
+
+    Each captured signal adds 0.3 to that dim (capped 0.99), so repeated
+    corrections actually accumulate (memory dedup would collapse them).
+    """
+    counts = _load_counts()
+    return {d: round(min(0.99, counts.get(d, 0) * 0.3), 3) for d in STYLE_DIMS}
+
+
 def active_style_lines(tendencies: dict[str, float]) -> list[str]:
     """Style sentences for persona injection (only when |v| >= threshold)."""
     lines = []
@@ -75,7 +111,10 @@ def active_style_lines(tendencies: dict[str, float]) -> list[str]:
 def capture_style_signal(text: str, memory: Optional[object] = None) -> list[str]:
     """Store style-preference items for any detected signals (best-effort)."""
     signals = detect_style_signals(text)
-    if not signals or memory is None:
+    if not signals:
+        return signals
+    _bump_counts(signals)
+    if memory is None:
         return signals
     from backend.target_scheduler_tools import memory_save
 

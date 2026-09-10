@@ -99,7 +99,7 @@ class ConversationSession:
         self._ctx_recent: dict[str, float] = {}  # de-dup of auto-recalled memories
         self._last_reviewed = 0          # turns count at last auto review
         self._reviewing = False
-        self.style_inject = False  # style persona injection (off until A/B accepted)
+        self.style_inject = True  # style persona injection (A/B accepted, 0242)
         self.registry = registry if registry is not None else setup_scheduler_capabilities()
         bind_memory_save_service(self.registry, self.memory)
         from backend.target_orchestrator import build_openai_compatible_llm_turn
@@ -157,12 +157,11 @@ class ConversationSession:
 
             persona_arg = None if draft == ANCHOR else draft
         style_lines = None
-        if self.style_inject and self.channel == "private":
+        if self.style_inject and self._is_owner():
             try:
-                from backend.target_style import active_style_lines, style_ema
+                from backend.target_style import active_style_lines, style_tendency
 
-                items = self.memory.recall("风格偏好", limit=30)
-                style_lines = active_style_lines(style_ema(items)) or None
+                style_lines = active_style_lines(style_tendency()) or None
             except Exception:
                 style_lines = None
         return render_system_prompt(
