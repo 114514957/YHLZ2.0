@@ -9,6 +9,7 @@ Model: BAAI/bge-small-zh-v1.5 (CPU, local). Store: cache/embvec.db
 from __future__ import annotations
 
 import pathlib
+import re
 import sqlite3
 import threading
 
@@ -111,10 +112,40 @@ def vec_search(scope: str, query: str, top: int = 8) -> list[tuple[str, float]]:
     return scored[:top]
 
 
+_TAIL = re.compile(r"[吗呢吧啊呀嘛的了哦噢～~，。！？!?、\s]+$")
+_ASK = re.compile(r"(你觉得|你认为|你有什么想法|你有什么建议|你说呢|怎么办|"
+                  r"该如何|如何|能不能|可不可以|可以吗|好吗|行吗|是吧|对吧|"
+                  r"有啥想法|有什么看法)")
+
+
+def _topic(q: str) -> str:
+    """Crude topic extraction so question/pleasantry wording doesn't skew the
+    embedding (e.g. '想养成点好习惯，你有什么想法？' -> '想养成点好习惯')."""
+    t = _ASK.sub(" ", str(q or ""))
+    t = _TAIL.sub("", t.strip())
+    t = re.sub(r"\s+", " ", t).strip()
+    return t if len(t) >= 4 else str(q or "")
+
+
 def semantic_l2(query: str, top: int = 8,
                 min_score: float = 0.35) -> list[dict]:
-    """Semantic search over L2 -> full item dicts from the memory db."""
-    hits = vec_search("l2", query, top=top * 2)
+    """Semantic search over L2 -> full item dicts from the memory db.
+
+    Uses both the raw query and a topic-stripped variant, keeping the best
+    score per item (mitigates wording noise like 提问/客套)."""
+    raw = str(query or "").strip()
+    if not raw:
+        return []
+    variants = [raw]
+    t = _topic(raw)
+    if t and t != raw:
+        variants.append(t)
+    best: dict[str, float] = {}
+    for v in variants:
+        for iid, sc in vec_search("l2", v, top=top * 2):
+            if sc > best.get(iid, -1.0):
+                best[iid] = sc
+    hits = sorted(best.items(), key=lambda x: x[1], reverse=True)[: top * 2]
     if not hits:
         return []
     ids = [i for i, _ in hits]

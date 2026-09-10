@@ -168,6 +168,12 @@ def memory_save(content: str, kind: str = "preference", importance: int = 0,
             svc.observe_hit(iid, strength=0.3)  # corroborate the existing one
             return f"近似记忆已存在（相似度 {ratio:.0%}），已强化原记忆"
     svc.store_item(item)
+    try:
+        from backend.vector_memory import vec_add
+
+        vec_add("l2", item.id, f"{item.summary} {item.keywords}".strip())
+    except Exception:
+        pass
     return f"已保存 ({kind})"
 
 
