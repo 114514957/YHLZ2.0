@@ -162,6 +162,114 @@ def _warm_asr() -> None:
         pass
 
 
+# ---- outbound (TTS voice / image / file) ----
+QQ_STATE = _PROJECT / "cache" / "tmp" / "qq_state.json"
+
+
+def _load_state() -> dict:
+    try:
+        return json.loads(QQ_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_state(d: dict) -> None:
+    try:
+        QQ_STATE.parent.mkdir(parents=True, exist_ok=True)
+        QQ_STATE.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _voice_intent(text: str) -> bool:
+    t = str(text or "")
+    return any(k in t for k in ("用语音", "发语音", "语音回", "语音说",
+                                "说给我听", "念给我听", "说给我听"))
+
+
+def _extract_markers(ans: str) -> tuple[str, list, list, bool]:
+    import re
+
+    imgs = re.findall(r"\[\[img:\s*(.+?)\]\]", ans)
+    files = re.findall(r"\[\[file:\s*(.+?)\]\]", ans)
+    voice = "[[voice]]" in ans
+    ans = re.sub(r"\[\[(?:img|file):.*?\]\]", "", ans).replace("[[voice]]", "")
+    return ans.strip(), imgs, files, voice
+
+
+def _tts_wav(text: str) -> str:
+    """Text -> wav (24k mono). edge-tts (natural, needs net); SAPI fallback."""
+    import subprocess
+    import tempfile
+
+    text = str(text or "").strip()
+    if not text:
+        return ""
+    d = pathlib.Path(tempfile.mkdtemp(prefix="yhlz_tts_"))
+    wav = d / "t.wav"
+    engine = os.getenv("YHLZ_TTS_ENGINE", "edge").lower()
+    # 1) edge-tts (neural, primary; needs network)
+    if engine != "sapi":
+        try:
+            import asyncio as _a
+
+            import edge_tts
+
+            mp3 = d / "t.mp3"
+            voice = os.getenv("YHLZ_TTS_VOICE", "zh-CN-XiaoyiNeural")
+            rate = os.getenv("YHLZ_TTS_RATE", "+8%")
+
+            async def _go() -> None:
+                await edge_tts.Communicate(text, voice, rate=rate).save(str(mp3))
+
+            _a.run(_go())
+            if mp3.exists() and mp3.stat().st_size > 0:
+                import imageio_ffmpeg
+
+                exe = imageio_ffmpeg.get_ffmpeg_exe()
+                subprocess.run([exe, "-y", "-i", str(mp3), "-ac", "1", "-ar",
+                                "24000", str(wav)], capture_output=True)
+                if wav.exists() and wav.stat().st_size > 44:
+                    return str(wav)
+        except Exception:
+            pass
+    # 2) SAPI fallback (offline)
+    import base64 as _b64
+
+    b64 = _b64.b64encode(text.encode("utf-8")).decode()
+    ps = ("Add-Type -AssemblyName System.Speech; "
+          f"$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{b64}')); "
+          "$s=New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+          f"$s.SetOutputToWaveFile('{wav}'); $s.Speak($t); $s.Dispose()")
+    try:
+        subprocess.run(["powershell", "-NoProfile", "-NonInteractive",
+                        "-Command", ps], capture_output=True, timeout=60)
+    except Exception:
+        return ""
+    return str(wav) if wav.exists() else ""
+
+
+def _wav_to_silk(wav: str) -> str:
+    """wav -> QQ silk (24k mono) via ffmpeg + pilk. Empty on failure."""
+    import subprocess
+    import tempfile
+
+    try:
+        import imageio_ffmpeg
+        import pilk
+
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        d = pathlib.Path(tempfile.mkdtemp(prefix="yhlz_silk_"))
+        w24 = d / "a24.wav"
+        subprocess.run([exe, "-y", "-i", str(wav), "-ac", "1", "-ar", "24000",
+                        str(w24)], capture_output=True)
+        silk = d / "a.silk"
+        pilk.encode(str(w24), str(silk), 24000, tencent=True)
+        return str(silk) if silk.exists() else ""
+    except Exception:
+        return ""
+
+
 def _find_onebot_config(uin: str | None) -> pathlib.Path:
     cands = []
     for d in (QQWATCH_CONFIG,
@@ -242,6 +350,34 @@ class QQBridge:
             p["message"] = part
             await self._send(ws, "send_msg", p)
 
+    @staticmethod
+    def _file_uri(path: str) -> str:
+        return "file:///" + str(pathlib.Path(path).resolve()).replace("\\", "/")
+
+    async def _send_segment(self, ws, params: dict, seg: dict) -> None:
+        p = dict(params)
+        p["message"] = [seg]
+        await self._send(ws, "send_msg", p)
+
+    async def _send_voice(self, ws, params, text: str) -> bool:
+        wav = await asyncio.to_thread(_tts_wav, text)
+        silk = await asyncio.to_thread(_wav_to_silk, wav) if wav else ""
+        if not silk:
+            return False
+        await self._send_segment(
+            ws, params, {"type": "record", "data": {"file": self._file_uri(silk)}})
+        return True
+
+    async def _send_image(self, ws, params, path: str) -> None:
+        await self._send_segment(
+            ws, params, {"type": "image", "data": {"file": self._file_uri(path)}})
+
+    async def _send_file(self, ws, params, path: str) -> None:
+        await self._send_segment(ws, params, {
+            "type": "file",
+            "data": {"file": self._file_uri(path),
+                     "name": pathlib.Path(path).name}})
+
     async def _dev_report(self, ws, params, status, text) -> None:
         tag = {"awaiting": "❓ 需要你决定", "done": "✅ 完成",
                "error": "⚠️ 出错", "running": "⏳ 进行中"}.get(status, status)
@@ -298,9 +434,36 @@ class QQBridge:
                 return
             await self._say(ws, params, f"[opencode] 已开工：{task[:80]}")
             self._spawn(ws, params, lambda: _pick(dev_runner.start(task)))
+        elif low in ("#voice", "#voice on", "#voice off"):
+            st = _load_state()
+            arg = low.replace("#voice", "").strip()
+            st["voice"] = True if arg == "on" else (
+                False if arg == "off" else not st.get("voice", False))
+            _save_state(st)
+            await self._say(ws, params,
+                            f"[元亨] 语音回复已{'开' if st['voice'] else '关'}")
+        elif low.startswith("#say"):
+            t = low[4:].strip()
+            if t and await self._send_voice(ws, params, t):
+                pass
+            else:
+                await self._say(ws, params, "[元亨] 语音合成失败")
+        elif low.startswith("#img"):
+            p_ = low[4:].strip().strip('"')
+            if pathlib.Path(p_).exists():
+                await self._send_image(ws, params, p_)
+            else:
+                await self._say(ws, params, f"[元亨] 找不到图片：{p_[:80]}")
+        elif low.startswith("#file"):
+            p_ = low[5:].strip().strip('"')
+            if pathlib.Path(p_).exists():
+                await self._send_file(ws, params, p_)
+            else:
+                await self._say(ws, params, f"[元亨] 找不到文件：{p_[:80]}")
         else:
             await self._say(ws, params,
-                            "未知指令：#dev <任务> / #y / #n / #push / #devstatus")
+                            "未知指令：#dev <任务> / #y / #n / #push / #devstatus / "
+                            "#voice on|off / #say <文字> / #img <路径> / #file <路径>")
 
     async def _resolve_image(self, seg) -> str:
         d = seg.get("data") or {}
@@ -457,13 +620,25 @@ class QQBridge:
         ans = _daemon_turn(text, channel, images=imgs)
         if not ans:
             return
-        ans = ans.strip()
+        ans, out_imgs, out_files, vmark = _extract_markers(ans.strip())
         params = {"message": ans}
         if msg_type == "private":
             params.update(message_type="private", user_id=int(user_id))
         else:
             params.update(message_type="group",
                           group_id=int(ev.get("group_id", 0)))
+        for ip in out_imgs:
+            if pathlib.Path(ip).exists():
+                await self._send_image(ws, params, ip)
+        for fp in out_files:
+            if pathlib.Path(fp).exists():
+                await self._send_file(ws, params, fp)
+        if not ans:
+            return
+        want_voice = (vmark or _load_state().get("voice", False)
+                      or _voice_intent(text))
+        if want_voice and await self._send_voice(ws, params, ans):
+            return
         for part in [ans[i:i + 1400] for i in range(0, len(ans), 1400)]:
             params["message"] = part
             await self._send(ws, "send_msg", params)
