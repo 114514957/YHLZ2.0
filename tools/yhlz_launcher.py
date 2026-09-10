@@ -116,6 +116,45 @@ def _spawn_qqbot():
                      cwd=str(_ROOT), close_fds=True)
 
 
+NAPCAT_BAT = Path(
+    r"C:\Users\ACE_WAN——PROJECT\qqwatch\shell\launcher-user.bat")
+
+
+def _proc_alive(script: str) -> bool:
+    try:
+        import psutil
+    except Exception:
+        return False
+    for p in psutil.process_iter(["cmdline"]):
+        try:
+            cl = p.info.get("cmdline") or []
+        except Exception:
+            continue
+        if any(script in str(x) for x in cl):
+            return True
+    return False
+
+
+def napcat_status() -> dict:
+    p = _ROOT / "cache" / "tmp" / "napcat_status.json"
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _spawn_napcat_watch():
+    subprocess.Popen([str(PY), "-B", str(_ROOT / "tools" / "napcat_watch.py")],
+                     cwd=str(_ROOT), close_fds=True,
+                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+
+def _spawn_napcat():
+    if NAPCAT_BAT.exists():
+        subprocess.Popen(["cmd", "/c", str(NAPCAT_BAT), QQBOT_UIN],
+                         cwd=str(NAPCAT_BAT.parent), close_fds=True)
+
+
 def ensure_stack() -> dict:
     st = status()
     if not st["ollama"]:
@@ -127,6 +166,9 @@ def ensure_stack() -> dict:
     # keep the QQ bridge alive, but only if NapCat's OneBot WS is up
     if _port_open("127.0.0.1", QQBOT_PORT) and not _qqbot_alive():
         _spawn_qqbot()
+    # keep the NapCat online-watcher alive
+    if not _proc_alive("napcat_watch.py"):
+        _spawn_napcat_watch()
     time.sleep(1)
     return status()
 

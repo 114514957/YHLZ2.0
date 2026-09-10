@@ -34,6 +34,7 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent
 STATE = _ROOT / "cache" / "dev" / "state.json"
 LOG = _ROOT / "cache" / "dev" / "opencode.log"
 MODEL = os.getenv("YHLZ_DEV_MODEL", "deepseek/deepseek-v4-flash")
+AGENT = os.getenv("YHLZ_DEV_AGENT", "yhlz-dev")
 TIMEOUT = float(os.getenv("YHLZ_DEV_TIMEOUT", "1800"))
 
 START_PROMPT = """你是 YHLZ 项目的开发执行体，工作目录就是项目根目录。
@@ -78,7 +79,7 @@ def _opencode_exe() -> str:
 def _run(prompt: str, session: str | None, timeout: float) -> dict:
     """Run opencode headless; return {text, session, ok}."""
     cmd = [_opencode_exe(), "run", prompt, "-m", MODEL,
-           "--dir", str(_ROOT), "--format", "json"]
+           "--agent", AGENT, "--dir", str(_ROOT), "--format", "json"]
     if session:
         cmd += ["--session", session]
     LOG.parent.mkdir(parents=True, exist_ok=True)

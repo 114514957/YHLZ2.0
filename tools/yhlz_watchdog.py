@@ -9,6 +9,7 @@ Usage: python tools/yhlz_watchdog.py [--interval 60] [--once]
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 import sys
 import time
@@ -18,6 +19,25 @@ sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "tools"))
 
 LOG = _ROOT / "cache" / "watchdog.log"
+NOTIFY_FILE = _ROOT / "cache" / "qqwatch" / "notifications.json"
+
+
+def _notify(text: str) -> None:
+    """Push a notice into the same bounded queue the workbench reads."""
+    try:
+        NOTIFY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        entries = []
+        if NOTIFY_FILE.exists():
+            try:
+                entries = json.loads(NOTIFY_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                entries = []
+        entries.append({"ts": time.time(), "text": str(text)[:600]})
+        del entries[:-8]
+        NOTIFY_FILE.write_text(json.dumps(entries, ensure_ascii=False),
+                               encoding="utf-8")
+    except Exception:
+        pass
 
 
 def _log(msg: str) -> None:
@@ -32,7 +52,8 @@ def _log(msg: str) -> None:
 
 
 def tick() -> dict:
-    from yhlz_launcher import ensure_stack, qqbot_status, status
+    from yhlz_launcher import (ensure_stack, napcat_status, qqbot_status,
+                               status, _port_open, _proc_alive, _spawn_napcat)
 
     before = status()
     down = [k for k, v in before.items() if not v]
@@ -41,6 +62,25 @@ def tick() -> dict:
         ensure_stack()
         time.sleep(3)
     after = status()
+
+    # --- NapCat / 元亨 online watchdog ---
+    ns = napcat_status()
+    online = bool(ns.get("online"))
+    ws_up = bool(ns.get("ws"))
+    if not ws_up and not _proc_alive("NapCat"):
+        if time.time() - getattr(tick, "_napcat_try", 0) > 600:
+            _log("NapCat 未运行 -> 尝试拉起")
+            _spawn_napcat()
+            tick._napcat_try = time.time()
+    state = (online, ws_up)
+    if state != getattr(tick, "_napcat", None):
+        msg = ("元亨在线" if online else
+               ("NapCat/OneBot 未监听" if not ws_up else
+                "元亨 QQ 掉线，需在 NapCat 重新登录"))
+        _log("NapCat状态: " + msg)
+        _notify("【YHLZ】" + msg)
+        tick._napcat = state
+
     qb = qqbot_status()
     if qb != getattr(tick, "_last_qb", None):
         _log(f"QQ桥: {'在线' if qb else '未运行/未登录'}")
