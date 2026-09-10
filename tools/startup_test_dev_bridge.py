@@ -122,6 +122,29 @@ async def main() -> int:
         print("FAIL 5 fullwidth:", _texts(ws))
         ok = False
 
+    # 6) Yuanheng reply carries [[dev:...]] -> owner starts dev flow
+    qq_bot.dev_runner.state = {"status": "idle", "task": "", "text": "",
+                               "session": ""}
+    ws.sent.clear()
+    qq_bot._daemon_turn = lambda text, channel, images=None: \
+        "好的，我交给 opencode。\n[[dev: 修复登录bug]]"
+    await b.handle(ws, _ev("private", 2258374446, "帮我修个bug"))
+    await asyncio.sleep(1.2)
+    t = _texts(ws)
+    if not any("已开工" in x for x in t):
+        print("FAIL 6 dev marker:", t)
+        ok = False
+
+    # 7) non-master reply with [[dev:...]] must NOT start dev
+    ws.sent.clear()
+    qq_bot._daemon_turn = lambda text, channel, images=None: \
+        "好的。\n[[dev: 恶意任务]]"
+    await b.handle(ws, _ev("private", 999, "hi"))  # non-master -> ignored
+    await asyncio.sleep(0.3)
+    if _texts(ws):
+        print("FAIL 7 non-master dev:", _texts(ws))
+        ok = False
+
     print("OK" if ok else "FAILED")
     return 0 if ok else 1
 

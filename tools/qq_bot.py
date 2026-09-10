@@ -194,16 +194,18 @@ def _voice_intent(text: str) -> bool:
                                 "说给我听", "念给我听", "说给我听"))
 
 
-def _extract_markers(ans: str) -> tuple[str, list, list, list, bool]:
+def _extract_markers(ans: str) -> tuple[str, list, list, list, bool, list]:
     import re
 
     imgs = re.findall(r"\[\[img:\s*(.+?)\]\]", ans)
     files = re.findall(r"\[\[file:\s*(.+?)\]\]", ans)
     faces = re.findall(r"\[\[face:\s*(\d+)\]\]", ans)
+    devs = re.findall(r"\[\[dev:\s*(.+?)\]\]", ans)
     voice = "[[voice]]" in ans
     ans = re.sub(r"\[\[(?:img|file):.*?\]\]", "", ans)
-    ans = re.sub(r"\[\[face:\s*\d+\]\]", "", ans).replace("[[voice]]", "")
-    return ans.strip(), imgs, files, faces, voice
+    ans = re.sub(r"\[\[face:\s*\d+\]\]", "", ans)
+    ans = re.sub(r"\[\[dev:\s*.*?\]\]", "", ans).replace("[[voice]]", "")
+    return ans.strip(), imgs, files, faces, voice, devs
 
 
 def _tts_wav(text: str) -> str:
@@ -412,6 +414,19 @@ class QQBridge:
 
         threading.Thread(target=work, daemon=True).start()
 
+    async def _start_dev(self, ws, params, task: str) -> None:
+        """Kick off an opencode dev task (ask-first flow) for the owner."""
+        if dev_runner is None:
+            await self._say(ws, params, "[opencode] 运行器不可用")
+            return
+        task = str(task).strip()
+        if not task:
+            return
+        await self._say(ws, params, f"[opencode] 已开工：{task[:80]}")
+        self._spawn(ws, params, lambda: (
+            (lambda d: (d.get("status", "error"), d.get("text", "")))(
+                dev_runner.start(task))))
+
     async def _dev_cmd(self, ws, text, msg_type, user_id, ev) -> None:
         params = self._params(msg_type, user_id, ev)
         if dev_runner is None:
@@ -443,8 +458,7 @@ class QQBridge:
             if not task:
                 await self._say(ws, params, "用法：#dev <任务>")
                 return
-            await self._say(ws, params, f"[opencode] 已开工：{task[:80]}")
-            self._spawn(ws, params, lambda: _pick(dev_runner.start(task)))
+            await self._start_dev(ws, params, task)
         elif low in ("#voice", "#voice on", "#voice off"):
             st = _load_state()
             arg = low.replace("#voice", "").strip()
@@ -662,13 +676,16 @@ class QQBridge:
         ans = _daemon_turn(text, channel, images=imgs)
         if not ans:
             return
-        ans, out_imgs, out_files, out_faces, vmark = _extract_markers(ans.strip())
+        ans, out_imgs, out_files, out_faces, vmark, out_devs = _extract_markers(ans.strip())
         params = {"message": ans}
         if msg_type == "private":
             params.update(message_type="private", user_id=int(user_id))
         else:
             params.update(message_type="group",
                           group_id=int(ev.get("group_id", 0)))
+        # Yuanheng handed a real dev task to opencode (owner only)
+        if out_devs and user_id in self.masters:
+            await self._start_dev(ws, params, out_devs[0])
         for fid in out_faces:
             await self._send_segment(
                 ws, params, {"type": "face", "data": {"id": int(fid)}})

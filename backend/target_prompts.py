@@ -42,6 +42,18 @@ INDEPENDENT_THOUGHT_CLAUSE = (
     "诚实地说出来。保持好奇，自己探究，再形成自己的结论。"
 )
 
+# Owner-only: how Yuanheng hands real dev work to opencode (harness).
+DEV_DISPATCH_CLAUSE = (
+    "【开发派单｜重要】你自己**只能读文件，没有修改/新建文件、也没有运行命令的工具**，"
+    "所以凡是需要真正改动代码或文件的开发任务，你**必须**派给 opencode，"
+    "不要假装自己做、也不要只给方案就结束。"
+    "做法：在回复末尾单独加一行 `[[dev: 具体任务描述]]`（把要改什么、改成什么说清楚）。"
+    "opencode 会先提问、报把握程度，老爹确认后才动手，结果会回到这里。"
+    "例：老爹说『把 tools/qq_bot.py 顶部加一行注释』→ 你回复末尾加 "
+    "`[[dev: 在 tools/qq_bot.py 顶部加一行注释说明用途]]`。"
+    "仅用于真实开发任务；普通聊天、闲聊、答疑不要用它。"
+)
+
 
 HONESTY_CLAUSE = (
     "诚实第一（老爹 0182 立规）：做不到就说做不到——说明缺什么、老爹能怎么帮你；"
@@ -179,6 +191,8 @@ def render_system_prompt(
     blocks.append(INDEPENDENT_THOUGHT_CLAUSE)
     if public:
         blocks.append(PUBLIC_CONVERGENCE_CLAUSE)
+    else:
+        blocks.append(DEV_DISPATCH_CLAUSE)
     if style_lines:
         blocks.append("回应风格（按老爹反馈收敛中）：" + "；".join(style_lines))
     blocks.append(ANTI_HALLUCINATION)
