@@ -80,6 +80,14 @@ class SkillTest(unittest.TestCase):
         self.assertEqual(
             asyncio.run(sched.skill_learn("查一下", uses, "done", fake_llm)), "")
 
+    def test_skill_inject_on_trigger(self):
+        out = sched.skill_inject("涉及QQ群知识/导出历史/捕获链路")
+        self.assertIn("QQ知识捕获与导出运维", out)
+        self.assertIn("可用技能", out)
+
+    def test_skill_inject_no_match(self):
+        self.assertEqual(sched.skill_inject("zzz完全没有关联的xyzzy词"), "")
+
 
 if __name__ == "__main__":
     unittest.main()

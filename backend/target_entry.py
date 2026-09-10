@@ -291,6 +291,15 @@ class ConversationSession:
                                 str(hit.get("summary", ""))[:150])
             except Exception:
                 pass
+        if self._is_owner():
+            try:
+                from backend.target_scheduler_tools import skill_inject
+
+                sk = skill_inject(text)
+                if sk:
+                    ctx_lines.append(sk)
+            except Exception:
+                pass
         result = await self.orchestrator.run(
             turn_text=text,
             system_prompt=system,

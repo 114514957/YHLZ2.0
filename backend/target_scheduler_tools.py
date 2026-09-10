@@ -951,6 +951,47 @@ def _skill_seen_add(key: str) -> bool:
     return True
 
 
+def skill_inject(text: str, limit: int = 2) -> str:
+    """B2: pre-turn skill injection. If the turn text hits registered skill
+    triggers (KB category=skill), return a compact '可用技能' block to append
+    to the system context. Returns '' when nothing matches (防花瓶: no
+    list-all fallback — inject only on real trigger evidence)."""
+    from backend.yuanheng_kb import kb_query
+
+    q = str(text or "")
+    if not q:
+        return ""
+    try:
+        hits = kb_query(q, limit=int(limit or 2), category="skill")
+        if not hits:  # long sentence -> sliding 4-char fragment fallback
+            frag: dict[str, dict] = {}
+            for i in range(0, max(1, len(q) - 3)):
+                f = q[i:i + 4]
+                if len(f) >= 2:
+                    for h in kb_query(f, limit=5, category="skill"):
+                        frag[h["id"]] = h
+            hits = list(frag.values())[: int(limit or 2)]
+    except Exception:
+        return ""
+    if not hits:
+        return ""
+    lines = []
+    for h in hits:
+        try:
+            from backend.yuanheng_kb import kb_note_hit
+
+            kb_note_hit(str(h["id"]))  # B3: real-use count
+        except Exception:
+            pass
+        name = str(h.get("summary") or "").split("|")[0].strip()
+        detail = str(h.get("detail") or "").strip()[:400].replace("\n", "；")
+        if name:
+            lines.append(f"- {name}：{detail}")
+    if not lines:
+        return ""
+    return "可用技能（若与本轮契合，按其中的步骤执行）：\n" + "\n".join(lines)
+
+
 async def skill_learn(dad_text: str, tool_uses: list, answer: str,
                       llm_turn=None) -> str:
     """B1: auto-extract a reusable skill draft from a successful multi-tool turn.
