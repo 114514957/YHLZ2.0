@@ -37,11 +37,18 @@ QQWATCH_CONFIG = pathlib.Path(
 DAEMON = os.getenv("DAEMON", "http://127.0.0.1:8321")
 MEDIA_DIR = _PROJECT / "cache" / "qq_media"
 MEDIA_KEEP_DAYS = 7
+IMG_MAX_BYTES = 8 * 1024 * 1024        # group/private image cap
+AUDIO_MAX_BYTES = 10 * 1024 * 1024
+AUDIO_MAX_SECONDS = 60                 # voice clip cap
+GROUP_USER_COOLDOWN = 8.0              # per-user min gap between group replies
+GROUP_CHAN_PER_MIN = 20                # per-group reply budget / minute
 
 
-def _save_media(data: bytes, ext: str) -> str:
+def _save_media(data: bytes, ext: str, max_bytes: int = 0) -> str:
     import hashlib
 
+    if max_bytes and len(data) > max_bytes:
+        return ""
     day = time.strftime("%Y%m%d")
     d = MEDIA_DIR / day
     d.mkdir(parents=True, exist_ok=True)
@@ -187,14 +194,16 @@ def _voice_intent(text: str) -> bool:
                                 "说给我听", "念给我听", "说给我听"))
 
 
-def _extract_markers(ans: str) -> tuple[str, list, list, bool]:
+def _extract_markers(ans: str) -> tuple[str, list, list, list, bool]:
     import re
 
     imgs = re.findall(r"\[\[img:\s*(.+?)\]\]", ans)
     files = re.findall(r"\[\[file:\s*(.+?)\]\]", ans)
+    faces = re.findall(r"\[\[face:\s*(\d+)\]\]", ans)
     voice = "[[voice]]" in ans
-    ans = re.sub(r"\[\[(?:img|file):.*?\]\]", "", ans).replace("[[voice]]", "")
-    return ans.strip(), imgs, files, voice
+    ans = re.sub(r"\[\[(?:img|file):.*?\]\]", "", ans)
+    ans = re.sub(r"\[\[face:\s*\d+\]\]", "", ans).replace("[[voice]]", "")
+    return ans.strip(), imgs, files, faces, voice
 
 
 def _tts_wav(text: str) -> str:
@@ -320,6 +329,8 @@ class QQBridge:
         self.masters = masters or {"2258374446"}  # owner QQ (command source)
         self.log_n = 0
         self.loop = None
+        self._last_reply: dict = {}
+        self._chan_reply: dict = {}
 
     def log(self, msg: str) -> None:
         print(f"[qqbot] {msg}", flush=True)
@@ -460,10 +471,18 @@ class QQBridge:
                 await self._send_file(ws, params, p_)
             else:
                 await self._say(ws, params, f"[元亨] 找不到文件：{p_[:80]}")
+        elif low.startswith("#face"):
+            fid = low[5:].strip()
+            if fid.isdigit():
+                await self._send_segment(
+                    ws, params, {"type": "face", "data": {"id": int(fid)}})
+            else:
+                await self._say(ws, params,
+                                "[元亨] 用法：#face <id>（4=微笑 76=赞 14=难过 …）")
         else:
             await self._say(ws, params,
                             "未知指令：#dev <任务> / #y / #n / #push / #devstatus / "
-                            "#voice on|off / #say <文字> / #img <路径> / #file <路径>")
+                            "#voice on|off / #say <文字> / #img <路径> / #file <路径> / #face <id>")
 
     async def _resolve_image(self, seg) -> str:
         d = seg.get("data") or {}
@@ -473,7 +492,7 @@ class QQBridge:
                 req = urllib.request.Request(
                     url, headers={"User-Agent": "Mozilla/5.0"})
                 return _save_media(urllib.request.urlopen(req, timeout=20).read(),
-                                   "jpg")
+                                   "jpg", IMG_MAX_BYTES)
             except Exception:
                 pass
         file = str(d.get("file") or d.get("file_id") or "")
@@ -486,7 +505,7 @@ class QQBridge:
             if p and pathlib.Path(p).exists():
                 src = pathlib.Path(p)
                 return _save_media(src.read_bytes(),
-                                   src.suffix.lstrip(".") or "jpg")
+                                   src.suffix.lstrip(".") or "jpg", IMG_MAX_BYTES)
         except Exception:
             pass
         u = str(r.get("url") or "")
@@ -495,7 +514,7 @@ class QQBridge:
                 return _save_media(urllib.request.urlopen(
                     urllib.request.Request(
                         u, headers={"User-Agent": "Mozilla/5.0"}),
-                    timeout=20).read(), "jpg")
+                    timeout=20).read(), "jpg", IMG_MAX_BYTES)
             except Exception:
                 pass
         self.log(f"取图失败 file={file[:40]}")
@@ -523,7 +542,8 @@ class QQBridge:
             if p and pathlib.Path(p).exists():
                 src = pathlib.Path(p)
                 saved = _save_media(src.read_bytes(),
-                                    src.suffix.lstrip(".") or "wav")
+                                    src.suffix.lstrip(".") or "wav",
+                                    AUDIO_MAX_BYTES)
                 self.log(f"语音已存 {saved}")
                 return saved
         except Exception as e:  # noqa: BLE001
@@ -532,7 +552,7 @@ class QQBridge:
         if b64:
             import base64 as _b64
 
-            saved = _save_media(_b64.b64decode(b64), "wav")
+            saved = _save_media(_b64.b64decode(b64), "wav", AUDIO_MAX_BYTES)
             self.log(f"语音已存(base64) {saved}")
             return saved
         u = str(r.get("url") or d.get("url") or "")
@@ -541,7 +561,7 @@ class QQBridge:
                 saved = _save_media(urllib.request.urlopen(
                     urllib.request.Request(
                         u, headers={"User-Agent": "Mozilla/5.0"}),
-                    timeout=20).read(), "wav")
+                    timeout=20).read(), "wav", AUDIO_MAX_BYTES)
                 self.log(f"语音已存(url) {saved}")
                 return saved
             except Exception:
@@ -551,10 +571,29 @@ class QQBridge:
 
     def _voice_text(self, path: str) -> str:
         try:
-            return _transcribe_audio(_decode_to_pcm16k(path))
+            audio = _decode_to_pcm16k(path)
+            if len(audio) / 16000.0 > AUDIO_MAX_SECONDS:
+                self.log(f"语音过长({len(audio)/16000:.0f}s) 跳过")
+                return ""
+            return _transcribe_audio(audio)
         except Exception as e:  # noqa: BLE001
             self.log(f"语音识别失败 {type(e).__name__}: {e}")
             return ""
+
+    def _rate_limited(self, channel: str, user_id: str) -> bool:
+        """Group anti-spam: per-user cooldown + per-group per-minute budget."""
+        if user_id in self.masters:
+            return False
+        now = time.time()
+        if now - self._last_reply.get(user_id, 0.0) < GROUP_USER_COOLDOWN:
+            return True
+        times = self._chan_reply.setdefault(channel, [])
+        times[:] = [t for t in times if now - t < 60.0]
+        if len(times) >= GROUP_CHAN_PER_MIN:
+            return True
+        self._last_reply[user_id] = now
+        times.append(now)
+        return False
 
     async def handle(self, ws, ev: dict) -> None:
         if ev.get("post_type") != "message":
@@ -598,6 +637,9 @@ class QQBridge:
                         return
                 except Exception as e:  # noqa: BLE001
                     self.log(f"dev 答复路由异常 {type(e).__name__}: {e}")
+        if msg_type == "group" and self._rate_limited(channel, user_id):
+            self.log(f"群频控跳过 {user_id} @ {channel}")
+            return
         imgs = (await self._collect_images(msg)
                 if any(s.get("type") == "image" for s in msg) else [])
         if any(s.get("type") == "record" for s in msg):
@@ -620,13 +662,16 @@ class QQBridge:
         ans = _daemon_turn(text, channel, images=imgs)
         if not ans:
             return
-        ans, out_imgs, out_files, vmark = _extract_markers(ans.strip())
+        ans, out_imgs, out_files, out_faces, vmark = _extract_markers(ans.strip())
         params = {"message": ans}
         if msg_type == "private":
             params.update(message_type="private", user_id=int(user_id))
         else:
             params.update(message_type="group",
                           group_id=int(ev.get("group_id", 0)))
+        for fid in out_faces:
+            await self._send_segment(
+                ws, params, {"type": "face", "data": {"id": int(fid)}})
         for ip in out_imgs:
             if pathlib.Path(ip).exists():
                 await self._send_image(ws, params, ip)

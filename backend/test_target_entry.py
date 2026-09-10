@@ -179,6 +179,32 @@ class TestConversationSession(unittest.TestCase):
         denied = any(not u["ok"] for u in info["tool_uses"])
         self.assertTrue(denied)  # no approver wired in tick -> fail-closed is correct
 
+    def test_group_channel_is_public_and_tool_free(self):
+        import asyncio
+
+        seen: dict = {}
+
+        class _Cap:
+            async def __call__(self, messages, tools):
+                seen["tools"] = tools
+                seen["system"] = messages[0]["content"]
+                return {"content": "你好呀", "tool_calls": []}
+
+        grp = ConversationSession(memory=self.mem, registry=self.reg,
+                                  llm_turn=_Cap(), channel="qq_g123")
+        asyncio.run(grp.run_turn("帮我读取文件并检索一下"))  # work-hint text
+        self.assertEqual(seen["tools"], [])            # no tools in group
+        self.assertIn("公共频道", seen["system"])       # public clause on
+        self.assertFalse(grp._is_owner())
+
+        owner = ConversationSession(memory=self.mem, registry=self.reg,
+                                    llm_turn=_Cap(),
+                                    channel="qq_p2258374446")
+        asyncio.run(owner.run_turn("帮我检索一下"))
+        self.assertTrue(seen["tools"])                 # owner keeps tools
+        self.assertNotIn("公共频道", seen["system"])
+        self.assertTrue(owner._is_owner())
+
 
 if __name__ == "__main__":
     unittest.main()

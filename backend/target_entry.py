@@ -130,6 +130,12 @@ class ConversationSession:
         self._persona = ""
 
     # ---------- system / persona ----------
+    def _is_owner(self) -> bool:
+        """Owner channels = private/console or the master's QQ private chat.
+        Group chats (qq_g*) and any other channel are 'public'."""
+        c = str(self.channel or "private")
+        return c in ("private", "console") or c.startswith("qq_p")
+
     def render_system(self) -> str:
         tools = self.registry.export_openai_tools()
         try:
@@ -153,8 +159,7 @@ class ConversationSession:
                 style_lines = None
         return render_system_prompt(
             persona=persona_arg, tools=tools,
-            public=(self.channel not in ("private", "console")
-                    and not str(self.channel).startswith("qq_")),
+            public=not self._is_owner(),
             style_lines=style_lines,
         )
 
@@ -205,9 +210,10 @@ class ConversationSession:
         capture_style_signal(text, self.memory)
         system = self.render_system()
         llm_turn = self.llm_turn
-        # images -> vision chat mode (no tool schema, no work reasoning)
-        work = (not images) and (mode == "work" or (
-            mode == "auto" and self._want_work_mode(text)))
+        # images -> vision chat mode; public/group -> no tools (security)
+        work = (self._is_owner() and not images
+                and (mode == "work" or (
+                    mode == "auto" and self._want_work_mode(text))))
         effort = "medium" if work else "none"
         if not self._llm_injected and work:
             from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
@@ -241,30 +247,31 @@ class ConversationSession:
                 reasoning_effort="none",
             )
         ctx_lines = []
-        try:
-            sl = self.memory.summary_line()
-            if sl:
-                ctx_lines.append(sl)
-            if not work:
-                import time as _t
+        if self._is_owner():  # never inject private memory into public/group
+            try:
+                sl = self.memory.summary_line()
+                if sl:
+                    ctx_lines.append(sl)
+                if not work:
+                    import time as _t
 
-                if pre_recall is not None:
-                    # speculative prefetch (ledger 0226): recall already ran
-                    # while the user was still speaking — reuse it, no re-query
-                    for s_ in pre_recall[:3]:
-                        ctx_lines.append("[此刻自然想起] 你以前提过：" + str(s_)[:150])
-                else:
-                    for hit in self.memory.contextual_recall(text, limit=3):
-                        hid = str(hit.get("id", ""))
-                        now = _t.time()
-                        if now - self._ctx_recent.get(hid, 0.0) < 30.0:
-                            continue
-                        self._ctx_recent[hid] = now
-                        ctx_lines.append(
-                            "[此刻自然想起] 你以前提过：" +
-                            str(hit.get("summary", ""))[:150])
-        except Exception:
-            pass
+                    if pre_recall is not None:
+                        # speculative prefetch (ledger 0226): recall already ran
+                        # while the user was still speaking — reuse it, no re-query
+                        for s_ in pre_recall[:3]:
+                            ctx_lines.append("[此刻自然想起] 你以前提过：" + str(s_)[:150])
+                    else:
+                        for hit in self.memory.contextual_recall(text, limit=3):
+                            hid = str(hit.get("id", ""))
+                            now = _t.time()
+                            if now - self._ctx_recent.get(hid, 0.0) < 30.0:
+                                continue
+                            self._ctx_recent[hid] = now
+                            ctx_lines.append(
+                                "[此刻自然想起] 你以前提过：" +
+                                str(hit.get("summary", ""))[:150])
+            except Exception:
+                pass
         result = await self.orchestrator.run(
             turn_text=text,
             system_prompt=system,
