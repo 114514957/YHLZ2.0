@@ -176,8 +176,10 @@ class ConversationSession:
     # ---------- contradiction trigger (M3: old-kernel contradiction -> belief) ----------
     _NEGATION = ("其实我不", "我不喜欢", "不喜欢", "不是", "不要再", "我改主意", "错了", "相反", "其实不是")
 
-    def _maybe_contradiction(self, text: str) -> int:
-        """If the user utterance negates a stored memory topic, lower its belief."""
+    async def _maybe_contradiction(self, text: str) -> int:
+        """If the user utterance negates a stored memory topic, decide via an
+        LLM judge (P5b): old-more-credible -> keep; new/uncertain -> lower the
+        old item's belief (non-destructive, never deletes)."""
         if not any(m in text for m in self._NEGATION):
             return 0
         try:
@@ -187,7 +189,35 @@ class ConversationSession:
         n = 0
         for h in hits:
             try:
+                verdict = "uncertain"
+                try:
+                    from backend import memory_judge
+
+                    verdict = await memory_judge.judge(
+                        text, str(h.get("summary", "")), self.llm_turn)
+                except Exception:
+                    verdict = "uncertain"
+                summary = str(h.get("summary", ""))[:60]
+                if verdict == "old":
+                    try:
+                        from backend import growth_log
+
+                        growth_log.record("冲突", f"旧说法更可信，保留：{summary}",
+                                          source="裁决")
+                    except Exception:
+                        pass
+                    continue
                 self.memory.observe_contradiction(h["id"])
+                try:
+                    from backend import growth_log
+
+                    growth_log.record(
+                        "冲突",
+                        ("新说法更可信，降权旧条：" if verdict == "new"
+                         else "证据不足，暂降权待察：") + summary,
+                        source="裁决")
+                except Exception:
+                    pass
                 n += 1
             except Exception:
                 pass
@@ -216,7 +246,7 @@ class ConversationSession:
                        pre_recall: Optional[list] = None,
                        images: Optional[list] = None) -> dict[str, Any]:
         self.memory.append_turn(role="user", text=text)
-        contradictions = self._maybe_contradiction(text)
+        contradictions = await self._maybe_contradiction(text)
         from backend.target_style import capture_style_signal
 
         capture_style_signal(text, self.memory)
