@@ -714,7 +714,11 @@ def approve_list() -> str:
         except Exception:
             pend = []
         for d in pend:
-            lines.append(f"[{idx}] 认知[{d.get('tier')}|{d.get('kind')}] {str(d.get('claim'))[:90]}")
+            _tier = {"core": "核心", "method": "方法", "meta": "待证伪"}.get(
+                str(d.get("tier")), str(d.get("tier")))
+            _kind = {"new": "新增", "refine": "深化", "refute": "推翻"}.get(
+                str(d.get("kind")), str(d.get("kind")))
+            lines.append(f"[{idx}] 认知（{_tier}·{_kind}）{str(d.get('claim'))[:90]}")
             idx += 1
     drafts = _skill_draft_files()
     for f in drafts:
