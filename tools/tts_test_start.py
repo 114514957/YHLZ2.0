@@ -112,26 +112,28 @@ def _clean(text: str) -> str:
 
 def _capture_loop(device: int, cap_gain: float, duration_s: float,
                   denoise: str, gate, verbose_gate: bool, debug: bool,
-                  on_level=None, on_segment=None) -> dict:
+                  on_level=None, on_segment=None, on_chunk=None) -> dict:
     """Try rnnoise (48k) capture; on any audio-layer failure degrade to raw
     16k so the test entry always runs and prints what went wrong.
     on_level(level, is_speech) optional per-~500ms activity callback.
-    on_segment(audio16k) called per accepted user segment (short pause cut)."""
+    on_segment(audio16k) called per accepted user segment (short pause cut).
+    on_chunk(audio16k_frame) called per enhanced frame (for streaming ASR)."""
     if denoise == "rnnoise":
         try:
             return _capture_impl(device, cap_gain, duration_s, "rnnoise",
                                  gate, verbose_gate, debug, on_level,
-                                 on_segment)
+                                 on_segment, on_chunk)
         except Exception as exc:  # noqa: BLE001
             print(f"[warn] rnnoise 采集失败({type(exc).__name__}: "
                   f"{str(exc)[:90]})，降级 raw 16k", flush=True)
     return _capture_impl(device, cap_gain, duration_s, "off",
-                         gate, verbose_gate, debug, on_level, on_segment)
+                         gate, verbose_gate, debug, on_level, on_segment,
+                         on_chunk)
 
 
 def _capture_impl(device: int, cap_gain: float, duration_s: float,
                   denoise: str, gate, verbose_gate: bool, debug: bool,
-                  on_level=None, on_segment=None) -> dict:
+                  on_level=None, on_segment=None, on_chunk=None) -> dict:
     import numpy as np
     import sounddevice as sd
 
@@ -181,6 +183,11 @@ def _capture_impl(device: int, cap_gain: float, duration_s: float,
             if mono.size == 0:
                 continue
             enhanced, is_speech = fe.process(mono)
+            if on_chunk is not None:
+                try:
+                    on_chunk(enhanced)
+                except Exception:
+                    pass
 
             if debug and time.time() - last_dbg >= 1.0:
                 last_dbg = time.time()

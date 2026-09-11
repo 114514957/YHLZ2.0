@@ -169,6 +169,27 @@ def _drives_list() -> list:
         return []
 
 
+_SHERPA = {"m": None, "tried": False}
+
+
+def _get_sherpa():
+    """Lazy singleton streaming ASR (sherpa zh-en) for live partials."""
+    if not _SHERPA["tried"]:
+        _SHERPA["tried"] = True
+        try:
+            from backend.target_sherpa_asr import (
+                SherpaOnlineASRConfig,
+                SherpaOnlineASRProvider,
+            )
+
+            _SHERPA["m"] = SherpaOnlineASRProvider(
+                SherpaOnlineASRConfig(min_available_memory_bytes=256 * 1024 * 1024))
+            _SHERPA["m"].start()
+        except Exception:
+            _SHERPA["m"] = None
+    return _SHERPA["m"]
+
+
 def _qq_status() -> dict:
     """元亨 QQ / NapCat / bridge status for the workbench."""
     out = {"uin": "3655185302", "name": "元亨", "online": False,
@@ -558,6 +579,33 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 parts: list[str] = []
                 pre: list[str] = []
 
+                # V3: streaming ASR for live partial (sherpa zh-en), fed by chunks
+                _sherpa = _get_sherpa()
+                sherpa_q: "_queue.Queue" = _queue.Queue()
+                if _sherpa is not None:
+                    def _sherpa_worker():
+                        from backend.target_chain import CancellationSignal
+
+                        sig = CancellationSignal()
+                        try:
+                            _sherpa.open_stream("cap", 1, 16000, 1, sig)
+                        except Exception:
+                            return
+                        last = ""
+                        while True:
+                            it = sherpa_q.get()
+                            if it is _stop:
+                                break
+                            try:
+                                for u in _sherpa.push_audio("cap", it, 16000, sig):
+                                    t = str(getattr(u, "text", "") or "")
+                                    if t and t != last:
+                                        last = t
+                                        emit({"type": "partial", "text": t})
+                            except Exception:
+                                pass
+                    _th.Thread(target=_sherpa_worker, daemon=True).start()
+
                 def _worker():
                     import re as _re2
 
@@ -583,7 +631,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                         if t:
                             parts.append(t)
                             acc = "".join(parts)
-                            emit({"type": "partial", "text": acc})
+                            if _sherpa is None:  # fallback: segment-based partial
+                                emit({"type": "partial", "text": acc})
                             if len(acc) >= 6 and time.time() - last_pre > 2.0:
                                 last_pre = time.time()
                                 try:
@@ -596,8 +645,10 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
                 wt = _th.Thread(target=_worker, daemon=True)
                 wt.start()
-                r = self._listen(body, st, on_segment=seg_q.put)
+                r = self._listen(body, st, on_segment=seg_q.put,
+                                 on_chunk=(sherpa_q.put if _sherpa is not None else None))
                 seg_q.put(_stop)
+                sherpa_q.put(_stop)
                 wt.join(timeout=8)
                 if not r.get("started"):
                     if continuous:
@@ -651,6 +702,17 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             emit({"type": "state", "value": "idle"})
             emit({"type": "voice_done", "status": "ok"})
         except Exception as exc:  # noqa: BLE001
+            import traceback
+
+            _log("voice_error", f"{type(exc).__name__}: {str(exc)[:160]}")
+            try:
+                _d = _PROJECT_ROOT / "cache" / "tmp"
+                _d.mkdir(parents=True, exist_ok=True)
+                with (_d / "voice_error.log").open("a", encoding="utf-8") as f:
+                    f.write(f"\n=== {time.strftime('%H:%M:%S')} ===\n")
+                    f.write(traceback.format_exc())
+            except Exception:
+                pass
             emit({"type": "error", "message": f"{type(exc).__name__}: "
                                               f"{str(exc)[:200]}"})
             emit({"type": "state", "value": "idle"})
@@ -760,7 +822,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": False, "error": f"{type(exc).__name__}"}
         return {"ok": False, "error": "未知操作：" + action}
 
-    def _listen(self, body, st: dict, on_segment=None) -> dict:
+    def _listen(self, body, st: dict, on_segment=None, on_chunk=None) -> dict:
         from tools.tts_test_start import _capture_loop
 
         device = int(body.get("device", st.get("device", 1)))
@@ -775,7 +837,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 pass
 
         return _capture_loop(device, 1.0, dur, denoise, None, False, False,
-                             on_level=on_level, on_segment=on_segment)
+                             on_level=on_level, on_segment=on_segment,
+                             on_chunk=on_chunk)
 
     def _emit_level(self, level, is_speech):
         self.wfile.write(_sse({"type": "level", "value": round(float(level), 4),
