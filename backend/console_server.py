@@ -148,6 +148,22 @@ def _bring_qq_front(delay: float = 8.0) -> None:
     threading.Thread(target=_go, daemon=True).start()
 
 
+def _drives_list() -> list:
+    try:
+        from backend import intrinsic_drives
+
+        ds = [d for d in intrinsic_drives.load() if d.get("status") == "active"]
+        ds.sort(key=lambda d: (int(d.get("priority", 0)),
+                               float(d.get("strength", 0))), reverse=True)
+        return [{"id": d.get("id"), "name": d.get("name"),
+                 "category": d.get("category"),
+                 "strength": round(float(d.get("strength", 0)), 2),
+                 "priority": d.get("priority"),
+                 "note": str(d.get("note", ""))[:80]} for d in ds[:12]]
+    except Exception:
+        return []
+
+
 def _qq_status() -> dict:
     """元亨 QQ / NapCat / bridge status for the workbench."""
     out = {"uin": "3655185302", "name": "元亨", "online": False,
@@ -605,6 +621,31 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": False, "error": f"{type(exc).__name__}"}
         if action == "reload_settings":
             return {"ok": True, "settings": _settings_load()}
+        if action in ("drives_add", "drives_reinforce", "drives_fade"):
+            try:
+                from backend import intrinsic_drives
+
+                if action == "drives_add":
+                    name = str(body.get("name", "")).strip()
+                    if not name:
+                        return {"ok": False, "error": "name required"}
+                    intrinsic_drives.add(
+                        name, str(body.get("category", "其他") or "其他"),
+                        float(body.get("strength", 0.6) or 0.6),
+                        evidence="老爹在工作台添加", channel="老爹")
+                elif action == "drives_reinforce":
+                    intrinsic_drives.reinforce(str(body.get("id", "")))
+                else:
+                    # 淡出（软，不删除）
+                    ds = intrinsic_drives.load()
+                    for d in ds:
+                        if d.get("id") == str(body.get("id", "")):
+                            d["status"] = "faded"
+                    intrinsic_drives.save(ds)
+                _log("control", action)
+                return {"ok": True, "drives": _drives_list()}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         if action == "napcat_login":
             try:
                 import subprocess
@@ -916,6 +957,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                               "task": str(dd.get("task", ""))[:60]}
             except Exception:
                 out["dev"] = {"status": "idle", "task": ""}
+            out["drives"] = _drives_list()
             st = self.runtime.health() if hasattr(self.runtime, "health") else None
             out["turns"] = 0
             if st:

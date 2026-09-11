@@ -185,6 +185,18 @@ async function launch(action, okMsg) {
 }
 $("petBtn").addEventListener("click", () => launch("launch_pet", "已启动桌宠"));
 $("allBtn").addEventListener("click", () => launch("launch_all", "已启动全家桶"));
+async function driveAct(action, id, name) {
+  const body = { action, id };
+  if (name) body.name = name;
+  await fetch("/control", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+  loadDashboard();
+}
+$("driveAdd").addEventListener("click", () => {
+  const n = $("driveName").value.trim();
+  if (n) { driveAct("drives_add", "", n); $("driveName").value = ""; }
+});
 
 async function loadDashboard() {
   try {
@@ -206,6 +218,22 @@ async function loadDashboard() {
     const dtag = { idle: "空闲", running: "执行中", awaiting: "待你答复",
                    done: "完成", error: "出错" }[d.status] || d.status || "空闲";
     $("m-dev").textContent = dtag + (d.task && d.status !== "idle" ? "：" + d.task : "");
+    const ul = $("drivesList");
+    if (ul) {
+      ul.innerHTML = "";
+      (s.drives || []).forEach((d) => {
+        const li = document.createElement("li");
+        li.textContent = d.name + "（" + d.category + "·" + d.strength + "） ";
+        const b = document.createElement("button");
+        b.className = "btn-mini"; b.textContent = "强化";
+        b.onclick = () => driveAct("drives_reinforce", d.id);
+        const f = document.createElement("button");
+        f.className = "btn-mini"; f.textContent = "淡出";
+        f.onclick = () => driveAct("drives_fade", d.id);
+        li.appendChild(b); li.appendChild(f);
+        ul.appendChild(li);
+      });
+    }
   } catch (e) { dot("s-daemon", false); }
   try {
     const m = await (await fetch("/monitor", { cache: "no-store" })).json();

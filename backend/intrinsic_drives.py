@@ -18,8 +18,9 @@ import time
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
 DRIVES_FILE = _ROOT / "cache" / "drives.json"
 
-# priority: 老爹最高
-PRIORITY = {"期待": 100, "老爹": 100, "自主": 60, "对话": 40, "群": 30, "其他": 30}
+# priority: 老爹最高；类别优先于渠道
+PRIORITY = {"期待": 100, "老爹": 100, "渴望": 60, "好奇": 60,
+            "自主": 60, "对话": 40, "群": 30, "其他": 30}
 _DECAY_PER_DAY = 0.985   # slow fade (no fixed TTL; only "缝隙")
 _FADE_BELOW = 0.05
 
