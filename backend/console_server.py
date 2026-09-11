@@ -500,19 +500,26 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
 
+        alive = {"ok": True}
+
         def emit(data: dict) -> None:
+            if not alive["ok"]:
+                return
             try:
                 self.wfile.write(_sse(data))
                 self.wfile.flush()
             except Exception:
-                pass
+                alive["ok"] = False  # client gone -> stop the loop
 
         import time as _t
 
         try:
             st = _settings_load()
             mock_text = str(body.get("text", "") or "").strip()
-            _log("voice", "mock:" + mock_text if mock_text else "listen")
+            continuous = str(body.get("continuous", "")).lower() in (
+                "1", "true", "yes", "on")
+            _log("voice", ("mock:" + mock_text) if mock_text
+                 else ("continuous" if continuous else "listen"))
             speak_default = "1" if st.get("tts_speak", True) else "0"
             speak = str(body.get("speak", speak_default)) not in ("0", "false", "off")
             if mock_text:
@@ -532,7 +539,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             from tools.tts_test_start import _get_sv, release_sv
 
             rounds = 0
-            while rounds < 4:
+            idle = 0
+            while alive["ok"] and rounds < (999 if continuous else 4):
                 rounds += 1
                 emit({"type": "state", "value": "listening"})
                 # streaming recognition worker: transcribe each segment as it
@@ -587,11 +595,17 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 seg_q.put(_stop)
                 wt.join(timeout=8)
                 if not r.get("started"):
+                    if continuous:
+                        idle += 1
+                        if idle >= 3 or not alive["ok"]:
+                            break
+                        continue
                     if rounds == 1:
                         emit({"type": "state", "value": "idle"})
                         emit({"type": "voice_done", "status": "no-speech"})
                         return
                     break
+                idle = 0
                 text = "".join(parts).strip()
                 if not text:
                     # fallback: whole-segment transcribe (worker produced none)
@@ -626,7 +640,9 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                     if rr == "interrupted":
                         emit({"type": "interrupted"})
                         continue  # back to listening (barge-in)
-                break
+                if not continuous:
+                    break
+                # continuous: keep listening for the next turn
             emit({"type": "state", "value": "idle"})
             emit({"type": "voice_done", "status": "ok"})
         except Exception as exc:  # noqa: BLE001

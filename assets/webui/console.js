@@ -295,12 +295,13 @@ async function loadDashboard() {
   } catch (e) {}
 }
 
-async function streamFetch(path, payload, ev) {
+async function streamFetch(path, payload, ev, signal) {
   try {
     const r = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: signal,
     });
     if (!r.ok) { if (ev.error) ev.error("(请求失败 " + r.status + ")"); return; }
     const reader = r.body.getReader();
@@ -352,29 +353,39 @@ async function emote(answer) {
   } catch (e) {}
 }
 
-async function voice() {
+let voiceAbort = null;
+async function voice(continuous) {
+  if (voiceAbort) { try { voiceAbort.abort(); } catch (e) {} voiceAbort = null; return; }
+  voiceAbort = new AbortController();
   busyOn(true); setStage("listening"); setVad(0, false);
   let box = null;
-  await streamFetch("/voice", { speak: 1 }, {
-    level: (e) => setVad(e.value, e.speech),
-    state: (e) => setStage(e.value),
-    voice_text: (e) => {
-      if (e.kind === "user") {
-        const last = msgs.lastElementChild;
-        if (last) { const t = last.querySelector("div:last-child"); if (t) t.textContent = e.text; }
-      }
-      if (e.kind === "asr") {
-        addMsg("u", "你", "");
-        box = addMsg("a", "元亨", "");
-      }
-    },
-    delta: (e) => { if (!box) box = addMsg("a", "元亨", ""); box.textContent += e.delta || ""; },
-    turn_done: (e) => { if (e.text && box) box.textContent = e.text; emote(e.text); },
-    interrupted: () => { setStage("listening"); },
-    voice_done: () => setVad(0, false),
-    error: (e) => { const t = addMsg("a", "元亨", ""); t.textContent = "(语音出错) " + (e.message || ""); },
-  });
-  busyOn(false); setStage("idle"); setVad(0, false); loadDashboard();
+  try {
+    await streamFetch("/voice", { speak: 1, continuous: continuous ? 1 : 0 }, {
+      level: (e) => setVad(e.value, e.speech),
+      state: (e) => setStage(e.value),
+      voice_text: (e) => {
+        if (e.kind === "user") {
+          const last = msgs.lastElementChild;
+          if (last) { const t = last.querySelector("div.body"); if (t) t.textContent = e.text; }
+        }
+        if (e.kind === "asr") {
+          addMsg("u", "你", "");
+          box = addMsg("a", "元亨", "");
+          box.classList.add("streaming");
+        }
+      },
+      delta: (e) => { if (!box) { box = addMsg("a", "元亨", ""); box.classList.add("streaming"); } box.textContent += e.delta || ""; follow(); },
+      turn_done: (e) => { if (box) box.classList.remove("streaming"); if (e.text && box) box.textContent = e.text; emote(e.text); },
+      interrupted: () => setStage("listening"),
+      voice_done: () => setVad(0, false),
+      error: (e) => { const t = addMsg("a", "元亨", ""); t.textContent = "(语音出错) " + (e.message || ""); },
+    }, voiceAbort.signal);
+  } catch (e) {
+  } finally {
+    voiceAbort = null;
+    busyOn(false); setStage("idle"); setVad(0, false); loadDashboard();
+    const cb = $("contBtn"); if (cb) cb.classList.remove("on");
+  }
 }
 
 async function loadHistory() {
@@ -434,7 +445,11 @@ inp.addEventListener("keydown", (e) => {
   }
 });
 $("talk").addEventListener("submit", (ev) => { ev.preventDefault(); sendNow(); });
-$("voiceBtn").addEventListener("click", () => { if (!busy) voice(); });
+$("voiceBtn").addEventListener("click", () => { if (!busy) voice(false); });
+$("contBtn").addEventListener("click", () => {
+  if (voiceAbort) { try { voiceAbort.abort(); } catch (e) {} }
+  else { $("contBtn").classList.add("on"); voice(true); }
+});
 inp.value = localStorage.getItem("yh_draft") || "";
 autoGrow();
 inp.focus();
