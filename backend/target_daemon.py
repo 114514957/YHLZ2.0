@@ -427,6 +427,14 @@ class DaemonRuntime:
                     communities.build(force=True)
                 except Exception:
                     pass
+                try:
+                    import asyncio as _asyncio
+
+                    from backend import reflection
+
+                    _asyncio.run(reflection.reflect())  # P5c 主动反思
+                except Exception:
+                    pass
             except Exception as exc:
                 print(f"[memory-upkeep] skip: {type(exc).__name__}", flush=True)
 
