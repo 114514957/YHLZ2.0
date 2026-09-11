@@ -709,6 +709,36 @@ class QQBridge:
             params["message"] = part
             await self._send(ws, "send_msg", params)
 
+    async def _relay_outbox(self, ws) -> None:
+        """P2e: relay queued proactive messages (from the daemon) to the master.
+        Only runs while connected; rate-limited to <=2/hour."""
+        sent: list = []
+        master = int(next(iter(self.masters)))
+        while True:
+            await asyncio.sleep(90)
+            try:
+                from backend import qq_outbox
+
+                items = qq_outbox.drain(3)
+            except Exception:
+                items = []
+            now = time.time()
+            sent[:] = [t for t in sent if now - t < 3600]
+            for it in items:
+                if len(sent) >= 2:
+                    break
+                text = str(it.get("text", "")).strip()
+                if not text:
+                    continue
+                try:
+                    await self._send(ws, "send_msg", {
+                        "message_type": "private", "user_id": master,
+                        "message": text})
+                    sent.append(time.time())
+                    self.log(f"主动联系已发: {text[:40]}")
+                except Exception:
+                    pass
+
     async def run(self) -> None:
         import websockets
 
@@ -721,20 +751,24 @@ class QQBridge:
                 async with websockets.connect(self.ws_url) as ws:
                     delay = 3
                     self.log("已连接，等待消息（私聊 / 群里 @元亨）…")
-                    async for raw in ws:
-                        try:
-                            ev = json.loads(raw)
-                        except Exception:
-                            continue
-                        if ev.get("post_type") == "meta_event":
-                            if ev.get("meta_event_type") == "lifecycle":
-                                self.log("生命周期: " + str(ev.get("sub_type")))
-                            continue
-                        if ev.get("post_type") == "message":
+                    relay = asyncio.create_task(self._relay_outbox(ws))
+                    try:
+                        async for raw in ws:
                             try:
-                                await self.handle(ws, ev)
-                            except Exception as e:  # noqa: BLE001
-                                self.log(f"处理错误 {type(e).__name__}: {e}")
+                                ev = json.loads(raw)
+                            except Exception:
+                                continue
+                            if ev.get("post_type") == "meta_event":
+                                if ev.get("meta_event_type") == "lifecycle":
+                                    self.log("生命周期: " + str(ev.get("sub_type")))
+                                continue
+                            if ev.get("post_type") == "message":
+                                try:
+                                    await self.handle(ws, ev)
+                                except Exception as e:  # noqa: BLE001
+                                    self.log(f"处理错误 {type(e).__name__}: {e}")
+                    finally:
+                        relay.cancel()
             except Exception as e:  # noqa: BLE001
                 self.log(f"连接断开 {type(e).__name__}: {e}，{delay}s 后重连")
             await asyncio.sleep(delay)

@@ -135,6 +135,16 @@ class DaemonRuntime:
                     self._maybe_consolidate("console")
                 except Exception:
                     pass
+                try:
+                    # P2e: proactive contact — queue a substantive autonomous
+                    # thought for the QQ bridge to relay to the master.
+                    from backend import qq_outbox
+
+                    ans = str(info.get("answer", "")).strip()
+                    if len(ans) >= 30 and not ans.startswith("没有"):
+                        qq_outbox.push("[自主] " + ans, kind="autonomy")
+                except Exception:
+                    pass
                 self._autonomy_last = time.time()
                 print("[autonomy] tick: "
                       + str(info.get("answer", ""))[:90], flush=True)
