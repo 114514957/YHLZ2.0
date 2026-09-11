@@ -148,7 +148,7 @@ def inject_block(limit: int = 3) -> str:
         tag = d.get("category", "")
         note = str(d.get("note", "")).strip()
         lines.append(f"- {d.get('name')}" + (f"（{note[:80]}）" if note else f"（{tag}）"))
-    return ("我此刻的内在因（我的驱动力，不是情绪；据此自然地行动与思考；"
+    return ("（你此刻的内在倾向，作为行动的理由；**不要说出来**；"
             "若相互冲突，以老爹的期待为先）：\n" + "\n".join(lines))
 
 

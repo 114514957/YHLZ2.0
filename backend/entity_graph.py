@@ -169,4 +169,5 @@ def context_for(text: str, limit: int = 2) -> str:
             lines.append(f"- {name}：" + "；".join(rels))
     if not lines:
         return ""
-    return "已知的稳定关系（供你自然参考，不要生硬罗列）：\n" + "\n".join(lines)
+    return ("（你隐约知道的背景关系，仅供理解，**不要提及或罗列**）：\n"
+            + "\n".join(lines))

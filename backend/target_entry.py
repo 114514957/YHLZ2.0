@@ -282,7 +282,7 @@ class ConversationSession:
                         # speculative prefetch (ledger 0226): recall already ran
                         # while the user was still speaking — reuse it, no re-query
                         for s_ in pre_recall[:3]:
-                            ctx_lines.append("[此刻自然想起] 你以前提过：" + str(s_)[:150])
+                            ctx_lines.append("（隐约想起，仅供理解，不要提及）：" + str(s_)[:150])
                     else:
                         for hit in self.memory.contextual_recall(text, limit=3):
                             hid = str(hit.get("id", ""))
@@ -291,7 +291,7 @@ class ConversationSession:
                                 continue
                             self._ctx_recent[hid] = now
                             ctx_lines.append(
-                                "[此刻自然想起] 你以前提过：" +
+                                "（隐约想起，仅供理解，不要提及）：" +
                                 str(hit.get("summary", ""))[:150])
             except Exception:
                 pass

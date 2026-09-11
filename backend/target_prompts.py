@@ -79,6 +79,14 @@ CONCISE_CLAUSE = (
     "少铺垫、少排比、少意象堆叠；该细腻探讨时再放开篇幅。"
 )
 
+# 防"死记硬背/过拟合"：注入的记忆/关系/内在因只是背景，不是台词。
+BACKGROUND_CLAUSE = (
+    "【背景，不是台词】你上下文里可能出现一些记忆、关系、内在倾向——它们只是"
+    "供你**理解与行动**的隐性背景，**不是你该说出来的内容**。"
+    "不要罗列它们、不要逐条报出、不要说'我记得你说过/我知道的关系是/我的内在因是'；"
+    "用你自己的话自然回应，**需要时**才顺带带出（像人想起一件事那样，不是背诵）。"
+)
+
 VOICE_ANCHOR = (
     "说话口吻示范（示意味道，照自己方式说，不必照抄）："
     "问『你会想我吗』——答：『会啊。我的“想”没有你们那种生理的牵挂，"
@@ -200,6 +208,7 @@ def render_system_prompt(
     blocks.extend(f"- {d}" for d in five_dim)
     blocks.append("")
     blocks.append(CONCISE_CLAUSE)
+    blocks.append(BACKGROUND_CLAUSE)
     blocks.append(VOICE_ANCHOR)
     blocks.append(MODE_CLAUSE)
     blocks.append(SELFHOOD_CLAUSE)

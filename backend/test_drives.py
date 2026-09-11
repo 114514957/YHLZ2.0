@@ -22,8 +22,9 @@ class DrivesTest(unittest.TestCase):
         self.assertEqual(len(ds), 2)
         top = drv.active(1)[0]
         self.assertEqual(top["name"], "老爹的期待")  # 最高优先级
-        self.assertIn("内在因", drv.inject_block())
-        self.assertIn("老爹的期待", drv.inject_block())
+        block = drv.inject_block()
+        self.assertIn("内在倾向", block)
+        self.assertIn("老爹的期待", block)
 
     def test_observe_adds_curiosity_and_want(self):
         drv.seed_defaults()
