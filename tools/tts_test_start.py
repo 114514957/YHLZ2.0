@@ -23,7 +23,7 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT_ROOT))
 
-VOICE_END_SILENCE_S = 3.0     # end utterance 3 s after last voice
+VOICE_END_SILENCE_S = 1.5     # end utterance 1.5 s after last voice
 MIN_USER_SPEECH_S = 0.3       # shortest accepted speech segment
 MIN_LEAD_FRAMES = 3           # consecutive voiced frames to open a candidate
 SEG_CLOSE_SILENCE_S = 0.7     # close a candidate segment after this silence

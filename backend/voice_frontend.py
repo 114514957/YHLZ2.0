@@ -40,10 +40,12 @@ class VoiceFrontend:
         self.reset()
 
     def reset(self) -> None:
-        self._noise_floor: float = 0.0
+        # start LOW (not from the first frame): if the user is already
+        # speaking when the mic opens, seeding the floor with that frame
+        # raises the gate above speech and mutes the first seconds.
+        self._noise_floor: float = 0.0005
         self._gain: float = 1.0
         self._hangover = 0
-        self._seen = False
 
     @property
     def noise_floor(self) -> float:
@@ -63,10 +65,7 @@ class VoiceFrontend:
         rms = float(np.sqrt(np.mean(np.square(x))) + 1e-9)
 
         # noise floor tracking: fast down, slow recovery
-        if not self._seen:
-            self._noise_floor = rms
-            self._seen = True
-        elif rms < self._noise_floor:
+        if rms < self._noise_floor:
             self._noise_floor = rms
         else:
             self._noise_floor += (rms - self._noise_floor) * self._nf_recover
