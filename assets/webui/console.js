@@ -92,7 +92,9 @@ async function qMem() {
     ul.innerHTML = "";
     for (const it of (r.items || [])) {
       const li = document.createElement("li");
-      li.textContent = "[" + (it.importance ?? "?") + "|" + (it.type ?? "") + "] " + it.summary;
+      const _ty = ({ fact: "事实", preference: "偏好", event: "事件",
+        decision: "决定" })[it.type] || (it.type ?? "");
+      li.textContent = "[" + (it.importance ?? "?") + "|" + _ty + "] " + it.summary;
       ul.appendChild(li);
     }
     if (!(r.items || []).length) ul.innerHTML = "<li>（记忆查无）</li>";
@@ -222,7 +224,8 @@ async function loadDashboard() {
     $("m-turns").textContent = s.history ?? "?";
     $("m-l2").textContent = s.l2 ?? "?";
     $("m-persona").textContent = s.persona ? "有" : "-";
-    $("m-stage").textContent = stage === "idle" ? "空闲" : stage;
+    $("m-stage").textContent = ({ idle: "空闲", busy: "思考中", listening: "聆听中",
+      speaking: "说话中" })[stage] || stage;
     const q = s.qq || {};
     if ($("s-qq")) dot("s-qq", !!(q.online && q.bridge));
     $("q-uin").textContent = q.uin ? (q.name ? q.name + " " : "") + q.uin : "-";

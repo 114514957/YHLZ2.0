@@ -714,11 +714,11 @@ class ConversationSession:
         }
 
 
-BANNER = """元亨 · 数字生命对话入口 (target-entry v1, ledger 0160)
-可用命令: /help /status /new /think /exit
-提示: 问项目历史/决策请让我查台账；要保存偏好会征求你同意。"""
+BANNER = """元亨 · 数字生命对话入口（目标入口 v1 · 台账 0160）
+可用命令：/help /status /new /think /exit
+提示：问项目历史/决策请让我查台账；记忆自主写入，异常会警报。"""
 
-_HELP = """命令列表:
+_HELP = """命令列表：
   /help            本帮助
   /status          会话与记忆状态
   /think           自主回顾（我主动整理记忆）
@@ -727,7 +727,7 @@ _HELP = """命令列表:
   /sessions        列出会话档案（最近优先）
   /new             开始新会话（当前会自动先存档）
   /exit            退出
-直接输入即对话。写类操作（保存记忆）会先征求你 y/n 同意。"""
+直接输入即对话。记忆自主写入；认知/技能写入需你批准。"""
 
 
 def _print_pending_dynamic(seen_file, shown: int) -> int:

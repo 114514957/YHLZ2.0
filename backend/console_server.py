@@ -264,17 +264,17 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
         p = self.path.split("?", 1)[0]
         if not p.startswith(route_prefix):
-            self._send_json(404, {"error": "not found"})
+            self._send_json(404, {"error": "未找到"})
             return
         rel = unquote(p[len(route_prefix):]).lstrip("/")
         target = (base_dir / rel).resolve()
         try:
             if not str(target).startswith(str(base_dir.resolve())) or \
                     not target.is_file():
-                self._send_json(404, {"error": "not found"})
+                self._send_json(404, {"error": "未找到"})
                 return
         except Exception:
-            self._send_json(404, {"error": "not found"})
+            self._send_json(404, {"error": "未找到"})
             return
         ext = target.suffix.lower()
         ctype = ("image/png" if ext == ".png"
@@ -380,7 +380,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         elif p == "/devices":
             self._send_json(200, {"ok": True, "devices": _audio_devices()})
         else:
-            self._send_json(404, {"error": "not found"})
+            self._send_json(404, {"error": "未找到"})
 
     def do_GET(self):
         self.console_do_GET()
@@ -395,7 +395,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")
             except Exception:
-                self._send_json(400, {"error": "bad json"})
+                self._send_json(400, {"error": "请求格式错误"})
                 return
             self._send_json(200, self._tap(body))
             return
@@ -410,7 +410,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")
             except Exception:
-                self._send_json(400, {"error": "bad json"})
+                self._send_json(400, {"error": "请求格式错误"})
                 return
             self._send_json(200, {"ok": True,
                                   "settings": _settings_save(body)})
@@ -420,7 +420,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")
             except Exception:
-                self._send_json(400, {"error": "bad json"})
+                self._send_json(400, {"error": "请求格式错误"})
                 return
             self._send_json(200, self._control(body))
             return
@@ -429,11 +429,11 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")
             except Exception:
-                self._send_json(400, {"error": "bad json"})
+                self._send_json(400, {"error": "请求格式错误"})
                 return
             self._send_json(200, self._session_load(body))
             return
-        self._send_json(404, {"error": "not found"})
+        self._send_json(404, {"error": "未找到"})
 
     def do_POST(self):
         self.console_do_POST()
@@ -493,7 +493,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
-            self._send_json(400, {"error": "bad json"})
+            self._send_json(400, {"error": "请求格式错误"})
             return
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -728,7 +728,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": True, "note": "已启动全家桶"}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
-        return {"ok": False, "error": "unknown action: " + action}
+        return {"ok": False, "error": "未知操作：" + action}
 
     def _listen(self, body, st: dict, on_segment=None) -> dict:
         from tools.tts_test_start import _capture_loop
@@ -1017,7 +1017,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length) or b"{}")
             text = str(body.get("text", "")).strip()
         except Exception:
-            self._send_json(400, {"error": "bad json"})
+            self._send_json(400, {"error": "请求格式错误"})
             return
         if not text:
             self._send_json(400, {"error": "empty text"})
