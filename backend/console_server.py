@@ -135,12 +135,15 @@ def _bring_qq_front(delay: float = 8.0) -> None:
             ps = (
                 "Add-Type -Namespace N -Name W -MemberDefinition "
                 "'[DllImport(\"user32.dll\")] public static extern bool "
+                "ShowWindow(IntPtr h,int n); "
+                "[DllImport(\"user32.dll\")] public static extern bool "
                 "SetForegroundWindow(IntPtr h);'; "
-                "Get-Process | Where-Object { ($_.MainWindowTitle -like "
-                "'*YHLZ-NapCat*' -or $_.ProcessName -like 'QQ*' -or "
-                "$_.ProcessName -like '*NapCat*') -and "
-                "$_.MainWindowHandle -ne 0 } | "
-                "ForEach-Object { [N.W]::SetForegroundWindow($_.MainWindowHandle) }"
+                "Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and ("
+                "$_.MainWindowTitle -like '*launcher-user*' -or "
+                "$_.MainWindowTitle -like '*NapCat*' -or "
+                "$_.ProcessName -like 'QQ*' -or $_.ProcessName -like '*NapCat*') } | "
+                "ForEach-Object { [N.W]::ShowWindow($_.MainWindowHandle,9); "
+                "[N.W]::SetForegroundWindow($_.MainWindowHandle) }"
             )
             subprocess.run(["powershell", "-NoProfile", "-Command", ps],
                            capture_output=True, timeout=20)
