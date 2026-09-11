@@ -136,8 +136,10 @@ def _bring_qq_front(delay: float = 8.0) -> None:
                 "Add-Type -Namespace N -Name W -MemberDefinition "
                 "'[DllImport(\"user32.dll\")] public static extern bool "
                 "SetForegroundWindow(IntPtr h);'; "
-                "Get-Process | Where-Object { ($_.ProcessName -like 'QQ*' -or "
-                "$_.ProcessName -like '*NapCat*') -and $_.MainWindowHandle -ne 0 } | "
+                "Get-Process | Where-Object { ($_.MainWindowTitle -like "
+                "'*YHLZ-NapCat*' -or $_.ProcessName -like 'QQ*' -or "
+                "$_.ProcessName -like '*NapCat*') -and "
+                "$_.MainWindowHandle -ne 0 } | "
                 "ForEach-Object { [N.W]::SetForegroundWindow($_.MainWindowHandle) }"
             )
             subprocess.run(["powershell", "-NoProfile", "-Command", ps],
@@ -660,7 +662,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                                    capture_output=True)
                 subprocess.Popen(["cmd", "/c", str(launch), "3655185302"],
                                  cwd=str(shell), close_fds=True)
-                _bring_qq_front()
+                _bring_qq_front(delay=12)
                 _log("control", "napcat_login")
                 return {"ok": True,
                         "note": "已唤起 NapCat，请在弹出的窗口登录元亨号 3655185302"}
