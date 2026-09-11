@@ -54,6 +54,12 @@ def create(tag: str = "") -> str:
     except Exception:
         return ""
     prune()
+    try:
+        from backend import growth_log
+
+        growth_log.record("快照", f"{ts}" + (f"（{tag}）" if tag else ""))
+    except Exception:
+        pass
     return str(dest)
 
 

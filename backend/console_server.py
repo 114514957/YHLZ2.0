@@ -200,7 +200,7 @@ GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
           "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html",
-          "/emotion", "/qq-qrcode"}
+          "/emotion", "/qq-qrcode", "/growth"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session",
@@ -348,6 +348,13 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, self._monitor())
         elif p == "/ledger":
             self._send_json(200, self._ledger())
+        elif p == "/growth":
+            try:
+                from backend import growth_log
+
+                self._send_json(200, {"items": growth_log.recent(30)})
+            except Exception as exc:
+                self._send_json(200, {"items": [], "error": type(exc).__name__})
         elif p == "/mem":
             self._send_json(200, self._mem())
         elif p == "/sessions":

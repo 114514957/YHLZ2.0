@@ -69,6 +69,12 @@ def add(name: str, category: str = "其他", strength: float = 0.5,
             PRIORITY.get(category, PRIORITY.get(channel, 40)), note)
     drives.append(d)
     save(drives)
+    try:
+        from backend import growth_log
+
+        growth_log.record("内在因", f"新增 {name}（{category}）", source=channel)
+    except Exception:
+        pass
     return d
 
 

@@ -198,6 +198,12 @@ def memory_save(content: str, kind: str = "preference", importance: int = 0,
     svc.store_item(item)
     _memory_fault_alert(content_txt)
     try:
+        from backend import growth_log
+
+        growth_log.record("记忆", content_txt, source=str(source or ""))
+    except Exception:
+        pass
+    try:
         from backend.vector_memory import vec_add
 
         vec_add("l2", item.id, f"{item.summary} {item.keywords}".strip())
@@ -751,6 +757,14 @@ def approve_act(index: int, ok: bool) -> str:
             used = [str(i) for i in entry.get("item_ids", [])]
             n = pc._apply([entry], version, used)
             msg = f"已批准写入认知根基（v{version}）" if n else "写入失败"
+            if n:
+                try:
+                    from backend import growth_log
+
+                    growth_log.record("认知", str(entry.get("claim", ""))[:100],
+                                      source="老爹批准")
+                except Exception:
+                    pass
         else:
             pend.pop(index)
             PENDING_FILE.write_text(json.dumps(pend, ensure_ascii=False, indent=1),
@@ -937,6 +951,12 @@ def _write_skill_draft(name: str, trigger: str, steps: str) -> str:
         f"# 技能申请：{n}\n\n触发场景：{trig}\n\n步骤：\n{st}\n\n状态：待老爹批准\n",
         encoding="utf-8",
     )
+    try:
+        from backend import growth_log
+
+        growth_log.record("技能", n, detail=trig[:80], source="待批")
+    except Exception:
+        pass
     return str(f)
 
 

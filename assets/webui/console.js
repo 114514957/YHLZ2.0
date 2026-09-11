@@ -5,7 +5,22 @@ const msgs = $("msgs");
 let busy = false;
 let stage = "idle";
 const bc = "BroadcastChannel" in window ? new BroadcastChannel("yhlz-avatar") : null;
-function bcStage(v) { if (bc) { try { bc.postMessage({ stage: v }); } catch (e) {} } }
+function bcStage(v) { if (bc) { try { bc.postMessage({ stage: v });   } catch (e) {}
+}
+
+async function loadGrowth() {
+  try {
+    const r = await (await fetch("/growth", { cache: "no-store" })).json();
+    const ul = $("growthList");
+    if (!ul) return;
+    ul.innerHTML = "";
+    for (const line of (r.items || []).slice(-8)) {
+      const li = document.createElement("li");
+      li.textContent = line.replace(/^-\s*/, "");
+      ul.appendChild(li);
+    }
+  } catch (e) {}
+} }
 
 function setLamp(id, state) {
   const el = $(id);
@@ -374,7 +389,7 @@ loadSettings();
 loadSessions();
 loadDashboard();
 loadLogs();
-setInterval(() => { loadDashboard(); loadLogs(); }, 3000);
+setInterval(() => { loadDashboard(); loadLogs(); loadGrowth(); }, 3000);
 window.addEventListener("load", () => {
   setTimeout(() => {
     const b = $("boot");
