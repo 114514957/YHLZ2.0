@@ -21,6 +21,35 @@ LLMTurn = Callable[
 
 Approver = Callable[[dict[str, Any]], Awaitable[bool]]
 
+# mid-loop compaction budget (chars) — 长任务防上下文溢出
+CTX_BUDGET_CHARS = int(os.getenv("YHLZ_CTX_BUDGET", "16000"))
+
+
+def _chars(messages: list[dict[str, Any]]) -> int:
+    return sum(len(str(m.get("content") or "")) for m in messages)
+
+
+async def _compact(messages: list[dict[str, Any]], llm_turn: Any) -> list[dict[str, Any]]:
+    """Summarize the middle of a long message list into one system note."""
+    systems = [m for m in messages if m.get("role") == "system"]
+    rest = [m for m in messages if m.get("role") != "system"]
+    if len(rest) <= 3:
+        return messages
+    body = "\n".join(f"{m.get('role')}: {str(m.get('content') or '')[:300]}"
+                     for m in rest[:-2])
+    summary = ""
+    try:
+        msg = await llm_turn([{"role": "user",
+                               "content": "把下面这段任务过程压缩成≤150字的要点，"
+                                          "保留关键结论与事实，只输出要点：\n"
+                                          + body[:4000]}], [])
+        summary = str(msg.get("content") or "").strip()[:300]
+    except Exception:
+        summary = body[:300]
+    return (systems
+            + [{"role": "system", "content": "（此前过程摘要）" + summary}]
+            + rest[-2:])
+
 
 def _strip_leaked_toolcall(content: str) -> str:
     """Remove provider-native tool-call text leaked when no tool schema was
@@ -333,6 +362,8 @@ class TurnOrchestrator:
                         )[:4000],
                     }
                 )
+            if _chars(messages) > CTX_BUDGET_CHARS:
+                messages = await _compact(messages, llm_turn)
         if not answer:
             # one recovery attempt: force a direct, tool-free answer (guards
             # against empty final content, e.g. reasoning eating all tokens)
