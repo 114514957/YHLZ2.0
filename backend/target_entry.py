@@ -313,6 +313,14 @@ class ConversationSession:
             except Exception:
                 pass
             try:
+                from backend import associations
+
+                asc = associations.context_for(text)
+                if asc:
+                    ctx_lines.append(asc)
+            except Exception:
+                pass
+            try:
                 from backend import intrinsic_drives
 
                 drv = intrinsic_drives.inject_block()
