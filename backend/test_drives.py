@@ -47,6 +47,23 @@ class DrivesTest(unittest.TestCase):
         s2 = [x for x in drv.load() if x["id"] == d["id"]][0]["strength"]
         self.assertLess(s2, s)
 
+    def test_dad_direction_and_constitutional_no_decay(self):
+        drv.seed_defaults()
+        self.assertEqual(drv.dad_direction("我希望你去多学点哲学"), 1)
+        self.assertIn("老爹的方向期待", {d["name"] for d in drv.load()})
+        # 期待 category 不衰减（宪法式）
+        ds = drv.load()
+        for d in ds:
+            if d["category"] == "期待":
+                d["strength"] = 0.06
+        drv.save(ds)
+        drv.decay(now=time.time() + 365 * 86400)
+        for d in drv.load():
+            if d["category"] == "期待":
+                self.assertEqual(d["status"], "active")
+        # 冲突时老爹优先：注入里点明
+        self.assertIn("以老爹的期待为先", drv.inject_block())
+
 
 if __name__ == "__main__":
     unittest.main()

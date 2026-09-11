@@ -353,6 +353,7 @@ class ConversationSession:
                 from backend import intrinsic_drives
 
                 intrinsic_drives.observe(text, result.answer)
+                intrinsic_drives.dad_direction(text)
             except Exception:
                 pass
         if self.memory._summary_pending:

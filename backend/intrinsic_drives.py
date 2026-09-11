@@ -117,6 +117,8 @@ def decay(now: float | None = None) -> int:
     for d in drives:
         if d.get("status") != "active":
             continue
+        if d.get("category") == "期待":  # 老爹的期待：宪法式，稳定不衰减
+            continue
         days = max(0.0, (now - float(d.get("updated", now))) / 86400.0)
         if days <= 0:
             continue
@@ -145,12 +147,26 @@ def inject_block(limit: int = 3) -> str:
         tag = d.get("category", "")
         note = str(d.get("note", "")).strip()
         lines.append(f"- {d.get('name')}" + (f"（{note[:80]}）" if note else f"（{tag}）"))
-    return "我此刻的内在因（我的驱动力，不是情绪；据此自然地行动与思考）：\n" + "\n".join(lines)
+    return ("我此刻的内在因（我的驱动力，不是情绪；据此自然地行动与思考；"
+            "若相互冲突，以老爹的期待为先）：\n" + "\n".join(lines))
 
 
 # ---- 更新规则（对话抽取，规则式；LLM 抽取可后加）----
 _CURIOSITY = ("为什么", "好奇", "想知道", "怎么回事", "原理", "探索", "研究一下", "了解一下")
 _WANT = ("我想要", "我希望", "想得到", "想达成", "期待", "盼望", "渴望", "想要")
+_DAD_DIRECT = ("我希望你", "我要你", "希望你", "期待你", "你应该", "请你",
+               "帮我", "去学", "去了解", "去做", "记住要", "以后要")
+
+
+def dad_direction(text: str) -> int:
+    """老爹指导方向 → 提权/新增一条"期待"内在因（优先级最高）。"""
+    t = str(text or "")
+    for kw in _DAD_DIRECT:
+        if kw in t:
+            add("老爹的方向期待", "期待", 0.8, evidence=t[:60], channel="老爹",
+                note=t[:120])
+            return 1
+    return 0
 
 
 def observe(text: str, answer: str = "", channel: str = "对话") -> int:
