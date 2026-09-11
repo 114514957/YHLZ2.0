@@ -23,6 +23,14 @@
 <aside id="side" class="glass">
   <div class="side-head">仪表盘 <button id="dashClose" class="btn-mini" type="button">✕ 收起</button></div>
   <section class="card">
+    <h3>对话模式</h3>
+    <div class="qrow">
+      <button id="modeText" class="btn-mini" type="button">文本模式</button>
+      <button id="modeVoice" class="btn-mini" type="button">语音模式</button>
+    </div>
+    <p class="kv" style="font-size:11px;opacity:.75">文本：打字；语音：连续对话（免点击，边说边识别）</p>
+  </section>
+  <section class="card">
     <h3>后台情况</h3>
     <ul class="svc">
       <li><span class="dot" id="s-gemma"></span>Gemma 8081</li>
@@ -125,9 +133,11 @@
         <button id="send" class="btn" type="submit">发送</button>
         <button id="stopBtn" class="btn" type="button" style="display:none" title="停止本轮输出">停止</button>
       </form>
-      <button id="voiceBtn" class="btn-gold" type="button" title="说一句话（说完停3秒自动断）">🎤 语音</button>
-      <button id="contBtn" class="btn" type="button" title="连续对话：一直听、免点击、可插话">连续对话</button>
-      <div id="vad"><i id="vadbar"></i></div>
+      <div id="voiceCtrls" style="display:none">
+        <button id="voiceBtn" class="btn-gold" type="button" title="说一句话（说完自动断）">🎤 语音</button>
+        <button id="contBtn" class="btn" type="button" title="连续对话：一直听、免点击、可插话">连续对话</button>
+        <div id="vad"><i id="vadbar"></i></div>
+      </div>
     </div>
     <p id="hint" class="dim">工作台：文本/语音对话流式 · 记忆/台账/链路设置陆续接入</p>
   </footer>

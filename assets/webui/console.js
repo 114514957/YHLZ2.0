@@ -452,6 +452,25 @@ inp.value = localStorage.getItem("yh_draft") || "";
 autoGrow();
 inp.focus();
 
+/* ---------- 对话模式：文本 / 语音 ---------- */
+let mode = localStorage.getItem("yh_mode") || "text";
+function setMode(m) {
+  mode = m;
+  localStorage.setItem("yh_mode", m);
+  const t = $("talk"), v = $("voiceCtrls");
+  if (t) t.style.display = m === "text" ? "flex" : "none";
+  if (v) v.style.display = m === "voice" ? "flex" : "none";
+  $("modeText").classList.toggle("on", m === "text");
+  $("modeVoice").classList.toggle("on", m === "voice");
+  if (m === "text") { try { inp.focus(); } catch (e) {} }
+}
+$("modeText").addEventListener("click", () => {
+  if (voiceAbort) { try { voiceAbort.abort(); } catch (e) {} }
+  setMode("text");
+});
+$("modeVoice").addEventListener("click", () => setMode("voice"));
+setMode(mode);
+
 loadHistory();
 loadSettings();
 loadSessions();
