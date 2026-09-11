@@ -507,6 +507,39 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             out["error"] = f"{type(exc).__name__}: {str(exc)[:100]}"
         return out
 
+    def _listen_wav(self, path, on_segment=None, on_chunk=None) -> dict:
+        """Test-only: feed a wav file as if it were live mic audio (16k mono)."""
+        import subprocess
+        import tempfile
+        import wave
+
+        import numpy as np
+
+        try:
+            import imageio_ffmpeg
+
+            exe = imageio_ffmpeg.get_ffmpeg_exe()
+            out = Path(tempfile.mkdtemp()) / "a16.wav"
+            subprocess.run([exe, "-y", "-i", str(path), "-ac", "1", "-ar",
+                            "16000", str(out)], capture_output=True)
+            with wave.open(str(out), "rb") as w:
+                audio = np.frombuffer(w.readframes(w.getnframes()),
+                                      dtype="<i2").astype("float32") / 32768.0
+        except Exception:
+            return {"started": False, "audio": None}
+        for i in range(0, len(audio), 1600):
+            if on_chunk is not None:
+                try:
+                    on_chunk(audio[i:i + 1600])
+                except Exception:
+                    pass
+        if on_segment is not None and len(audio) > 0:
+            try:
+                on_segment(audio)
+            except Exception:
+                pass
+        return {"started": True, "audio": audio}
+
     def _do_voice(self):
         """One voice turn over SSE: listen(gated 3s) -> SenseVoice -> LLM
         stream -> TTS speak. {text} present => mock mode (skip mic, use text)."""
@@ -581,6 +614,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
                 # V3: streaming ASR for live partial (sherpa zh-en), fed by chunks
                 _sherpa = _get_sherpa()
+                _log("voice_sherpa", "ok" if _sherpa is not None else "none")
                 sherpa_q: "_queue.Queue" = _queue.Queue()
                 if _sherpa is not None:
                     def _sherpa_worker():
@@ -589,7 +623,9 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                         sig = CancellationSignal()
                         try:
                             _sherpa.open_stream("cap", 1, 16000, 1, sig)
-                        except Exception:
+                            _log("voice_sherpa", "stream ready")
+                        except Exception as e:  # noqa: BLE001
+                            _log("voice_sherpa", "open fail " + type(e).__name__)
                             return
                         last = ""
                         while True:
@@ -602,6 +638,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                                     if t and t != last:
                                         last = t
                                         emit({"type": "partial", "text": t})
+                                        _log("voice_partial", t[:30])
                             except Exception:
                                 pass
                     _th.Thread(target=_sherpa_worker, daemon=True).start()
@@ -824,6 +861,11 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
     def _listen(self, body, st: dict, on_segment=None, on_chunk=None) -> dict:
         from tools.tts_test_start import _capture_loop
+
+        # offline test path: feed a wav file instead of the mic
+        wav = str(body.get("wav", "") or "")
+        if wav and Path(wav).exists():
+            return self._listen_wav(wav, on_segment, on_chunk)
 
         device = int(body.get("device", st.get("device", 1)))
         dur = float(body.get("duration", st.get("duration", 60.0)))
