@@ -421,6 +421,12 @@ class DaemonRuntime:
                     intrinsic_drives.decay()
                 except Exception:
                     pass
+                try:
+                    from backend import communities
+
+                    communities.build(force=True)
+                except Exception:
+                    pass
             except Exception as exc:
                 print(f"[memory-upkeep] skip: {type(exc).__name__}", flush=True)
 

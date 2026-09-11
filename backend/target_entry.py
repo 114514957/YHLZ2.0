@@ -321,6 +321,14 @@ class ConversationSession:
             except Exception:
                 pass
             try:
+                from backend import communities
+
+                cm = communities.context_for(text)
+                if cm:
+                    ctx_lines.append(cm)
+            except Exception:
+                pass
+            try:
                 from backend import intrinsic_drives
 
                 drv = intrinsic_drives.inject_block()
