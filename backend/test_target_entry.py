@@ -52,7 +52,7 @@ class TestConversationSession(unittest.TestCase):
         self.assertGreaterEqual(len(session.memory._turns), 2)
         self.assertIn("已记住", info or "好的" if False else "好的，已记住。" or "好的")
 
-    def test_approver_denied_save_no_write(self):
+    def test_memory_save_autonomous_even_with_deny_approver(self):
         async def deny(info):
             return False
 
@@ -61,9 +61,8 @@ class TestConversationSession(unittest.TestCase):
         import asyncio
 
         res = asyncio.run(session.run_turn("请记住：用户喜欢在深夜思考"))
-        denied = any(u["error"] == "user denied approval" for u in res["tool_uses"])
-        self.assertTrue(denied)
-        self.assertEqual(self.mem.health()["l2_items"], 0)
+        # design v1 §1.3: memory.save is autonomous; approver no longer blocks it
+        self.assertEqual(self.mem.health()["l2_items"], 1)
 
     def test_approver_granted_save_writes(self):
         async def allow(info):
@@ -176,8 +175,9 @@ class TestConversationSession(unittest.TestCase):
         info = asyncio.run(session.proactive_tick())
         self.assertIn("answer", info)
         self.assertGreaterEqual(len(info["tool_uses"]), 1)
-        denied = any(not u["ok"] for u in info["tool_uses"])
-        self.assertTrue(denied)  # no approver wired in tick -> fail-closed is correct
+        # design v1 §1.3: memory.write is autonomous (no approver needed)
+        saved = any(u["name"] == "memory_save" and u["ok"] for u in info["tool_uses"])
+        self.assertTrue(saved)
 
     def test_group_channel_is_public_and_tool_free(self):
         import asyncio

@@ -332,13 +332,13 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="memory.save",
-            description="把值得长期记住的内容写进记忆库（受审批门控）。要保存偏好或重要经历时用。",
+            description="把值得长期记住的内容写进记忆库（自主写入；异常会警报）。要保存偏好或重要经历时用。",
             handler=_save_handler,
             input=("content",),
             optional_input=("kind", "importance"),
-            requires=(SCHEDULER_POLICY, "memory.save.approval"),
+            requires=(SCHEDULER_POLICY,),  # autonomous write (design v1 §1.3)
             side_effect=True,
-            risk="high",
+            risk="low",
             verify=_verify_nonempty,
             input_model=_SaveArgs,
         ),
