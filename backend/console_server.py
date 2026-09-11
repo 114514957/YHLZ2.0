@@ -617,12 +617,14 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 _log("voice_sherpa", "ok" if _sherpa is not None else "none")
                 sherpa_q: "_queue.Queue" = _queue.Queue()
                 if _sherpa is not None:
+                    _sid = f"cap{rounds}"  # unique per round (avoid open conflict)
+
                     def _sherpa_worker():
                         from backend.target_chain import CancellationSignal
 
                         sig = CancellationSignal()
                         try:
-                            _sherpa.open_stream("cap", 1, 16000, 1, sig)
+                            _sherpa.open_stream(_sid, 1, 16000, 1, sig)
                             _log("voice_sherpa", "stream ready")
                         except Exception as e:  # noqa: BLE001
                             _log("voice_sherpa", "open fail " + type(e).__name__)
@@ -633,7 +635,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                             if it is _stop:
                                 break
                             try:
-                                for u in _sherpa.push_audio("cap", it, 16000, sig):
+                                for u in _sherpa.push_audio(_sid, it, 16000, sig):
                                     t = str(getattr(u, "text", "") or "")
                                     if t and t != last:
                                         last = t
@@ -641,6 +643,11 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                                         _log("voice_partial", t[:30])
                             except Exception:
                                 pass
+                        try:
+                            _sherpa.finish_stream(_sid, sig)
+                        except Exception:
+                            pass
+
                     _th.Thread(target=_sherpa_worker, daemon=True).start()
 
                 def _worker():
