@@ -149,8 +149,8 @@ def _memory_fault_alert(content: str) -> None:
 
 
 def memory_save(content: str, kind: str = "preference", importance: int = 0,
-                service: Any = None) -> str:
-    """Save a notable item into long-term memory (user consent required)."""
+                service: Any = None, source: str = "") -> str:
+    """Save a notable item into long-term memory (自主写入)."""
     import hashlib
     import time as _time
 
@@ -177,6 +177,7 @@ def memory_save(content: str, kind: str = "preference", importance: int = 0,
         keywords=content_txt[:40].replace(" ", ""),
         evidence_ref="memory.save:user-approved",
         created_at=_time.time(),
+        source=str(source or ""),
     )
     from difflib import SequenceMatcher
     import sqlite3 as _sqlite3
@@ -263,7 +264,8 @@ def _save_handler(params: dict[str, Any]) -> str:
     )
 
 
-def bind_memory_save_service(registry: CapabilityRegistry, service: Any) -> None:
+def bind_memory_save_service(registry: CapabilityRegistry, service: Any,
+                             source: str = "") -> None:
     """Rebind memory.save handler to a session-owned memory service."""
     cap = registry.get("memory.save")
     if cap is None:
@@ -276,6 +278,7 @@ def bind_memory_save_service(registry: CapabilityRegistry, service: Any) -> None
                 str(p.get("kind", "preference")),
                 int(p.get("importance", 0) or 0),
                 service=service,
+                source=str(p.get("source", "") or source),
             ),
             input=cap.input,
             optional_input=cap.optional_input,

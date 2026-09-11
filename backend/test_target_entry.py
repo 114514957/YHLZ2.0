@@ -201,8 +201,9 @@ class TestConversationSession(unittest.TestCase):
 
         class _Cap:
             async def __call__(self, messages, tools):
-                seen["tools"] = tools
-                seen["system"] = messages[0]["content"]
+                if "tools" not in seen:  # first (orchestrator) call only
+                    seen["tools"] = tools
+                    seen["system"] = messages[0]["content"]
                 return {"content": "你好呀", "tool_calls": []}
 
         grp = ConversationSession(memory=self.mem, registry=self.reg,
@@ -215,6 +216,7 @@ class TestConversationSession(unittest.TestCase):
         self.assertIn("公共频道", seen["system"])       # public clause on
         self.assertFalse(grp._is_owner())
 
+        seen.clear()
         owner = ConversationSession(memory=self.mem, registry=self.reg,
                                     llm_turn=_Cap(),
                                     channel="qq_p2258374446")
@@ -223,6 +225,39 @@ class TestConversationSession(unittest.TestCase):
         self.assertIn("memory_save", onames)           # owner keeps full tools
         self.assertNotIn("公共频道", seen["system"])
         self.assertTrue(owner._is_owner())
+
+
+    def test_group_promote_writes_owner_with_source(self):
+        import asyncio
+        import json
+        import sqlite3
+
+        import backend.target_memory as tm
+
+        tmp = self.tmp / "owner.db"
+        real = tm.TargetMemoryService
+
+        class _Fake(real):
+            def __init__(self, *a, **k):
+                super().__init__(db_path=tmp)
+
+        tm.TargetMemoryService = _Fake
+        try:
+            class _LLM:
+                async def __call__(self, messages, tools):
+                    return {"content": json.dumps(
+                        [{"summary": "群友分享的 Python 技巧", "kind": "fact"}])}
+
+            sess = ConversationSession(memory=self.mem, registry=self.reg,
+                                       llm_turn=_LLM(), channel="qq_g123")
+            n = asyncio.run(sess._promote_group("群里聊到 Python", "是个好技巧"))
+            self.assertGreaterEqual(n, 1)
+            con = sqlite3.connect(str(tmp))
+            row = con.execute("SELECT source FROM l2_items LIMIT 1").fetchone()
+            con.close()
+            self.assertEqual(row[0], "群聊")
+        finally:
+            tm.TargetMemoryService = real
 
 
 if __name__ == "__main__":

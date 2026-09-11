@@ -64,6 +64,7 @@ class L2Item:
     access_count: int = 0
     last_accessed: float = 0.0
     salience: float = 0.5  # 0..1 情感/理想显著度：越高越难忘（design v1 §1.1）
+    source: str = ""       # 学习来源（老爹/agent/QQ群/未来渠道）P3
 
     def to_dict(self) -> dict:
         return {
@@ -82,6 +83,7 @@ class L2Item:
             "access_count": self.access_count,
             "last_accessed": self.last_accessed,
             "salience": self.salience,
+            "source": self.source,
         }
 
 
@@ -145,6 +147,7 @@ class TargetMemoryService:
                 ("evidence_count", "INTEGER NOT NULL DEFAULT 0"),
                 ("belief_updated", "REAL NOT NULL DEFAULT 0"),
                 ("salience", "REAL NOT NULL DEFAULT 0.5"),
+                ("source", "TEXT NOT NULL DEFAULT ''"),
             ):
                 if name not in cols:
                     con.execute(f"ALTER TABLE l2_items ADD COLUMN {name} {decl}")
@@ -458,21 +461,22 @@ class TargetMemoryService:
                 con.execute(
                     """
                     INSERT INTO l2_items
-                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                       tier=excluded.tier, type=excluded.type,
                       importance=excluded.importance, summary=excluded.summary,
                       content_hash=excluded.content_hash, keywords=excluded.keywords,
                       status=excluded.status, evidence_ref=excluded.evidence_ref,
                       version=excluded.version, obsolete_of=excluded.obsolete_of,
-                      salience=excluded.salience
+                      salience=excluded.salience, source=excluded.source
                     """,
                     (
                         item.id, item.tier, item.type, item.importance, item.summary,
                         item.content_hash, item.keywords, item.status, item.evidence_ref,
                         item.created_at, item.version, item.obsolete_of, 0, 0.0,
                         0.5, 0, time.time(), float(getattr(item, "salience", 0.5)),
+                        str(getattr(item, "source", "") or ""),
                     ),
                 )
                 con.execute("INSERT OR REPLACE INTO l2_fts(sid, keywords, summary) VALUES (?,?,?)",
@@ -699,14 +703,16 @@ class TargetMemoryService:
                 con.execute(
                     """
                     INSERT OR REPLACE INTO l2_items
-                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """,
                     (
                         item.id, item.tier, item.type, item.importance, item.summary,
                         item.content_hash, item.keywords, item.status,
                         item.evidence_ref, item.created_at, item.version,
                         item.obsolete_of, 0, now, 0.5, 0, now,
+                        float(getattr(item, "salience", 0.5)),
+                        str(getattr(item, "source", "") or ""),
                     ),
                 )
                 con.execute(

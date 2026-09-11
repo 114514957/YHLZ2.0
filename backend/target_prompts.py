@@ -152,6 +152,14 @@ MEMORY_L2_CANDIDATE_PROMPT = (
     "（均归为 preference）。只输出 JSON 数组，字段："
     '{"type":...,"importance":...,"summary":...,"keywords":...}。\n'
 )
+GROUP_PROMOTE_PROMPT = (
+    "下面是一段群聊（元亨与群友）。请提取其中**可内化**的要点——只限："
+    "技术知识、说话风格、做事方法、哲学思考；**绝不包含任何私人信息**"
+    "（关于老爹/元亨的隐私、私密偏好、项目内部记录）。"
+    "输出 JSON 数组，每项 {\"summary\":\"≤50字\",\"kind\":\"fact|preference\"}；"
+    "没有可内化的就输出 []。不要输出别的。\n文本：<TEXT>"
+)
+
 MEMORY_L2_JUDGE_PROMPT = (
     "你是记忆裁决官。根据条目与用户既有信息判断 importance 维持1-10；status ∈ "
     "active|downgraded|cold|archive（只在证据支持时降档；绝不删除）。"

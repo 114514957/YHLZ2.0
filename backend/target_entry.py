@@ -101,7 +101,10 @@ class ConversationSession:
         self._reviewing = False
         self.style_inject = True  # style persona injection (A/B accepted, 0242)
         self.registry = registry if registry is not None else setup_scheduler_capabilities()
-        bind_memory_save_service(self.registry, self.memory)
+        _src = ("老爹" if self._is_owner()
+                else "群聊" if str(self.channel).startswith("qq_g")
+                else str(self.channel))
+        bind_memory_save_service(self.registry, self.memory, source=_src)
         from backend.target_orchestrator import build_openai_compatible_llm_turn
         from backend.env_loader import ensure_env_loaded
         from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
@@ -356,6 +359,14 @@ class ConversationSession:
                 intrinsic_drives.dad_direction(text)
             except Exception:
                 pass
+        if str(self.channel).startswith("qq_g"):
+            # P3b: group chats selectively internalize (tech/style/method/
+            # philosophy only; never private) into the OWNER memory, sourced.
+            try:
+                self._summary_tasks.append(asyncio.ensure_future(
+                    self._promote_group(text, result.answer)))
+            except Exception:
+                pass
         if self.memory._summary_pending:
             self._summary_tasks.append(asyncio.ensure_future(self.memory.process_summary()))
         if (not self._reviewing and
@@ -566,6 +577,37 @@ class ConversationSession:
             return out
         except Exception:
             return []
+
+    async def _promote_group(self, text: str, answer: str) -> int:
+        """P3b: extract tech/style/method/philosophy from a group turn and
+        internalize into the owner memory (source='群聊'); never private."""
+        try:
+            import json as _j
+
+            from backend.target_memory import TargetMemoryService
+            from backend.target_prompts import GROUP_PROMOTE_PROMPT
+            from backend.target_scheduler_tools import memory_save
+
+            prompt = GROUP_PROMOTE_PROMPT.replace(
+                "<TEXT>", (str(text) + "\n" + str(answer))[:800])
+            msg = await self.llm_turn([{"role": "user", "content": prompt}], [])
+            raw = str(msg.get("content") or "")
+            a, b = raw.find("["), raw.rfind("]")
+            if a < 0 or b < a:
+                return 0
+            data = _j.loads(raw[a:b + 1])
+            owner = TargetMemoryService()
+            n = 0
+            for it in (data if isinstance(data, list) else []):
+                s = str((it or {}).get("summary") or "").strip()
+                if not s:
+                    continue
+                memory_save(s, kind=str(it.get("kind") or "fact"), importance=5,
+                            service=owner, source="群聊")
+                n += 1
+            return n
+        except Exception:
+            return 0
 
     def autonomy_prompt(self, question: str,
                         extra: str = "") -> str:

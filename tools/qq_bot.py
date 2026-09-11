@@ -399,6 +399,16 @@ class QQBridge:
         msg = f"[opencode] {tag}\n{text}"
         if status == "done" and hint:
             msg += "\n\n回 #y 提交 / #n 不提交 / #push 推送"
+            try:
+                # P3c: internalize dev experience with source='agent'
+                from backend.target_memory import TargetMemoryService
+                from backend.target_scheduler_tools import memory_save
+
+                memory_save(f"开发经验（opencode）：{str(text)[:80]}",
+                            kind="event", importance=4,
+                            service=TargetMemoryService(), source="agent")
+            except Exception:
+                pass
         await self._say(ws, params, msg)
 
     def _spawn(self, ws, params, fn, hint: bool = True) -> None:
