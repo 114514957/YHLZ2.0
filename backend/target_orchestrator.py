@@ -60,6 +60,9 @@ def _strip_leaked_toolcall(content: str) -> str:
     if "<|tool_call" in c or "<tool_call" in c:
         c = re.sub(r"<\|?tool_call.*?(\|>|>)", " ", c, flags=re.S)
         c = re.sub(r"<\|?tool_call.*", " ", c, flags=re.S)
+    if "[[tool_code" in c or "tool_code:" in c:
+        c = re.sub(r"\[\[tool_code.*?\]\]", " ", c, flags=re.S)
+        c = re.sub(r"\[\[tool_code.*", " ", c, flags=re.S)
     return c.strip()
 
 

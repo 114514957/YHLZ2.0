@@ -233,6 +233,7 @@ class ConversationSession:
         "日记", "安排",
         "以前", "提过", "说过", "回忆", "想起", "记不记得", "还记得",
         "哪些", "关系", "问过", "聊过", "提过什么",
+        "审批", "批准", "待批", "待审", "认知候选", "技能草稿", "owner_approve",
     )
 
     @classmethod
@@ -358,6 +359,17 @@ class ConversationSession:
                     ctx_lines.append(cm)
             except Exception:
                 pass
+            _ap = ("审批", "待批", "待审", "批准", "拒绝", "认知候选", "技能草稿")
+            if any(k in text for k in _ap):
+                try:
+                    from backend.target_scheduler_tools import approve_handle
+
+                    lst = approve_handle("list")
+                    if lst and "没有待" not in lst:
+                        ctx_lines.append(
+                            "（当前待批清单，请**如实汇报**、不要编造）：\n" + lst[:900])
+                except Exception:
+                    pass
             try:
                 from backend import intrinsic_drives
 
