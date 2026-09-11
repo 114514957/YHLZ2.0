@@ -37,17 +37,27 @@ function setVad(level, speech) {
   b.style.width = w;
   b.classList.toggle("hot", !!speech);
 }
+let nearBottom = true;
+function atBottom() { return msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 60; }
+function scrollBottom() { msgs.scrollTop = msgs.scrollHeight; }
+function follow() {
+  if (nearBottom) { scrollBottom(); }
+  else { const b = $("toBottom"); if (b) b.style.display = "block"; }
+}
 function addMsg(role, who, text) {
   const d = document.createElement("div");
   d.className = "msg " + (role === "u" ? "u" : "a");
   const w = document.createElement("div"); w.className = "who"; w.textContent = who;
-  const t = document.createElement("div"); t.textContent = text;
+  const t = document.createElement("div"); t.className = "body"; t.textContent = text;
   d.appendChild(w); d.appendChild(t);
   msgs.appendChild(d);
-  msgs.scrollTop = msgs.scrollHeight;
+  follow();
   return t;
 }
-function busyOn(v) { busy = v; $("send").disabled = v; $("voiceBtn").disabled = v; }
+function busyOn(v) {
+  busy = v; $("send").disabled = v; $("voiceBtn").disabled = v;
+  $("stopBtn").style.display = v ? "inline-block" : "none";
+}
 function setStage(v) { stage = v; setLamp("l-busy", v); bcStage(v); }
 
 /* ---------- dashboard drawer ---------- */
@@ -317,14 +327,16 @@ async function streamFetch(path, payload, ev) {
 async function talk(text) {
   busyOn(true); setStage("busy");
   const box = addMsg("a", "元亨", "");
+  box.classList.add("streaming");
   await streamFetch("/talk", { text }, {
     state: (e) => setStage(e.value),
-    delta: (e) => { box.textContent += e.delta || ""; },
+    delta: (e) => { box.textContent += e.delta || ""; follow(); },
     turn_done: (e) => {
+      box.classList.remove("streaming");
       if (e.text) box.textContent = e.text;
       emote(e.text || box.textContent);
     },
-    error: (e) => { box.textContent = "(出错) " + (e.message || ""); },
+    error: (e) => { box.classList.remove("streaming"); box.textContent = "(出错) " + (e.message || ""); },
   });
   busyOn(false); setStage("idle"); loadDashboard();
 }
@@ -377,15 +389,55 @@ async function loadHistory() {
   } catch (e) {}
 }
 
-$("talk").addEventListener("submit", (ev) => {
-  ev.preventDefault();
-  const v = $("in").value.trim();
+msgs.addEventListener("scroll", () => {
+  nearBottom = atBottom();
+  const b = $("toBottom");
+  if (b) b.style.display = nearBottom ? "none" : "block";
+});
+$("toBottom").addEventListener("click", () => {
+  scrollBottom(); nearBottom = true; $("toBottom").style.display = "none";
+});
+$("stopBtn").addEventListener("click", async () => {
+  try {
+    await fetch("/control", { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancel_turn", channel: "console" }) });
+  } catch (e) {}
+});
+
+const _sent = [];
+const inp = $("in");
+function autoGrow() {
+  inp.style.height = "auto";
+  inp.style.height = Math.min(140, inp.scrollHeight) + "px";
+}
+function sendNow() {
+  const v = inp.value.trim();
   if (!v || busy) return;
   addMsg("u", "你", v);
-  $("in").value = "";
+  _sent.push(v);
+  inp.value = "";
+  inp.style.height = "auto";
+  localStorage.removeItem("yh_draft");
   talk(v);
+}
+inp.addEventListener("input", () => {
+  autoGrow();
+  localStorage.setItem("yh_draft", inp.value);
 });
+inp.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendNow(); }
+  else if (e.key === "ArrowUp" && inp.value === "" && _sent.length) {
+    e.preventDefault();
+    inp.value = _sent[_sent.length - 1];
+    autoGrow();
+  }
+});
+$("talk").addEventListener("submit", (ev) => { ev.preventDefault(); sendNow(); });
 $("voiceBtn").addEventListener("click", () => { if (!busy) voice(); });
+inp.value = localStorage.getItem("yh_draft") || "";
+autoGrow();
+inp.focus();
 
 loadHistory();
 loadSettings();

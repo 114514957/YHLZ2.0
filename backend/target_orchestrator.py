@@ -112,6 +112,7 @@ def build_openai_compatible_llm_turn(
     fallback_model: Optional[str] = None,
     on_delta: Optional[Callable[[str], None]] = None,
     reasoning_effort: Optional[str] = None,
+    should_stop: Optional[Callable[[], bool]] = None,
 ) -> LLMTurn:
     """Factory for the shared real-model turn path (OpenAI-compatible HTTP).
 
@@ -153,6 +154,7 @@ def build_openai_compatible_llm_turn(
                     temperature=float(temperature),
                     max_tokens=int(max_tokens),
                     reasoning_effort=reasoning_effort,
+                    should_stop=should_stop,
                 )
 
             try:
@@ -256,6 +258,7 @@ class TurnOrchestrator:
         early_context: str = "",
         images: Optional[list[str]] = None,
         allowed_tools: Optional[set] = None,
+        should_stop: Optional[Callable[[], bool]] = None,
     ) -> TurnResult:
         started = time.perf_counter()
         messages: list[dict[str, Any]] = [
@@ -290,6 +293,8 @@ class TurnOrchestrator:
         answer = ""
         iterations = 0
         for _ in range(self.max_tool_rounds + 1):
+            if should_stop is not None and should_stop():
+                break  # 优雅停止：保留已产出
             iterations += 1
             with_tools = iterations <= self.max_tool_rounds and bool(tools)
             if not with_tools and iterations > 1:

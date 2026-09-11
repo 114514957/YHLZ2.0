@@ -74,7 +74,7 @@ class ConversationSession:
         registry: Any = None,
         llm_turn: Any = None,
         approver: Optional[Approver] = None,
-        max_tool_rounds: int = 2,
+        max_tool_rounds: int = 4,
         history_limit: int = HISTORY_LIMIT,
         channel: str = "private",
     ) -> None:
@@ -248,6 +248,10 @@ class ConversationSession:
                        images: Optional[list] = None) -> dict[str, Any]:
         self.memory.append_turn(role="user", text=text)
         contradictions = await self._maybe_contradiction(text)
+        from backend import turn_control
+
+        turn_control.clear(self.channel)
+        _stop = lambda: turn_control.cancelled(self.channel)  # noqa: E731
         from backend.target_style import capture_style_signal
 
         capture_style_signal(text, self.memory)
@@ -284,6 +288,7 @@ class ConversationSession:
                 fallback_model=LOCAL_MODEL,
                 on_delta=on_delta,
                 reasoning_effort="medium",
+                should_stop=_stop,
             )
         elif not self._llm_injected and on_delta is not None:
             from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
@@ -299,6 +304,7 @@ class ConversationSession:
                 fallback_model=LOCAL_MODEL,
                 on_delta=on_delta,
                 reasoning_effort="none",
+                should_stop=_stop,
             )
         ctx_lines = []
         if self._is_owner():  # never inject private memory into public/group
@@ -387,6 +393,7 @@ class ConversationSession:
             early_context="\n".join(ctx_lines),
             images=images,
             allowed_tools=allowed_tools,
+            should_stop=_stop,
         )
         self.memory.append_turn(role="assistant", text=result.answer)
         # B1 skill learning: owner turns with a successful multi-tool chain

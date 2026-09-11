@@ -728,6 +728,15 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": True, "note": "已启动全家桶"}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
+        if action == "cancel_turn":
+            try:
+                from backend import turn_control
+
+                turn_control.request(str(body.get("channel", "console")))
+                _log("control", "cancel_turn")
+                return {"ok": True, "note": "已请求停止"}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"{type(exc).__name__}"}
         return {"ok": False, "error": "未知操作：" + action}
 
     def _listen(self, body, st: dict, on_segment=None) -> dict:

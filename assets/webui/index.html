@@ -114,12 +114,16 @@
 </aside>
 
 <main>
-  <section id="chat"><div id="msgs"></div></section>
+  <section id="chat">
+    <div id="msgs"></div>
+    <button id="toBottom" class="btn-mini" type="button" title="回到最底" style="display:none">↓ 回到最新</button>
+  </section>
   <footer>
     <div id="bar">
       <form id="talk">
-        <input id="in" type="text" autocomplete="off" placeholder="输入消息，回车发送…">
+        <textarea id="in" rows="1" autocomplete="off" placeholder="输入消息：回车发送 · Shift+回车换行"></textarea>
         <button id="send" class="btn" type="submit">发送</button>
+        <button id="stopBtn" class="btn" type="button" style="display:none" title="停止本轮输出">停止</button>
       </form>
       <button id="voiceBtn" class="btn-gold" type="button" title="说一句话（说完停3秒自动断）">🎤 语音</button>
       <div id="vad"><i id="vadbar"></i></div>

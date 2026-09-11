@@ -34,6 +34,7 @@ async def stream_openai_compatible(
     max_tokens: int = 1200,
     reasoning_effort: Optional[str] = None,
     extra_headers: Optional[dict] = None,
+    should_stop: Optional[Callable[[], bool]] = None,
 ) -> dict[str, Any]:
     """Consume an OpenAI-compatible stream and emit unified events.
 
@@ -69,6 +70,8 @@ async def stream_openai_compatible(
                                  headers=headers) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
+                if should_stop is not None and should_stop():
+                    break
                 if not line.startswith("data:"):
                     continue
                 data = line[5:].strip()
