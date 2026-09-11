@@ -573,6 +573,15 @@ class ConversationSession:
         now = _dt.datetime.now()
         lines = [question,
                  f"（现在是 {now:%Y-%m-%d %H:%M}）"]
+        try:
+            from backend import intrinsic_drives
+
+            drv = intrinsic_drives.inject_block()
+            if drv:
+                lines.append(drv + "\n（让这次自主由你的内在因驱动，"
+                                   "而不是泛泛地想；做完可自然更新它们。）")
+        except Exception:
+            pass
         hints = self._recall_hints(extra or question)
         if hints:
             lines.append("也许可以想起这些旧记忆（若相关，自然地想起、带出，"
@@ -580,7 +589,7 @@ class ConversationSession:
                          + "\n- ".join(hints))
         return "\n".join(lines)
 
-    async def proactive_tick(self, question: str = "根据最近积累的记忆，有什么值得主动整理或提醒的？",
+    async def proactive_tick(self, question: str = "你此刻的内在因在驱动你做什么？可去探索未知、推进你的渴望、或对齐老爹的期待。",
                              extra: str = "") -> dict[str, Any]:
         """Self-initiated turn (no user prompt): model reviews memory and may
         use tools; nothing is executed without gated approval.

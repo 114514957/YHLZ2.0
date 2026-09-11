@@ -179,6 +179,21 @@ class TestConversationSession(unittest.TestCase):
         saved = any(u["name"] == "memory_save" and u["ok"] for u in info["tool_uses"])
         self.assertTrue(saved)
 
+    def test_autonomy_prompt_includes_drives(self):
+        from backend import intrinsic_drives as drv
+
+        old = drv.DRIVES_FILE
+        drv.DRIVES_FILE = self.tmp / "drives.json"
+        try:
+            drv.seed_defaults()
+            session = ConversationSession(memory=self.mem, registry=self.reg,
+                                          llm_turn=self.llm)
+            p = session.autonomy_prompt("自主时刻")
+            self.assertIn("内在因", p)
+            self.assertIn("老爹的期待", p)
+        finally:
+            drv.DRIVES_FILE = old
+
     def test_group_channel_is_public_and_tool_free(self):
         import asyncio
 

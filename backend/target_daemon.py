@@ -117,11 +117,11 @@ class DaemonRuntime:
 
                 async def _run():
                     return await s.proactive_tick(
-                        "这是你的自主时刻（每 3 小时一次）：看看最近有什么值得"
-                        "自己整理、记录，或想对老爹说的。简短、真实；没有就"
-                        "说没有，别硬凑。若你确实想通了值得长期坚持的原则，"
-                        "可以用 memory.save(importance 8-9) 记下，日后可沉淀为"
-                        "你的认知。", extra="")
+                        "这是你的自主时刻（每 3 小时一次）：读你的内在因，"
+                        "据此行动——去探索未知、推进你的渴望、或对齐老爹的期待。"
+                        "简短、真实；没有就说没有，别硬凑。若确实想通了值得长期"
+                        "坚持的原则，可用 memory.save(importance 8-9) 记下。",
+                        extra="")
 
                 fut = asyncio.run_coroutine_threadsafe(_run(), self._loop)
                 info = fut.result(timeout=300)
