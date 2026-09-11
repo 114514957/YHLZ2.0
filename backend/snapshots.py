@@ -29,6 +29,7 @@ def _targets() -> dict[str, pathlib.Path]:
         "cognition": _ROOT / "docs" / "元亨认知根基.md",
         "persona_dims": _ROOT / "data" / "persona_dims.json",
         "style_signals": _ROOT / "cache" / "style_signals.json",
+        "drives": _ROOT / "cache" / "drives.json",
         "entity_graph": _ROOT / "cache" / "entity_graph.db",
         "memory_db": pathlib.Path(DEFAULT_DB),
     }

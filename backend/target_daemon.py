@@ -405,6 +405,12 @@ class DaemonRuntime:
                     snapshots.create("daily")
                 except Exception:
                     pass
+                try:
+                    from backend import intrinsic_drives
+
+                    intrinsic_drives.decay()
+                except Exception:
+                    pass
             except Exception as exc:
                 print(f"[memory-upkeep] skip: {type(exc).__name__}", flush=True)
 
@@ -681,6 +687,12 @@ def main() -> int:
         from backend.vector_memory import warm_reranker
 
         warm_reranker()  # background: reranker ready shortly after boot
+    except Exception:
+        pass
+    try:
+        from backend import intrinsic_drives
+
+        intrinsic_drives.seed_defaults()  # P2: 老爹的期待 + 基础好奇
     except Exception:
         pass
     server = make_server(args.port, args.host, runtime)

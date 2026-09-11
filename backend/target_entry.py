@@ -309,6 +309,14 @@ class ConversationSession:
                     ctx_lines.append(eg)
             except Exception:
                 pass
+            try:
+                from backend import intrinsic_drives
+
+                drv = intrinsic_drives.inject_block()
+                if drv:
+                    ctx_lines.append(drv)
+            except Exception:
+                pass
         result = await self.orchestrator.run(
             turn_text=text,
             system_prompt=system,
@@ -339,6 +347,12 @@ class ConversationSession:
 
                 self._summary_tasks.append(asyncio.ensure_future(
                     entity_graph.ingest_text(f"{text}。{result.answer}")))
+            except Exception:
+                pass
+            try:
+                from backend import intrinsic_drives
+
+                intrinsic_drives.observe(text, result.answer)
             except Exception:
                 pass
         if self.memory._summary_pending:
