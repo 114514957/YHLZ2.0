@@ -147,7 +147,9 @@ MEMORY_L1_COMPRESS_PROMPT = (
 )
 MEMORY_L2_CANDIDATE_PROMPT = (
     "从下面对话中提取可作为长期记忆的条目（每条≤60字摘要；importance 1-10 初值；type ∈ "
-    "fact|preference|event|decision；keywords 逗号分隔）。只输出 JSON 数组，字段："
+    "fact|preference|event|decision；keywords 逗号分隔）。"
+    "**尤其留意这三类（很重要，别漏）：①说话风格与表达偏好 ②做事/协作方法 ③哲学观点与思考方式**"
+    "（均归为 preference）。只输出 JSON 数组，字段："
     '{"type":...,"importance":...,"summary":...,"keywords":...}。\n'
 )
 MEMORY_L2_JUDGE_PROMPT = (
