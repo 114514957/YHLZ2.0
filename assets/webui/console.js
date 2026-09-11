@@ -214,6 +214,21 @@ async function loadDashboard() {
     $("q-online").textContent = q.online ? "在线" : "离线";
     $("q-ws").textContent = q.ws ? "已连" : "未连";
     $("q-bridge").textContent = q.bridge ? "运行中" : "未运行";
+    const qrWrap = $("qqQrWrap");
+    if (qrWrap) {
+      if (!q.online) {
+        qrWrap.style.display = "block";
+        const img = $("qqQr");
+        const t = Date.now();
+        if (img && (!img.dataset.ts || t - (+img.dataset.ts) > 20000)) {
+          img.dataset.ts = t;
+          img.onerror = () => { qrWrap.style.display = "none"; };
+          img.src = "/qq-qrcode?t=" + t;
+        }
+      } else {
+        qrWrap.style.display = "none";
+      }
+    }
     const d = s.dev || {};
     const dtag = { idle: "空闲", running: "执行中", awaiting: "待你答复",
                    done: "完成", error: "出错" }[d.status] || d.status || "空闲";

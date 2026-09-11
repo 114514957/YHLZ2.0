@@ -200,7 +200,7 @@ GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
           "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html",
-          "/emotion"}
+          "/emotion", "/qq-qrcode"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session",
@@ -238,6 +238,25 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _qq_qrcode(self) -> None:
+        """Serve NapCat's login QR (saved to qrcode.png) so the workbench can
+        show it directly — NapCat is headless (no console/QQ window needed)."""
+        qr = Path(r"C:\Users\ACE_WAN——PROJECT\qqwatch\shell\cache\qrcode.png")
+        try:
+            if qr.exists() and (time.time() - qr.stat().st_mtime) < 300:
+                body = qr.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+        except Exception:
+            pass
+        self.send_response(404)
+        self.end_headers()
 
     # ---------- routing (shared with daemon _Handler via inheritance) ----------
     def _serve_under(self, route_prefix: str, base_dir) -> None:
@@ -313,6 +332,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._serve_file("avatar.js")
         elif p == "/favicon.png":
             self._serve_file("favicon.png")
+        elif p == "/qq-qrcode":
+            self._qq_qrcode()
         elif p == "/loading.webp":
             self._serve_file("loading.webp")
         elif p == "/console.css":
@@ -663,8 +684,10 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 if kill.exists():
                     subprocess.run(["cmd", "/c", str(kill)], cwd=str(shell),
                                    capture_output=True)
-                subprocess.Popen(["cmd", "/c", str(launch), "3655185302"],
-                                 cwd=str(shell), close_fds=True)
+                subprocess.Popen(
+                    ["cmd", "/c", str(launch), "3655185302"],
+                    cwd=str(shell), close_fds=True,
+                    creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
                 _bring_qq_front(delay=12)
                 _log("control", "napcat_login")
                 return {"ok": True,
