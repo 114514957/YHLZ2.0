@@ -500,16 +500,20 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
 
+        import threading
+
         alive = {"ok": True}
+        _emit_lock = threading.Lock()
 
         def emit(data: dict) -> None:
             if not alive["ok"]:
                 return
-            try:
-                self.wfile.write(_sse(data))
-                self.wfile.flush()
-            except Exception:
-                alive["ok"] = False  # client gone -> stop the loop
+            with _emit_lock:
+                try:
+                    self.wfile.write(_sse(data))
+                    self.wfile.flush()
+                except Exception:
+                    alive["ok"] = False  # client gone -> stop the loop
 
         import time as _t
 
@@ -579,6 +583,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                         if t:
                             parts.append(t)
                             acc = "".join(parts)
+                            emit({"type": "partial", "text": acc})
                             if len(acc) >= 6 and time.time() - last_pre > 2.0:
                                 last_pre = time.time()
                                 try:

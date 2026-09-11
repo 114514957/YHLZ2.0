@@ -359,20 +359,18 @@ async function voice(continuous) {
   voiceAbort = new AbortController();
   busyOn(true); setStage("listening"); setVad(0, false);
   let box = null;
+  let userBox = null;
+  const ensureUser = () => { if (!userBox) { userBox = addMsg("u", "你", ""); } return userBox; };
   try {
     await streamFetch("/voice", { speak: 1, continuous: continuous ? 1 : 0 }, {
       level: (e) => setVad(e.value, e.speech),
-      state: (e) => setStage(e.value),
+      state: (e) => {
+        if (e.value === "listening") { userBox = null; box = null; }
+        setStage(e.value);
+      },
+      partial: (e) => { ensureUser().textContent = e.text || ""; follow(); },
       voice_text: (e) => {
-        if (e.kind === "user") {
-          const last = msgs.lastElementChild;
-          if (last) { const t = last.querySelector("div.body"); if (t) t.textContent = e.text; }
-        }
-        if (e.kind === "asr") {
-          addMsg("u", "你", "");
-          box = addMsg("a", "元亨", "");
-          box.classList.add("streaming");
-        }
+        if (e.kind === "user") { ensureUser().textContent = e.text || ""; userBox = null; }
       },
       delta: (e) => { if (!box) { box = addMsg("a", "元亨", ""); box.classList.add("streaming"); } box.textContent += e.delta || ""; follow(); },
       turn_done: (e) => { if (box) box.classList.remove("streaming"); if (e.text && box) box.textContent = e.text; emote(e.text); },
