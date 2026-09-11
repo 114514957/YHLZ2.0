@@ -51,6 +51,19 @@ async def _compact(messages: list[dict[str, Any]], llm_turn: Any) -> list[dict[s
             + rest[-2:])
 
 
+def _log_compaction(before: int, after: int) -> None:
+    try:
+        import pathlib
+        import time
+
+        p = pathlib.Path(__file__).resolve().parent.parent / "cache" / "tmp" / "ctx_compaction.log"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(f"[{time.strftime('%H:%M:%S')}] compact {before}->{after} chars\n")
+    except Exception:
+        pass
+
+
 def _strip_leaked_toolcall(content: str) -> str:
     """Remove provider-native tool-call text leaked when no tool schema was
     given (e.g. '<|tool_call>call:memory_recall{...}<tool_call|>')."""
@@ -366,7 +379,9 @@ class TurnOrchestrator:
                     }
                 )
             if _chars(messages) > CTX_BUDGET_CHARS:
+                _before = _chars(messages)
                 messages = await _compact(messages, llm_turn)
+                _log_compaction(_before, _chars(messages))
         if not answer:
             # one recovery attempt: force a direct, tool-free answer (guards
             # against empty final content, e.g. reasoning eating all tokens)
