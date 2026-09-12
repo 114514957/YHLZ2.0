@@ -296,7 +296,9 @@ class TargetMemoryService:
                 if r[3] not in (None, "", "active"):
                     continue
                 store = str(r[4] or "") or str(r[5] or "")
-                if not any(g in store for g in grams):
+                # require >=2 shared 2-grams: a single bigram match is noise
+                # (ledger 0306) — was `any(g in store for g in grams)`.
+                if sum(1 for g in grams if g in store) < 2:
                     continue
                 s = str(r[5] or "").strip()
             except Exception:
