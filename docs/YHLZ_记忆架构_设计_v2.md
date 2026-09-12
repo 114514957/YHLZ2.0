@@ -149,3 +149,34 @@ L0 上下文     当前轮 LLM 原生
 | 管理 | fire-and-forget | **幂等闭环 + 游标/事件日志/审计** |
 | 生长 | 巩固→认知 | **+实体图多跳 / 梦境沉淀** |
 | 保护 | 认知根基审批 | **+protected 段免衰减 + rejected 留痕** |
+
+---
+
+## 7. 研究佐证与优化（2026-09-12 补充；查证 GitHub/arXiv）
+
+> 目的：用开源实现与论文**佐证/修正**本设计。以下均为公开资料（GitHub + arXiv）。
+
+### 7.1 佐证（与本设计一致）
+| 来源 | 关键点 | 佐证本设计 |
+|---|---|---|
+| **Mem0**（`mem0ai/mem0`，65k⭐；arXiv:2504.19413） | 新算法改为 **单次 ADD-only 抽取**（不 UPDATE/DELETE，记忆只增不覆写）、**agent 产生的事实一等公民**、**实体链接**、**multi-signal 检索**（语义+BM25+实体并行融合）、**temporal reasoning**；LoCoMo 92.5 / LongMemEval 94.4 | ③④"证据驱动/不改写"、多信号融合、实体增强 |
+| **Graphiti / Zep**（`getzep/graphiti`，31k⭐；arXiv:2501.13956） | **双时态知识图**：每条事实带**有效期窗口（valid_at/invalid_at）**，变更时**失效而非删除**；**episodes=provenance**（可溯源原始数据）；hybrid（语义+BM25+**图遍历**） | ③"supersede/失效不删"、provenance、混合检索 |
+| **A-MEM**（arXiv:2502.12110，NeurIPS'25） | Zettelkasten 式**互链笔记**+动态索引；**memory evolution**（新记忆触发旧记忆上下文/属性更新）；agent 驱动 | ⑥"记忆生长/联想"、实体互链 |
+| **HippoRAG 2**（arXiv:2502.14802 / 2405.14831，ICML'25/NeurIPS'24） | KG + **Personalized PageRank** 做**联想/多跳**检索；比 GraphRAG/RAPTOR/LightRAG **更省资源** | 已有 `associations.py`(PPR)+`communities` 方向**正确**；资源友好 |
+| **LongMemEval**（arXiv:2410.10813，ICLR'25） | 长时记忆 **5 能力**：信息抽取 / 多会话推理 / 时间推理 / **知识更新** / **弃答(abstention)**；3 阶段 indexing/retrieval/reading；优化=**会话粒度切分**、**事实增强的 key 扩展**、**时间感知 query 扩展** | 验收维度 + 检索优化点；**"弃答"应正式纳入**（对齐"不确定就问"） |
+| **Letta/MemGPT**（`letta-ai/letta`，25k⭐） | OS 虚拟内存思想，stateful agent 自管记忆、self-improve（core/working/archival/recall + sleeptime） | ②"自主管理/后台整理"、"记忆即 Agent"方向 |
+
+### 7.2 据研究修订/优化 v2
+
+1. **冲突 = "失效不删 + 双时态窗口"（采纳 Graphiti）**：不做"覆盖旧记忆"，而是给旧条目 `invalid_at`/`superseded_by`，新条目 `valid_at`；查"当前事实"取未失效者，历史完整保留。**比规则覆盖更安全，且天然满足"零删除"**。
+2. **保守模式 = ADD-only（采纳 Mem0）**：若证据裁决不稳，可退化为"**只增不改 + 时间推理**"，把"谁对"交给**读取时**按时间/证据/来源排序。**给 M2 一个可降级档**（默认"裁决+失效"，兜底"ADD-only"）。
+3. **检索升级 = multi-signal fusion + 实体匹配（Mem0/Graphiti）**：语义 + BM25 + **实体匹配** 并行、融合（RRF）；由 `entity_graph` 供实体信号（即"实体增强的 key 扩展"）。
+4. **联想升级 = 多类型节点 + PPR（HippoRAG2）**：实体图从"实体-关系"扩为 **passage + entity + phrase** 多类型；用 PPR 做联想召回并与向量/BM25 融合（我们已有 PPR，属"验证正确方向 + 扩展"）。
+5. **验收纳入 5 能力（LongMemEval）**：抽取 / 多会话推理 / 时间推理 / 知识更新 / **弃答**；其中"弃答"正式成为她的显式能力（不确定→不编→可问）。
+6. **检索三优化（LongMemEval）**：①**会话粒度切分**（抽取按会话/事件粒度，而非单句）②**事实增强的 key 扩展**（索引时把事实/别名并入 key）③**时间感知 query 扩展**（涉"现在/当时/计划"时按时间窗扩展）。
+7. **memory evolution（A-MEM）谨慎采纳**：新记忆可更新旧记忆的**派生字段**（关联、摘要、上下文），但**不改事实本身**，且留 version/证据——防"污染事实"。
+
+### 7.3 结论
+- v2 的**分层（Profile/Episodic）、证据/失效、混合检索、图联想、人在环**均被 2025–2026 主流工作**佐证**；**无需推翻**。
+- **据研究微调 3 处**：③冲突改"**双时态失效**"（+ADD-only 兜底）、④检索加"**多信号+实体**"融合、⑤验收加"**弃答**"与检索三优化。
+- 明确**不采纳**：需要外部图数据库/高显存（Zep/Neo4j、HippoRAG 全量 vLLM）、端到端记忆模型（继续不训参数）。
