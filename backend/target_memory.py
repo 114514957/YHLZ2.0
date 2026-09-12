@@ -111,6 +111,7 @@ class TargetMemoryService:
         self._boost_ts: dict[str, float] = {}  # recall-use boost dedup window (ledger 0189)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
+        self._load_l1()
 
     # ---------- storage ----------
     def _init_db(self) -> None:
@@ -163,6 +164,40 @@ class TargetMemoryService:
         self._judge = judge
 
     # ---------- L1 transient ----------
+    def _l1_path(self) -> Path:
+        return self.db_path.with_name(self.db_path.name + ".l1.json")
+
+    def _load_l1(self) -> None:
+        """Restore the rolling window + compressed memo across restarts
+        (ledger 0308). Derived cache: safe to lose, never the source of truth."""
+        try:
+            d = json.loads(self._l1_path().read_text(encoding="utf-8"))
+        except Exception:
+            return
+        with self._lock:
+            self._summary = str(d.get("summary", "") or "")
+            self._summary_version = int(d.get("version", 0) or 0)
+            turns = d.get("turns")
+            if isinstance(turns, list):
+                self._turns = [
+                    {"role": str(t.get("role", "")),
+                     "text": str(t.get("text", ""))}
+                    for t in turns
+                    if isinstance(t, dict) and "role" in t and "text" in t
+                ][-self.window_turns:]
+
+    def _save_l1(self) -> None:
+        try:
+            p = self._l1_path()
+            p.parent.mkdir(parents=True, exist_ok=True)
+            tmp = p.with_name(p.name + ".tmp")
+            tmp.write_text(json.dumps(
+                {"summary": self._summary, "version": self._summary_version,
+                 "turns": self._turns}, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(p)
+        except Exception:
+            pass
+
     def append_turn(self, *, role: str, text: str) -> None:
         with self._lock:
             self._turns.append({"role": role, "text": str(text)})
@@ -172,6 +207,7 @@ class TargetMemoryService:
                 if dropped:
                     self._pending_dropped = list(dropped)
                     self._summary_pending = True
+            self._save_l1()
 
     async def process_summary(self) -> None:
         """Run the pending Summary Compression (non-blocking by caller)."""
@@ -197,6 +233,7 @@ class TargetMemoryService:
                 self._summary = str(summary_text or "")
                 self._summary_pending = False
                 self._summary_version = int(version or 0)
+                self._save_l1()
         except Exception:
             with self._lock:
                 self._summary_pending = False

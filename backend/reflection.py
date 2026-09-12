@@ -80,30 +80,46 @@ async def reflect(llm_turn=None, pending_file: pathlib.Path | None = None) -> in
         return 0
     if not isinstance(data, list):
         return 0
+    import hashlib
+    import time
+
     pending = []
     if pf.exists():
         try:
             pending = json.loads(pf.read_text(encoding="utf-8"))
         except Exception:
             pending = []
+    seen_ids = {str(e.get("id")) for e in pending if isinstance(e, dict)}
+    seen_claims = {(str(e.get("kind")), str(e.get("claim")))
+                   for e in pending if isinstance(e, dict)}
     n = 0
     for d in data:
         claim = str((d or {}).get("claim") or "").strip()[:80]
         if not claim:
             continue
         kind = str(d.get("kind") or "new").strip().lower()
+        if kind not in ("new", "refine", "refute"):
+            kind = "new"
         tier = str(d.get("tier") or "meta").strip().lower()
-        entry = {"claim": claim,
-                 "kind": kind if kind in ("new", "refine", "refute") else "new",
-                 "tier": tier if tier in ("core", "method", "meta") else "meta",
-                 "item_ids": []}
-        if entry not in pending:
-            pending.append(entry)
-            n += 1
+        if tier not in ("core", "method", "meta"):
+            tier = "meta"
+        # stable id -> idempotent: re-reflecting the same claim won't duplicate
+        eid = "cog_" + hashlib.sha256(
+            (kind + "|" + claim).encode("utf-8")).hexdigest()[:12]
+        if eid in seen_ids or (kind, claim) in seen_claims:
+            continue
+        pending.append({"id": eid, "claim": claim, "kind": kind, "tier": tier,
+                        "status": "pending", "created": time.time(),
+                        "item_ids": []})
+        seen_ids.add(eid)
+        seen_claims.add((kind, claim))
+        n += 1
     try:
         pf.parent.mkdir(parents=True, exist_ok=True)
-        pf.write_text(json.dumps(pending, ensure_ascii=False, indent=1),
-                      encoding="utf-8")
+        tmp = pf.with_name(pf.name + ".tmp")
+        tmp.write_text(json.dumps(pending, ensure_ascii=False, indent=1),
+                       encoding="utf-8")
+        tmp.replace(pf)
     except Exception:
         pass
     if n:

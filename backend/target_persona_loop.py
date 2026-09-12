@@ -266,10 +266,16 @@ class PersonaConsolidationLoop:
         import sqlite3
 
         con = sqlite3.connect(str(self.memory.db_path))
+        ref = f"{_PERSONA_PREFIX}v{version}"
         for iid in set(item_ids):
+            # stamp + mark absorbed (archive): this source item is now
+            # represented in the cognition foundation, so it leaves the active
+            # recall/consolidation pool — never deleted; reversible via status
+            # (ledger 0308).
             con.execute(
-                "UPDATE l2_items SET evidence_ref=? WHERE id=?",
-                (f"{_PERSONA_PREFIX}v{version}", iid),
+                "UPDATE l2_items SET evidence_ref=?, status='archive' "
+                "WHERE id=? AND status='active'",
+                (ref, iid),
             )
         con.commit()
         con.close()
