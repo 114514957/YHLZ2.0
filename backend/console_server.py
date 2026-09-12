@@ -71,6 +71,118 @@ def _get_tts(which: str):
     return _TTS["model"]
 
 
+class _StreamingSpeaker:
+    """Streaming TTS (ledger 0309): synthesize+play sentences as the LLM emits
+    them, so the first audio no longer waits for the whole reply. One resident
+    InputStream; barge-in (or turn cancel) stops playback."""
+
+    def __init__(self, speaker: str, device: int, model_key: str,
+                 should_stop=None) -> None:
+        import queue as _q
+        import threading as _th
+
+        self._q: "_q.Queue" = _q.Queue()
+        self._speaker = str(speaker or "Vivian")
+        self._device = int(device or 1)
+        self._key = str(model_key or "0.6B")
+        self._should_stop = should_stop
+        self._interrupted = False
+        self._thread = _th.Thread(target=self._run, daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def feed(self, sentence: str) -> None:
+        s = str(sentence or "").strip()
+        if s and not self._interrupted:
+            self._q.put(s)
+
+    def finish(self) -> str:
+        self._q.put(None)
+        self._thread.join(timeout=180)
+        if self._interrupted:
+            return "interrupted"
+        if self._should_stop is not None and self._should_stop():
+            return "cancelled"
+        return "done"
+
+    def _run(self) -> None:
+        import numpy as np
+        import sounddevice as sd
+
+        try:
+            m = _get_tts(self._key)
+        except Exception:
+            _log("voice", "stream tts load fail")
+            return
+        _log("voice", "stream tts ready")
+
+        def loop(inp) -> None:
+            while True:
+                s = self._q.get()
+                if s is None:
+                    break
+                if self._interrupted:
+                    continue
+                if self._should_stop is not None and self._should_stop():
+                    self._interrupted = True
+                    continue
+                try:
+                    wavs, sr = m.generate_custom_voice(
+                        text=str(s)[:120], language="Chinese",
+                        speaker=self._speaker,
+                        instruct="自然地说，像和亲近的人聊天，别播音腔。")
+                    samples = np.asarray(wavs[0], dtype="float32")
+                except Exception:
+                    continue
+                rms = float(np.sqrt(np.mean(samples * samples)) + 1e-9)
+                thr = max(0.03, rms * 1.5)
+                try:
+                    sd.play(samples, int(sr))
+                    _log("voice", f"stream tts play {len(samples)}")
+                except Exception:
+                    continue
+                dur = len(samples) / float(sr)
+                t0 = time.time()
+                hot = 0
+                while time.time() - t0 < dur + 0.3:
+                    if self._should_stop is not None and self._should_stop():
+                        self._interrupted = True
+                        break
+                    if inp is None:
+                        time.sleep(0.05)
+                        continue
+                    try:
+                        data, _ = inp.read(1600)
+                    except Exception:
+                        break
+                    mono = np.asarray(
+                        data[:, 0] if getattr(data, "ndim", 1) > 1 else data,
+                        dtype="float32")
+                    r = float(np.sqrt(np.mean(mono * mono)) + 1e-9)
+                    if r > thr:
+                        hot += 1
+                        if hot >= 2:
+                            self._interrupted = True
+                            break
+                    else:
+                        hot = 0
+                if self._interrupted:
+                    break
+
+        try:
+            with sd.InputStream(device=self._device, samplerate=16000,
+                                channels=1, dtype="float32", blocksize=1600,
+                                latency="low") as inp:
+                loop(inp)
+        except Exception:
+            loop(None)
+        try:
+            sd.stop()
+        except Exception:
+            pass
+
+
 def _settings_load() -> dict:
     d = dict(DEFAULT_SETTINGS)
     try:
@@ -726,19 +838,45 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 if not text:
                     break
                 emit({"type": "state", "value": "thinking"})
+                _spk = None
+                _spoke = {"on": False}
+                if speak:
+                    try:
+                        _spk = _StreamingSpeaker(
+                            st.get("tts_speaker", "Vivian"),
+                            int(st.get("device", 1) or 1),
+                            st.get("tts_model", "0.6B"),
+                            should_stop=lambda: _tc.cancelled("console"))
+                        _spk.start()
+                    except Exception:
+                        _spk = None
+                _buf = {"t": ""}
+
+                def _on_delta(c, _b=_buf, _s=_spk, _sp=_spoke):
+                    emit({"type": "delta", "delta": c})
+                    if _s is None:
+                        return
+                    if not _sp["on"]:
+                        _sp["on"] = True
+                        emit({"type": "state", "value": "speaking"})
+                    _b["t"] += c
+                    while True:
+                        sent, rest = self._pop_sentence(_b["t"])
+                        if not sent:
+                            break
+                        _s.feed(sent)
+                        _b["t"] = rest
+
                 info = self.runtime.console_turn_stream(
-                    text, lambda c: emit({"type": "delta", "delta": c}),
-                    pre_recall=pre or None)
+                    text, _on_delta, pre_recall=pre or None)
                 answer = str(info.get("answer", ""))
                 emit({"type": "turn_done", "text": answer,
                       "tool_uses": len(info.get("tool_uses") or [])})
-                if speak and answer.strip():
-                    emit({"type": "state", "value": "speaking"})
-                    rr = self._speak_interruptible(
-                        answer, st.get("tts_speaker", "Vivian"),
-                        int(st.get("device", 1) or 1),
-                        st.get("tts_model", "0.6B"),
-                        should_stop=lambda: _tc.cancelled("console"))
+                if _spk is not None:
+                    if _buf["t"].strip():
+                        _spk.feed(_buf["t"])
+                        _buf["t"] = ""
+                    rr = _spk.finish()
                     if rr in ("interrupted", "cancelled"):
                         emit({"type": "interrupted"})
                         if rr == "cancelled":
@@ -917,6 +1055,21 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         if cur:
             out.append(cur)
         return out[:6] or [t[:maxlen]]
+
+    @staticmethod
+    def _pop_sentence(buf: str, maxlen: int = 48) -> tuple[str, str]:
+        """Pop one speakable sentence from the head of `buf` for streaming TTS.
+        Returns ('', buf) while no complete sentence is ready yet."""
+        t = str(buf or "")
+        for i, ch in enumerate(t):
+            if ch in "。！？!?…\n":
+                return t[:i + 1].strip(), t[i + 1:]
+        if len(t) >= maxlen:
+            cut = max([t.rfind(ch, 0, maxlen) for ch in "，,、;； "] or [-1])
+            if cut > 8:
+                return t[:cut + 1].strip(), t[cut + 1:]
+            return t[:maxlen].strip(), t[maxlen:]
+        return "", t
 
     def _speak_interruptible(self, text: str, speaker: str = "Vivian",
                              device: int = 1, model_key: str = "0.6B",
