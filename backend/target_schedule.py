@@ -193,10 +193,14 @@ def toggle_plan(plan_id: str, enabled: bool) -> str:
 
 # ---- cadence / due logic (pure, unit-testable) ----
 def is_due(plan: dict, now: time.struct_time, last_run: str = "") -> bool:
-    """Weekly/monthly via weekday/day match; daily always matches its day.
-    A run is due when its time-of-day has passed today AND it was not already
-    run this cycle (compare last_run date against the cycle's anchor)."""
-    cd = plan.get("cadence", {})
+    """Daily/weekly/monthly due check with catch-up.
+
+    A plan is due when its time-of-day has passed today AND it has not run in
+    the current cycle. Weekly/monthly plans CATCH UP: if the scheduled weekday
+    (or day) was missed (daemon was down), they run on the next matching
+    opportunity within the overdue window instead of silently skipping the
+    whole cycle (ledger 0307)."""
+    cd = plan.get("cadence", {}) or {}
     typ = cd.get("type")
     hhmm = str(cd.get("time", "")).strip()
     if len(hhmm) != 5:
@@ -205,26 +209,34 @@ def is_due(plan: dict, now: time.struct_time, last_run: str = "") -> bool:
     target = int(hhmm[:2]) * 60 + int(hhmm[3:5])
     if cur < target:
         return False
-    if typ == "weekly" and now.tm_wday != int(cd.get("weekday", 0) or 0) % 7:
-        return False
-    if typ == "monthly" and now.tm_mday != int(cd.get("day", 1) or 1):
-        return False
     from datetime import date
 
     today_d = date.fromtimestamp(time.mktime(now))
     last = str(last_run or "")
-    if not last or len(last) < 10:
-        return True
-    try:
-        last_d = date.fromisoformat(last[:10])
-    except Exception:
-        return True
+    last_d = None
+    if len(last) >= 10:
+        try:
+            last_d = date.fromisoformat(last[:10])
+        except Exception:
+            last_d = None
     if typ == "weekly":
-        return last_d.isocalendar()[:2] != today_d.isocalendar()[:2]
+        wd = int(cd.get("weekday", 0) or 0) % 7
+        if last_d is None:
+            return now.tm_wday == wd  # never run: wait for the scheduled day
+        if now.tm_wday == wd:
+            return last_d.isocalendar()[:2] != today_d.isocalendar()[:2]
+        # scheduled weekday missed -> run once if a full week is overdue
+        return (today_d - last_d).days >= 7
     if typ == "monthly":
-        return (last_d.year, last_d.month) != (today_d.year, today_d.month)
+        day = int(cd.get("day", 1) or 1)
+        if last_d is None:
+            return now.tm_mday == day
+        ran_this_month = (last_d.year, last_d.month) == (today_d.year, today_d.month)
+        if now.tm_mday == day:
+            return not ran_this_month
+        return (not ran_this_month) and today_d.day > day
     # daily
-    return last_d != today_d
+    return last_d is None or last_d != today_d
 
 
 def mark_run(plan_id: str, now: time.struct_time) -> None:
