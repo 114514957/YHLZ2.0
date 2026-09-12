@@ -19,11 +19,12 @@ import time
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 from backend.qq_token import ws_url  # noqa: E402
+from backend.yhlz_paths import MASTER_UIN  # noqa: E402
 
 STATUS = _ROOT / "cache" / "tmp" / "napcat_status.json"
 LOCK = _ROOT / "cache" / "tmp" / "napcat_watch.lock"
 URL = ws_url()
-MASTER = 2258374446
+MASTER = int(MASTER_UIN)
 
 
 def _acquire_lock() -> bool:

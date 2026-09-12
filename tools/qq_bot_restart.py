@@ -11,8 +11,8 @@ import time
 import psutil
 
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
-UIN = "3655185302"
-MASTER = "2258374446"
+sys.path.insert(0, str(_ROOT))
+from backend.yhlz_paths import BOT_UIN as UIN, MASTER_UIN as MASTER  # noqa: E402
 
 
 def _pids() -> list[int]:

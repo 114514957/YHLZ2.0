@@ -17,6 +17,8 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from backend.yhlz_paths import BOT_UIN, NAPCAT_QR, QQWATCH_SHELL
+
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = _PROJECT_ROOT / "assets" / "webui"
 LEDGER_FILE = _PROJECT_ROOT / "docs" / "上下文台账.md"
@@ -190,7 +192,7 @@ def _get_sherpa():
 
 def _qq_status() -> dict:
     """元亨 QQ / NapCat / bridge status for the workbench."""
-    out = {"uin": "3655185302", "name": "元亨", "online": False,
+    out = {"uin": BOT_UIN, "name": "元亨", "online": False,
            "ws": False, "bridge": False, "since": 0.0}
     try:
         p = _PROJECT_ROOT / "cache" / "tmp" / "napcat_status.json"
@@ -261,7 +263,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
     def _qq_qrcode(self) -> None:
         """Serve NapCat's login QR (saved to qrcode.png) so the workbench can
         show it directly — NapCat is headless (no console/QQ window needed)."""
-        qr = Path(r"C:\Users\ACE_WAN——PROJECT\qqwatch\shell\cache\qrcode.png")
+        qr = NAPCAT_QR
         try:
             if qr.exists() and (time.time() - qr.stat().st_mtime) < 300:
                 body = qr.read_bytes()
@@ -808,7 +810,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             try:
                 import subprocess
 
-                shell = Path(r"C:\Users\ACE_WAN——PROJECT\qqwatch\shell")
+                shell = QQWATCH_SHELL
                 kill = shell / "KillQQ.bat"
                 launch = shell / "launcher-user.bat"
                 if not launch.exists():
@@ -817,13 +819,13 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                     subprocess.run(["cmd", "/c", str(kill)], cwd=str(shell),
                                    capture_output=True)
                 subprocess.Popen(
-                    ["cmd", "/c", str(launch), "3655185302"],
+                    ["cmd", "/c", str(launch), BOT_UIN],
                     cwd=str(shell), close_fds=True,
                     creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
                 _bring_qq_front(delay=12)
                 _log("control", "napcat_login")
                 return {"ok": True,
-                        "note": "已唤起 NapCat，请在弹出的窗口登录元亨号 3655185302"}
+                        "note": f"已唤起 NapCat，请在弹出的窗口登录元亨号 {BOT_UIN}"}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         if action == "launch_pet":

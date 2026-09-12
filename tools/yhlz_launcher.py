@@ -25,15 +25,17 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-SRC_DIR = Path(r"C:\Users\ACE_WAN——PROJECT\Desktop\图片素材")
+from backend.yhlz_paths import (  # noqa: E402
+    BOT_UIN, DESKTOP_DIR, GEMMA_GGUF, LLAMA_EXE, MASTER_UIN, MMPROJ_GGUF,
+    NAPCAT_LAUNCHER, OLLAMA_EXE,
+)
+
+SRC_DIR = DESKTOP_DIR
 BOOT_PORT = 8577
-OLLAMA = r"C:\Users\ACE_WAN——PROJECT\AppData\Local\Programs\Ollama\ollama.exe"
-LLAMA = (r"C:\Users\ACE_WAN——PROJECT\AppData\Local\Microsoft\WinGet\Packages"
-         r"\ggml.llamacpp_Microsoft.Winget.Source_8wekyb3d8bbwe\llama-server.exe")
-GEMMA = Path(os.getenv("YHLZ_MODELS_DIR",
-                       r"C:\Users\ACE_WAN——PROJECT\models")) / "gemma4" / "gemma4-e4b-aggr-q4km.gguf"
-MMPROJ = Path(os.getenv("YHLZ_MODELS_DIR",
-                        r"C:\Users\ACE_WAN——PROJECT\models")) / "gemma4" / "mmproj-gemma4-e4b.gguf"
+OLLAMA = OLLAMA_EXE
+LLAMA = LLAMA_EXE
+GEMMA = GEMMA_GGUF
+MMPROJ = MMPROJ_GGUF
 PY = _ROOT / ".venv" / "Scripts" / "python.exe"
 
 URLS = {
@@ -43,8 +45,8 @@ URLS = {
 }
 
 # QQ bridge (optional): kept alive only when NapCat's OneBot WS is up.
-QQBOT_UIN = "3655185302"
-QQBOT_MASTER = "2258374446"
+QQBOT_UIN = BOT_UIN
+QQBOT_MASTER = MASTER_UIN
 QQBOT_PORT = 3001
 QQBOT_LOCK = _ROOT / "cache" / "tmp" / "qqbot.lock"
 
@@ -118,8 +120,7 @@ def _spawn_qqbot():
                      cwd=str(_ROOT), close_fds=True)
 
 
-NAPCAT_BAT = Path(
-    r"C:\Users\ACE_WAN——PROJECT\qqwatch\shell\launcher-user.bat")
+NAPCAT_BAT = NAPCAT_LAUNCHER
 
 
 def _proc_alive(script: str) -> bool:

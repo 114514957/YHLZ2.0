@@ -27,14 +27,14 @@ import urllib.request
 _PROJECT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT))
 sys.path.insert(0, str(_PROJECT / "tools"))
+from backend.yhlz_paths import EXTERNAL, MASTER_UIN, QQWATCH_CONFIG  # noqa: E402
+
 try:
     import dev_runner
 except Exception:  # noqa: BLE001
     dev_runner = None
 
 CONFIG_DIR = _PROJECT / "cache" / "tmp"  # fallback; use qqwatch path
-QQWATCH_CONFIG = pathlib.Path(
-    r"C:\Users\ACE_WAN——PROJECT\qqwatch\shell\config")
 DAEMON = os.getenv("DAEMON", "http://127.0.0.1:8321")
 MEDIA_DIR = _PROJECT / "cache" / "qq_media"
 MEDIA_KEEP_DAYS = 7
@@ -285,9 +285,8 @@ def _wav_to_silk(wav: str) -> str:
 def _find_onebot_config(uin: str | None) -> pathlib.Path:
     cands = []
     for d in (QQWATCH_CONFIG,
-              pathlib.Path(r"C:\Users\ACE_WAN——PROJECT\NEKO\desktop\resources"
-                           r"\bin\plugin\plugins\qq_auto_reply\NapCat.Shell"
-                           r"\config")):
+              EXTERNAL / "NEKO" / "desktop" / "resources" / "bin" / "plugin"
+              / "plugins" / "qq_auto_reply" / "NapCat.Shell" / "config"):
         if not d.exists():
             continue
         pat = f"onebot11_{uin}.json" if uin else "onebot11_*.json"
@@ -329,7 +328,7 @@ class QQBridge:
         self.ws_url = ws
         self.uin = str(uin)
         self.cfg = cfg
-        self.masters = masters or {"2258374446"}  # owner QQ (command source)
+        self.masters = masters or {MASTER_UIN}  # owner QQ (command source)
         self.log_n = 0
         self.loop = None
         self._last_reply: dict = {}
@@ -844,7 +843,7 @@ def main() -> int:
         url += f"?access_token={s['token']}"
     print(f"[qqbot] config={cfg} ws={s['host']}:{s['port']} uin={s['uin']}",
           flush=True)
-    masters = set(a.master or ["2258374446"])
+    masters = set(a.master or [MASTER_UIN])
     bridge = QQBridge(url, s["uin"], cfg, masters=masters)
     try:
         asyncio.run(bridge.run())

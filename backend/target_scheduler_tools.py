@@ -17,6 +17,9 @@ from backend.agent.tool_registry import get_registry, ToolRegistry
 from backend.target_access import file_list, file_read, web_fetch, web_search  # noqa: F401
 from backend.target_capability_registry import Capability, CapabilityRegistry
 from backend.target_memory import TargetMemoryService
+from backend.yhlz_paths import (
+    NAPCAT_START_BAT, QQWATCH_EXTRACT_BAT, QQWATCH_RUN_BAT,
+)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 LEDGER = _PROJECT_ROOT / "docs" / "上下文台账.md"
@@ -1296,8 +1299,8 @@ async def _qqops_bootstrap(params: dict) -> str:
 
     import httpx
 
-    NAPCAT_BAT = r"C:\Users\ACE_WAN——PROJECT\qqwatch\start-napcat.bat"
-    WATCH_BAT = r"C:\Users\ACE_WAN——PROJECT\YHLZ\qqwatch-run.bat"
+    NAPCAT_BAT = str(NAPCAT_START_BAT)
+    WATCH_BAT = str(QQWATCH_RUN_BAT)
     CREATE_NEW_CONSOLE = 0x00000010
     report: list[str] = []
 
@@ -1430,7 +1433,7 @@ async def _qqops_runbatch(params: dict) -> str:
     import os
     import subprocess
 
-    BAT = r"C:\Users\ACE_WAN——PROJECT\YHLZ\qqwatch-extract.bat"
+    BAT = str(QQWATCH_EXTRACT_BAT)
     if not os.path.exists(BAT):
         return "批处理脚本缺失：" + BAT
     subprocess.Popen(["cmd", "/c", BAT],
