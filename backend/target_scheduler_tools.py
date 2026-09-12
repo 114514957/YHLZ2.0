@@ -804,7 +804,7 @@ def approve_act(index: int, ok: bool) -> str:
 
 
 def schedule_handle(action: str, name: str = "", time_: str = "",
-                    cadence: str = "daily", steps: str = "", plan_id: str = "",
+                    cadence: str = "", steps: str = "", plan_id: str = "",
                     weekday: str = "", day: str = "", enabled: str = "",
                     fields_json: str = "") -> str:
     """Unified schedule tool dispatcher (ledger 0209+0210). actions:
@@ -829,7 +829,7 @@ def schedule_handle(action: str, name: str = "", time_: str = "",
         if not time_val:
             # last-chance: also try via fields_json
             pass
-        return add_plan(name, cadence, time_val, step_lines,
+        return add_plan(name, cadence or "daily", time_val, step_lines,
                         weekday=int(weekday) if str(weekday).isdigit() else None,
                         day=int(day) if str(day).isdigit() else None)
     if a in ("update", "edit", "modify"):

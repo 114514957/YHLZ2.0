@@ -5,8 +5,7 @@ const msgs = $("msgs");
 let busy = false;
 let stage = "idle";
 const bc = "BroadcastChannel" in window ? new BroadcastChannel("yhlz-avatar") : null;
-function bcStage(v) { if (bc) { try { bc.postMessage({ stage: v });   } catch (e) {}
-}
+function bcStage(v) { if (bc) { try { bc.postMessage({ stage: v }); } catch (e) {} } }
 
 async function loadGrowth() {
   try {
@@ -20,7 +19,7 @@ async function loadGrowth() {
       ul.appendChild(li);
     }
   } catch (e) {}
-} }
+}
 
 function setLamp(id, state) {
   const el = $(id);
@@ -86,7 +85,10 @@ async function qLedger() {
     ul.innerHTML = "";
     for (const it of (r.items || [])) {
       const li = document.createElement("li");
-      li.innerHTML = "<b>" + it.id + "</b>" + (it.text || "");
+      const b = document.createElement("b");
+      b.textContent = it.id;
+      li.appendChild(b);
+      li.appendChild(document.createTextNode(it.text || ""));
       ul.appendChild(li);
     }
     if (!(r.items || []).length) ul.innerHTML = "<li>（台账查无）</li>";
@@ -136,7 +138,9 @@ async function loadSessions() {
     ul.innerHTML = "";
     for (const it of (r.items || []).slice(0, 10)) {
       const li = document.createElement("li");
-      li.innerHTML = "<b>" + it.name + "</b>";
+      const b = document.createElement("b");
+      b.textContent = it.name;
+      li.appendChild(b);
       const t = document.createElement("div");
       t.textContent = it.turns + "轮 · " + it.title;
       li.appendChild(t);

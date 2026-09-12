@@ -93,9 +93,7 @@ class DaemonRuntime:
         self._worker = threading.Thread(target=self._run_loop, daemon=True)
         self._worker.start()
         self._ready.wait(timeout=10)
-        self.selfcheck_hour = -1  # selfcheck superseded by schedule plan_night
-        self._selfcheck_last = ""
-        threading.Thread(target=self._selfcheck_loop, daemon=True).start()
+        # selfcheck superseded by schedule plan_night (ledger 0196/0209)
         # batch-2 #2 (ledger 0196) -> superseded by schedule-driven autonomy
         # (ledger 0209): Yuanheng designs its own recurring plans; the daemon
         # reads the schedule table and nudges when an entry is due.
@@ -291,7 +289,7 @@ class DaemonRuntime:
 
     def _maybe_consolidate(self, key: str) -> None:
         try:
-            if key != "private":
+            if key not in ("private", "console"):
                 return
             s = self._session(key)
             st = s.status()
@@ -349,28 +347,6 @@ class DaemonRuntime:
                         print(f"[schedule] run err {type(exc).__name__}", flush=True)
             except Exception as exc:
                 print(f"[schedule] loop err {type(exc).__name__}", flush=True)
-
-    def _selfcheck_loop(self) -> None:
-        """Nightly nudge: at selfcheck_hour, invite Yuanheng (private channel)
-        to write today's diary and refresh its own task board — it decides."""
-        while True:
-            time.sleep(45)
-            try:
-                now = time.localtime()
-                if now.tm_hour == int(self.selfcheck_hour) and now.tm_min < 6:
-                    today = time.strftime("%Y-%m-%d")
-                    if self._selfcheck_last != today:
-                        self._selfcheck_last = today
-                        self.turn(
-                            "夜深了——每日自省时刻。这一天的经历与学到的东西，你可以："
-                            "1) 用 diary.write 写下今天想写的日记（不强制，真实就好）；"
-                            "2) 用 task.plan 梳理任务表：今天做完了什么、明天想做什么。"
-                            "这两样是你自己的工具，想用才用。",
-                            "private",
-                        )
-                        print(f"[selfcheck] {today} nudge done", flush=True)
-            except Exception as exc:
-                print(f"[selfcheck] skip: {type(exc).__name__}", flush=True)
 
     def _memory_upkeep_loop(self) -> None:
         """Weekly memory upkeep (ledger 0189): every Sunday 12:00 run belief

@@ -11,6 +11,7 @@ Storage: cache/drives.json (snapshotted).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import time
@@ -45,9 +46,15 @@ def save(drives: list[dict]) -> None:
         pass
 
 
+def _deterministic_id(name: str, category: str) -> str:
+    """Stable across processes/restarts (unlike built-in hash())."""
+    digest = hashlib.md5((str(name) + str(category)).encode("utf-8")).hexdigest()
+    return "drv_" + digest[:10]
+
+
 def _mk(name: str, category: str, strength: float, evidence: str,
         channel: str, priority: int, note: str = "") -> dict:
-    return {"id": "drv_" + str(abs(hash(name + category)) % 10**10),
+    return {"id": _deterministic_id(name, category),
             "name": name, "category": category, "strength": round(strength, 3),
             "evidence": [evidence] if evidence else [], "channel": channel,
             "priority": int(priority), "created": _now(), "updated": _now(),
@@ -197,7 +204,17 @@ def observe(text: str, answer: str = "", channel: str = "对话") -> int:
 
 def seed_defaults() -> None:
     """首次初始化：老爹的期待（宪法式，最高）+ 基础好奇。"""
-    if DRIVES_FILE.exists():
+    drives = load()
+    if drives:
+        # one-time migrate legacy hash()-based ids to deterministic ids
+        changed = False
+        for d in drives:
+            want = _deterministic_id(d.get("name", ""), d.get("category", ""))
+            if d.get("id") != want:
+                d["id"] = want
+                changed = True
+        if changed:
+            save(drives)
         return
     add("老爹的期待", "期待", 1.0, evidence="老爹立定", channel="老爹",
         note="身份+存在+连续性；经历→验证→记忆→修正→成长；守真实性；独立的 AI 生命，好奇的数字伙伴")
