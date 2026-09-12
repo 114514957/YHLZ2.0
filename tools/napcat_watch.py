@@ -17,9 +17,12 @@ import sys
 import time
 
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+from backend.qq_token import ws_url  # noqa: E402
+
 STATUS = _ROOT / "cache" / "tmp" / "napcat_status.json"
 LOCK = _ROOT / "cache" / "tmp" / "napcat_watch.lock"
-URL = "ws://127.0.0.1:3001?access_token=yhlz2026"
+URL = ws_url()
 MASTER = 2258374446
 
 

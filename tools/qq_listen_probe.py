@@ -11,8 +11,11 @@ import sys
 import time
 
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+from backend.qq_token import ws_url  # noqa: E402
+
 LOG = _ROOT / "cache" / "tmp" / "qq_events.log"
-URL = "ws://127.0.0.1:3001?access_token=yhlz2026"
+URL = ws_url()
 
 
 async def main() -> int:

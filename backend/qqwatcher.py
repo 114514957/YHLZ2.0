@@ -20,7 +20,7 @@ CAND_DIR = BASE / "cache" / "qqwatch"
 
 DEFAULT_CONFIG = {
     "ws_url": "ws://127.0.0.1:3001",
-    "token": "yhlz2026",
+    "token": "",  # resolved via backend.qq_token (env / qqwatch.local.json)
     "groups": [],          # whitelist group ids; empty => observe all (log only)
     "self_id": "2258374446",
     "min_chars": 60,       # candidate if text >= min_chars
@@ -49,7 +49,15 @@ def load_config() -> dict:
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     if not CONFIG_PATH.exists():
         CONFIG_PATH.write_text(json.dumps(DEFAULT_CONFIG, ensure_ascii=False, indent=2), encoding="utf-8")
-    return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    if not str(cfg.get("token", "") or "").strip():
+        try:
+            from backend.qq_token import get_token
+
+            cfg["token"] = get_token()
+        except Exception:
+            pass
+    return cfg
 
 
 def extract_text(event: dict) -> str:

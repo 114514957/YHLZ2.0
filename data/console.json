@@ -1,8 +1,0 @@
-{
- "device": 1,
- "denoise": "rnnoise",
- "duration": 3.0,
- "asr": "sensevoice",
- "tts_speaker": "Vivian",
- "tts_speak": true
-}
