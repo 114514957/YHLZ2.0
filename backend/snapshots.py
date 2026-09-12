@@ -32,7 +32,30 @@ def _targets() -> dict[str, pathlib.Path]:
         "drives": _ROOT / "cache" / "drives.json",
         "entity_graph": _ROOT / "cache" / "entity_graph.db",
         "memory_db": pathlib.Path(DEFAULT_DB),
+        "embvec": _ROOT / "cache" / "embvec.db",
+        "kw_index": _ROOT / "cache" / "search" / "kw_index.db",
     }
+
+
+def _copy_db(src: pathlib.Path, dst: pathlib.Path) -> None:
+    """Consistent SQLite copy (uses the backup API, includes WAL). A plain
+    file copy of a live WAL db can tear the snapshot (ledger 0305)."""
+    import sqlite3
+
+    s = sqlite3.connect(str(src))
+    try:
+        try:
+            s.execute("PRAGMA wal_checkpoint(FULL)")
+        except Exception:
+            pass
+        d = sqlite3.connect(str(dst))
+        try:
+            with d:
+                s.backup(d)
+        finally:
+            d.close()
+    finally:
+        s.close()
 
 
 def create(tag: str = "") -> str:
@@ -44,7 +67,11 @@ def create(tag: str = "") -> str:
     for name, src in _targets().items():
         try:
             if src.exists():
-                shutil.copy2(str(src), str(dest / (name + src.suffix)))
+                target = dest / (name + src.suffix)
+                if src.suffix == ".db":
+                    _copy_db(src, target)
+                else:
+                    shutil.copy2(str(src), str(target))
                 manifest["files"][name] = src.name
         except Exception:
             pass
@@ -91,6 +118,14 @@ def restore(ts: str) -> dict:
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(str(cand[0]), str(target))
+            if target.suffix == ".db":  # drop stale WAL/SHM from the old db
+                for ext in ("-wal", "-shm"):
+                    p = pathlib.Path(str(target) + ext)
+                    if p.exists():
+                        try:
+                            p.unlink()
+                        except Exception:
+                            pass
             restored.append(name)
         except Exception:
             missing.append(name)
