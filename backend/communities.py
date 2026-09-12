@@ -66,9 +66,15 @@ def _summarize(members: list[str], evidence: str, llm) -> str:
               "主题（≤40字），只输出句子。\n实体：" + "、".join(members[:12])
               + ("\n关系：" + evidence if evidence else ""))
     try:
+        # run in a dedicated thread so a caller that already owns an event
+        # loop does not make asyncio.run() raise (ledger 0300)
         import asyncio
+        import concurrent.futures as _cf
 
-        msg = asyncio.run(llm([{"role": "user", "content": prompt}], []))
+        with _cf.ThreadPoolExecutor(max_workers=1) as ex:
+            msg = ex.submit(
+                lambda: asyncio.run(llm([{"role": "user", "content": prompt}], []))
+            ).result()
         return str(msg.get("content") or "").strip()[:80]
     except Exception:
         return ""

@@ -15,6 +15,7 @@ import pathlib
 import re
 import sqlite3
 import time
+from contextlib import contextmanager
 
 _PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DB_PATH = _PROJECT_ROOT / "cache" / "entity_graph.db"
@@ -41,7 +42,10 @@ def _norm(name: str) -> str:
     return _ALIASES.get(str(name).strip(), str(name).strip())
 
 
-def _conn() -> sqlite3.Connection:
+@contextmanager
+def _conn():
+    """Yield a connection and always close it (ledger 0300: `with connect()`
+    only commits, so the old version leaked a handle per call)."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(str(DB_PATH))
     con.execute(
@@ -52,7 +56,11 @@ def _conn() -> sqlite3.Connection:
         "id INTEGER PRIMARY KEY AUTOINCREMENT, src TEXT, rel TEXT, dst TEXT, "
         "evidence TEXT, hits INTEGER DEFAULT 0, updated REAL, "
         "UNIQUE(src,rel,dst))")
-    return con
+    try:
+        yield con
+        con.commit()
+    finally:
+        con.close()
 
 
 def _local_llm():

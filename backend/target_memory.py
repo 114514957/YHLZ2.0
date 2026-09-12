@@ -141,6 +141,9 @@ class TargetMemoryService:
             )
             con.execute("CREATE INDEX IF NOT EXISTS idx_l2_status ON l2_items(status)")
             con.execute("CREATE VIRTUAL TABLE IF NOT EXISTS l2_fts USING fts5(sid, keywords, summary)")
+            # one-time heal: drop legacy duplicate FTS rows (ledger 0300)
+            con.execute("DELETE FROM l2_fts WHERE rowid NOT IN "
+                        "(SELECT MIN(rowid) FROM l2_fts GROUP BY sid)")
             cols = {r[1] for r in con.execute("PRAGMA table_info(l2_items)").fetchall()}
             for name, decl in (
                 ("belief", "REAL NOT NULL DEFAULT 0.5"),
@@ -479,7 +482,8 @@ class TargetMemoryService:
                         str(getattr(item, "source", "") or ""),
                     ),
                 )
-                con.execute("INSERT OR REPLACE INTO l2_fts(sid, keywords, summary) VALUES (?,?,?)",
+                con.execute("DELETE FROM l2_fts WHERE sid=?", (item.id,))
+                con.execute("INSERT INTO l2_fts(sid, keywords, summary) VALUES (?,?,?)",
                             (item.id, item.keywords, item.summary))
             con.commit()
             con.close()
@@ -715,8 +719,9 @@ class TargetMemoryService:
                         str(getattr(item, "source", "") or ""),
                     ),
                 )
+                con.execute("DELETE FROM l2_fts WHERE sid=?", (item.id,))
                 con.execute(
-                    "INSERT OR REPLACE INTO l2_fts(sid, keywords, summary) VALUES (?,?,?)",
+                    "INSERT INTO l2_fts(sid, keywords, summary) VALUES (?,?,?)",
                     (item.id, item.keywords, item.summary),
                 )
                 con.commit()
@@ -802,8 +807,7 @@ class TargetMemoryService:
             return []
         ranked = self._recall_via_kw(q, int(limit))
         if ranked is not None:
-            self._boost_recalled(ranked)
-            return ranked
+            return ranked  # kw path already recorded hits (no double-boost)
         sql = self._recall_via_sqlite(q, int(limit))
         self._boost_recalled(sql)
         return sql

@@ -28,18 +28,30 @@ def push(text: str, kind: str = "proactive") -> None:
 
 
 def drain(limit: int = 5) -> list[dict]:
-    """Return pending items and clear the file."""
+    """Return up to `limit` pending items and KEEP the rest (atomic rewrite).
+
+    Earlier versions cleared the whole file and returned only lines[:limit],
+    silently dropping everything past the limit (ledger 0300)."""
     if not OUTBOX.exists():
         return []
     try:
         lines = OUTBOX.read_text(encoding="utf-8").splitlines()
     except Exception:
         return []
-    OUTBOX.write_text("", encoding="utf-8")
-    out = []
-    for ln in lines[:limit]:
-        try:
-            out.append(json.loads(ln))
-        except Exception:
-            continue
+    out: list[dict] = []
+    rest: list[str] = []
+    for ln in lines:
+        if len(out) < limit:
+            try:
+                out.append(json.loads(ln))
+                continue
+            except Exception:
+                continue  # drop malformed line
+        rest.append(ln)
+    try:
+        tmp = OUTBOX.with_suffix(".tmp")
+        tmp.write_text(("\n".join(rest) + "\n") if rest else "", encoding="utf-8")
+        tmp.replace(OUTBOX)
+    except Exception:
+        pass
     return out
