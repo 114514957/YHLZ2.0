@@ -65,6 +65,13 @@ class L2Item:
     last_accessed: float = 0.0
     salience: float = 0.5  # 0..1 情感/理想显著度：越高越难忘（design v1 §1.1）
     source: str = ""       # 学习来源（老爹/agent/QQ群/未来渠道）P3
+    # M1 (ledger 0313/0314): Profile/Episodic + bi-temporal
+    kind: str = "episodic"     # episodic | profile
+    protected: int = 0         # 1 = 永不衰减/不清扫（身份/关系/期待）
+    valid_at: float = 0.0      # 事实生效时间（0 -> 取 created_at）
+    invalid_at: float = 0.0    # >0 = 已失效（软失效，不删）
+    superseded_by: str = ""    # 被哪条取代
+    confidence: float = 0.5    # 写入/证据置信
 
     def to_dict(self) -> dict:
         return {
@@ -152,9 +159,19 @@ class TargetMemoryService:
                 ("belief_updated", "REAL NOT NULL DEFAULT 0"),
                 ("salience", "REAL NOT NULL DEFAULT 0.5"),
                 ("source", "TEXT NOT NULL DEFAULT ''"),
+                # M1 (ledger 0313/0314): Profile/Episodic + bi-temporal
+                ("kind", "TEXT NOT NULL DEFAULT 'episodic'"),
+                ("protected", "INTEGER NOT NULL DEFAULT 0"),
+                ("valid_at", "REAL NOT NULL DEFAULT 0"),
+                ("invalid_at", "REAL NOT NULL DEFAULT 0"),
+                ("superseded_by", "TEXT NOT NULL DEFAULT ''"),
+                ("confidence", "REAL NOT NULL DEFAULT 0.5"),
             ):
                 if name not in cols:
                     con.execute(f"ALTER TABLE l2_items ADD COLUMN {name} {decl}")
+            # backfill valid_at from created_at (idempotent)
+            con.execute("UPDATE l2_items SET valid_at=created_at "
+                        "WHERE valid_at=0 AND created_at>0")
             con.commit()
             con.close()
 
@@ -483,15 +500,16 @@ class TargetMemoryService:
                 con.execute(
                     """
                     INSERT INTO l2_items
-                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source,kind,valid_at,confidence)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                       tier=excluded.tier, type=excluded.type,
                       importance=excluded.importance, summary=excluded.summary,
                       content_hash=excluded.content_hash, keywords=excluded.keywords,
                       status=excluded.status, evidence_ref=excluded.evidence_ref,
                       version=excluded.version, obsolete_of=excluded.obsolete_of,
-                      salience=excluded.salience, source=excluded.source
+                      salience=excluded.salience, source=excluded.source,
+                      confidence=MAX(l2_items.confidence, excluded.confidence)
                     """,
                     (
                         item.id, item.tier, item.type, item.importance, item.summary,
@@ -499,6 +517,9 @@ class TargetMemoryService:
                         item.created_at, item.version, item.obsolete_of, 0, 0.0,
                         0.5, 0, time.time(), float(getattr(item, "salience", 0.5)),
                         str(getattr(item, "source", "") or ""),
+                        str(getattr(item, "kind", "episodic") or "episodic"),
+                        float(getattr(item, "valid_at", 0) or 0) or float(item.created_at or time.time()),
+                        float(getattr(item, "confidence", 0.5) or 0.5),
                     ),
                 )
                 con.execute("DELETE FROM l2_fts WHERE sid=?", (item.id,))
@@ -586,7 +607,9 @@ class TargetMemoryService:
         )
         con.commit()
         rows = con.execute(
-            "SELECT id, belief, belief_updated, salience FROM l2_items WHERE belief_updated > 0"
+            "SELECT id, belief, belief_updated, salience FROM l2_items "
+            "WHERE belief_updated > 0 AND COALESCE(protected,0)=0 "
+            "AND COALESCE(kind,'episodic')!='profile'"
         ).fetchall()
         n = 0
         for iid, b, updated, sal in rows:
@@ -670,7 +693,8 @@ class TargetMemoryService:
         Returns the number downgraded."""
         con = sqlite3.connect(str(self.db_path))
         rows = con.execute(
-            "SELECT id FROM l2_items WHERE status='active' AND belief < ?",
+            "SELECT id FROM l2_items WHERE status='active' AND belief < ? "
+            "AND COALESCE(protected,0)=0",
             (float(hint),),
         ).fetchall()
         for (iid,) in rows:
@@ -726,15 +750,17 @@ class TargetMemoryService:
                 con.execute(
                     """
                     INSERT INTO l2_items
-                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source,kind,protected,valid_at,invalid_at,superseded_by,confidence)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                       summary=excluded.summary,
                       keywords=excluded.keywords,
                       content_hash=excluded.content_hash,
                       importance=MAX(l2_items.importance, excluded.importance),
                       salience=MAX(l2_items.salience, excluded.salience),
-                      source=excluded.source
+                      source=excluded.source,
+                      kind=excluded.kind,
+                      confidence=MAX(l2_items.confidence, excluded.confidence)
                     """,
                     (
                         item.id, item.tier, item.type, item.importance, item.summary,
@@ -743,6 +769,12 @@ class TargetMemoryService:
                         item.obsolete_of, 0, now, 0.5, 0, now,
                         float(getattr(item, "salience", 0.5)),
                         str(getattr(item, "source", "") or ""),
+                        str(getattr(item, "kind", "episodic") or "episodic"),
+                        int(getattr(item, "protected", 0) or 0),
+                        float(getattr(item, "valid_at", 0) or 0) or float(item.created_at or now),
+                        float(getattr(item, "invalid_at", 0) or 0),
+                        str(getattr(item, "superseded_by", "") or ""),
+                        float(getattr(item, "confidence", 0.5) or 0.5),
                     ),
                 )
                 con.execute("DELETE FROM l2_fts WHERE sid=?", (item.id,))
@@ -754,6 +786,43 @@ class TargetMemoryService:
             finally:
                 con.close()
         self._sync_kw([item])
+
+    def profile_get(self, key: str, limit: int = 5) -> list[dict]:
+        """Precise read of Profile items (M1): active, not invalidated,
+        matching the key in summary/keywords, ordered by confidence."""
+        k = str(key or "").strip()
+        if not k:
+            return []
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            rows = con.execute(
+                "SELECT id, summary, keywords, importance, confidence, valid_at "
+                "FROM l2_items WHERE kind='profile' AND COALESCE(invalid_at,0)=0 "
+                "AND (summary LIKE ? OR keywords LIKE ?) "
+                "ORDER BY confidence DESC, importance DESC LIMIT ?",
+                (f"%{k}%", f"%{k}%", int(limit)),
+            ).fetchall()
+        finally:
+            con.close()
+        return [{"id": r[0], "summary": r[1], "keywords": r[2],
+                 "importance": r[3], "confidence": r[4], "valid_at": r[5]}
+                for r in rows]
+
+    def supersede(self, old_id: str, new_id: str, when: float = 0.0) -> bool:
+        """Soft-invalidate an old item in favor of a new one (M1): sets
+        invalid_at + superseded_by. Never deletes; reversible."""
+        with self._lock:
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                cur = con.execute(
+                    "UPDATE l2_items SET invalid_at=?, superseded_by=? "
+                    "WHERE id=? AND COALESCE(invalid_at,0)=0",
+                    (float(when or time.time()), str(new_id), str(old_id)),
+                )
+                con.commit()
+                return cur.rowcount > 0
+            finally:
+                con.close()
 
     def mark(self, item_id: str, status: str) -> None:
         if status not in {"active", "downgraded", "cold", "archive"}:
