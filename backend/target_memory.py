@@ -808,6 +808,31 @@ class TargetMemoryService:
                  "importance": r[3], "confidence": r[4], "valid_at": r[5]}
                 for r in rows]
 
+    def profile_context(self, text: str, limit: int = 3) -> list[str]:
+        """Profile-layer recall for turn-time injection (M1): match stable
+        Profile items against the turn by shared 2-grams (natural questions
+        won't contain the stored phrase verbatim), ranked by match+confidence."""
+        q = str(text or "").strip()
+        if len(q) < 2:
+            return []
+        grams = {q[i:i + 2] for i in range(len(q) - 1)}
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            rows = con.execute(
+                "SELECT summary, keywords, confidence FROM l2_items "
+                "WHERE kind='profile' AND COALESCE(invalid_at,0)=0"
+            ).fetchall()
+        finally:
+            con.close()
+        scored: list[tuple[int, float, str]] = []
+        for s, kw, conf in rows:
+            store = str(s or "") + str(kw or "")
+            n = sum(1 for g in grams if g in store)
+            if n >= 1:
+                scored.append((n, float(conf or 0.5), str(s or "")))
+        scored.sort(reverse=True)
+        return [s for _, _, s in scored[:int(limit)]]
+
     def supersede(self, old_id: str, new_id: str, when: float = 0.0) -> bool:
         """Soft-invalidate an old item in favor of a new one (M1): sets
         invalid_at + superseded_by. Never deletes; reversible."""

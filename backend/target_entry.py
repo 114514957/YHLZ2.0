@@ -396,11 +396,11 @@ class ConversationSession:
         # Profile layer (M1): precise, high-trust stable facts about the owner
         if self._is_owner():
             try:
-                _prof = self.memory.profile_get(text, limit=3)
+                _prof = self.memory.profile_context(text, limit=3)
                 if _prof:
                     ctx_lines.append(
                         "（关于老爹的稳定画像，请以此为准）："
-                        + "；".join(str(r.get("summary", "")) for r in _prof))
+                        + "；".join(str(s) for s in _prof))
             except Exception:
                 pass
         result = await self.orchestrator.run(
