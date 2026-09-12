@@ -36,6 +36,15 @@ def _factory(channel: str = "private"):
 class TestDaemon(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        import pathlib as _pl
+        import tempfile as _tf
+
+        import backend.target_entry as _te
+        # isolate session storage: tests must NEVER write into cache/sessions
+        # (a previous leak polluted the real console session with fake answers
+        #  that the live model then imitated — ledger 0316)
+        cls._sess_dir = _te.SESSIONS_DIR
+        _te.SESSIONS_DIR = _pl.Path(_tf.mkdtemp()) / "sessions"
         cls.rt = DaemonRuntime(session_factory=_factory)
         cls.srv = make_server(0, "127.0.0.1", cls.rt)
         import threading
@@ -46,6 +55,9 @@ class TestDaemon(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.srv.shutdown()
+        import backend.target_entry as _te
+
+        _te.SESSIONS_DIR = cls._sess_dir
 
     def _post(self, path, obj):
         req = urllib.request.Request(

@@ -152,8 +152,12 @@ def _memory_fault_alert(content: str) -> None:
 
 
 def memory_save(content: str, kind: str = "preference", importance: int = 0,
-                service: Any = None, source: str = "") -> str:
-    """Save a notable item into long-term memory (自主写入)."""
+                service: Any = None, source: str = "",
+                kind_profile: bool = False) -> str:
+    """Save a notable item into long-term memory (自主写入).
+
+    kind_profile=True (M1): owner explicitly marked it -> Profile layer
+    (exact-read, protected from decay)."""
     import hashlib
     import time as _time
 
@@ -181,6 +185,8 @@ def memory_save(content: str, kind: str = "preference", importance: int = 0,
         evidence_ref="memory.save:user-approved",
         created_at=_time.time(),
         source=str(source or ""),
+        kind=("profile" if kind_profile else "episodic"),
+        confidence=(0.85 if kind_profile else 0.5),
     )
     from difflib import SequenceMatcher
     import sqlite3 as _sqlite3
@@ -265,12 +271,34 @@ def _verify_nonempty(output: Any) -> bool:
     return bool(str(output or "").strip())
 
 
+_PROFILE_MARKERS = ("记住", "别忘", "重要", "以后", "我的", "我是", "我叫",
+                    "我不", "我偏好", "我喜欢", "我讨厌", "忌讳", "过敏",
+                    "对我", "叫我")
+
+
+def _looks_like_profile(content: str) -> bool:
+    """Owner language annotation (M1): a strong marker upgrades to Profile."""
+    t = str(content or "")
+    return any(m in t for m in _PROFILE_MARKERS)
+
+
 def _save_handler(params: dict[str, Any]) -> str:
+    content = str(params.get("content", ""))
     return memory_save(
-        str(params.get("content", "")),
+        content,
         str(params.get("kind", "preference")),
         int(params.get("importance", 0) or 0),
+        kind_profile=bool(params.get("profile") or _looks_like_profile(content)),
     )
+
+
+def _profile_handler(key: str) -> str:
+    """M1: precise read of the Profile layer (stable facts about the owner)."""
+    svc = TargetMemoryService()
+    rows = svc.profile_get(str(key or ""), limit=5)
+    if not rows:
+        return f"画像无「{key}」相关记录"
+    return "；".join(str(r.get("summary", "")) for r in rows)
 
 
 def bind_memory_save_service(registry: CapabilityRegistry, service: Any,
@@ -282,12 +310,15 @@ def bind_memory_save_service(registry: CapabilityRegistry, service: Any,
     registry.register_capability(
         Capability(
             name=cap.name,
-            handler=lambda p: memory_save(
+            handler=lambda p, _s=service, _src=source: memory_save(
                 str(p.get("content", "")),
                 str(p.get("kind", "preference")),
                 int(p.get("importance", 0) or 0),
-                service=service,
-                source=str(p.get("source", "") or source),
+                service=_s,
+                source=str(p.get("source", "") or _src),
+                kind_profile=bool(
+                    p.get("profile")
+                    or _looks_like_profile(str(p.get("content", "")))),
             ),
             input=cap.input,
             optional_input=cap.optional_input,
@@ -353,6 +384,16 @@ def scheduler_capabilities() -> list[Capability]:
             risk="low",
             verify=_verify_nonempty,
             input_model=_SaveArgs,
+        ),
+        Capability(
+            name="memory.profile",
+            description="查老爹的稳定画像（画像层精确读）：称呼/偏好/忌讳/作息等。参数 key=关键词。以此为准，别记错。",
+            handler=lambda p: _profile_handler(str(p.get("key", ""))),
+            input=("key",),
+            optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
         ),
         Capability(
             name="diary.write",

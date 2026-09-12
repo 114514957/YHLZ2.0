@@ -172,6 +172,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
             set(caps),
             {"owner.approve",
              "ledger.search", "memory.recall", "memory.save", "memory.audit",
+             "memory.profile",
              "report.qq_weekly", "system.time",
              "diary.write", "diary.list", "diary.delete", "task.plan",
              "kb.add", "kb.query",
@@ -205,7 +206,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
         reg = setup_scheduler_capabilities()
         tools = reg.export_openai_tools()
         names = {t["function"]["name"] for t in tools}
-        self.assertEqual(names, {"ledger_search", "memory_recall", "memory_save", "memory_audit", "report_qq_weekly", "system_time",
+        self.assertEqual(names, {"ledger_search", "memory_recall", "memory_save", "memory_audit", "memory_profile", "report_qq_weekly", "system_time",
               "diary_write", "diary_list", "diary_delete", "task_plan",
               "kb_add", "kb_query",
               "qq_bootstrap", "qq_digest", "qq_export", "qq_process",
@@ -217,7 +218,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
     def test_internal_names_stay_dotted(self):
         reg = setup_scheduler_capabilities()
         self.assertEqual(reg.names(), ["diary.delete", "diary.list", "diary.write", "file.list", "file.read",
-             "kb.add", "kb.query", "ledger.search", "memory.audit", "memory.recall", "memory.save",
+             "kb.add", "kb.query", "ledger.search", "memory.audit", "memory.profile", "memory.recall", "memory.save",
              "owner.approve",
              "qq.bootstrap", "qq.digest", "qq.export", "qq.process", "qq.runbatch", "qq.shutdown", "qq.status", "qq.summarize",
              "report.qq_weekly",
@@ -229,7 +230,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
         rt = ToolRegistry()
         names = setup_scheduler_tools(rt)
         self.assertEqual(sorted(names), ["diary_delete", "diary_list", "diary_write", "file_list", "file_read",
-             "kb_add", "kb_query", "ledger_search", "memory_audit", "memory_recall", "memory_save", "owner_approve",
+             "kb_add", "kb_query", "ledger_search", "memory_audit", "memory_profile", "memory_recall", "memory_save", "owner_approve",
              "qq_bootstrap", "qq_digest", "qq_export", "qq_process", "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize", "report_qq_weekly", "schedule_plan", "skill_add", "skill_feedback", "skill_search", "system_time",
              "task_plan", "web_fetch", "web_search"])
         exported = rt.export_openai_tools()
