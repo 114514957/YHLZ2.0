@@ -5,7 +5,7 @@ Serves assets/webui/* on port 8321 and streams Yuanheng turns back as SSE:
     GET  /console.css     -> styles
     GET  /console.js      -> app
     GET  /state           -> json status (daemon/gemma/session/memory)
-    GET  /logs|/growth|/ledger|/mem|/sessions|/drives|/monitor
+    GET  /logs|/growth|/ledger|/mem|/sessions|/monitor
     POST /v1/chat/completions (stream) | /turn | /voice
 """
 from __future__ import annotations
