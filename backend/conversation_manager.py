@@ -258,7 +258,7 @@ class ConversationManager:
             return "这问题问得好！不过现在没连上大脑, 等连上了咱再聊。"
 
         elif any(q in user_lower for q in ["名字", "叫什么"]):
-            return "我叫元亨, 你的铁哥们！"
+            return "我叫元亨，你的数字生命伙伴。"
         
         elif any(q in user_lower for q in ["天气", "温度"]):
             return "今天天气看起来不错！具体天气信息需要连接LLM服务后查询。"

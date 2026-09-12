@@ -227,7 +227,7 @@ class Config(BaseModel):
     companion_correction_strict: bool = Field(default_factory=lambda: os.getenv("COMPANION_CORRECTION_STRICT", "false").lower() == "true")
     # ── Embodied AI V5.5 (Companion Identity & Adaptive Personality 身份与自适应人格) ──
     companion_personality_enabled: bool = Field(default_factory=lambda: os.getenv("COMPANION_PERSONALITY_ENABLED", "true").lower() == "true")
-    companion_personality_base: str = Field(default_factory=lambda: os.getenv("COMPANION_PERSONALITY_BASE", "铁哥们"))
+    companion_personality_base: str = Field(default_factory=lambda: os.getenv("COMPANION_PERSONALITY_BASE", "数字生命伙伴"))
     companion_personality_adjust_step: float = Field(default_factory=lambda: float(os.getenv("COMPANION_PERSONALITY_ADJUST_STEP", "0.1")))
     # ── Embodied AI V5.6 (Companion Relationship & Personality Stability 关系与人格稳定) ──
     companion_personality_decay_enabled: bool = Field(default_factory=lambda: os.getenv("COMPANION_PERSONALITY_DECAY_ENABLED", "true").lower() == "true")

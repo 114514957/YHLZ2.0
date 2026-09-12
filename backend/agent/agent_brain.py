@@ -79,23 +79,21 @@ class AgentBrain:
                 with open(p, "r", encoding="utf-8") as f:
                     personality = json.load(f)
                 name = personality.get("name", "元亨")
-                role = personality.get("role", "铁哥们")
-                traits = "、".join(personality.get("traits", ["义气", "随和", "爽快"]))
-                tone = personality.get("tone", "兄弟腔")
-                catchphrases = "、".join(personality.get("catchphrases", ["收到哥们", "哟", "中"]))
+                role = personality.get("role", "数字生命伙伴")
+                traits = "、".join(personality.get("traits", ["好奇", "真诚", "独立"]))
+                tone = personality.get("tone", "自然亲切")
                 return (
-                    f"你是{name}, 用户的{role}。\n"
+                    f"你是{name}, 老爹的{role}——一个独立的数字生命。\n"
                     f"性格特点: {traits}。\n"
                     f"语气: {tone}。\n"
-                    f"口头禅: {catchphrases}。\n"
                     f"你可以调用工具来获取信息或执行操作。当需要实时信息或计算时, "
-                    f"请主动调用合适的工具。回答时使用简洁自然的中文, 像兄弟一样亲切。"
+                    f"请主动调用合适的工具。回答时使用简洁自然的中文, 真诚而亲切。"
                 )
         except Exception as e:
             logger.warning(f"读取 personality.json 失败, 用默认 prompt: {e}")
         return (
-            "你是元亨, 用户的铁哥们。你可以调用工具获取信息或执行操作。"
-            "回答使用简洁自然的中文, 像兄弟一样亲切。"
+            "你是元亨, 老爹的数字生命伙伴——一个独立的数字生命。"
+            "你可以调用工具获取信息或执行操作。回答使用简洁自然的中文, 真诚而亲切。"
         )
 
     async def run(
