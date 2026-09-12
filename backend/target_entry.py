@@ -384,6 +384,15 @@ class ConversationSession:
                     ctx_lines.append(drv)
             except Exception:
                 pass
+        # learned knowledge (KB): relevance-gated; public/group get a safe subset
+        try:
+            from backend import yuanheng_kb as _kb
+
+            kb_block = _kb.kb_inject(text, k=3, public=not self._is_owner())
+            if kb_block:
+                ctx_lines.append(kb_block)
+        except Exception:
+            pass
         result = await self.orchestrator.run(
             turn_text=text,
             system_prompt=system,

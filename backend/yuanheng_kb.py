@@ -32,11 +32,6 @@ CREATE TABLE IF NOT EXISTS kb_items (
     uses INTEGER NOT NULL DEFAULT 0,
     quality INTEGER NOT NULL DEFAULT 0
 );
-CREATE TABLE IF NOT EXISTS kb_fts (
-    sid TEXT PRIMARY KEY,
-    summary TEXT NOT NULL,
-    category TEXT NOT NULL
-);
 """
 
 _COLUMN_ADD = [
@@ -59,11 +54,31 @@ def _db() -> sqlite3.Connection:
     return con
 
 
+def _ensure_fts(con: sqlite3.Connection) -> None:
+    """kb_fts must be a real FTS5 table (trigram tokenizer for Chinese).
+    A legacy PLAIN table makes bm25() throw and silently degrades every query
+    to LIKE (ledger 0302) — drop it and rebuild from kb_items."""
+    row = con.execute(
+        "SELECT sql FROM sqlite_master WHERE name='kb_fts'").fetchone()
+    if row and row[0] and "using fts5" in str(row[0]).lower():
+        return
+    con.execute("DROP TABLE IF EXISTS kb_fts")
+    try:
+        con.execute("CREATE VIRTUAL TABLE kb_fts USING fts5("
+                    "sid UNINDEXED, summary, category, tokenize='trigram')")
+    except sqlite3.OperationalError:
+        con.execute("CREATE VIRTUAL TABLE kb_fts USING fts5("
+                    "sid UNINDEXED, summary, category)")
+    con.execute("INSERT INTO kb_fts(sid, summary, category) "
+                "SELECT id, summary, category FROM kb_items")
+
+
 def _init() -> None:
     DEFAULT_KB_DB.parent.mkdir(parents=True, exist_ok=True)
     with _lock, _db() as con:
         con.executescript(_SCHEMA)
         _migrate(con)
+        _ensure_fts(con)
         con.commit()
 
 
@@ -105,8 +120,9 @@ def kb_add(summary: str, category: str = "tech", source: str = "",
             (iid, cat, text[:400], str(detail or "")[:2000],
              str(source or "")[:120], "active", stamp, now),
         )
+        con.execute("DELETE FROM kb_fts WHERE sid=?", (iid,))
         con.execute(
-            "INSERT OR REPLACE INTO kb_fts(sid,summary,category) VALUES(?,?,?)",
+            "INSERT INTO kb_fts(sid,summary,category) VALUES(?,?,?)",
             (iid, text[:400], cat),
         )
         con.commit()
@@ -131,12 +147,17 @@ def kb_query(query: str, limit: int = 6, category: str = "") -> list[dict]:
         except Exception:
             ids = []
         if not ids:
-            # word-wise AND fallback (space-separated tokens)
+            # word-wise AND fallback (space-separated tokens), escaped
             tokens = [w for w in re.split(r"[\s,，。.!！?？:：]+", q) if w]
             if not tokens:
                 tokens = [q]
-            conds = " AND ".join(["summary LIKE ?"] * len(tokens))
-            args = [f"%{w}%" for w in tokens] + [int(limit)]
+
+            def _esc(w: str) -> str:
+                return (str(w).replace("\\", "\\\\")
+                        .replace("%", "\\%").replace("_", "\\_"))
+
+            conds = " AND ".join(["summary LIKE ? ESCAPE '\\'"] * len(tokens))
+            args = [f"%{_esc(w)}%" for w in tokens] + [int(limit)]
             rows = con.execute(
                 f"SELECT id FROM kb_items WHERE status='active' "
                 f"AND {conds} ORDER BY created DESC LIMIT ?",
@@ -156,6 +177,44 @@ def kb_query(query: str, limit: int = 6, category: str = "") -> list[dict]:
                 "detail": r[3] or "", "source": r[4], "created": r[5],
             })
     return out
+
+
+def kb_inject(text: str, k: int = 3, public: bool = False,
+              max_chars: int = 480) -> str:
+    """Build a compact, relevance-gated "related knowledge" block for the
+    prompt (ledger 0302). Public/group channels only get a safe subset
+    (tech/method/resource/skill, no self-reflection/personal sources)."""
+    q = str(text or "").strip()
+    if len(q) < 4:
+        return ""
+    rows = kb_query(q, limit=max(2, int(k) * 2))
+    if not rows:
+        return ""
+    safe_cats = {"tech", "method", "resource", "skill"}
+    private_src = ("自主", "用户对话", "self", "对话反馈", "对话")
+    out: list[str] = []
+    used = 0
+    for it in rows:
+        if public:
+            if it.get("category") not in safe_cats:
+                continue
+            if any(x in str(it.get("source", "")) for x in private_src):
+                continue
+        line = "· " + str(it.get("summary", ""))[:120]
+        if used + len(line) > int(max_chars):
+            break
+        out.append(line)
+        used += len(line)
+        try:
+            kb_note_hit(it.get("id", ""))
+        except Exception:
+            pass
+        if len(out) >= int(k):
+            break
+    if not out:
+        return ""
+    return ("（你积累过的相关知识，仅供你参考；相关就用、不相关就忽略，"
+            "**不要罗列**）：\n" + "\n".join(out))
 
 
 def kb_list(category: str = "", limit: int = 50) -> list[dict]:
@@ -213,6 +272,23 @@ def kb_stats() -> dict:
             "GROUP BY category").fetchall()
     return {"items": total, "by_category": {c: n for c, n in cats},
             "db": str(DEFAULT_KB_DB)}
+
+
+def kb_cleanup() -> dict:
+    """Archive (never delete) test-fixture rows and unprovenanced legacy rows
+    so they leave the active pool (ledger 0302). Reversible via status."""
+    _init()
+    with _lock, _db() as con:
+        fx = con.execute(
+            "UPDATE kb_items SET status='archive', updated=? "
+            "WHERE status='active' AND source LIKE 'qq:g1:t%'",
+            (time.time(),)).rowcount
+        up = con.execute(
+            "UPDATE kb_items SET status='archive', updated=? "
+            "WHERE status='active' AND source LIKE 'qq:g:t0:%'",
+            (time.time(),)).rowcount
+        con.commit()
+    return {"fixtures_archived": fx, "unprovenanced_archived": up}
 
 
 def kb_migrate_from_l2() -> int:
