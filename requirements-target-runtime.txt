@@ -1,0 +1,9 @@
+# Live runtime stack (ledger 0295): daemon + workbench + MCP + voice I/O.
+# 注意：与 requirements-target-input.txt 的 numpy 版本冲突（1.26 vs 2.2），
+# 按使用场景分别安装，勿混装。numpy 不在此钉死，交由所选 profile 决定。
+mcp==1.29.1
+faster-qwen3-tts==0.4.0
+websockets==15.0.1
+psutil==7.0.0
+funasr==1.4.13
+sounddevice==0.5.2

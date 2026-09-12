@@ -1,14 +1,12 @@
-"""YHLZ Workbench console server (ledger 0222, M1): single-page control deck.
+"""YHLZ Workbench console server (ledger 0222+): single-page control deck.
 
-Serves assets/webui/* on port 8322 and streams Yuanheng turns back as SSE:
+Serves assets/webui/* on port 8321 and streams Yuanheng turns back as SSE:
     GET  /                -> index.html (static)
     GET  /console.css     -> styles
     GET  /console.js      -> app
     GET  /state           -> json status (daemon/gemma/session/memory)
-    POST /talk {text}     -> SSE stream of {state|delta|turn_done|error} frames
-
-Design notes (v2): backend-owned audio/ASR/TTS come in M2+; M1 is the control
-deck shell + streaming text dialog. Rolling back = just stop port 8322.
+    GET  /logs|/growth|/ledger|/mem|/sessions|/drives|/monitor
+    POST /v1/chat/completions (stream) | /turn | /voice
 """
 from __future__ import annotations
 
