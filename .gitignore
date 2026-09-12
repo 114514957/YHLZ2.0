@@ -78,6 +78,6 @@ YHLZqwen-apiKey-.csv
 角色皮套/
 
 # Runtime state (not source; ledger 0289)
-data/
+/data/
 backend/data/voice_cache/
 config/qqwatch.local.json
