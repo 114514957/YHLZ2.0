@@ -691,6 +691,7 @@ class QQBridge:
         if not ans:
             return
         ans, out_imgs, out_files, out_faces, vmark, out_devs = _extract_markers(ans.strip())
+        self.log(f"回复 {user_id}: {ans[:50]}")
         params = {"message": ans}
         if msg_type == "private":
             params.update(message_type="private", user_id=int(user_id))
