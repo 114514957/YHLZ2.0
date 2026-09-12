@@ -351,9 +351,10 @@ class DaemonRuntime:
                 print(f"[schedule] loop err {type(exc).__name__}", flush=True)
 
     def _memory_upkeep_loop(self) -> None:
-        """Weekly memory upkeep (ledger 0189): every Sunday 12:00 run belief
-        time-decay + downgrades (cold) so L2 behaves like a real memory
-        (unused items fade, nothing is ever deleted)."""
+        """Weekly memory upkeep (ledger 0189/0301): belief time-decay + downgrades
+        (cold) so L2 behaves like a real memory (unused items fade, nothing is
+        ever deleted). Runs weekly with catch-up so a daemon that was down at the
+        scheduled moment still runs it on the next start."""
         import pathlib
 
         stamp_file = pathlib.Path(_PROJECT) / "cache" / "memory_upkeep_last.json"
@@ -361,19 +362,30 @@ class DaemonRuntime:
             time.sleep(60)
             try:
                 now = time.localtime()
-                if now.tm_wday != 6 or now.tm_hour != 12:  # Sunday 12:00-12:59
-                    continue
                 today = time.strftime("%Y-%m-%d")
                 if self._upkeep_last == today:
                     continue
+                last = ""
                 try:
                     if stamp_file.exists():
-                        last = json.loads(stamp_file.read_text(encoding="utf-8")).get("date", "")
-                        if last == today:
-                            self._upkeep_last = today
-                            continue
+                        last = str(json.loads(
+                            stamp_file.read_text(encoding="utf-8")).get("date", ""))
                 except Exception:
                     pass
+                # weekly cadence WITH catch-up (ledger 0301): run when >=7 days
+                # since the last run (or never run), regardless of day/hour —
+                # the old "only Sunday 12:00" gate silently never fired when the
+                # daemon was down at that moment.
+                import datetime as _dt
+
+                try:
+                    due = (not last) or (
+                        (_dt.date.fromisoformat(today)
+                         - _dt.date.fromisoformat(last)).days >= 7)
+                except Exception:
+                    due = True
+                if not due:
+                    continue
                 self._upkeep_last = today
                 from backend.target_memory import TargetMemoryService
 

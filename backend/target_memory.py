@@ -404,29 +404,9 @@ class TargetMemoryService:
                 continue
             items.append(
                 L2Item(
-                    id="mem_" + _fingerprint(json.dumps([evidence_ref, summary[:80]], ensure_ascii=False))[:12],
-                    tier=tier,
-                    type=type_,
-                    importance=importance,
-                    summary=summary,
-                    content_hash=_fingerprint(summary),
-                    keywords=str(cand.get("keywords", "") or "")[:400],
-                    evidence_ref=str(evidence_ref),
-                    created_at=time.time(),
-                    access_count=0,
-                )
-            )
-        return items
-        for cand in raw or []:
-            importance = int(cand.get("importance", 3) or 3)
-            summary = str(cand.get("summary", "") or "")
-            type_ = str(cand.get("type", "fact") or "fact")
-            tier = str(cand.get("tier", "L2") or "L2")
-            if not summary:
-                continue
-            items.append(
-                L2Item(
-                    id="mem_" + _fingerprint(json.dumps([evidence_ref, summary[:80]], ensure_ascii=False))[:12],
+                    # content-based id: same fact dedups regardless of provenance
+                    # (ledger 0301). Normalized so whitespace/case don't split.
+                    id="mem_" + _fingerprint(" ".join(str(summary).lower().split()))[:12],
                     tier=tier,
                     type=type_,
                     importance=importance,
@@ -706,9 +686,16 @@ class TargetMemoryService:
                 now = time.time()
                 con.execute(
                     """
-                    INSERT OR REPLACE INTO l2_items
+                    INSERT INTO l2_items
                     (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(id) DO UPDATE SET
+                      summary=excluded.summary,
+                      keywords=excluded.keywords,
+                      content_hash=excluded.content_hash,
+                      importance=MAX(l2_items.importance, excluded.importance),
+                      salience=MAX(l2_items.salience, excluded.salience),
+                      source=excluded.source
                     """,
                     (
                         item.id, item.tier, item.type, item.importance, item.summary,
