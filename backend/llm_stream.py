@@ -30,6 +30,7 @@ async def stream_openai_compatible(
     model: str,
     messages: list[dict],
     on_event: EventSink,
+    tools: Optional[list[dict]] = None,
     temperature: float = 0.7,
     max_tokens: int = 1200,
     reasoning_effort: Optional[str] = None,
@@ -57,6 +58,8 @@ async def stream_openai_compatible(
     }
     if reasoning_effort:
         payload["reasoning_effort"] = reasoning_effort
+    if tools:
+        payload["tools"] = tools
     headers = {} if not api_key else {"Authorization": f"Bearer {api_key}"}
     if extra_headers:
         headers.update(extra_headers)

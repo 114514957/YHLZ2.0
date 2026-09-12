@@ -223,7 +223,9 @@ class DaemonRuntime:
         """Unified conversation (ledger 0226): all owner text entry points share
         one session ('console' = console UI / pet chat window / plain /turn)."""
         c = str(channel or "").strip()
-        if c in ("", "private", "default", "public", "chat", "console"):
+        # "public" is the external OpenAI-compatible channel — it must stay
+        # isolated (own memory db, read-only tools), NOT alias to owner.
+        if c in ("", "private", "default", "chat", "console"):
             return "console"
         return c
 

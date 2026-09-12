@@ -35,6 +35,7 @@ class Capability:
     verify: Optional[Callable[[Any], bool]] = None
     input_model: Any = None  # optional pydantic BaseModel: typed arg contract (R1)
     description: str = ""  # real tool guidance shown to the model (ledger 0184)
+    llm_exposed: bool = True  # False = owner-only, never shown to the LLM
 
     @property
     def all_inputs(self) -> tuple[str, ...]:
@@ -150,13 +151,14 @@ class CapabilityRegistry:
 
     def export_openai_tools(self) -> list[dict]:
         with self._lock:
-            return [c.to_openai_tool() for c in self._caps.values()]
+            return [c.to_openai_tool() for c in self._caps.values()
+                    if c.llm_exposed]
 
     def get_by_openai_name(self, openai_name: str) -> Optional[Capability]:
         """Reverse-map an exposed (underscored) tool name to its capability."""
         with self._lock:
             for cap in self._caps.values():
-                if cap.openai_name == openai_name:
+                if cap.llm_exposed and cap.openai_name == openai_name:
                     return cap
         return None
 

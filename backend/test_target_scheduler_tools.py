@@ -64,8 +64,8 @@ class TestSchedulerRegistration(unittest.TestCase):
             sorted(names),
             ["diary_delete", "diary_list", "diary_write",
              "file_list", "file_read", "kb_add", "kb_query", "ledger_search",
-             "memory_recall", "memory_save", "owner_approve", "qq_bootstrap", "qq_digest", "qq_export", "qq_process",
-             "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize", "schedule_plan", "skill_add", "skill_feedback", "skill_search", "system_time", "task_plan",
+             "memory_audit", "memory_recall", "memory_save", "owner_approve", "qq_bootstrap", "qq_digest", "qq_export", "qq_process",
+             "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize", "report_qq_weekly", "schedule_plan", "skill_add", "skill_feedback", "skill_search", "system_time", "task_plan",
              "web_fetch", "web_search"],
         )
         exported = self.registry.export_openai_tools()

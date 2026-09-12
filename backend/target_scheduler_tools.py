@@ -535,6 +535,7 @@ def scheduler_capabilities() -> list[Capability]:
             requires=(APPROVE_POLICY,),
             side_effect=True,
             risk="high",
+            llm_exposed=False,  # owner-only: the agent must never self-approve
         ),
         Capability(
             name="skill.feedback",

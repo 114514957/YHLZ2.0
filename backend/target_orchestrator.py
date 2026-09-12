@@ -151,6 +151,7 @@ def build_openai_compatible_llm_turn(
                 return await stream_openai_compatible(
                     base_url=url, api_key=key, model=payload["model"],
                     messages=messages, on_event=_on,
+                    tools=tools or None,
                     temperature=float(temperature),
                     max_tokens=int(max_tokens),
                     reasoning_effort=reasoning_effort,
