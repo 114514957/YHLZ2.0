@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from backend.yhlz_paths import BOT_UIN, NAPCAT_QR, QQWATCH_SHELL
+from backend import turn_control as _tc
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = _PROJECT_ROOT / "assets" / "webui"
@@ -736,9 +737,12 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                     rr = self._speak_interruptible(
                         answer, st.get("tts_speaker", "Vivian"),
                         int(st.get("device", 1) or 1),
-                        st.get("tts_model", "0.6B"))
-                    if rr == "interrupted":
+                        st.get("tts_model", "0.6B"),
+                        should_stop=lambda: _tc.cancelled("console"))
+                    if rr in ("interrupted", "cancelled"):
                         emit({"type": "interrupted"})
+                        if rr == "cancelled":
+                            break
                         continue  # back to listening (barge-in)
                 if not continuous:
                     break
@@ -915,8 +919,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         return out[:6] or [t[:maxlen]]
 
     def _speak_interruptible(self, text: str, speaker: str = "Vivian",
-                             device: int = 1,
-                             model_key: str = "0.6B") -> str:
+                             device: int = 1, model_key: str = "0.6B",
+                             should_stop=None) -> str:
         """Sentence-by-sentence resident TTS with barge-in (echo-masked).
         First sentence is synthesized+played immediately (faster first sound);
         if the user speaks over it, stop and return 'interrupted'."""
@@ -948,6 +952,10 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                     t0 = time.time()
                     hot = 0
                     while time.time() - t0 < dur + 0.3:
+                        if should_stop is not None and should_stop():
+                            sd.stop()
+                            _log("voice", "tts cancelled")
+                            return "cancelled"
                         data, _ = inp.read(1600)
                         mono = np.asarray(
                             data[:, 0] if data.ndim > 1 else data,

@@ -160,6 +160,8 @@ def _capture_impl(device: int, cap_gain: float, duration_s: float,
     user_started = False
     user_silent_s = 0.0
     lead = 0
+    _preroll: list[np.ndarray] = []   # pre-onset frames (avoid clipping 1st phoneme)
+    _PREROLL_FRAMES = 3
     seg: list[np.ndarray] = []
     seg_silent_s = 0.0
     seg_len_s = 0.0
@@ -198,11 +200,17 @@ def _capture_impl(device: int, cap_gain: float, duration_s: float,
                       flush=True)
 
             if is_speech:
+                if not seg and _preroll:
+                    seg.extend(_preroll)
+                    _preroll = []
                 seg.append(enhanced.copy())
                 seg_len_s += 0.1
                 seg_silent_s = 0.0
                 lead += 1
             else:
+                _preroll.append(enhanced.copy())
+                if len(_preroll) > _PREROLL_FRAMES:
+                    _preroll.pop(0)
                 seg_silent_s += 0.1
                 if 0 < lead < MIN_LEAD_FRAMES:
                     lead = 0
@@ -228,6 +236,7 @@ def _capture_impl(device: int, cap_gain: float, duration_s: float,
                 seg = []
                 seg_len_s = 0.0
                 seg_silent_s = 0.0
+                lead = 0
                 if seg_s >= MIN_USER_SPEECH_S:
                     accept = True
                     sim = 1.0
