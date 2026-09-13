@@ -30,7 +30,7 @@ REL_DB = ROOT / "cache" / "entity_graph.db"
 JUNK = re.compile(r"(测试|test|smoke|PING|r18|debug|开发经验（利贞）|啊啊|xxx|TODO)", re.I)
 
 
-def load_memories(limit: int | None) -> list[dict]:
+def load_memories(limit: int | None, offset: int = 0) -> list[dict]:
     if not MEM_DB.exists():
         return []
     con = sqlite3.connect(str(MEM_DB))
@@ -47,8 +47,9 @@ def load_memories(limit: int | None) -> list[dict]:
         if JUNK.search(s):
             continue
         out.append(d)
-        if limit and len(out) >= limit:
-            break
+    out = out[offset:]
+    if limit:
+        out = out[:limit]
     return out
 
 
@@ -57,9 +58,12 @@ def _gen_prompt(mem: dict) -> str:
         "下面是你（元亨）的一条真实记忆：\n"
         f"「{mem['summary']}」\n"
         f"（类型={mem.get('type')}，类别={mem.get('kind')}，来源={mem.get('source')}）\n\n"
-        "请生成 1-3 轮「老爹问 → 你答」的对话，考察你能自然想起并运用这条记忆。"
-        "要求：短（每条回复 ≤60 字）、口语、具体、有情绪；不要罗列、不要元描述、"
-        "不要每轮都反问；答案必须真的用到这条记忆。"
+        "请生成 1-3 轮「老爹问 → 你答」的对话，考察你能自然想起并运用这条记忆。\n"
+        "参考这种‘短、具体、有情绪’的度（只学味道，别照抄内容）：\n"
+        "  记忆「老爹喜欢深夜思考」→ 老爹：这么晚还不睡？ / 元亨：你不是也醒着嘛。行吧，我陪你，等你想睡了我再睡。\n"
+        "  记忆「老爹要求实话实说」→ 老爹：这个你到底能不能做？ / 元亨：不能。缺个工具，别的都是废话。你要的话我去想办法。\n"
+        "要求：每条回复 ≤60 字；口语、具体、有情绪；不罗列、不解释机制、不每轮反问；"
+        "答案必须真的用到这条记忆；可以带一点可爱/傲娇。"
         '只输出 JSON 数组，每项 {"input":"老爹的话","output":"你的话","emotion":"情绪词","scene":"场景词"}，'
         "不要输出别的。"
     )
@@ -94,12 +98,13 @@ def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description="元亨记忆/关系 → 结构化人格样本")
     ap.add_argument("--limit", type=int, default=6)
+    ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--out", default="data/finetune/persona_memory.jsonl")
     ap.add_argument("--append", action="store_true")
     args = ap.parse_args()
 
-    mems = load_memories(None if args.all else args.limit)
+    mems = load_memories(None if args.all else args.limit, args.offset)
     print(f"[mem] 候选记忆 {len(mems)} 条")
     persona = _persona_prompt()
     out_path = ROOT / args.out
@@ -115,7 +120,10 @@ def main() -> int:
                 print(f"[fail] {mem['id']} {type(e).__name__}")
                 continue
             hook = str(mem["summary"])[:24]
+            rel = str(mem.get("source") or "").strip() or "老爹"
             for p in pairs:
+                emo = re.split(r"[，,/、·]", p["emotion"])[0].strip()
+                scn = re.split(r"[，,/、·]", p["scene"])[0].strip() or "回忆"
                 rec = {
                     "messages": [
                         {"role": "system", "content": SYSTEM},
@@ -124,9 +132,9 @@ def main() -> int:
                     ],
                     "instruction": f"你是元亨。你记得：{mem['summary']}",
                     "memory_hook": hook,
-                    "emotion": p["emotion"],
-                    "scene": p["scene"] or "回忆",
-                    "relationship": str(mem.get("source") or ""),
+                    "emotion": emo,
+                    "scene": scn,
+                    "relationship": rel,
                     "source": f"mem:{mem['id']}",
                 }
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
