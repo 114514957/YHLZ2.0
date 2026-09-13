@@ -103,18 +103,21 @@ def load_golden(path: Path | None = None) -> list[dict]:
         gid = parts[i]
         body = parts[i + 1]
         meta: dict[str, str] = {}
-        for m in re.finditer(r"^\s*-\s*([A-Za-z_]+)\s*:\s*(.*)$", body, re.MULTILINE):
+        for m in re.finditer(r"^[ \t]*-[ \t]*([A-Za-z_]+)[ \t]*:[ \t]*(.*)$", body, re.MULTILINE):
             meta[m.group(1).lower()] = m.group(2).strip()
         m_user = re.search(r"^###\s*老爹\s*\n(.*?)(?=^###\s*元亨)", body, re.MULTILINE | re.DOTALL)
         m_asst = re.search(r"^###\s*元亨\s*\n(.*?)(?=^##\s+golden-|\Z)", body, re.MULTILINE | re.DOTALL)
         if not (m_user and m_asst):
             continue
+        status = meta.get("status", "candidate").strip().lower()
+        status = {"fidex": "fixed", "fix": "fixed", "fixed": "fixed",
+                  "keep": "keep", "drop": "drop", "delete": "drop"}.get(status, status or "candidate")
         out.append({"id": int(gid),
                     "source": meta.get("source", ""),
                     "note": meta.get("note", ""),
                     "rating": meta.get("rating", ""),
                     "tags": meta.get("tags", ""),
-                    "status": meta.get("status", "keep"),
+                    "status": status,
                     "user": m_user.group(1).strip(),
                     "assistant": m_asst.group(1).strip()})
     return out
