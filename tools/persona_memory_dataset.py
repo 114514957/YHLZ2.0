@@ -43,7 +43,7 @@ STYLE = (
 )
 
 
-def load_memories(limit: int | None, offset: int = 0) -> list[dict]:
+def load_memories(limit: int | None, offset: int = 0, ids: set[str] | None = None) -> list[dict]:
     if not MEM_DB.exists():
         return []
     con = sqlite3.connect(str(MEM_DB))
@@ -59,6 +59,8 @@ def load_memories(limit: int | None, offset: int = 0) -> list[dict]:
         if JUNK.search(str(d.get("summary") or "")):
             continue
         out.append(d)
+    if ids is not None:
+        return [d for d in out if d["id"] in ids]
     out = out[offset:]
     return out[:limit] if limit else out
 
@@ -101,11 +103,13 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=6)
     ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--all", action="store_true")
+    ap.add_argument("--ids", default=None, help="逗号分隔的记忆 id，仅处理这些")
     ap.add_argument("--out", default="data/finetune/persona_memory.jsonl")
     ap.add_argument("--append", action="store_true")
     args = ap.parse_args()
 
-    mems = load_memories(None if args.all else args.limit, args.offset)
+    ids = {s.strip() for s in args.ids.split(",") if s.strip()} if args.ids else None
+    mems = load_memories(None if args.all else args.limit, args.offset, ids)
     print(f"[mem] 候选记忆 {len(mems)} 条")
     persona = _persona_prompt()
     out_path = ROOT / args.out
