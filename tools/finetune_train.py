@@ -142,10 +142,11 @@ def _dry_run(cfg: dict, train: list[dict], val: list[dict]) -> int:
     return 0
 
 
-def _train(cfg: dict, train: list[dict], val: list[dict]) -> int:
+def _train(cfg: dict, train: list[dict], val: list[dict], resume_from: str | None = None) -> int:
     import torch
     from datasets import Dataset
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+    from peft import (LoraConfig, PeftModel, get_peft_model,
+                      prepare_model_for_kbit_training)
     from transformers import (AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig,
                               DataCollatorForSeq2Seq, Trainer, TrainingArguments)
 
@@ -172,7 +173,11 @@ def _train(cfg: dict, train: list[dict], val: list[dict]) -> int:
     lora = LoraConfig(
         r=cfg["lora_r"], lora_alpha=cfg["lora_alpha"], lora_dropout=cfg["lora_dropout"],
         target_modules=cfg["target_modules"], bias="none", task_type="CAUSAL_LM")
-    model = get_peft_model(model, lora)
+    if resume_from:
+        print(f"[train] 从已有 adapter 续训：{resume_from}")
+        model = PeftModel.from_pretrained(model, resume_from, is_trainable=True)
+    else:
+        model = get_peft_model(model, lora)
     model.print_trainable_parameters()
 
     def _map(rec: dict) -> dict:
@@ -225,11 +230,20 @@ def main() -> int:
     ap.add_argument("--val", default=None)
     ap.add_argument("--output", default=None)
     ap.add_argument("--epochs", type=int, default=None)
+    ap.add_argument("--tag", default=None, help="数据/产物版本号（如 v1）")
+    ap.add_argument("--resume-from", dest="resume_from", default=None,
+                    help="从已有 LoRA adapter 目录续训（增量训练）")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--no-4bit", dest="no_4bit", action="store_true")
     args = ap.parse_args()
 
     cfg = _load_cfg(Path(args.config))
+    tag = args.tag or cfg.get("tag")
+    if tag:
+        base_out = cfg.get("output_dir", "models/lora/yuanheng-gemma4-e4b")
+        cfg["train_file"] = f"data/finetune/sft_persona_{tag}_train.jsonl"
+        cfg["val_file"] = f"data/finetune/sft_persona_{tag}_val.jsonl"
+        cfg["output_dir"] = base_out if base_out.endswith(f"-{tag}") else f"{base_out}-{tag}"
     if args.base:
         cfg["base_model"] = args.base
     if args.train:
@@ -247,11 +261,11 @@ def main() -> int:
     val = _read_jsonl(ROOT / cfg["val_file"])
     if not train:
         print(f"[error] 训练集为空：{cfg['train_file']}"
-              f"（先跑 tools/finetune_split.py）", file=sys.stderr)
+              f"（先跑 finetune_assemble.py + finetune_split.py）", file=sys.stderr)
         return 1
     if args.dry_run:
         return _dry_run(cfg, train, val)
-    return _train(cfg, train, val)
+    return _train(cfg, train, val, args.resume_from)
 
 
 if __name__ == "__main__":

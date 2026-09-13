@@ -52,6 +52,7 @@ def main() -> int:
 
     ap = argparse.ArgumentParser(description="切分人格 SFT 数据为 train/val")
     ap.add_argument("--config", default=str(cfg_path))
+    ap.add_argument("--tag", default=None, help="数据版本号（如 v1），覆盖默认文件名")
     ap.add_argument("--in", dest="data_in", default=None)
     ap.add_argument("--train", default=None)
     ap.add_argument("--val", default=None)
@@ -59,9 +60,16 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=None)
     args = ap.parse_args()
 
-    data_in = ROOT / (args.data_in or cfg.get("data_in", "data/finetune/sft_persona.jsonl"))
-    train_path = ROOT / (args.train or cfg.get("train_file", "data/finetune/sft_persona_train.jsonl"))
-    val_path = ROOT / (args.val or cfg.get("val_file", "data/finetune/sft_persona_val.jsonl"))
+    tag = args.tag or cfg.get("tag")
+    data_in = ROOT / (args.data_in or
+                      (f"data/finetune/sft_persona_{tag}.jsonl" if tag
+                       else cfg.get("data_in", "data/finetune/sft_persona.jsonl")))
+    train_path = ROOT / (args.train or
+                         (f"data/finetune/sft_persona_{tag}_train.jsonl" if tag
+                          else cfg.get("train_file", "data/finetune/sft_persona_train.jsonl")))
+    val_path = ROOT / (args.val or
+                       (f"data/finetune/sft_persona_{tag}_val.jsonl" if tag
+                        else cfg.get("val_file", "data/finetune/sft_persona_val.jsonl")))
     ratio = args.ratio if args.ratio is not None else float(cfg.get("val_ratio", 0.15))
     seed = args.seed if args.seed is not None else int(cfg.get("seed", 20260913))
 
