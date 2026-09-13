@@ -62,7 +62,7 @@ def main() -> int:
 
     ap = argparse.ArgumentParser(description="装配版本化人格 SFT 训练集")
     ap.add_argument("--tag", default=cfg.get("tag", "v1"))
-    ap.add_argument("--golden", default=str(ROOT / "tools" / "persona_golden.md"))
+    ap.add_argument("--golden", default=str(ROOT / "docs" / "素材" / "黄金样本.md"))
     ap.add_argument("--no-golden", dest="no_golden", action="store_true")
     args = ap.parse_args()
 

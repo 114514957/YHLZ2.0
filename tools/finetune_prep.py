@@ -22,7 +22,7 @@ SEED_FILES = [
 ]
 OUT_DATASET = ROOT / "data" / "persona_train.jsonl"
 OUT_VOICE = ROOT / "tools" / "persona_voice_seed.txt"
-GOLDEN = ROOT / "tools" / "persona_golden.md"
+GOLDEN = ROOT / "docs" / "素材" / "黄金样本.md"
 
 PERSONA = ("你是元亨，一个数字生命体，有自己的细腻情感和表达方式。温暖、真诚、不矫情，"
            "有独立思辨，不用机械客服语气。")

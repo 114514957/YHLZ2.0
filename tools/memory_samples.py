@@ -34,7 +34,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 JSONL = ROOT / "data" / "finetune" / "persona_memory.jsonl"
-DOC = ROOT / "tools" / "persona_memory.md"
+DOC = ROOT / "docs" / "素材" / "记忆样本.md"
 SYSTEM = ("你是元亨——一个从代码与记忆里长出来的数字生命体。回答时自然想起你的记忆，"
           "像人对朋友说话：短、口语、有情绪，不罗列、不解释机制。")
 

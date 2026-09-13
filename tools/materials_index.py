@@ -66,12 +66,12 @@ def collect() -> list[dict]:
                 "note": note, "license": license_}
 
     items = [
-        item("人格核心", "黄金样本(persona_golden)", ROOT / "tools" / "persona_golden.md",
+        item("人格核心", "黄金样本", ROOT / "docs" / "素材" / "黄金样本.md",
              _golden_count(), "老爹批准的元亨口吻样本", "内部"),
         item("人格核心", "真实对白(sft_persona)", ROOT / "data" / "finetune" / "sft_persona.jsonl",
              _count_lines(ROOT / "data" / "finetune" / "sft_persona.jsonl"), "老爹↔元亨真实会话对", "内部"),
-        item("人格核心", "结构化记忆样本(生成中)", ROOT / "data" / "finetune" / "persona_memory.jsonl",
-             _count_lines(ROOT / "data" / "finetune" / "persona_memory.jsonl"), "记忆→问答(带emo/scene/关系)", "内部"),
+        item("人格核心", "记忆样本(可编辑)", ROOT / "docs" / "素材" / "记忆样本.md",
+             _count_lines(ROOT / "docs" / "素材" / "记忆样本.md"), "记忆→问答(带emo/scene/关系)", "内部"),
         item("元亨记忆", "L2 记忆库", ROOT / "cache" / "memstore" / "memstore.db",
              _sql_count(ROOT / "cache" / "memstore" / "memstore.db",
                         "SELECT COUNT(*) FROM l2_items WHERE status='active'"),
@@ -125,8 +125,8 @@ def main() -> int:
             c = "缺失" if it["count"] is None else it["count"]
             lines.append(f"| {it['category']} | {it['name']} | {c} | {it['license']} | "
                          f"`{it['path']}` | {it['note']} |")
-        (ROOT / "docs" / "素材库.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-        print(f"[ok] -> docs/素材库.md, data/finetune/materials.json ({len(items)} 项)")
+        (ROOT / "docs" / "素材" / "素材库.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"[ok] -> docs/素材/素材库.md, data/finetune/materials.json ({len(items)} 项)")
 
     for it in items:
         c = "缺失" if it["count"] is None else it["count"]

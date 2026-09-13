@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 ENDPOINT = "http://127.0.0.1:8081/v1/chat/completions"
-OUT_DEFAULT = ROOT / "tools" / "persona_golden.md"
+OUT_DEFAULT = ROOT / "docs" / "素材" / "黄金样本.md"
 GROUND_FILES = [ROOT / "docs" / "元亨认知根基.md", ROOT / "docs" / "元亨的日记.md"]
 
 SCENARIOS: dict[str, list[str]] = {

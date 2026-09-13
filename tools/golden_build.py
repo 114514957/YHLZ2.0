@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 CAND = ROOT / "data" / "finetune" / "golden_candidates.jsonl"
-GOLDEN = ROOT / "tools" / "persona_golden.md"
+GOLDEN = ROOT / "docs" / "素材" / "黄金样本.md"
 
 SCHED_PREFIX = ("（计划表到点）", "(计划表", "（系统", "系统：", "[系统")
 META_MARK = ("元亨的内部状态", "**已锁定**", "**最终确认")
