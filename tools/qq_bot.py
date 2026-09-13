@@ -395,7 +395,7 @@ class QQBridge:
         tag = {"awaiting": "❓ 需要你决定", "done": "✅ 完成",
                "error": "⚠️ 出错", "running": "⏳ 进行中",
                "info": "ℹ️"}.get(status, status)
-        msg = f"[opencode] {tag}\n{text}"
+        msg = f"[利贞] {tag}\n{text}"
         if status == "done" and hint:
             msg += "\n\n回 #y 提交 / #n 不提交 / #push 推送"
             try:
@@ -403,7 +403,7 @@ class QQBridge:
                 from backend.target_memory import TargetMemoryService
                 from backend.target_scheduler_tools import memory_save
 
-                memory_save(f"开发经验（opencode）：{str(text)[:80]}",
+                memory_save(f"开发经验（利贞）：{str(text)[:80]}",
                             kind="event", importance=4,
                             service=TargetMemoryService(), source="agent")
             except Exception:
@@ -428,12 +428,12 @@ class QQBridge:
     async def _start_dev(self, ws, params, task: str) -> None:
         """Kick off an opencode dev task (ask-first flow) for the owner."""
         if dev_runner is None:
-            await self._say(ws, params, "[opencode] 运行器不可用")
+            await self._say(ws, params, "[利贞] 运行器不可用")
             return
         task = str(task).strip()
         if not task:
             return
-        await self._say(ws, params, f"[opencode] 已开工：{task[:80]}")
+        await self._say(ws, params, f"[利贞] 已开工：{task[:80]}")
         self._spawn(ws, params, lambda: (
             (lambda d: (d.get("status", "error"), d.get("text", "")))(
                 dev_runner.start(task))))
@@ -441,7 +441,7 @@ class QQBridge:
     async def _dev_cmd(self, ws, text, msg_type, user_id, ev) -> None:
         params = self._params(msg_type, user_id, ev)
         if dev_runner is None:
-            await self._say(ws, params, "[opencode] 运行器不可用")
+            await self._say(ws, params, "[利贞] 运行器不可用")
             return
         low = text.strip()
 
@@ -451,17 +451,17 @@ class QQBridge:
         if low in ("#devstatus", "#ds"):
             d = dev_runner._load()
             await self._say(ws, params,
-                            f"[opencode] 状态={d.get('status')} "
+                            f"[利贞] 状态={d.get('status')} "
                             f"任务={d.get('task','')[:60]}")
         elif low in ("#y", "#commit"):
             d = dev_runner._load()
             msg = ("chore(remote-dev): " + d.get("task", "")[:40]).strip()
-            await self._say(ws, params, "[opencode] 正在提交…")
+            await self._say(ws, params, "[利贞] 正在提交…")
             self._spawn(ws, params,
                         lambda: ("info", dev_runner.commit(msg).get("text", "")),
                         hint=False)
         elif low == "#n":
-            await self._say(ws, params, "[opencode] 好的，不提交，改动留在工作区。")
+            await self._say(ws, params, "[利贞] 好的，不提交，改动留在工作区。")
         elif low == "#push":
             self._spawn(ws, params,
                         lambda: ("info", dev_runner.push().get("text") or "已推送"),
@@ -656,8 +656,8 @@ class QQBridge:
                 try:
                     if dev_runner._load().get("status") == "awaiting":
                         params = self._params(msg_type, user_id, ev)
-                        self.log(f"答复 opencode {user_id}: {text[:50]}")
-                        await self._say(ws, params, "[opencode] 收到答复，继续…")
+                        self.log(f"答复 利贞 {user_id}: {text[:50]}")
+                        await self._say(ws, params, "[利贞] 收到答复，继续…")
                         self._spawn(ws, params, lambda: (
                             (lambda d: (d.get("status", "error"),
                                         d.get("text", "")))(dev_runner.answer(text))))

@@ -7,3 +7,4 @@ websockets==15.0.1
 psutil==7.0.0
 funasr==1.4.13
 sounddevice==0.5.2
+html2text==2025.4.15

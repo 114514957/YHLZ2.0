@@ -127,7 +127,7 @@ async def main() -> int:
                                "session": ""}
     ws.sent.clear()
     qq_bot._daemon_turn = lambda text, channel, images=None: \
-        "好的，我交给 opencode。\n[[dev: 修复登录bug]]"
+        "好的，我交给利贞。\n[[dev: 修复登录bug]]"
     await b.handle(ws, _ev("private", 2258374446, "帮我修个bug"))
     await asyncio.sleep(1.2)
     t = _texts(ws)

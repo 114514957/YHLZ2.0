@@ -134,8 +134,29 @@ def _host_blocked(url: str) -> bool:
     return any(h in low for h in _BLOCKED_HOST_PARTS)
 
 
+def _html_to_md(html: str) -> str:
+    """HTML -> readable Markdown (mirrors opencode's webfetch/Turndown).
+    Uses html2text when available; falls back to tag-stripping."""
+    try:
+        import html2text
+
+        h = html2text.HTML2Text()
+        h.ignore_images = True
+        h.body_width = 0
+        h.skip_internal_links = True
+        h.ignore_emphasis = True
+        md = h.handle(html)
+        md = re.sub(r"\n{3,}", "\n\n", md)
+        return md.strip()
+    except Exception:
+        t = re.sub(r"(?is)<(script|style|nav|header|footer)[^>]*>.*?</\1>", " ", html)
+        t = re.sub(r"<[^>]+>", " ", t)
+        return re.sub(r"\s+", " ", t).strip()
+
+
 async def web_fetch(url: str, max_chars: int = 4000) -> str:
-    """Fetch URL text content (zero-key). Content is untrusted data."""
+    """Fetch URL -> clean Markdown (ledger 0325). Mirrors opencode's webfetch:
+    httpx fetch + HTML->Markdown; honours HTTPS_PROXY/HTTP_PROXY (trust_env)."""
     url = str(url or "").strip()
     if not url.startswith(("http://", "https://")):
         return "仅支持 http/https 链接"
@@ -149,7 +170,8 @@ async def web_fetch(url: str, max_chars: int = 4000) -> str:
     for _attempt in range(2):  # one retry: some hosts reset intermittently
         try:
             async with httpx.AsyncClient(timeout=25, follow_redirects=True,
-                                         headers=_BROWSER_HEADERS) as c:
+                                         headers=_BROWSER_HEADERS,
+                                         trust_env=True) as c:
                 r = await c.get(url)
                 status = r.status_code
                 if status != 200:
@@ -160,12 +182,11 @@ async def web_fetch(url: str, max_chars: int = 4000) -> str:
             last_err = f"{type(exc).__name__}"
     if not raw:
         return f"抓取失败: {last_err or 'empty'}"
-    cat = _category_blocked(raw.decode("utf-8", errors="ignore"))
+    html = raw.decode("utf-8", errors="replace")
+    cat = _category_blocked(html)
     if cat:
         return f"内容被拦截（类别: {cat}）"
-    text = re.sub(r"<[^>]+>", " ", raw.decode("utf-8", errors="replace"))
-    text = re.sub(r"\s+", " ", text).strip()
-    text = text[: int(max_chars)]
+    text = _html_to_md(html)[: int(max_chars)]
     if not text:
         return "（页面无可读文本）"
     return f"{EXTERNAL_MARKER}\n来源: {url}\n\n{text}"

@@ -1,4 +1,4 @@
-"""YHLZ remote dev runner (ledger 0226): drive opencode headless from QQ.
+"""YHLZ remote dev runner (ledger 0226): drive 利贞 (opencode) headless from QQ.
 
 Flow (per user's workflow):
   master QQ -> qq_bot `#dev <task>` -> DevRunner.start(task)
@@ -73,7 +73,7 @@ def _opencode_exe() -> str:
     ):
         if c.exists():
             return str(c)
-    raise FileNotFoundError("找不到 opencode 可执行文件（npm i -g opencode-ai）")
+    raise FileNotFoundError("找不到利贞(opencode)可执行文件（npm i -g opencode-ai）")
 
 
 def _run(prompt: str, session: str | None, timeout: float) -> dict:
