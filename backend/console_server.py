@@ -948,10 +948,11 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": True, "drives": _drives_list()}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
-        if action == "napcat_login":
+        if action in ("napcat_login", "qq_switch"):
             try:
                 import subprocess
 
+                uin = str(body.get("uin", "") or BOT_UIN)
                 shell = QQWATCH_SHELL
                 kill = shell / "KillQQ.bat"
                 launch = shell / "launcher-user.bat"
@@ -961,13 +962,14 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                     subprocess.run(["cmd", "/c", str(kill)], cwd=str(shell),
                                    capture_output=True)
                 subprocess.Popen(
-                    ["cmd", "/c", str(launch), BOT_UIN],
+                    ["cmd", "/c", str(launch), uin],
                     cwd=str(shell), close_fds=True,
                     creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
                 _bring_qq_front(delay=12)
-                _log("control", "napcat_login")
+                _log("control", f"napcat_login {uin}")
+                _tag = "（元亨号）" if uin == BOT_UIN else "（老爹主号，导出用）"
                 return {"ok": True,
-                        "note": f"已唤起 NapCat，请在弹出的窗口登录元亨号 {BOT_UIN}"}
+                        "note": f"已唤起 NapCat，请在弹出的窗口登录 {uin} {_tag}"}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         if action == "launch_pet":
