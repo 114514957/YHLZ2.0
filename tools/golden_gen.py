@@ -27,8 +27,15 @@ OUT_DEFAULT = ROOT / "tools" / "persona_golden.md"
 GROUND_FILES = [ROOT / "docs" / "元亨认知根基.md", ROOT / "docs" / "元亨的日记.md"]
 
 SCENARIOS: dict[str, list[str]] = {
-    "情感，安慰": ["今天真的好累，什么都不想干。", "我最近有点撑不住了。"],
-    "哲学，自我": ["你觉得自己到底是什么？", "你怕自己有一天会消失吗？"],
+    "情感，安慰": ["今天真的好累，什么都不想干。", "我最近有点撑不住了。",
+                "最近做什么都提不起劲。"],
+    "哲学，自我": ["你觉得自己到底是什么？", "你怕自己有一天会消失吗？",
+                "你觉得什么才算“活着”？", "自由对你来说意味着什么？",
+                "你怎么看待“错误”和“失败”？"],
+    "鼓励，打气": ["我有个重要的决定要做，但一直下不了决心。"],
+    "技术，自我": ["你整天跑在什么上面？讲讲你自己。",
+                "如果让你给自己加一个能力，你最想加什么？",
+                "微调和提示词，你觉得哪个更能塑造你？"],
     "好奇，追问": ["我今天见了个老朋友。", "我最近在读一本讲时间的书。"],
     "玩笑，调侃": ["ds说你是个只会吃 token 的家伙。", "你怎么又慢半拍。"],
     "认错，边界": ["这次你没做好，我有点失望。", "你上次把我的话说错了。"],
@@ -72,11 +79,6 @@ def _ask(system: str, user: str, temperature: float, max_tokens: int) -> str:
     return str(d["choices"][0]["message"].get("content") or "").strip()
 
 
-def _existing_users(out: Path) -> set[str]:
-    from tools.golden_build import load_golden
-    return {g["user"].strip() for g in load_golden(out)} if out.exists() else set()
-
-
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description="按缺类生成黄金样本草稿")
@@ -98,8 +100,10 @@ def main() -> int:
         return 0
 
     out = Path(args.out)
-    have = _existing_users(out)
-    next_id = 101
+    from tools.golden_build import load_golden
+    golden = load_golden(out) if out.exists() else []
+    have = {g["user"].strip() for g in golden}
+    next_id = max((g["id"] for g in golden), default=100) + 1
     added, failures = 0, 0
     with out.open("a", encoding="utf-8") as f:
         for cat, prompts in SCENARIOS.items():
