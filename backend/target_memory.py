@@ -786,6 +786,63 @@ class TargetMemoryService:
             finally:
                 con.close()
         self._sync_kw([item])
+        self._auto_adjudicate(item)
+
+    def _auto_adjudicate(self, item: Any) -> None:
+        """M2: bounded evidence-based conflict scan over same-topic active
+        facts; only a high-confidence 'supersede' acts (soft-invalidate, never
+        delete). Profile/identity conflicts are skipped (owner approval)."""
+        try:
+            if str(getattr(item, "kind", "episodic")) == "profile":
+                return
+            if int(getattr(item, "protected", 0) or 0) == 1:
+                return
+            s = str(getattr(item, "summary", "") or "")
+            if len(s) < 4:
+                return
+            grams = {s[i:i + 2] for i in range(len(s) - 1)}
+            cols = ["id", "tier", "type", "importance", "summary", "content_hash",
+                    "keywords", "status", "evidence_ref", "created_at", "version",
+                    "obsolete_of", "access_count", "last_accessed", "belief",
+                    "evidence_count", "belief_updated", "salience", "source",
+                    "kind", "protected", "valid_at", "invalid_at",
+                    "superseded_by", "confidence"]
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                rows = con.execute(
+                    "SELECT " + ",".join(cols) + " FROM l2_items "
+                    "WHERE status='active' AND COALESCE(invalid_at,0)=0 "
+                    "AND id!=? AND COALESCE(protected,0)=0 "
+                    "AND COALESCE(kind,'episodic')!='profile' "
+                    "ORDER BY created_at DESC LIMIT 200", (item.id,)).fetchall()
+            finally:
+                con.close()
+        except Exception:
+            return
+        try:
+            from types import SimpleNamespace
+
+            from backend.memory_adjudicate import ACTION_SUPERSEDE, resolve
+        except Exception:
+            return
+        hits = 0
+        for r in rows:
+            old = SimpleNamespace(**dict(zip(cols, r)))
+            store = str(getattr(old, "summary", "")) + str(getattr(old, "keywords", ""))
+            if not any(g in store for g in grams):
+                continue
+            v = resolve(item, old)
+            if v.action == ACTION_SUPERSEDE and hits < 3:
+                self.supersede(old.id, item.id)
+                hits += 1
+                try:
+                    from backend import growth_log
+
+                    growth_log.record("记忆裁决",
+                                      f"supersede {old.id} -> {item.id} ({v.reason})",
+                                      source="M2")
+                except Exception:
+                    pass
 
     def profile_get(self, key: str, limit: int = 5) -> list[dict]:
         """Precise read of Profile items (M1): active, not invalidated,
