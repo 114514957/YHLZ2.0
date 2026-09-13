@@ -18,7 +18,7 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_KB_DB = _PROJECT_ROOT / "data" / "yuanheng_kb.db"
 
-VALID_CATEGORIES = {"tech", "method", "idea", "fact", "skill", "resource"}
+VALID_CATEGORIES = {"tech", "method", "idea", "fact", "skill", "resource", "word"}
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS kb_items (
     id TEXT PRIMARY KEY,
@@ -190,7 +190,7 @@ def kb_inject(text: str, k: int = 3, public: bool = False,
     rows = kb_query(q, limit=max(2, int(k) * 2))
     if not rows:
         return ""
-    safe_cats = {"tech", "method", "resource", "skill"}
+    safe_cats = {"tech", "method", "resource", "skill", "word"}
     private_src = ("自主", "用户对话", "self", "对话反馈", "对话")
     out: list[str] = []
     used = 0
