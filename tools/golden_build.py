@@ -102,15 +102,19 @@ def load_golden(path: Path | None = None) -> list[dict]:
     for i in range(1, len(parts), 2):
         gid = parts[i]
         body = parts[i + 1]
-        src = re.search(r"^\s*-\s*source:\s*(.*)$", body, re.MULTILINE)
-        note = re.search(r"^\s*-\s*note:\s*(.*)$", body, re.MULTILINE)
+        meta: dict[str, str] = {}
+        for m in re.finditer(r"^\s*-\s*([A-Za-z_]+)\s*:\s*(.*)$", body, re.MULTILINE):
+            meta[m.group(1).lower()] = m.group(2).strip()
         m_user = re.search(r"^###\s*老爹\s*\n(.*?)(?=^###\s*元亨)", body, re.MULTILINE | re.DOTALL)
         m_asst = re.search(r"^###\s*元亨\s*\n(.*?)(?=^##\s+golden-|\Z)", body, re.MULTILINE | re.DOTALL)
         if not (m_user and m_asst):
             continue
         out.append({"id": int(gid),
-                    "source": (src.group(1).strip() if src else ""),
-                    "note": (note.group(1).strip() if note else ""),
+                    "source": meta.get("source", ""),
+                    "note": meta.get("note", ""),
+                    "rating": meta.get("rating", ""),
+                    "tags": meta.get("tags", ""),
+                    "status": meta.get("status", "keep"),
                     "user": m_user.group(1).strip(),
                     "assistant": m_asst.group(1).strip()})
     return out
@@ -158,7 +162,10 @@ def cmd_pick(args: argparse.Namespace) -> int:
                 continue
             f.write(f"\n## golden-{n}\n"
                     f"- source: {r.get('source', '')}\n"
-                    f"- note: {r.get('note', '')}\n"
+                    f"- rating: \n"
+                    f"- tags: \n"
+                    f"- status: keep\n"
+                    f"- note: \n"
                     f"### 老爹\n{r['user'].strip()}\n"
                     f"### 元亨\n{r['assistant'].strip()}\n")
             have.add(r["user"].strip()[:40])
@@ -168,6 +175,26 @@ def cmd_pick(args: argparse.Namespace) -> int:
     except ValueError:
         shown = GOLDEN
     print(f"[pick] 已加入 {added} 条 -> {shown}")
+    return 0
+
+
+def cmd_seed(args: argparse.Namespace) -> int:
+    rows = _load()
+    have = {g["user"].strip()[:40] for g in load_golden()}
+    added = 0
+    with GOLDEN.open("a", encoding="utf-8") as f:
+        for n, r in enumerate(rows, 1):
+            if not args.all and r.get("flags"):
+                continue
+            if r["user"].strip()[:40] in have:
+                continue
+            f.write(f"\n## golden-{n}\n"
+                    f"- source: {r.get('source', '')}\n"
+                    f"- rating: \n- tags: \n- status: candidate\n- note: \n"
+                    f"### 老爹\n{r['user'].strip()}\n### 元亨\n{r['assistant'].strip()}\n")
+            have.add(r["user"].strip()[:40])
+            added += 1
+    print(f"[seed] 新增 {added} 条候选 -> {GOLDEN}")
     return 0
 
 
@@ -193,10 +220,12 @@ def main() -> int:
     p_show.add_argument("ids", type=int, nargs="+")
     p_pick = sub.add_parser("pick")
     p_pick.add_argument("ids", type=int, nargs="+")
+    p_seed = sub.add_parser("seed")
+    p_seed.add_argument("--all", action="store_true")
     sub.add_parser("stats")
     args = ap.parse_args()
     return {"build": lambda a: build(), "list": cmd_list, "show": cmd_show,
-            "pick": cmd_pick, "stats": cmd_stats}[args.cmd](args)
+            "pick": cmd_pick, "seed": cmd_seed, "stats": cmd_stats}[args.cmd](args)
 
 
 if __name__ == "__main__":
