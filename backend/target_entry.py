@@ -176,49 +176,76 @@ class ConversationSession:
     # ---------- contradiction trigger (M3: old-kernel contradiction -> belief) ----------
     _NEGATION = ("其实我不", "我不喜欢", "不喜欢", "不是", "不要再", "我改主意", "错了", "相反", "其实不是")
 
+    @staticmethod
+    def _explicit_note(text: str) -> str:
+        """Owner explicit memory annotation -> the content to persist
+        (ledger 0320). Fires only on a clear leading marker."""
+        import re
+
+        m = re.match(
+            r"^\s*(?:记住|记得|别忘|注意|更正|更新|纠正)\s*[：:,，、]?\s*(.+)$",
+            str(text or ""))
+        if m:
+            c = m.group(1).strip()
+            if len(c) >= 4:
+                return c[:300]
+        return ""
+
     async def _maybe_contradiction(self, text: str) -> int:
-        """If the user utterance negates a stored memory topic, decide via an
-        LLM judge (P5b): old-more-credible -> keep; new/uncertain -> lower the
-        old item's belief (non-destructive, never deletes)."""
+        """M2 (ledger 0319): user negation -> decide via the unified EVIDENCE
+        adjudicator (no LLM judge). A high-confidence supersede soft-invalidates
+        the old fact when the new one is stored (reversible); otherwise the old
+        item's belief is merely lowered (non-destructive)."""
         if not any(m in text for m in self._NEGATION):
             return 0
         try:
             hits = self.memory.recall(text, limit=2)
         except Exception:
             return 0
+        import time as _t
+        from types import SimpleNamespace
+
+        from backend.memory_adjudicate import (
+            ACTION_CANDIDATE, ACTION_SUPERSEDE, resolve,
+        )
+
+        new = SimpleNamespace(
+            summary=str(text)[:120],
+            source=("老爹" if self._is_owner() else "群聊"),
+            confidence=0.7, protected=0, created_at=_t.time(),
+            evidence_count=0, belief=0.5)
         n = 0
         for h in hits:
             try:
-                verdict = "uncertain"
-                try:
-                    from backend import memory_judge
-
-                    verdict = await memory_judge.judge(
-                        text, str(h.get("summary", "")), self.llm_turn)
-                except Exception:
-                    verdict = "uncertain"
-                summary = str(h.get("summary", ""))[:60]
-                if verdict == "old":
-                    try:
-                        from backend import growth_log
-
-                        growth_log.record("冲突", f"旧说法更可信，保留：{summary}",
-                                          source="裁决")
-                    except Exception:
-                        pass
+                old = SimpleNamespace(
+                    summary=str(h.get("summary", "")), source="", confidence=0.5,
+                    protected=0, created_at=0.0, evidence_count=0, belief=0.5)
+                v = resolve(new, old)
+                if v.action not in (ACTION_SUPERSEDE, ACTION_CANDIDATE):
                     continue
-                self.memory.observe_contradiction(h["id"])
+                iid = str(h.get("id", ""))
+                self.memory.observe_contradiction(iid)
+                if v.action == ACTION_SUPERSEDE:
+                    nid = ""
+                    try:
+                        nid = self.memory.find_id_by_summary(str(text)[:120])
+                    except Exception:
+                        nid = ""
+                    if nid:
+                        try:
+                            self.memory.supersede(iid, nid)
+                        except Exception:
+                            pass
+                n += 1
                 try:
                     from backend import growth_log
 
                     growth_log.record(
                         "冲突",
-                        ("新说法更可信，降权旧条：" if verdict == "new"
-                         else "证据不足，暂降权待察：") + summary,
+                        f"[{v.action}] {v.reason}：{str(h.get('summary', ''))[:50]}",
                         source="裁决")
                 except Exception:
                     pass
-                n += 1
             except Exception:
                 pass
         return n
@@ -247,6 +274,20 @@ class ConversationSession:
                        pre_recall: Optional[list] = None,
                        images: Optional[list] = None) -> dict[str, Any]:
         self.memory.append_turn(role="user", text=text)
+        # Explicit owner annotation -> DETERMINISTIC save (never rely on the
+        # model to remember to call the tool; ledger 0320). Corrections go
+        # through store_item's evidence auto-adjudicator, so "改口" can
+        # soft-invalidate the old fact.
+        if self._is_owner():
+            try:
+                note = self._explicit_note(text)
+                if note:
+                    from backend.target_scheduler_tools import memory_save
+
+                    memory_save(note, service=self.memory, source="老爹",
+                                kind_profile=True)
+            except Exception:
+                pass
         contradictions = await self._maybe_contradiction(text)
         from backend import turn_control
 

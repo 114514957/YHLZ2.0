@@ -44,9 +44,14 @@ class Verdict:
 
 
 def _trust(item) -> float:
+    # source dominates; evidence_ref only consulted when source is silent
     src = str(getattr(item, "source", "") or "").lower()
     for k, v in SOURCE_TRUST:
         if k and k.lower() in src:
+            return v
+    er = str(getattr(item, "evidence_ref", "") or "").lower()
+    for k, v in SOURCE_TRUST:
+        if k and k.lower() in er:
             return v
     return 0.5
 

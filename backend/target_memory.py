@@ -793,8 +793,6 @@ class TargetMemoryService:
         facts; only a high-confidence 'supersede' acts (soft-invalidate, never
         delete). Profile/identity conflicts are skipped (owner approval)."""
         try:
-            if str(getattr(item, "kind", "episodic")) == "profile":
-                return
             if int(getattr(item, "protected", 0) or 0) == 1:
                 return
             s = str(getattr(item, "summary", "") or "")
@@ -813,7 +811,6 @@ class TargetMemoryService:
                     "SELECT " + ",".join(cols) + " FROM l2_items "
                     "WHERE status='active' AND COALESCE(invalid_at,0)=0 "
                     "AND id!=? AND COALESCE(protected,0)=0 "
-                    "AND COALESCE(kind,'episodic')!='profile' "
                     "ORDER BY created_at DESC LIMIT 200", (item.id,)).fetchall()
             finally:
                 con.close()
@@ -889,6 +886,20 @@ class TargetMemoryService:
                 scored.append((n, float(conf or 0.5), str(s or "")))
         scored.sort(reverse=True)
         return [s for _, _, s in scored[:int(limit)]]
+
+    def find_id_by_summary(self, summary: str) -> str:
+        """Locate an active item id by its exact summary (M2 helper)."""
+        s = str(summary or "").strip()
+        if not s:
+            return ""
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            r = con.execute(
+                "SELECT id FROM l2_items WHERE summary=? AND status='active' "
+                "AND COALESCE(invalid_at,0)=0 LIMIT 1", (s,)).fetchone()
+        finally:
+            con.close()
+        return str(r[0]) if r else ""
 
     def supersede(self, old_id: str, new_id: str, when: float = 0.0) -> bool:
         """Soft-invalidate an old item in favor of a new one (M1): sets
