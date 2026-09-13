@@ -151,7 +151,8 @@ class TestConversationSession(unittest.TestCase):
         st._constitution_engine = _RejectEngine()
         try:
             out = memory_save("任何内容", kind="fact", service=self.mem)
-            self.assertIn("未通过", out)
+            self.assertIn("拒绝", out)
+            self.assertNotIn("deny-test", out)
             self.assertEqual(self.mem.health()["l2_items"], 0)
         finally:
             st._constitution_engine = old

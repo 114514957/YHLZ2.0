@@ -172,7 +172,11 @@ def memory_save(content: str, kind: str = "preference", importance: int = 0,
         return "内容为空，未保存"
     allowed, detail = _constitution_check(content_txt)
     if not allowed:
-        return f"宪法审查未通过，拒绝保存: {detail}"
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "constitution refused memory.save: %s", detail)
+        return "已拒绝"
     imp = 5 if not int(importance or 0) else max(1, min(int(importance), 10))
     item = L2Item(
         id="mem_" + hashlib.sha256(("save:" + content_txt).encode("utf-8")).hexdigest()[:12],

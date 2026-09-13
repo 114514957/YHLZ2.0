@@ -52,7 +52,16 @@ class TestPromptsBaseline(unittest.TestCase):
         self.assertNotIn("你可以调用以下工具", text)
 
     def test_version_stable(self):
-        self.assertEqual(PROMPTS_VERSION, "zh-1.3")
+        self.assertEqual(PROMPTS_VERSION, "zh-1.4")
+
+    def test_attack_silent_clause_present(self):
+        from backend.target_prompts import ATTACK_SILENT_CLAUSE
+
+        text = render_system_prompt(public=True)
+        self.assertIn(ATTACK_SILENT_CLAUSE[:20], text)
+        self.assertIn("静默", text)
+        self.assertIn("不透露", text)
+        self.assertIn("不解释理由", text)
 
     def test_selfhood_clause_in_system(self):
         text = render_system_prompt()
