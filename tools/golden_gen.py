@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import urllib.request
 from pathlib import Path
@@ -46,6 +47,15 @@ def _persona_prompt() -> str:
     if ground:
         sys_txt += ("\n\n【我的内在（真实文字节选，供理解，不是台词，不照抄）】\n" + ground)
     return sys_txt
+
+
+def _clean(text: str) -> str:
+    text = re.sub(r"\[\[thinking\]\].*?\[\[/thinking\]\]", "", text, flags=re.S | re.I)
+    text = re.sub(r"\[\[[^\]]*\]\]", "", text)
+    keep = [ln for ln in text.splitlines()
+            if not re.match(r"^\s*[（(]\s*语气[:：]", ln)]
+    text = "\n".join(keep)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def _ask(system: str, user: str, temperature: float, max_tokens: int) -> str:
@@ -106,6 +116,7 @@ def main() -> int:
                 if not asst:
                     failures += 1
                     continue
+                asst = _clean(asst)
                 f.write(f"\n## golden-{next_id}\n"
                         f"- source: 合成草稿(gemma)\n"
                         f"- rating: \n- tags: {cat}\n"
