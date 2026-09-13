@@ -111,7 +111,12 @@ def load_golden(path: Path | None = None) -> list[dict]:
             continue
         status = meta.get("status", "candidate").strip().lower()
         status = {"fidex": "fixed", "fix": "fixed", "fixed": "fixed",
-                  "keep": "keep", "drop": "drop", "delete": "drop"}.get(status, status or "candidate")
+                  "改": "fixed", "改过": "fixed", "已改": "fixed", "我改了": "fixed",
+                  "keep": "keep", "要": "keep", "保留": "keep", "留": "keep",
+                  "drop": "drop", "delete": "drop", "不要": "drop",
+                  "这条不要": "drop", "丢弃": "drop", "删": "drop",
+                  "candidate": "candidate", "待": "candidate", "待定": "candidate",
+                  }.get(status, status or "candidate")
         out.append({"id": int(gid),
                     "source": meta.get("source", ""),
                     "note": meta.get("note", ""),
