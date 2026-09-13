@@ -27,6 +27,7 @@ QQWATCH_CONFIG = QQWATCH_SHELL / "config"
 NAPCAT_LAUNCHER = QQWATCH_SHELL / "launcher-user.bat"
 NAPCAT_START_BAT = QQWATCH / "start-napcat.bat"
 NAPCAT_QR = QQWATCH_SHELL / "cache" / "qrcode.png"
+NAPCAT_WEBUI = QQWATCH_SHELL / "config" / "webui.json"
 
 MODELS_DIR = pathlib.Path(os.getenv("YHLZ_MODELS_DIR", str(EXTERNAL / "models")))
 GEMMA_GGUF = MODELS_DIR / "gemma4" / "gemma4-e4b-aggr-q4km.gguf"

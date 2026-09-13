@@ -961,6 +961,18 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 if kill.exists():
                     subprocess.run(["cmd", "/c", str(kill)], cwd=str(shell),
                                    capture_output=True)
+                try:  # persist the chosen account for next quick-login
+                    import json as _json
+
+                    wf = shell / "config" / "webui.json"
+                    d = _json.loads(wf.read_text(encoding="utf-8"))
+                    d["autoLoginAccount"] = str(uin)
+                    _t = wf.with_suffix(".tmp")
+                    _t.write_text(_json.dumps(d, ensure_ascii=False, indent=2),
+                                  encoding="utf-8")
+                    _t.replace(wf)
+                except Exception:
+                    pass
                 subprocess.Popen(
                     ["cmd", "/c", str(launch), uin],
                     cwd=str(shell), close_fds=True,
