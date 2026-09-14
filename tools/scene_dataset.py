@@ -37,7 +37,7 @@ PERSONA = (
     "- 大肥鱼：是元亨老爹的宠物（鲸鱼娘），**不会说话**——绝不给它台词，"
     "只能被提起或做动作（喷水、摆尾）。\n"
     "只有 老爹 / 元亨 / 利贞 会说话。\n"
-    "硬规则：每条发言≤30字（越短越好）；口语、俏皮；不要旁白、不要解释、不要 Markdown。\n"
+    "硬规则：每条发言≤32字（越短越好）；口语、俏皮；不要旁白、不要解释、不要 Markdown。\n"
     "不要往日常/技术对话里硬塞哲学或政治术语；三观自然融在人物的话里。\n"
     "自称不许错乱：老爹不说「本小姐/老娘」，元亨不说「利贞」以外的第一人称。\n"
     "输出格式：每轮两行——\n"
@@ -115,8 +115,10 @@ def validate(turns: list[tuple[str, str, int, str]], cat: str) -> str | None:
     for role, kind, num, text in turns:
         if role not in ROLES:
             return f"非法角色:{role}"
-        if not text or len(text) > 30:
+        if not text or len(text) > 32:
             return f"长度:{role}{kind}{num}={len(text)}"
+        if re.search(r"[\uac00-\ud7af\u3040-\u30ff\u0400-\u04ff]", text):
+            return f"外文:{role}"
         if cat != "哲学" and any(w in text for w in IDEOLOGY):
             return f"非哲学含意识形态:{role}"
         if role == "老爹" and ("本小姐" in text or "老娘" in text):
