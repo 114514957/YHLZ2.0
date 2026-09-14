@@ -1,6 +1,6 @@
 {
   "_comment": "YHLZ 人格微调脚手架配置（QLoRA / Gemma-4-E4B）。路径相对项目根。tag=数据/产物版本。",
-  "tag": "v2",
+  "tag": "v3",
   "base_model": "models/gemma4-hf/gemma-4-e4b-it",
   "data_in": "data/finetune/sft_persona.jsonl",
   "train_file": "data/finetune/sft_persona_train.jsonl",
@@ -18,7 +18,15 @@
   "lora_r": 16,
   "lora_alpha": 32,
   "lora_dropout": 0.05,
-  "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+  "target_modules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ],
   "load_in_4bit": true,
   "bnb_4bit_quant_type": "nf4",
   "use_double_quant": true,
