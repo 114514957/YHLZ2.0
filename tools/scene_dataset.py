@@ -161,6 +161,18 @@ def gen_scene(system: str, cat: str, scene: str, model: str, tries: int = 3) -> 
     return None, last
 
 
+def _quota(n: int, rng: random.Random) -> list[str]:
+    total = sum(w for _, w in MIX)
+    seq = []
+    for cat, w in MIX:
+        seq += [cat] * round(n * w / total)
+    while len(seq) < n:
+        seq.append(MIX[len(seq) % len(MIX)][0])
+    seq = seq[:n]
+    rng.shuffle(seq)
+    return seq
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description="场景对话批量生成（带硬闸）")
@@ -172,7 +184,7 @@ def main() -> int:
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
-    pool = [c for c, w in MIX for _ in range(w)]
+    cats_seq = _quota(args.n, rng)
     doc = Path(args.doc)
     doc.parent.mkdir(parents=True, exist_ok=True)
     mode = "a" if args.append else "w"
@@ -180,10 +192,9 @@ def main() -> int:
     with doc.open(mode, encoding="utf-8") as f:
         if not args.append:
             f.write("# 元亨对话样本（场景·多角色）\n\n"
-                    "> 由 `tools/scene_dataset.py` 生成；硬闸：≤30字/问答成对/仅老爹·元亨·利贞发言/"
+                    "> 由 `tools/scene_dataset.py` 生成；硬闸：≤32字/问答成对/仅老爹·元亨·利贞发言/"
                     "非哲学禁意识形态/大肥鱼不发言。\n> `status` 可改 keep/drop。\n\n")
-        for i in range(args.n):
-            cat = rng.choice(pool)
+        for i, cat in enumerate(cats_seq):
             scene = rng.choice(CATS[cat])
             res, err = gen_scene(PERSONA, cat, scene, args.model)
             if res is None:
