@@ -191,6 +191,10 @@ def main() -> int:
     cats_seq = _quota(args.n, rng)
     doc = Path(args.doc)
     doc.parent.mkdir(parents=True, exist_ok=True)
+    start = 0
+    if args.append and doc.exists():
+        nums = [int(n) for n in re.findall(r"(?m)^## 对话-(\d+)", doc.read_text(encoding="utf-8"))]
+        start = max(nums) if nums else 0
     mode = "a" if args.append else "w"
     ok = fail = 0
     with doc.open(mode, encoding="utf-8") as f:
@@ -205,9 +209,10 @@ def main() -> int:
                 fail += 1
                 print(f"[{i+1}/{args.n}] 放弃 [{cat}] {scene} :: {err}")
                 continue
-            f.write(render(f"对话-{i+1}｜{cat}", cat, parse(res)) + "\n\n")
+            idx = start + i + 1
+            f.write(render(f"对话-{idx}｜{cat}", cat, parse(res)) + "\n\n")
             ok += 1
-            print(f"[{i+1}/{args.n}] OK [{cat}] {scene}")
+            print(f"[{i+1}/{args.n}] OK [{cat}] {scene} (#{idx})")
     print(json.dumps({"ok": ok, "fail": fail, "doc": str(doc)}, ensure_ascii=False, indent=1))
     return 0
 
