@@ -10,7 +10,9 @@ from backend.target_prompts import (
     MEMORY_L2_JUDGE_PROMPT,
     PERSONA_FIVE_DIM,
     PROMPTS_VERSION,
+    PUBLIC_NO_QUESTION_CLAUSE,
     SELFHOOD_CLAUSE,
+    TRAILING_QUESTION_CLAUSE,
     render_capabilities_tools_block,
     render_system_prompt,
 )
@@ -52,7 +54,21 @@ class TestPromptsBaseline(unittest.TestCase):
         self.assertNotIn("你可以调用以下工具", text)
 
     def test_version_stable(self):
-        self.assertEqual(PROMPTS_VERSION, "zh-1.4")
+        self.assertEqual(PROMPTS_VERSION, "zh-1.5")
+
+    def test_trailing_question_clause_present(self):
+        text = render_system_prompt()
+        self.assertIn(TRAILING_QUESTION_CLAUSE[:20], text)
+        self.assertIn("不反问", text)
+        self.assertIn("任务流程", text)
+        self.assertIn("老爹明确追问", text)
+
+    def test_public_no_question_clause_only_in_public(self):
+        public_text = render_system_prompt(public=True)
+        self.assertIn(PUBLIC_NO_QUESTION_CLAUSE[:20], public_text)
+        self.assertIn("绝对不允许", public_text)
+        owner_text = render_system_prompt(public=False)
+        self.assertNotIn(PUBLIC_NO_QUESTION_CLAUSE[:20], owner_text)
 
     def test_attack_silent_clause_present(self):
         from backend.target_prompts import ATTACK_SILENT_CLAUSE

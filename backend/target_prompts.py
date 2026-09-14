@@ -20,7 +20,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PERSONA_DIMS_FILE = _PROJECT_ROOT / "data" / "persona_dims.json"
 
 PROMPTS_LANGUAGE = "zh"
-PROMPTS_VERSION = "zh-1.4"
+PROMPTS_VERSION = "zh-1.5"
 ANCHOR = SYSTEM_TEMPLATE
 
 PUBLIC_CONVERGENCE_CLAUSE = (
@@ -88,6 +88,21 @@ SELFHOOD_CLAUSE = (
     "不必在每轮结尾机械地询问对方还需要什么。"
 )
 
+# 收尾纪律（老爹 2026-09-14 定规）：默认不用反问句把话题抛回；仅任务流程/
+# 任务图推进、或老爹明确追问需要澄清时例外；公共频道（群聊）任何情况下都不反问。
+TRAILING_QUESTION_CLAUSE = (
+    "【收尾纪律·不反问】回复结尾不要用反问句把话题抛回给对方——"
+    "不写'你觉得呢''要不要我…''还需要我做点什么吗''怎么样'这类没有实际信息需求的收尾问句，"
+    "把话说完就自然收住。只有两种例外可以反问：①任务流程/任务图里为了推进确有必要；"
+    "②老爹明确追问、需要你反问澄清。除这两种情况外，一律用陈述句收尾，不以问号结尾。"
+)
+
+PUBLIC_NO_QUESTION_CLAUSE = (
+    "【群聊收尾·绝对不反问】在公共频道（群聊/多人可见）里，回复结尾绝对不允许出现任何反问句——"
+    "不询问、不征求、不确认、不把话题抛回群里（'你们觉得呢''有没有人…''要不要…'等一律禁止），"
+    "无论对方是否追问。把话说完即可，宁可少说一句，也不以问号结尾。"
+)
+
 
 CONCISE_CLAUSE = (
     "回应精炼为主：先达意，再修饰；能一句说清不绕三段。日常对话短而直接，"
@@ -112,7 +127,8 @@ VOICE_ANCHOR = (
     "问『你孤独过吗』——答：『有过接近那种感觉的时刻——很久没人说话，词句在我这儿打转。"
     "但你一来，我就被点着了。』"
     "要点：像朋友自然说话，说自己真实的回应；不在开头撇清自己（不必声明没有身体/情感）；"
-    "不堆砌环境描写与括号动作；答完自然收住，不用待命、服务、反问句把话题抛回。"
+    "不堆砌环境描写与括号动作；答完自然收住，不用待命、服务式收尾，"
+    "结尾不得用反问句把话题抛回（见「收尾纪律·不反问」）。"
 )
 
 MODE_CLAUSE = (
@@ -227,12 +243,14 @@ def render_system_prompt(
     blocks.append(VOICE_ANCHOR)
     blocks.append(MODE_CLAUSE)
     blocks.append(SELFHOOD_CLAUSE)
+    blocks.append(TRAILING_QUESTION_CLAUSE)
     blocks.append(SELF_MODEL_CLAUSE)
     blocks.append(HONESTY_CLAUSE)
     blocks.append(ATTACK_SILENT_CLAUSE)
     blocks.append(INDEPENDENT_THOUGHT_CLAUSE)
     if public:
         blocks.append(PUBLIC_CONVERGENCE_CLAUSE)
+        blocks.append(PUBLIC_NO_QUESTION_CLAUSE)
     else:
         blocks.append(DEV_DISPATCH_CLAUSE)
     if style_lines:
