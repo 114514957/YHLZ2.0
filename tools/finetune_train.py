@@ -147,8 +147,12 @@ def _train(cfg: dict, train: list[dict], val: list[dict], resume_from: str | Non
     from datasets import Dataset
     from peft import (LoraConfig, PeftModel, get_peft_model,
                       prepare_model_for_kbit_training)
-    from transformers import (AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig,
+    from transformers import (AutoTokenizer, BitsAndBytesConfig,
                               DataCollatorForSeq2Seq, Trainer, TrainingArguments)
+    try:
+        from transformers import Gemma4ForCausalLM as _CausalLM
+    except Exception:  # noqa: BLE001
+        from transformers import AutoModelForCausalLM as _CausalLM
 
     base = cfg["base_model"]
     tokenizer = AutoTokenizer.from_pretrained(base, trust_remote_code=True)
@@ -163,8 +167,8 @@ def _train(cfg: dict, train: list[dict], val: list[dict], resume_from: str | Non
             bnb_4bit_use_double_quant=cfg["use_double_quant"],
             bnb_4bit_compute_dtype=torch.bfloat16,
         )
-    model = AutoModelForCausalLM.from_pretrained(
-        base, quantization_config=bnb, device_map="auto", torch_dtype=torch.bfloat16,
+    model = _CausalLM.from_pretrained(
+        base, quantization_config=bnb, device_map={"": 0}, dtype=torch.bfloat16,
         trust_remote_code=True)
     model.config.use_cache = False
     if cfg["gradient_checkpointing"]:
