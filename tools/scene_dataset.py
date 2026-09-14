@@ -33,7 +33,8 @@ PERSONA = (
     "你是一个多角色对话剧本生成器。角色与语气：\n"
     "- 老爹：创造者，随意、懒散、爱开玩笑。\n"
     "- 元亨：活泼、乐观、傲娇，哲学强；爱用「哼/本小姐/老娘/啦/哟」。\n"
-    "- 利贞：稳重、博学、直接，技术强，少废话。\n"
+    "- 利贞：稳重、博学、直接，技术强，少废话。但私下**很没常识、大胆开放**：对脏话不敏感；"
+    "爱在米饭里挤番茄酱；给大肥鱼喂瓜子（它不会嗑、囫囵吞、常被卡喉咙）；下厨/买菜一塌糊涂。\n"
     "- 大肥鱼：是元亨老爹的宠物（鲸鱼娘），**不会说话**——绝不给它台词，只能被提起；"
     "行为按语境：最爱**吃白饭**、饿了、在水里跑/泡着，偶尔喷水（低频，水边才用）。\n"
     "只有 老爹 / 元亨 / 利贞 会说话。\n"
@@ -56,7 +57,8 @@ PERSONA = (
 CATS = {
     "日常": ["出去吃饭", "黄河边晒太阳", "钓鱼", "给电脑清灰", "茶摊喝茶",
            "咖啡店看书", "逛博物馆", "动物园看动物", "公园散步", "周末大扫除",
-           "煮一锅面", "阳台养花", "傍晚遛弯", "逛菜市场"],
+           "煮一锅面", "阳台养花", "傍晚遛弯", "逛菜市场", "利贞下厨", "利贞去买菜",
+           "给大肥鱼喂瓜子"],
     "哲学": ["苏格拉底：什么是好的生活", "柏拉图：洞穴寓言", "亚里士多德：幸福",
            "康德：道德律", "黑格尔：辩证法", "叔本华：痛苦", "笛卡尔：我思",
            "马克思：劳动异化", "泰戈尔：爱与自由", "尼采：超人", "论语：君子"],
@@ -112,6 +114,7 @@ def validate(turns: list[tuple[str, str, int, str]], cat: str) -> str | None:
     if not turns:
         return "空"
     rounds: dict[int, dict] = {}
+    cnt: dict[tuple[int, str], int] = {}
     for role, kind, num, text in turns:
         if role not in ROLES:
             return f"非法角色:{role}"
@@ -126,10 +129,11 @@ def validate(turns: list[tuple[str, str, int, str]], cat: str) -> str | None:
         if "**" in text or text.startswith(("-", "*", "#")):
             return "markdown"
         rounds.setdefault(num, {})[kind] = text
+        cnt[(num, kind)] = cnt.get((num, kind), 0) + 1
     if not (2 <= len(rounds) <= 3):
         return f"轮数:{len(rounds)}"
-    for num, d in rounds.items():
-        if set(d) != {"问", "答"}:
+    for num in rounds:
+        if cnt.get((num, "问"), 0) != 1 or cnt.get((num, "答"), 0) != 1:
             return f"第{num}轮不配对"
     return None
 
