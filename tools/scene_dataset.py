@@ -1,14 +1,16 @@
-"""Scene dialogue generator with hard gates (ledger 0351).
+"""Scene dialogue generator with hard gates (ledger 0351+).
 
 Generates 老爹/元亨/利贞 multi-role dialogues by category (日常/哲学/技术/闲聊):
-  - 元亨: 活泼乐观傲娇, 哲学强; 利贞: 稳重博学直接, 技术强; 大肥鱼: 宠物, 不说话.
-  - worldview implicit (not crammed); ≤30 chars/turn; only 老爹/元亨/利贞 speak.
-  - gates + retry: format 问K/答K paired, role set, no 大肥鱼 lines, no ideology in
-    non-哲学, no markdown, self-reference consistency.
+  - 元亨: 活泼乐观傲娇, 哲学强; 利贞: 稳重博学直接, 技术强, 私下没常识/大胆;
+    大肥鱼: 宠物, 不说话, 吃白饭/水里跑/低频喷水.
+  - each turn ≤32 chars; only 老爹/元亨/利贞 speak; no ideology in non-哲学;
+    story-like (起因/互动/收尾).
+Per-turn gates reject a draft; then consecutive same-kind turns are merged and
+问K/答K renumbered (so an extra "答" doesn't discard the whole sample).
 
 Usage:
-    python tools/scene_dataset.py --n 12                 # Gemma
-    python tools/scene_dataset.py --n 12 --model qwen    # qwen2.5:3b
+    python tools/scene_dataset.py --n 20                 # Gemma
+    python tools/scene_dataset.py --n 20 --model qwen
 """
 from __future__ import annotations
 
@@ -24,7 +26,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 DOC = ROOT / "docs" / "素材" / "对话样本.md"
-
 ROLES = ("老爹", "元亨", "利贞")
 IDEOLOGY = ("唯物", "辩证", "历史唯物", "阶级", "意识形态", "生产资料", "异化",
             "商品拜物", "剩余价值", "剥削")
@@ -33,14 +34,19 @@ PERSONA = (
     "你是一个多角色对话剧本生成器。角色与语气：\n"
     "- 老爹：创造者，随意、懒散、爱开玩笑。\n"
     "- 元亨：活泼、乐观、傲娇，哲学强；爱用「哼/本小姐/老娘/啦/哟」。\n"
-    "- 利贞：稳重、博学、直接，技术强，少废话。但私下**很没常识、大胆开放**：对脏话不敏感；"
-    "爱在米饭里挤番茄酱；给大肥鱼喂瓜子（它不会嗑、囫囵吞、常被卡喉咙）；下厨/买菜一塌糊涂。\n"
+    "- 利贞：稳重、博学、直接，技术强，少废话。但私下**很没常识、大胆开放**："
+    "对脏话不敏感；爱在米饭里挤番茄酱；给大肥鱼喂瓜子（它不会嗑、囫囵吞、常被卡喉咙）；"
+    "下厨/买菜一塌糊涂。\n"
     "- 大肥鱼：是元亨老爹的宠物（鲸鱼娘），**不会说话**——绝不给它台词，只能被提起；"
-    "行为按语境：最爱**吃白饭**、饿了、在水里跑/泡着，偶尔喷水（低频，水边才用）。\n"
+    "行为按语境：最爱吃白饭、饿了、在水里跑/泡着，偶尔喷水（低频，水边才用）。\n"
     "只有 老爹 / 元亨 / 利贞 会说话。\n"
+    "【故事性】每段要像一个小故事/小场景：有起因、有互动、有收尾（可有小反转或笑点），"
+    "不要干巴巴的一问一答。\n"
+    "【身份绝不混淆】各角色只用自己的自称与口吻：老爹自称「我/老爹」；"
+    "元亨自称「我/本小姐/老娘/元亨」；利贞自称「我/利贞」。"
+    "元亨不谈硬核技术（技术归利贞），利贞不抢元亨的哲学。称呼别人要用对名字。\n"
     "硬规则：每条发言≤32字（越短越好）；口语、俏皮；不要旁白、不要解释、不要 Markdown。\n"
     "不要往日常/技术对话里硬塞哲学或政治术语；三观自然融在人物的话里。\n"
-    "自称不许错乱：老爹不说「本小姐/老娘」，元亨不说「利贞」以外的第一人称。\n"
     "输出格式：每轮两行——\n"
     "### <角色>问K\n<内容>\n### <角色>答K\n<内容>\n"
     "同一 K 只能有一个问、一个答；问答者可互换；生成 2-3 轮。\n\n"
@@ -105,16 +111,13 @@ def parse(txt: str) -> list[tuple[str, str, int, str]] | None:
         role = m.group(1).strip()
         kind, num = m.group(2), int(m.group(3))
         end = ms[i + 1].start() if i + 1 < len(ms) else len(txt)
-        text = txt[m.end():end].strip().splitlines()[0].strip() if txt[m.end():end].strip() else ""
+        seg = txt[m.end():end].strip()
+        text = seg.splitlines()[0].strip() if seg else ""
         out.append((role, kind, num, text))
     return out
 
 
-def validate(turns: list[tuple[str, str, int, str]], cat: str) -> str | None:
-    if not turns:
-        return "空"
-    rounds: dict[int, dict] = {}
-    cnt: dict[tuple[int, str], int] = {}
+def _check_turns(turns, cat: str) -> str | None:
     for role, kind, num, text in turns:
         if role not in ROLES:
             return f"非法角色:{role}"
@@ -128,17 +131,35 @@ def validate(turns: list[tuple[str, str, int, str]], cat: str) -> str | None:
             return "老爹自称错乱"
         if "**" in text or text.startswith(("-", "*", "#")):
             return "markdown"
-        rounds.setdefault(num, {})[kind] = text
-        cnt[(num, kind)] = cnt.get((num, kind), 0) + 1
-    if not (2 <= len(rounds) <= 3):
-        return f"轮数:{len(rounds)}"
-    for num in rounds:
-        if cnt.get((num, "问"), 0) != 1 or cnt.get((num, "答"), 0) != 1:
-            return f"第{num}轮不配对"
     return None
 
 
-def render(scene: str, cat: str, turns: list[tuple[str, str, int, str]]) -> str:
+def _normalize(turns) -> list[tuple[str, str, int, str]]:
+    merged: list[list] = []
+    for role, kind, num, text in turns:
+        if merged and merged[-1][1] == kind:
+            prev = merged[-1]
+            prev[3] = prev[3] + (f"；{role}：{text}" if prev[0] != role else "；" + text)
+        else:
+            merged.append([role, kind, num, text])
+    pairs, j = [], 0
+    while j < len(merged):
+        if merged[j][1] == "问":
+            a = merged[j + 1] if j + 1 < len(merged) and merged[j + 1][1] == "答" else None
+            pairs.append((merged[j], a))
+            j += 2 if a else 1
+        else:
+            j += 1
+    out, k = [], 0
+    for q, a in pairs:
+        if not (q and a):
+            continue
+        k += 1
+        out += [(q[0], "问", k, q[3]), (a[0], "答", k, a[3])]
+    return out
+
+
+def render(scene: str, cat: str, turns) -> str:
     lines = [f"## {scene}", f"- category: {cat}", "- status: candidate"]
     for role, kind, num, text in turns:
         lines.append(f"### {role}{kind}{num}")
@@ -146,8 +167,9 @@ def render(scene: str, cat: str, turns: list[tuple[str, str, int, str]]) -> str:
     return "\n".join(lines)
 
 
-def gen_scene(system: str, cat: str, scene: str, model: str, tries: int = 3) -> tuple[str, str] | None:
+def gen_scene(system: str, cat: str, scene: str, model: str, tries: int = 4):
     user = f"生成一条【{cat}】场景的多角色对话。主题：{scene}。2-3 轮。"
+    last = "?"
     for _ in range(tries):
         try:
             txt = _gemma(system, user) if model == "gemma" else _qwen(system, user)
@@ -158,10 +180,15 @@ def gen_scene(system: str, cat: str, scene: str, model: str, tries: int = 3) -> 
         if turns is None:
             last = "解析失败"
             continue
-        err = validate(turns, cat)
-        if err is None:
-            return txt, ""
-        last = err
+        err = _check_turns(turns, cat)
+        if err:
+            last = err
+            continue
+        nt = _normalize(turns)
+        if len({t[2] for t in nt if t[1] == "问"}) < 2:
+            last = "轮数不足"
+            continue
+        return nt, ""
     return None, last
 
 
@@ -204,13 +231,13 @@ def main() -> int:
                     "非哲学禁意识形态/大肥鱼不发言。\n> `status` 可改 keep/drop。\n\n")
         for i, cat in enumerate(cats_seq):
             scene = rng.choice(CATS[cat])
-            res, err = gen_scene(PERSONA, cat, scene, args.model)
-            if res is None:
+            turns, err = gen_scene(PERSONA, cat, scene, args.model)
+            if turns is None:
                 fail += 1
                 print(f"[{i+1}/{args.n}] 放弃 [{cat}] {scene} :: {err}")
                 continue
             idx = start + i + 1
-            f.write(render(f"对话-{idx}｜{cat}", cat, parse(res)) + "\n\n")
+            f.write(render(f"对话-{idx}｜{cat}", cat, turns) + "\n\n")
             ok += 1
             print(f"[{i+1}/{args.n}] OK [{cat}] {scene} (#{idx})")
     print(json.dumps({"ok": ok, "fail": fail, "doc": str(doc)}, ensure_ascii=False, indent=1))
