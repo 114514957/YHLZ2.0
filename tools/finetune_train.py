@@ -149,27 +149,32 @@ def _train(cfg: dict, train: list[dict], val: list[dict], resume_from: str | Non
                       prepare_model_for_kbit_training)
     from transformers import (AutoTokenizer, BitsAndBytesConfig,
                               DataCollatorForSeq2Seq, Trainer, TrainingArguments)
-    try:
-        from transformers import Gemma4ForCausalLM as _CausalLM
-    except Exception:  # noqa: BLE001
-        from transformers import AutoModelForCausalLM as _CausalLM
 
     base = cfg["base_model"]
     tokenizer = AutoTokenizer.from_pretrained(base, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    model_cls = None
+    if cfg.get("multimodal"):
+        from transformers import Gemma4ForConditionalGeneration as model_cls  # noqa: N813
+    else:
+        try:
+            from transformers import Gemma4ForCausalLM as model_cls  # noqa: N813
+        except Exception:  # noqa: BLE001
+            from transformers import AutoModelForCausalLM as model_cls  # noqa: N813
+
     bnb = None
-    if cfg["load_in_4bit"]:
+    if cfg.get("load_in_4bit"):
         bnb = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type=cfg["bnb_4bit_quant_type"],
             bnb_4bit_use_double_quant=cfg["use_double_quant"],
             bnb_4bit_compute_dtype=torch.bfloat16,
         )
-    model = _CausalLM.from_pretrained(
+    model = model_cls.from_pretrained(
         base, quantization_config=bnb, device_map={"": 0}, dtype=torch.bfloat16,
-        trust_remote_code=True)
+        low_cpu_mem_usage=True, trust_remote_code=True)
     model.config.use_cache = False
     if cfg["gradient_checkpointing"]:
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
@@ -237,6 +242,8 @@ def main() -> int:
     ap.add_argument("--tag", default=None, help="数据/产物版本号（如 v1）")
     ap.add_argument("--resume-from", dest="resume_from", default=None,
                     help="从已有 LoRA adapter 目录续训（增量训练）")
+    ap.add_argument("--multimodal", action="store_true",
+                    help="加载多模态模型（保留 vision/audio 塔；需 ≥24GB 显存 bf16）")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--no-4bit", dest="no_4bit", action="store_true")
     args = ap.parse_args()
@@ -260,6 +267,8 @@ def main() -> int:
         cfg["epochs"] = args.epochs
     if args.no_4bit:
         cfg["load_in_4bit"] = False
+    if args.multimodal:
+        cfg["multimodal"] = True
 
     train = _read_jsonl(ROOT / cfg["train_file"])
     val = _read_jsonl(ROOT / cfg["val_file"])
