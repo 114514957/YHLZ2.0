@@ -157,7 +157,10 @@ def main() -> int:
         n_scene += len(records) - before
 
     from tools.memory_samples import load_memory_samples
-    for m in load_memory_samples(D / "记忆样本.md"):
+    mem_doc = D / "记忆样本_v2.md"
+    if not mem_doc.exists():
+        mem_doc = D / "记忆样本.md"
+    for m in load_memory_samples(mem_doc):
         if m.get("status") in ("drop", "不要", "这条不要"):
             continue
         if m.get("answerer") != "元亨":
