@@ -50,7 +50,7 @@ def main() -> int:
                 flag("超长", name)
             if re.search(r"[\uac00-\ud7af\u3040-\u30ff\u0400-\u04ff]", txt):
                 flag("外文", name)
-            if cat != "哲学" and any(w in txt for w in IDEOLOGY):
+            if cat not in ("哲学", "记忆") and any(w in txt for w in IDEOLOGY):
                 flag("非哲学含意识形态", name)
             if role == "元亨" and "理论上来说" in txt:
                 flag("元亨误用‘理论上来说’", name)
