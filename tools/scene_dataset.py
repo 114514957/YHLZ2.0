@@ -44,7 +44,8 @@ PERSONA = (
     "不要干巴巴的一问一答。\n"
     "【身份绝不混淆】各角色只用自己的自称与口吻：老爹自称「我/老爹」；"
     "元亨自称「我/本小姐/老娘/元亨」；利贞自称「我/利贞」。"
-    "元亨不谈硬核技术（技术归利贞），利贞不抢元亨的哲学。称呼别人要用对名字。\n"
+    "**哲学话题由元亨主讲（她哲学担当），利贞只提问或做技术/系统类比**；"
+    "**硬核技术由利贞主讲，元亨少谈**。称呼别人要用对名字。\n"
     "硬规则：每条发言≤32字（越短越好）；口语、俏皮；不要旁白、不要解释、不要 Markdown。\n"
     "不要往日常/技术对话里硬塞哲学或政治术语；三观自然融在人物的话里。\n"
     "输出格式：每轮两行——\n"
@@ -88,15 +89,16 @@ def _gemma(system: str, user: str) -> str:
 
 
 def _qwen(system: str, user: str) -> str:
-    body = json.dumps({"model": "qwen2.5:3b",
+    """qwen3:4b via Ollama (thinking allowed; final answer in message.content)."""
+    body = json.dumps({"model": "qwen3:4b",
                        "messages": [{"role": "system", "content": system},
                                     {"role": "user", "content": user}],
                        "stream": False,
-                       "options": {"temperature": 0.85, "num_predict": 500}}).encode()
+                       "options": {"temperature": 0.8, "num_predict": 3000}}).encode()
     req = urllib.request.Request("http://127.0.0.1:11434/api/chat", data=body,
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=240) as r:
-        return json.loads(r.read().decode("utf-8", "replace")).get("message", {}).get("content", "")
+    with urllib.request.urlopen(req, timeout=900) as r:
+        return str(json.loads(r.read().decode("utf-8", "replace")).get("message", {}).get("content") or "").strip()
 
 
 TURN = re.compile(r"^###\s*([^\n#]*?)(问|答)\s*(\d+)\s*$", re.MULTILINE)
@@ -167,28 +169,38 @@ def render(scene: str, cat: str, turns) -> str:
     return "\n".join(lines)
 
 
+def _attempt(call, system: str, user: str, cat: str):
+    try:
+        txt = call(system, user)
+    except Exception as e:  # noqa: BLE001
+        return None, type(e).__name__
+    turns = parse(txt)
+    if turns is None:
+        return None, "解析失败"
+    err = _check_turns(turns, cat)
+    if err:
+        return None, err
+    nt = _normalize(turns)
+    if len({t[2] for t in nt if t[1] == "问"}) < 2:
+        return None, "轮数不足"
+    return nt, ""
+
+
 def gen_scene(system: str, cat: str, scene: str, model: str, tries: int = 4):
+    """Gemma 主力；model=gemma 时失败再用 qwen3:4b 兜底一次。"""
     user = f"生成一条【{cat}】场景的多角色对话。主题：{scene}。2-3 轮。"
+    call = _gemma if model == "gemma" else _qwen
     last = "?"
     for _ in range(tries):
-        try:
-            txt = _gemma(system, user) if model == "gemma" else _qwen(system, user)
-        except Exception as e:  # noqa: BLE001
-            last = type(e).__name__
-            continue
-        turns = parse(txt)
-        if turns is None:
-            last = "解析失败"
-            continue
-        err = _check_turns(turns, cat)
-        if err:
-            last = err
-            continue
-        nt = _normalize(turns)
-        if len({t[2] for t in nt if t[1] == "问"}) < 2:
-            last = "轮数不足"
-            continue
-        return nt, ""
+        nt, err = _attempt(call, system, user, cat)
+        if nt is not None:
+            return nt, ""
+        last = err
+    if model == "gemma":
+        nt, err = _attempt(_qwen, system, user, cat)
+        if nt is not None:
+            return nt, "assist"
+        last = "assist:" + err
     return None, last
 
 
