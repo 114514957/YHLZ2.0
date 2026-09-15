@@ -6,9 +6,11 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 HF_MODEL="${HF_MODEL:-google/gemma-4-E4B-it}"
-BASE_DIR="${BASE_DIR:-models/gemma4-hf/gemma-4-e4b-it}"
-SFT_OUT="${SFT_OUT:-models/lora/yuanheng-sft}"
-DPO_OUT="${DPO_OUT:-models/lora/yuanheng-dpo}"
+# AutoDL：大文件放数据盘；本机无则用当前目录
+DISK="/root/autodl-tmp"; [ -d "$DISK" ] || DISK="."
+BASE_DIR="${BASE_DIR:-$DISK/models/gemma4-hf/gemma-4-e4b-it}"
+SFT_OUT="${SFT_OUT:-$DISK/models/lora/yuanheng-sft}"
+DPO_OUT="${DPO_OUT:-$DISK/models/lora/yuanheng-dpo}"
 SFT_DATA="${SFT_DATA:-../sft_persona_v3_train.jsonl}"
 VAL_DATA="${VAL_DATA:-../sft_persona_v3_val.jsonl}"
 MODE="${1:-qlora}"
