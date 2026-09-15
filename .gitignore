@@ -81,3 +81,6 @@ YHLZqwen-apiKey-.csv
 /data/
 backend/data/voice_cache/
 config/qqwatch.local.json
+
+# 训练环境（试错用）
+venv-train/
