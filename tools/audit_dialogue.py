@@ -59,9 +59,10 @@ def main() -> int:
             if role == "利贞":
                 lz_theory += txt.count("理论上来说")
                 lz_ren += txt.count("我认")
-            rounds.setdefault(num, {})[kind] = 1
+            rounds.setdefault(num, {})
+            rounds[num][kind] = rounds[num].get(kind, 0) + 1
         for num, d in rounds.items():
-            if set(d) != {"问", "答"}:
+            if d.get("问", 0) < 1 or d.get("答", 0) < 1:
                 flag("配对", name)
         if len(rounds) > 1 and lz_theory >= max(2, len(rounds) - 1):
             flag("利贞口头禅过密", name)
