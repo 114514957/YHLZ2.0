@@ -51,10 +51,11 @@ def load_key() -> str:
 
 def ds_chat(key: str, user: str) -> tuple[str, dict]:
     body = json.dumps({
-        "model": "deepseek-chat",
+        "model": "deepseek-flash",
         "messages": [{"role": "system", "content": SYSTEM},
                      {"role": "user", "content": user}],
-        "temperature": 0.9, "max_tokens": 700, "stream": False,
+        "temperature": 0.9, "max_tokens": 900, "stream": False,
+        "thinking": {"type": "disabled"},
     }).encode()
     req = urllib.request.Request("https://api.deepseek.com/v1/chat/completions", data=body,
                                  headers={"Content-Type": "application/json",
@@ -116,6 +117,28 @@ def load_memory_blocks():
     return blocks
 
 
+def load_dialogue_blocks(match=None):
+    doc = ROOT / "docs" / "素材" / "对话样本.md"
+    if not doc.exists():
+        return []
+    blocks = []
+    for blk in re.split(r"(?m)(?=^## )", doc.read_text(encoding="utf-8")):
+        if not blk.startswith("## "):
+            continue
+        name = blk.splitlines()[0][3:].strip()
+        if match and match not in name:
+            continue
+        ms = list(TURN.finditer(blk))
+        if not ms:
+            continue
+        works = []
+        for i, m in enumerate(ms):
+            end = ms[i + 1].start() if i + 1 < len(ms) else len(blk)
+            works.append(f"{m.group(1).strip()}{m.group(2)}{m.group(3)}：{blk[m.end():end].strip()}")
+        blocks.append((name, "\n".join(works)))
+    return blocks
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
@@ -123,6 +146,10 @@ def main() -> int:
     ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--append", action="store_true")
+    ap.add_argument("--dialogue", action="store_true", help="重写 docs/素材/对话样本.md 的块")
+    ap.add_argument("--match", default=None)
+    ap.add_argument("--names", default=None, help="精确块名，逗号分隔")
+    ap.add_argument("--strict", action="store_true", help="严格一问一答交替")
     ap.add_argument("--out", default=str(OUT_DOC))
     args = ap.parse_args()
     key = load_key()
@@ -130,17 +157,33 @@ def main() -> int:
         print("[error] 未找到 DEEPSEEK_API_KEY（.env）", file=sys.stderr)
         return 2
 
-    blocks = load_memory_blocks()
+    if args.dialogue:
+        blocks = load_dialogue_blocks(args.match)
+        if args.names:
+            keep = set(args.names.split(","))
+            blocks = [b for b in blocks if b[0] in keep]
+        cat = "故事"
+        out = Path(args.out) if args.out != str(OUT_DOC) else (ROOT / "docs" / "素材" / "对话样本_restyled.md")
+    else:
+        blocks = load_memory_blocks()
+        cat = "记忆"
+        out = Path(args.out)
     blocks = blocks[args.offset:]
     todo = blocks if args.all else blocks[: args.n]
-    out = Path(args.out)
     mode = "a" if args.append else "w"
+    label = "【原始对话】" if args.dialogue else "【原始记忆问答】"
+    instr = "\n\n请按人设重写。"
+    if args.strict:
+        instr += ("硬性要求：严格一问一答交替，格式 问1/答1/问2/答2…，每轮恰好一个问和一个答；"
+                  "禁止出现没有问的答、没有答的问，禁止连续两个答；"
+                  "哲学问题由利贞或老爹问、元亨答；技术问题由元亨或老爹问、利贞答；"
+                  "每句话不超过32字；只输出对话，不要任何解释。")
     ok = fail = 0
     tok_in = tok_out = 0
     with out.open(mode, encoding="utf-8") as f:
         for name, orig in todo:
             try:
-                txt, usage = ds_chat(key, "【原始记忆问答】\n" + orig + "\n\n请按人设重写。")
+                txt, usage = ds_chat(key, label + "\n" + orig + instr)
             except Exception as e:  # noqa: BLE001
                 fail += 1
                 print(f"[fail] {name} :: {type(e).__name__}")
@@ -152,7 +195,7 @@ def main() -> int:
                 fail += 1
                 print(f"[fail] {name} :: 解析不足")
                 continue
-            lines = [f"## {name}", "- category: 记忆", "- status: candidate"]
+            lines = [f"## {name}", f"- category: {cat}", "- status: candidate"]
             for r, k, n, t in turns:
                 lines += [f"### {r}{k}{n}", t]
             f.write("\n".join(lines) + "\n\n")
