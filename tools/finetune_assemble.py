@@ -119,6 +119,8 @@ def main() -> int:
     cfg = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
     ap = argparse.ArgumentParser(description="装配全素材版本化 SFT 训练集")
     ap.add_argument("--tag", default=cfg.get("tag", "v3"))
+    ap.add_argument("--memory-ratio", type=float, default=0.20,
+                    help="memory 占比上限（0-1，1=不限）")
     args = ap.parse_args()
     out_dir = ROOT / "data" / "finetune"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -157,9 +159,11 @@ def main() -> int:
         n_scene += len(records) - before
 
     from tools.memory_samples import load_memory_samples
+    import random
     mem_doc = D / "记忆样本_v2.md"
     if not mem_doc.exists():
         mem_doc = D / "记忆样本.md"
+    mem_items: list[tuple[dict, str, bool]] = []
     for m in load_memory_samples(mem_doc):
         if m.get("status") in ("drop", "不要", "这条不要"):
             continue
@@ -167,17 +171,33 @@ def main() -> int:
             continue
         who = m["asker"]
         u = m["question"] if who == "老爹" else f"{who}：{m['question']}"
+        rec = {"messages": [{"role": "system", "content": SYSTEM},
+                            {"role": "user", "content": u},
+                            {"role": "assistant", "content": m["answer"]}],
+               "source": "memory"}
+        mem_items.append((rec, _fp(u, m["answer"]), m.get("status") == "keep"))
+    mem_total = len(mem_items)
+    mem_cap = mem_total
+    if args.memory_ratio < 1 and records:
+        mem_cap = int(round(args.memory_ratio / (1 - args.memory_ratio) * len(records)))
+        if mem_cap < mem_total:
+            rnd = random.Random(cfg.get("seed", 20260913))
+            keeps = [x for x in mem_items if x[2]]
+            others = [x for x in mem_items if not x[2]]
+            rnd.shuffle(keeps)
+            rnd.shuffle(others)
+            mem_items = (keeps + others)[:mem_cap]
+    for rec, key, _ in mem_items:
         before = len(records)
-        add({"messages": [{"role": "system", "content": SYSTEM},
-                          {"role": "user", "content": u},
-                          {"role": "assistant", "content": m["answer"]}],
-             "source": "memory"}, _fp(u, m["answer"]))
+        add(rec, key)
         n_mem += len(records) - before
 
     out = out_dir / f"sft_persona_{args.tag}.jsonl"
     out.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n", encoding="utf-8")
     stats = {"tag": args.tag, "total": len(records), "real": n_real, "golden": n_gold,
-             "scene": n_scene, "memory": n_mem, "file": str(out.relative_to(ROOT))}
+             "scene": n_scene, "memory": n_mem, "memory_total": mem_total,
+             "memory_ratio": round(n_mem / max(1, len(records)), 3),
+             "file": str(out.relative_to(ROOT))}
     (out_dir / f"sft_persona_{args.tag}.stats.json").write_text(
         json.dumps(stats, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps(stats, ensure_ascii=False, indent=1))

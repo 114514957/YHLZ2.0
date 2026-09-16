@@ -1,9 +1,11 @@
 {
  "tag": "v3",
- "total": 1487,
+ "total": 1124,
  "real": 38,
  "golden": 71,
  "scene": 790,
- "memory": 588,
+ "memory": 225,
+ "memory_total": 588,
+ "memory_ratio": 0.2,
  "file": "data\\finetune\\sft_persona_v3.jsonl"
 }
