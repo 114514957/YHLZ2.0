@@ -34,7 +34,7 @@ def main():
     args = ap.parse_args()
 
     import torch
-    from transformers import AutoTokenizer, BitsAndBytesConfig
+    from transformers import AutoTokenizer
     try:
         from transformers import Gemma4ForConditionalGeneration as LM
     except Exception:
@@ -43,10 +43,9 @@ def main():
     tok = AutoTokenizer.from_pretrained(args.base, trust_remote_code=True)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
-    bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
-                             bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=torch.bfloat16)
-    model = LM.from_pretrained(args.base, quantization_config=bnb, device_map={"": 0},
-                               dtype=torch.bfloat16, trust_remote_code=True)
+    # bf16 (no bitsandbytes: incompatible with Gemma4).
+    model = LM.from_pretrained(args.base, dtype=torch.bfloat16, device_map={"": 0},
+                               low_cpu_mem_usage=True, trust_remote_code=True)
     model.eval()
 
     rows = read_jsonl(args.data)[: args.n]

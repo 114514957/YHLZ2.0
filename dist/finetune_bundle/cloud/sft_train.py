@@ -70,10 +70,15 @@ def main():
     if not args.no_4bit:
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
 
+    _projs = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+    if args.multimodal:
+        # Gemma4 towers also expose q_proj.. but wrapped in Gemma4ClippableLinear
+        # (PEFT only supports nn.Linear) -> restrict LoRA to the language model.
+        target = r"model\.language_model\..*\.(" + "|".join(_projs) + ")"
+    else:
+        target = _projs
     lora = LoraConfig(r=args.r, lora_alpha=args.alpha, lora_dropout=0.05,
-                      target_modules=["q_proj","k_proj","v_proj","o_proj",
-                                      "gate_proj","up_proj","down_proj"],
-                      bias="none", task_type="CAUSAL_LM")
+                      target_modules=target, bias="none", task_type="CAUSAL_LM")
     model = get_peft_model(model, lora)
     model.print_trainable_parameters()
 
@@ -96,13 +101,19 @@ def main():
     if val is not None:
         val = val.map(map_fn, remove_columns=[c for c in val.column_names if c in drop])
 
-    args_t = TrainingArguments(
+    import inspect
+    total_steps = max(1, (len(train) // max(1, args.batch * args.grad_accum)) * int(args.epochs))
+    _kw = dict(
         output_dir=args.out, per_device_train_batch_size=args.batch,
         gradient_accumulation_steps=args.grad_accum, num_train_epochs=args.epochs,
-        learning_rate=args.lr, warmup_ratio=0.03, logging_steps=5, save_steps=100,
-        save_total_limit=2, bf16=True, gradient_checkpointing=(not args.no_4bit),
-        report_to="none", seed=20260913, eval_strategy=("steps" if val else "no"),
-        eval_steps=100 if val else None, remove_unused_columns=False)
+        learning_rate=args.lr, warmup_ratio=0.03, warmup_steps=max(1, int(0.03 * total_steps)),
+        logging_steps=5, save_steps=100, save_total_limit=2, bf16=True,
+        gradient_checkpointing=(not args.no_4bit), report_to="none", seed=20260913,
+        eval_strategy=("steps" if val else "no"), eval_steps=(100 if val else None),
+        remove_unused_columns=False)
+    _sig = set(inspect.signature(TrainingArguments.__init__).parameters)
+    _kw = {k: v for k, v in _kw.items() if k in _sig}
+    args_t = TrainingArguments(**_kw)
     collator = DataCollatorForSeq2Seq(tok, padding=True, label_pad_token_id=-100)
     trainer = Trainer(model=model, args=args_t, train_dataset=train, eval_dataset=val,
                       data_collator=collator)

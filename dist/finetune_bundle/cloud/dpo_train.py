@@ -59,13 +59,21 @@ def main():
     model = PeftModel.from_pretrained(model, args.sft_adapter, is_trainable=True)
 
     pairs = read_jsonl(args.pairs)
-    ds = Dataset.from_list([{"prompt": p["prompt"], "chosen": p["chosen"], "rejected": p["rejected"]}
+    # trl>=1.x conversational format: prompt is a message list, so chosen/rejected
+    # must be message lists too (not bare strings).
+    ds = Dataset.from_list([{"prompt": p["prompt"],
+                             "chosen": [{"role": "assistant", "content": p["chosen"]}],
+                             "rejected": [{"role": "assistant", "content": p["rejected"]}]}
                             for p in pairs])
-    cfg = DPOConfig(output_dir=args.out, per_device_train_batch_size=args.batch,
-                    gradient_accumulation_steps=args.grad_accum, num_train_epochs=args.epochs,
-                    learning_rate=args.lr, beta=args.beta, max_length=args.seq,
-                    logging_steps=5, save_steps=100, save_total_limit=2, bf16=True,
-                    gradient_checkpointing=(not args.no_4bit), report_to="none", seed=20260913)
+    import inspect
+    _kw = dict(output_dir=args.out, per_device_train_batch_size=args.batch,
+               gradient_accumulation_steps=args.grad_accum, num_train_epochs=args.epochs,
+               learning_rate=args.lr, beta=args.beta, max_length=args.seq,
+               logging_steps=5, save_steps=100, save_total_limit=2, bf16=True,
+               gradient_checkpointing=(not args.no_4bit), report_to="none", seed=20260913)
+    _sig = set(inspect.signature(DPOConfig.__init__).parameters)
+    _kw = {k: v for k, v in _kw.items() if k in _sig}
+    cfg = DPOConfig(**_kw)
     trainer = DPOTrainer(model=model, args=cfg, train_dataset=ds, processing_class=tok)
     trainer.train()
     Path(args.out).mkdir(parents=True, exist_ok=True)
