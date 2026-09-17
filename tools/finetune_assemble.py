@@ -90,10 +90,16 @@ def _read_jsonl(path: Path) -> list[dict]:
     return out
 
 
-def _to_messages(turns: list[tuple[str, str]]) -> list[dict] | None:
-    """turns: ordered (role, text) of 问/答; map 元亨->assistant else user(prefix)."""
+def _to_messages(turns: list[tuple[str, str]], keep: tuple = ("老爹", "元亨")) -> list[dict] | None:
+    """turns: ordered (role, text) of 问/答; map 元亨->assistant else user(prefix).
+
+    v5: 默认**丢弃利贞轮次**——利贞已有独立 persona 集；保留会让模型学出
+    「利贞：」面板模拟（前缀泄漏）。
+    """
     msgs: list[dict] = [{"role": "system", "content": SYSTEM}]
     for role, text in turns:
+        if role not in keep:
+            continue
         who = "assistant" if role == "元亨" else "user"
         content = text if role == "元亨" else (f"{role}：{text}" if role != "老爹" else text)
         if msgs[-1]["role"] == who and who == "user":
