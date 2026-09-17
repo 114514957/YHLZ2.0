@@ -32,6 +32,41 @@ SYSTEM = (
 )
 TURN = re.compile(r"^###\s*([^\n#]*?)(问|答)(\d+)\s*$", re.MULTILINE)
 
+# 利贞 persona（v4 新增）：把「利贞答」的轮次独立训成利贞=assistant，
+# 推理时切换 system prompt 即可切换人格。
+SYSTEM_LZ = (
+    "你是利贞——元亨的伙伴、靠谱的技术担当。稳重、博学、直接，话不多但到位；"
+    "句尾偶尔「，理论上来说」；私下其实没常识、有点大胆。禁止助手腔/列表/小标题。"
+)
+
+
+def _from_dialogue_doc_lizhen(path: Path) -> list[dict]:
+    """抽对话块里「利贞答」的轮次 -> 利贞 persona 样本。"""
+    if not path.exists():
+        return []
+    out = []
+    for blk in re.split(r"(?m)(?=^## )", path.read_text(encoding="utf-8")):
+        if not blk.startswith("## "):
+            continue
+        ms = list(TURN.finditer(blk))
+        rounds: dict[str, dict] = {}
+        for i, m in enumerate(ms):
+            end = ms[i + 1].start() if i + 1 < len(ms) else len(blk)
+            rounds.setdefault(m.group(3), {})[m.group(2)] = (
+                m.group(1).strip(), blk[m.end():end].strip())
+        for num, d in rounds.items():
+            q, a = d.get("问"), d.get("答")
+            if not (q and a):
+                continue
+            if a[0] != "利贞" or q[0] not in ("元亨", "老爹"):
+                continue
+            u = q[1] if q[0] == "老爹" else f"元亨：{q[1]}"
+            out.append({"messages": [{"role": "system", "content": SYSTEM_LZ},
+                                     {"role": "user", "content": u},
+                                     {"role": "assistant", "content": a[1]}],
+                        "source": "lizhen:" + blk.splitlines()[0][3:][:24]})
+    return out
+
 
 def _norm(s: str) -> str:
     return re.sub(r"\s+", "", str(s or ""))
@@ -121,6 +156,8 @@ def main() -> int:
     ap.add_argument("--tag", default=cfg.get("tag", "v3"))
     ap.add_argument("--memory-ratio", type=float, default=0.20,
                     help="memory 占比上限（0-1，1=不限）")
+    ap.add_argument("--lizhen-cap", type=int, default=300,
+                    help="利贞 persona 样本上限（0=不限）")
     args = ap.parse_args()
     out_dir = ROOT / "data" / "finetune"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -157,6 +194,17 @@ def main() -> int:
         before = len(records)
         add(rec, key)
         n_scene += len(records) - before
+
+    n_lz = 0
+    lz_recs = _from_dialogue_doc_lizhen(D / "对话样本.md")
+    if args.lizhen_cap and len(lz_recs) > args.lizhen_cap:
+        import random as _r
+        _r.Random(cfg.get("seed", 20260913)).shuffle(lz_recs)
+        lz_recs = lz_recs[: args.lizhen_cap]
+    for rec in lz_recs:
+        before = len(records)
+        add(rec, _fp(json.dumps(rec["messages"], ensure_ascii=False)))
+        n_lz += len(records) - before
 
     from tools.memory_samples import load_memory_samples
     import random
@@ -195,7 +243,7 @@ def main() -> int:
     out = out_dir / f"sft_persona_{args.tag}.jsonl"
     out.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n", encoding="utf-8")
     stats = {"tag": args.tag, "total": len(records), "real": n_real, "golden": n_gold,
-             "scene": n_scene, "memory": n_mem, "memory_total": mem_total,
+             "scene": n_scene, "lizhen": n_lz, "memory": n_mem, "memory_total": mem_total,
              "memory_ratio": round(n_mem / max(1, len(records)), 3),
              "file": str(out.relative_to(ROOT))}
     (out_dir / f"sft_persona_{args.tag}.stats.json").write_text(
