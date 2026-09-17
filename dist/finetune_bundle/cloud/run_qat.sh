@@ -8,12 +8,13 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 REPO="${REPO:-google/gemma-4-E4B-it-qat-q4_0-unquantized}"   # 可训练的 QAT 权重(14.8G)
+TAG="${TAG:-v5}"                                            # 数据/产物版本
 DISK="/root/autodl-tmp"; [ -d "$DISK" ] || DISK="."
 BASE_DIR="${BASE_DIR:-$DISK/models/gemma4-qat/gemma-4-E4B-it-qat-unquantized}"
-SFT_OUT="${SFT_OUT:-$DISK/models/lora/yuanheng-qat-sft}"
-DPO_OUT="${DPO_OUT:-$DISK/models/lora/yuanheng-qat-dpo}"
-SFT_DATA="${SFT_DATA:-../sft_persona_v4_train.jsonl}"
-VAL_DATA="${VAL_DATA:-../sft_persona_v4_val.jsonl}"
+SFT_OUT="${SFT_OUT:-$DISK/models/lora/yuanheng-$TAG-sft}"
+DPO_OUT="${DPO_OUT:-$DISK/models/lora/yuanheng-$TAG-dpo}"
+SFT_DATA="${SFT_DATA:-../sft_persona_${TAG}_train.jsonl}"
+VAL_DATA="${VAL_DATA:-../sft_persona_${TAG}_val.jsonl}"
 N_PAIRS="${N_PAIRS:-400}"
 
 echo "== 0. env =="
@@ -31,7 +32,7 @@ print("base:", p)
 PY
 
 echo "== 2. SFT（bf16 LoRA，塔冻结）=="
-python sft_train.py --tag v4 --multimodal --no-4bit \
+python sft_train.py --tag "$TAG" --multimodal --no-4bit \
   --base "$BASE_DIR" --train "$SFT_DATA" --val "$VAL_DATA" --out "$SFT_OUT" \
   --epochs "${SFT_EPOCHS:-3}" --seq "${SEQ:-2048}" --batch "${BATCH:-4}" \
   --grad-accum "${GA:-4}" --lr "${LR:-2e-4}" --r 16 --alpha 32

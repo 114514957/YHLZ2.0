@@ -8,7 +8,7 @@ param(
   [string]$Server = "$PSScriptRoot\..\..\models\llama-cuda\llama-server.exe",
   [string]$Base   = "$PSScriptRoot\..\..\models\gemma4-gguf\gemma-4-E4B_q4_0-it.gguf",
   [string]$Mmproj = "$PSScriptRoot\..\..\models\gemma4-gguf\gemma-4-E4B-it-mmproj.gguf",
-  [string]$Lora   = "$PSScriptRoot\..\..\models\gguf-lora\yuanheng-lora.gguf",
+  [string]$Lora   = "$PSScriptRoot\..\..\models\gguf-lora\yuanheng-v5-lora.gguf",
   [int]$Ctx = 2048, [int]$Port = 8080, [int]$Ngl = 99,
   [switch]$NoLora, [switch]$NoMmproj
 )
