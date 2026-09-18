@@ -76,15 +76,28 @@ class KeywordIndex:
         self._lock = threading.RLock()
         self._init_schema()
 
-    def _conn(self) -> sqlite3.Connection:
+    def _conn(self, *, writable: bool = True) -> sqlite3.Connection:
         con = sqlite3.connect(str(self.db_path))
-        con.execute("PRAGMA journal_mode=WAL")
-        con.execute("PRAGMA synchronous=NORMAL")
+        if writable:
+            # WAL persists in the db file; only writers re-assert it (plus the
+            # per-connection synchronous hint).  Read paths skip both pragmas —
+            # they cost ~1.8 ms per op on Windows (ledger 0433 demo).
+            con.execute("PRAGMA journal_mode=WAL")
+            con.execute("PRAGMA synchronous=NORMAL")
         return con
 
     def _use(self, fn: Callable[[sqlite3.Connection], object]) -> object:
         with self._lock:
             con = self._conn()
+            try:
+                return fn(con)
+            finally:
+                con.close()
+
+    def _read(self, fn: Callable[[sqlite3.Connection], object]) -> object:
+        """Read-only path: no per-op pragmas (journal mode is persistent)."""
+        with self._lock:
+            con = self._conn(writable=False)
             try:
                 return fn(con)
             finally:
@@ -198,17 +211,36 @@ class KeywordIndex:
 
         def _search(con: sqlite3.Connection) -> list[dict]:
             n = con.execute("SELECT COUNT(*) FROM kw_docs").fetchone()[0]
+            placeholders = ",".join("?" * len(terms))
+            # ledger 0433: force the planner to materialize the postings first
+            # and probe kw_docs by PK.  The default plan scanned kw_docs via
+            # idx_kw_docext and probed kw_index per doc (~12 ms vs ~6 ms).
             join_sql = (
-                "SELECT kw_index.term, kw_index.docid, kw_index.tf "
-                "FROM kw_index JOIN kw_docs ON kw_docs.docid = kw_index.docid "
-                "WHERE kw_index.term IN (" + ",".join("?" * len(terms)) + ")"
+                "WITH p AS MATERIALIZED (SELECT term,docid,tf FROM kw_index "
+                f"WHERE term IN ({placeholders})) "
+                "SELECT p.term,p.docid,p.tf FROM p "
+                "JOIN kw_docs d INDEXED BY sqlite_autoindex_kw_docs_1 "
+                "ON d.docid=p.docid WHERE d.status IN ('active','downgraded')"
             )
             params: list[object] = list(terms)
             if source is not None:
-                join_sql += " AND kw_docs.source=?"
+                join_sql += " AND d.source=?"
                 params.append(source)
-            join_sql += " AND kw_docs.status IN ('active','downgraded')"
-            rows = con.execute(join_sql, tuple(params)).fetchall()
+            try:
+                rows = con.execute(join_sql, tuple(params)).fetchall()
+            except sqlite3.OperationalError:
+                # portability fallback (e.g. a db without the autoindex name)
+                legacy = (
+                    "SELECT kw_index.term, kw_index.docid, kw_index.tf "
+                    "FROM kw_index JOIN kw_docs ON kw_docs.docid = kw_index.docid "
+                    "WHERE kw_index.term IN (" + placeholders + ")"
+                )
+                legacy_params: list[object] = list(terms)
+                if source is not None:
+                    legacy += " AND kw_docs.source=?"
+                    legacy_params.append(source)
+                legacy += " AND kw_docs.status IN ('active','downgraded')"
+                rows = con.execute(legacy, tuple(legacy_params)).fetchall()
             if not rows:
                 return []
             df_map: dict[str, int] = {}
@@ -271,13 +303,13 @@ class KeywordIndex:
                     break
             return results
 
-        return self._use(_search)
+        return self._read(_search)
 
     def count(self) -> int:
         def _count(con: sqlite3.Connection) -> int:
             return int(con.execute("SELECT COUNT(*) FROM kw_docs").fetchone()[0])
 
-        return self._use(_count)
+        return self._read(_count)
 
     def health(self) -> dict:
         def _health(con: sqlite3.Connection) -> dict:
@@ -285,4 +317,4 @@ class KeywordIndex:
             terms = con.execute("SELECT COUNT(*) FROM kw_index").fetchone()[0]
             return {"provider": "keyword-index-v1", "docs": int(docs), "terms": int(terms)}
 
-        return self._use(_health)
+        return self._read(_health)

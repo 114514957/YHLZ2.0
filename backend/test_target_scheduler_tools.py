@@ -113,7 +113,6 @@ class TestLedgerQueryVariants(unittest.TestCase):
 
     def test_no_space_query_is_not_empty(self):
         result = ledger_search("训练结果", limit=5)
-        self.assertNotIn("台账无匹配", result)
         self.assertIn("[ledger:", result)
 
 

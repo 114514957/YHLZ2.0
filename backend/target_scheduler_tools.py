@@ -73,9 +73,7 @@ def recall_memory(query: str, limit: int = 5) -> str:
             from backend.target_memory import TargetMemoryService as _S
 
             service = _S()
-            from backend.target_kw_index import KeywordIndex
-
-            kw = KeywordIndex()
+            kw = _kw_index()
             for sub in _split_query(q):
                 hits = kw.query(sub, limit=4, source="l2")
                 if hits:
@@ -289,6 +287,21 @@ def _merge_hits(lists: list[list[dict]]) -> list[dict]:
     )
 
 
+_KW_CACHE: dict = {}
+
+
+def _kw_index():
+    """Process-level cached KeywordIndex (ledger 0433): re-creating the index
+    per query re-ran _init_schema (~5 DDL statements + commit) every call."""
+    from backend.target_kw_index import KeywordIndex
+
+    idx = _KW_CACHE.get("default")
+    if idx is None:
+        idx = KeywordIndex()
+        _KW_CACHE["default"] = idx
+    return idx
+
+
 def _retry_query(query: str, source: str) -> list[dict]:
     """Multi-variant keyword query (ledger 0425).
 
@@ -297,9 +310,7 @@ def _retry_query(query: str, source: str) -> list[dict]:
     pieces, a stopword-squeezed core and a bigram-expanded fallback brings the
     real records in as well.
     """
-    from backend.target_kw_index import KeywordIndex
-
-    kw = KeywordIndex()
+    kw = _kw_index()
     variants: list[str] = [str(query or "")]
     for piece in _split_query(query):
         # pure stopword pieces ("上次", "一下", …) only pull in unrelated
