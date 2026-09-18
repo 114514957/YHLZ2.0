@@ -164,6 +164,9 @@ def main() -> int:
                     help="memory 占比上限（0-1，1=不限）")
     ap.add_argument("--lizhen-cap", type=int, default=300,
                     help="利贞 persona 样本上限（0=不限）")
+    ap.add_argument("--extra", default=None,
+                    help="额外 JSONL（如工具样本）；保留其 tools 字段")
+    ap.add_argument("--extra-cap", type=int, default=0, help="extra 上限（0=不限）")
     args = ap.parse_args()
     out_dir = ROOT / "data" / "finetune"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -246,10 +249,29 @@ def main() -> int:
         add(rec, key)
         n_mem += len(records) - before
 
+    n_extra = 0
+    if args.extra:
+        ex_path = Path(args.extra)
+        ex_rows = _read_jsonl(ex_path)
+        if args.extra_cap and len(ex_rows) > args.extra_cap:
+            random.Random(cfg.get("seed", 20260913)).shuffle(ex_rows)
+            ex_rows = ex_rows[: args.extra_cap]
+        for r in ex_rows:
+            msgs = r.get("messages")
+            if not msgs:
+                continue
+            rec = {"messages": msgs, "source": r.get("source", "extra")}
+            if r.get("tools"):
+                rec["tools"] = r["tools"]
+            before = len(records)
+            add(rec, _fp(json.dumps(msgs, ensure_ascii=False)))
+            n_extra += len(records) - before
+
     out = out_dir / f"sft_persona_{args.tag}.jsonl"
     out.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n", encoding="utf-8")
     stats = {"tag": args.tag, "total": len(records), "real": n_real, "golden": n_gold,
              "scene": n_scene, "lizhen": n_lz, "memory": n_mem, "memory_total": mem_total,
+             "extra": n_extra,
              "memory_ratio": round(n_mem / max(1, len(records)), 3),
              "file": str(out.relative_to(ROOT))}
     (out_dir / f"sft_persona_{args.tag}.stats.json").write_text(

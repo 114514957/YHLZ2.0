@@ -24,6 +24,49 @@ def read_jsonl(p):
             except Exception: pass
     return rows
 
+
+def build_example(tok, rec, seq):
+    """chat(+可选 tools) -> {input_ids, attention_mask, labels}。
+
+    只训练 **assistant 回合**（含 tool_call 回合），mask 掉 system/user/tool 结果；
+    tool_call 回合在 `<|tool_response>` 前截断，避免模型学会自造工具结果。
+    """
+    messages = rec.get("messages") or []
+    tools = rec.get("tools")
+    if not messages:
+        return None
+    full = tok.apply_chat_template(messages, tools=tools, tokenize=False,
+                                   add_generation_prompt=False)
+    ids = tok(full, add_special_tokens=False)["input_ids"][:seq]
+    if not ids:
+        return None
+    bounds = []
+    for i in range(len(messages)):
+        pre = tok.apply_chat_template(messages[:i + 1], tools=tools, tokenize=False,
+                                      add_generation_prompt=False)
+        bounds.append(len(tok(pre, add_special_tokens=False)["input_ids"]))
+    try:
+        tresp = tok.convert_tokens_to_ids("<|tool_response>")
+    except Exception:  # noqa: BLE001
+        tresp = -1
+    labels = [-100] * len(ids)
+    prev = 0
+    for i, m in enumerate(messages):
+        if m.get("role") == "assistant":
+            s, e = prev, min(bounds[i], len(ids))
+            if m.get("tool_calls") and tresp is not None and tresp >= 0:
+                for t in range(s, e):
+                    if ids[t] == tresp:
+                        e = t
+                        break
+            for t in range(max(0, s), max(0, e)):
+                if t < len(ids):
+                    labels[t] = ids[t]
+        prev = bounds[i]
+    if all(x == -100 for x in labels):
+        return None
+    return {"input_ids": ids, "attention_mask": [1] * len(ids), "labels": labels}
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
@@ -82,24 +125,20 @@ def main():
     model = get_peft_model(model, lora)
     model.print_trainable_parameters()
 
-    def enc(messages):
-        full = tok.apply_chat_template(messages, tokenize=False)
-        ids = tok(full, add_special_tokens=True, truncation=True, max_length=args.seq)["input_ids"]
-        labels = list(ids)
-        if len(messages) >= 2:
-            prompt = tok.apply_chat_template(messages[:-1], tokenize=False, add_generation_prompt=True)
-            p = tok(prompt, add_special_tokens=True, truncation=True, max_length=args.seq)["input_ids"]
-            n = min(len(p), len(ids)); labels = [-100]*n + ids[n:]
-        return {"input_ids": ids, "attention_mask": [1]*len(ids), "labels": labels}
-
     def map_fn(rec):
-        return enc(rec["messages"])
-    train = Dataset.from_list(read_jsonl(args.train))
-    val = Dataset.from_list(read_jsonl(args.val)) if args.val and read_jsonl(args.val) else None
-    drop = ["messages","source"]
-    train = train.map(map_fn, remove_columns=[c for c in train.column_names if c in drop])
-    if val is not None:
-        val = val.map(map_fn, remove_columns=[c for c in val.column_names if c in drop])
+        ex = build_example(tok, rec, args.seq)
+        return ex or {"input_ids": [], "attention_mask": [], "labels": []}
+
+    def prep(rows):
+        rows = [r for r in rows
+                if any(m.get("role") == "assistant" for m in (r.get("messages") or []))]
+        ds = Dataset.from_list(rows)
+        drop = [c for c in ds.column_names if c in ("messages", "source", "tools", "meta")]
+        return ds.map(map_fn, remove_columns=drop)
+
+    train = prep(read_jsonl(args.train))
+    val_rows = read_jsonl(args.val) if args.val else []
+    val = prep(val_rows) if val_rows else None
 
     import inspect
     total_steps = max(1, (len(train) // max(1, args.batch * args.grad_accum)) * int(args.epochs))

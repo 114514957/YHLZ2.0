@@ -38,11 +38,15 @@ python sft_train.py --tag "$TAG" --multimodal --no-4bit \
   --grad-accum "${GA:-4}" --lr "${LR:-2e-4}" --r 16 --alpha 32
 
 echo "== 3. DPO（v2 温和参数才是对的：beta=0.05, lr=1e-5）=="
+if [ "${SKIP_DPO:-0}" = "1" ]; then
+  echo "SKIP_DPO=1 -> 跳过 DPO（v6 含工具样本，避免风格 DPO 造成工具回归）"
+else
 python dpo_build.py --base "$BASE_DIR" --data "$SFT_DATA" --n "$N_PAIRS" \
   --out "$DISK/dpo_pairs.jsonl"
 python dpo_train.py --base "$BASE_DIR" --sft-adapter "$SFT_OUT" \
   --pairs "$DISK/dpo_pairs.jsonl" --out "$DPO_OUT" --no-4bit \
   --epochs 1 --lr 1e-5 --beta 0.05
+fi
 
 echo "== 4. 导出 LoRA → GGUF（部署用；需 llama.cpp 的 convert_lora_to_gguf.py）=="
 if [ -f "$DISK/llama.cpp/convert_lora_to_gguf.py" ]; then
