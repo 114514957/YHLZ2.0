@@ -53,6 +53,11 @@ def main():
     with Path(args.out).open("w", encoding="utf-8") as f:
         for i, r in enumerate(rows, 1):
             msgs = r["messages"]
+            # v6: 跳过工具轨迹（含 tools 或 tool_calls/role=tool），
+            # 只在纯 chat 上做风格 DPO，避免伤到工具能力。
+            if r.get("tools") or any(
+                    (m.get("tool_calls") or m.get("role") == "tool") for m in msgs):
+                continue
             chosen = next((m["content"] for m in msgs if m["role"] == "assistant"), "")
             prompt = msgs[:-1]
             if not chosen or not prompt:
