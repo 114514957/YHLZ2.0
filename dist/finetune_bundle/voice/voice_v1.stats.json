@@ -1,0 +1,13 @@
+{
+ "total": 334,
+ "train": 301,
+ "val": 33,
+ "kinds": {
+  "reply": 132,
+  "asr": 200,
+  "asr_real": 2
+ },
+ "noise_ratio": 0.3,
+ "audio_dir": "dist\\finetune_bundle\\voice\\audio",
+ "elapsed_s": 1235.8
+}
