@@ -180,10 +180,21 @@ def main() -> int:
 
     # ---------------- real training ----------------
     import torch
-    from datasets import Dataset
     from peft import LoraConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training
     from transformers import (BitsAndBytesConfig, Trainer, TrainingArguments)
     from transformers import Gemma4ForConditionalGeneration as LM
+
+    class _ListDataset(torch.utils.data.Dataset):
+        """Raw python examples; avoids pyarrow mangling torch tensors."""
+
+        def __init__(self, items):
+            self.items = items
+
+        def __len__(self):
+            return len(self.items)
+
+        def __getitem__(self, i):
+            return self.items[i]
 
     rows = audio_rows
     texts = []
@@ -196,13 +207,20 @@ def main() -> int:
         texts = pool[: args.rehearsal_n]
 
     examples = []
+    failed = 0
     for r in rows:
         try:
             ex = build_audio_example(proc, r, args.seq)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             ex = None
+            failed += 1
+            if failed <= 3:
+                print(f"[voice] build ERR {r.get('id')}: "
+                      f"{type(exc).__name__}: {str(exc)[:180]}", flush=True)
         if ex:
             examples.append(ex)
+    if failed:
+        print(f"[voice] build failures: {failed}/{len(rows)}", flush=True)
     for r in texts:
         ex = build_text_example(tok, r, args.seq)
         if ex:
@@ -212,17 +230,22 @@ def main() -> int:
     print(f"[voice] examples={len(examples)} (audio={len(rows)}, rehearsal={len(texts)})",
           flush=True)
 
-    ds = Dataset.from_list(examples)
+    ds = _ListDataset(examples)
 
     val_examples = []
+    val_failed = 0
     for r in _resolve_media(read_jsonl(args.val), media_root) if args.val else []:
         try:
             ex = build_audio_example(proc, r, args.seq)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             ex = None
+            val_failed += 1
+            if val_failed <= 2:
+                print(f"[voice] val build ERR {r.get('id')}: "
+                      f"{type(exc).__name__}: {str(exc)[:160]}", flush=True)
         if ex:
             val_examples.append(ex)
-    val_ds = Dataset.from_list(val_examples) if val_examples else None
+    val_ds = _ListDataset(val_examples) if val_examples else None
     if val_ds is not None:
         print(f"[voice] val examples={len(val_examples)}", flush=True)
 
@@ -238,9 +261,13 @@ def main() -> int:
         batch = {"input_ids": torch.tensor(ids), "attention_mask": torch.tensor(att),
                  "labels": torch.tensor(lab)}
         if all("input_features" in f for f in features):
-            batch["input_features"] = torch.stack([f["input_features"] for f in features])
+            # Dataset.from_list turns tensors into nested lists -> re-wrap.
+            batch["input_features"] = torch.stack(
+                [torch.as_tensor(f["input_features"], dtype=torch.float32)
+                 for f in features])
             batch["input_features_mask"] = torch.stack(
-                [f["input_features_mask"] for f in features])
+                [torch.as_tensor(f["input_features_mask"], dtype=torch.bool)
+                 for f in features])
             mt = [f["mm_token_type_ids"] + [0] * (maxlen - len(f["mm_token_type_ids"]))
                   for f in features]
             batch["mm_token_type_ids"] = torch.tensor(mt)
@@ -268,6 +295,7 @@ def main() -> int:
     import inspect
 
     _kw = dict(output_dir=args.out or "voice-sft", per_device_train_batch_size=1,
+               per_device_eval_batch_size=1,
                gradient_accumulation_steps=args.grad_accum,
                num_train_epochs=args.epochs, learning_rate=args.lr,
                warmup_steps=20, logging_steps=5, save_steps=200,

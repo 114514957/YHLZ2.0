@@ -13,7 +13,7 @@ OUT="${OUT:-$DISK/models/lora/yuanheng-$TAG-sft}"
 REHEARSAL_N="${REHEARSAL_N:-120}"
 
 export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
-python -m pip install -q -U "transformers>=5.15.1" peft accelerate datasets safetensors soundfile
+python -m pip install -q -U "transformers>=5.15.1" peft accelerate datasets safetensors soundfile librosa
 
 echo "== 0. 契约冒烟（3 样本 1 步：先证 input_features/mm_token_type_ids 前向可用）=="
 python sft_voice.py --base "$BASE_DIR" --sft-adapter "$SFT_ADAPTER" \
