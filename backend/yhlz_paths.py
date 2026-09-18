@@ -38,7 +38,9 @@ LOCAL_MODELS = ROOT / "models"
 YH_LLAMA_EXE = LOCAL_MODELS / "llama-cuda" / "llama-server.exe"
 YH_BASE_GGUF = LOCAL_MODELS / "gemma4-gguf" / "gemma-4-E4B_q4_0-it.gguf"
 YH_MMPROJ_GGUF = LOCAL_MODELS / "gemma4-gguf" / "gemma-4-E4B-it-mmproj.gguf"
-YH_LORA_GGUF = LOCAL_MODELS / "gguf-lora" / "yuanheng-v6-lora.gguf"
+# 生产 LoRA（记录 0432）：v7b = v6-dpo + 语音(真实域ASR+应答+rehearsal)
+# 历史：v6(0398) -> v7b；回滚可指回 yuanheng-v6-lora.gguf
+YH_LORA_GGUF = LOCAL_MODELS / "gguf-lora" / "yuanheng-v7b-lora.gguf"
 
 BOT_UIN = str(os.getenv("YHLZ_QQ_BOT_UIN", "3655185302"))
 MASTER_UIN = str(os.getenv("YHLZ_QQ_MASTER_UIN", "2258374446"))
