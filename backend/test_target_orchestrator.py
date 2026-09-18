@@ -64,6 +64,44 @@ class TestTurnOrchestrator(unittest.TestCase):
         self.assertEqual(result.tool_uses[0].output, "tool-result:麦克风")
         self.assertEqual(result.iterations, 2)
 
+    def test_audio_content_parts(self):
+        import asyncio
+        import tempfile
+        from pathlib import Path
+
+        captured = {}
+
+        async def llm_turn(messages, tools):
+            captured["messages"] = messages
+            return {"content": "听到了", "tool_calls": []}
+
+        wav = Path(tempfile.mkdtemp()) / "in.wav"
+        wav.write_bytes(b"RIFF0000WAVEfake")
+
+        asyncio.run(TurnOrchestrator(self.reg).run(
+            "", "sys", llm_turn, audio=[str(wav)]))
+        user = captured["messages"][-1]
+        self.assertEqual(user["role"], "user")
+        self.assertIsInstance(user["content"], list)
+        parts = user["content"]
+        self.assertEqual(parts[-1]["type"], "input_audio")
+        self.assertEqual(parts[-1]["input_audio"]["format"], "wav")
+        self.assertTrue(parts[-1]["input_audio"]["data"])
+
+    def test_audio_missing_file_keeps_text_head(self):
+        import asyncio
+
+        captured = {}
+
+        async def llm_turn(messages, tools):
+            captured["messages"] = messages
+            return {"content": "ok", "tool_calls": []}
+
+        asyncio.run(TurnOrchestrator(self.reg).run(
+            "", "sys", llm_turn, audio=["Z:/nope-missing.wav"]))
+        user = captured["messages"][-1]
+        self.assertEqual(user["content"], "（语音消息，听完直接回应）")
+
     def test_policy_denied_tool_reported_failure(self):
         reg = CapabilityRegistry()
         reg.register_policy("deny", lambda: False)

@@ -226,6 +226,25 @@ class TargetMemoryService:
                     self._summary_pending = True
             self._save_l1()
 
+    def restamp_last_user(self, text: str, *, placeholder: str = "（语音）") -> bool:
+        """Replace the newest placeholder user turn with its transcript.
+
+        Voice write-back (ledger 0406): the audio turn is recorded with a
+        placeholder first (fast reply), then the async transcript stamps it.
+        Returns True when an entry was updated; never raises on absence.
+        """
+        text = str(text or "").strip()
+        if not text:
+            return False
+        with self._lock:
+            for turn in reversed(self._turns):
+                if (turn.get("role") == "user"
+                        and str(turn.get("text", "")) == str(placeholder)):
+                    turn["text"] = text
+                    self._save_l1()
+                    return True
+        return False
+
     async def process_summary(self) -> None:
         """Run the pending Summary Compression (non-blocking by caller)."""
         extractor = self._extractor

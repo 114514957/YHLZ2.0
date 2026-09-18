@@ -80,11 +80,15 @@ class TestConsolidation(unittest.TestCase):
         # stamped so it is not re-proposed
         rows = self.mem._unconsolidated_items() if hasattr(self.mem, "_unconsolidated_items") else []
         stamped = self.mem.belief_report("mem_seed0_a")
-        self.assertEqual(stamped["status"], "active")  # never deleted
+        # ledger 0308: absorbed source items become 'archive' (represented in
+        # the cognition foundation) — never deleted, reversible via status.
+        self.assertEqual(stamped["status"], "archive")
         import sqlite3
         con = sqlite3.connect(str(self.mem.db_path))
+        row = con.execute("SELECT status FROM l2_items WHERE id='mem_seed0_a'").fetchone()
         ev = con.execute("SELECT evidence_ref FROM l2_items WHERE id='mem_seed0_a'").fetchone()[0]
         con.close()
+        self.assertIsNotNone(row)  # still present (never deleted)
         self.assertTrue(ev.startswith(_PERSONA_PREFIX))
 
     def test_nothing_to_consolidate_when_all_stamped(self):

@@ -25,6 +25,10 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHED_FILE = _ROOT / "data" / "yuanheng_schedule.json"
 MIRROR_FILE = _ROOT / "docs" / "元亨的计划表.md"
 
+# Guardrail (ledger 0405): a looping model once created 336 duplicate plans in
+# minutes, which flooded the console session via the schedule nudge loop.
+MAX_PLANS = 30
+
 # defaults = the old hardcoded 13:00 / 23:00 autonomous moments, now entries
 DEFAULT_PLANS = [
     {"id": "plan_midday", "name": "午间自主回顾",
@@ -114,6 +118,18 @@ def add_plan(name: str, cadence_type: str, time_: str, steps: list[str],
     if cd["type"] == "monthly":
         cd["day"] = max(1, min(31, int(day)))
     plans = _load()
+    # dedupe (name + cadence) and cap: a looping model must not flood the table
+    sig = (name, cd["type"], cd["time"], cd.get("weekday"), cd.get("day"))
+    for p in plans:
+        p_cd = p.get("cadence") or {}
+        p_sig = (str(p.get("name", "")).strip(), p_cd.get("type"),
+                 p_cd.get("time"), p_cd.get("weekday"), p_cd.get("day"))
+        if p_sig == sig:
+            return (f"计划已存在，未重复添加：{name}（{cd['type']} {cd['time']}，"
+                    f"id={p.get('id')}）——如需修改请用 schedule.plan 的 update。")
+    if len(plans) >= MAX_PLANS:
+        return (f"计划表已满（{MAX_PLANS} 条），未添加——请先删除或停用旧计划"
+                "（schedule.plan: delete/disable）。")
     iid = "plan_" + str(int(time.time() * 1000))
     plans.append({"id": iid, "name": name, "cadence": cd,
                   "steps": [str(s).strip()[:300] for s in steps if str(s).strip()][:6],

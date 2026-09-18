@@ -100,6 +100,29 @@ def _to_data_url(src: str) -> str:
     return f"data:image/{mime};base64,{b}"
 
 
+def _to_input_audio(src: str) -> Optional[dict[str, Any]]:
+    """Local wav path -> llama.cpp ``input_audio`` content part (ledger 0406).
+
+    The clip must be 16 kHz mono wav (record 0399).  ``data:audio`` URIs pass
+    through; remote URLs are intentionally not fetched.
+    """
+    import base64
+    import pathlib
+
+    s = str(src)
+    if s.startswith("data:audio"):
+        return {"type": "input_audio",
+                "input_audio": {"data": s.split(",", 1)[-1], "format": "wav"}}
+    p = pathlib.Path(s)
+    if not p.exists():
+        return None
+    try:
+        data = base64.b64encode(p.read_bytes()).decode()
+    except Exception:
+        return None
+    return {"type": "input_audio", "input_audio": {"data": data, "format": "wav"}}
+
+
 def build_openai_compatible_llm_turn(
     *,
     base_url: str = "https://api.deepseek.com/v1/chat/completions",
@@ -258,6 +281,7 @@ class TurnOrchestrator:
         with_tools: bool = True,
         early_context: str = "",
         images: Optional[list[str]] = None,
+        audio: Optional[list[str]] = None,
         allowed_tools: Optional[set] = None,
         should_stop: Optional[Callable[[], bool]] = None,
     ) -> TurnResult:
@@ -269,16 +293,21 @@ class TurnOrchestrator:
             messages.append({"role": "system",
                              "content": str(early_context)[:1500]})
         user_content: Any = str(turn_text)
-        if images:
-            parts: list[dict[str, Any]] = [
-                {"type": "text", "text": str(turn_text) or "（看图）"}]
-            for p in images:
+        if images or audio:
+            head = str(turn_text).strip()
+            if not head:
+                head = "（看图）" if images else "（语音消息，听完直接回应）"
+            parts: list[dict[str, Any]] = [{"type": "text", "text": head}]
+            for p in (images or []):
                 url = _to_data_url(p)
                 if url:
                     parts.append({"type": "image_url",
                                   "image_url": {"url": url}})
-            if len(parts) > 1:
-                user_content = parts
+            for p in (audio or []):
+                part = _to_input_audio(p)
+                if part:
+                    parts.append(part)
+            user_content = parts if len(parts) > 1 else head
         messages += [
             *(history or [])[-6:],
             {"role": "user", "content": user_content},

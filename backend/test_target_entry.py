@@ -52,6 +52,32 @@ class TestConversationSession(unittest.TestCase):
         self.assertGreaterEqual(len(session.memory._turns), 2)
         self.assertIn("已记住", info or "好的" if False else "好的，已记住。" or "好的")
 
+    def test_voice_turn_transcript_restamps_history_and_memory(self):
+        import asyncio
+        import tempfile
+        from pathlib import Path
+
+        wav = Path(tempfile.mkdtemp()) / "v.wav"
+        wav.write_bytes(b"RIFF0000WAVEfake")
+
+        class _VoiceLLM:
+            def __init__(self):
+                self.n = 0
+
+            async def __call__(self, messages, tools):
+                self.n += 1
+                return {"content": "就吃泡面" if self.n == 1 else "今晚吃什么",
+                        "tool_calls": []}
+
+        session = ConversationSession(memory=self.mem, registry=self.reg,
+                                      llm_turn=_VoiceLLM())
+        asyncio.run(session.run_turn("", audio=[str(wav)]))
+        asyncio.run(session._transcribe_audio_turn([str(wav)], "（语音）"))
+        self.assertIn("今晚吃什么", session.history[0]["content"])
+        self.assertIn("（语音：v.wav）", session.history[0]["content"])
+        users = [t for t in self.mem._turns if t.get("role") == "user"]
+        self.assertIn("（语音：v.wav）", users[-1]["text"])
+
     def test_memory_save_autonomous_even_with_deny_approver(self):
         async def deny(info):
             return False
@@ -259,6 +285,87 @@ class TestConversationSession(unittest.TestCase):
             self.assertEqual(row[0], "群聊")
         finally:
             tm.TargetMemoryService = real
+
+
+class TestToolPolicy(unittest.TestCase):
+    """Owner casual turns keep read-only info tools (ledger 0405)."""
+
+    def test_owner_casual_gets_safe_tools_only(self):
+        from backend.target_entry import CASUAL_SAFE_TOOLS
+
+        use, allowed = ConversationSession._tool_policy(
+            is_owner=True, work=False, images=False)
+        self.assertTrue(use)
+        self.assertEqual(allowed, CASUAL_SAFE_TOOLS)
+        self.assertIn("system_time", allowed)
+        self.assertIn("web_search", allowed)
+        self.assertNotIn("memory_save", allowed)
+        self.assertNotIn("schedule_plan", allowed)
+
+    def test_owner_work_gets_full_registry(self):
+        use, allowed = ConversationSession._tool_policy(
+            is_owner=True, work=True, images=False)
+        self.assertTrue(use)
+        self.assertIsNone(allowed)
+
+    def test_vision_turn_has_no_tools(self):
+        use, allowed = ConversationSession._tool_policy(
+            is_owner=True, work=True, images=True)
+        self.assertFalse(use)
+        self.assertIsNone(allowed)
+
+    def test_voice_turn_gets_safe_tools(self):
+        from backend.target_entry import CASUAL_SAFE_TOOLS
+
+        use, allowed = ConversationSession._tool_policy(
+            is_owner=True, work=True, images=False, audio=True)
+        self.assertTrue(use)
+        self.assertEqual(allowed, CASUAL_SAFE_TOOLS)
+
+    def test_public_channel_keeps_public_tools(self):
+        from backend.target_entry import PUBLIC_TOOLS
+
+        use, allowed = ConversationSession._tool_policy(
+            is_owner=False, work=False, images=False)
+        self.assertTrue(use)
+        self.assertEqual(allowed, PUBLIC_TOOLS)
+
+
+class TestTranscriptGuard(unittest.TestCase):
+    """Voice write-back: transcript + audio reference for audit (ledger 0418)."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+
+        from backend.target_kw_index import KeywordIndex
+
+        self.tmp = Path(tempfile.mkdtemp())
+        self.mem = TargetMemoryService(db_path=self.tmp / "mem.db",
+                                       kw_index=KeywordIndex(self.tmp / "kw.db"))
+        self.reg = setup_scheduler_capabilities()
+
+    def test_transcript_restamps_with_audio_reference(self):
+        import asyncio
+        import tempfile
+        from pathlib import Path
+
+        class _LLM:
+            async def __call__(self, messages, tools):
+                return {"content": "哦，我听得到啊", "tool_calls": []}
+
+        wav = Path(tempfile.mkdtemp()) / "v.wav"
+        wav.write_bytes(b"RIFF0000WAVEfake")
+        session = ConversationSession(memory=self.mem, registry=self.reg,
+                                      llm_turn=_LLM())
+        session.history = [{"role": "user", "content": "（语音）"}]
+        self.mem.append_turn(role="user", text="（语音）")
+        asyncio.run(session._transcribe_audio_turn([str(wav)], "（语音）"))
+        text = session.history[0]["content"]
+        self.assertIn("哦，我听得到啊", text)
+        self.assertIn("（语音：v.wav）", text)
+        users = [t for t in self.mem._turns if t.get("role") == "user"]
+        self.assertIn("（语音：v.wav）", users[-1]["text"])
 
 
 if __name__ == "__main__":

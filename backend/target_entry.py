@@ -36,6 +36,14 @@ SESSIONS_DIR = _PROJECT_ROOT / "cache" / "sessions"
 # tools allowed for public/group channels (read-only external search only)
 PUBLIC_TOOLS = frozenset({"web_search", "web_fetch"})
 
+# Read-only info tools allowed on owner *casual* turns (ledger 0405): no writes,
+# no security/constitution surface.  Without these, a casual "现在几点了" ran
+# tool-less and the model hallucinated the answer.  work mode keeps the full set.
+CASUAL_SAFE_TOOLS = frozenset({
+    "system_time", "web_search", "web_fetch",
+    "memory_recall", "ledger_search", "kb_query", "diary_list",
+})
+
 
 def is_owner_channel(channel: str) -> bool:
     """Owner channels = private/console or the master's QQ private chat."""
@@ -139,6 +147,8 @@ class ConversationSession:
         self.history_limit = int(history_limit)
         self.history: list[dict[str, Any]] = []
         self._summary_tasks: list[Any] = []
+        self._voice_task: Any = None  # last audio transcript write-back task
+        self._session_name = ""  # set by save/load; voice re-save only if known
         self._persona = ""
 
     # ---------- system / persona ----------
@@ -268,11 +278,35 @@ class ConversationSession:
         t = str(text or "").strip()
         return any(w in t for w in cls._WORK_HINTS)
 
+    @staticmethod
+    def _tool_policy(*, is_owner: bool, work: bool, images: bool,
+                     audio: bool = False) -> tuple[bool, frozenset | None]:
+        """Tools allowed for this turn (ledger 0405/0406).
+
+        - images -> vision chat, no tools
+        - voice (audio) -> CASUAL_SAFE_TOOLS: low-latency read-only; heavy
+          work is handed to 利贞 via [[dev:...]] instead (owner decision A)
+        - owner work -> full registry
+        - owner casual -> CASUAL_SAFE_TOOLS (read-only info tools)
+        - public/group -> PUBLIC_TOOLS (read-only external search only)
+        """
+        if images:
+            return False, None
+        if is_owner:
+            if audio:
+                return True, CASUAL_SAFE_TOOLS
+            return True, (None if work else CASUAL_SAFE_TOOLS)
+        return True, PUBLIC_TOOLS
+
     async def run_turn(self, text: str,
                        on_delta: Optional[Callable[[str], None]] = None,
                        mode: str = "auto",
                        pre_recall: Optional[list] = None,
-                       images: Optional[list] = None) -> dict[str, Any]:
+                       images: Optional[list] = None,
+                       audio: Optional[list] = None) -> dict[str, Any]:
+        text = str(text or "")
+        if audio and not text:
+            text = "（语音）"  # placeholder; async transcript restamps it (0406)
         self.memory.append_turn(role="user", text=text)
         # Explicit owner annotation -> DETERMINISTIC save (never rely on the
         # model to remember to call the tool; ledger 0320). Corrections go
@@ -298,21 +332,15 @@ class ConversationSession:
         capture_style_signal(text, self.memory)
         system = self.render_system()
         llm_turn = self.llm_turn
-        # images -> vision chat mode; owner -> full tools (work); public/group
-        # -> only read-only search tools (PUBLIC_TOOLS), never file/memory/dev.
+        # images -> vision chat mode; owner work -> full tools; owner casual ->
+        # CASUAL_SAFE_TOOLS; public/group -> PUBLIC_TOOLS, never file/memory/dev.
         is_owner = self._is_owner()
-        work = (is_owner and not images
+        work = (is_owner and not images and not audio
                 and (mode == "work" or (
                     mode == "auto" and self._want_work_mode(text))))
-        if images:
-            use_tools = False
-            allowed_tools = None
-        elif is_owner:
-            use_tools = work
-            allowed_tools = None
-        else:
-            use_tools = True
-            allowed_tools = PUBLIC_TOOLS
+        use_tools, allowed_tools = self._tool_policy(
+            is_owner=is_owner, work=work, images=bool(images),
+            audio=bool(audio))
         effort = "medium" if work else "none"
         if not self._llm_injected and work:
             from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
@@ -329,6 +357,24 @@ class ConversationSession:
                 fallback_model=LOCAL_MODEL,
                 on_delta=on_delta,
                 reasoning_effort="medium",
+                should_stop=_stop,
+            )
+        elif not self._llm_injected and audio:
+            # voice turns cap the reply hard (ledger 0422): a rare sampling
+            # leak once produced a 500+ char "thinking mode" trace, which the
+            # speaker would read aloud.
+            from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
+            from backend.target_orchestrator import (
+                build_openai_compatible_llm_turn,
+            )
+
+            llm_turn = build_openai_compatible_llm_turn(
+                base_url="http://127.0.0.1:8081/v1/chat/completions",
+                api_key="", model="gemma-4-e4b",
+                temperature=0.2, max_tokens=220,
+                fallback_base_url=LOCAL_BASE,
+                fallback_model=LOCAL_MODEL,
+                reasoning_effort="none",
                 should_stop=_stop,
             )
         elif not self._llm_injected and on_delta is not None:
@@ -348,6 +394,13 @@ class ConversationSession:
                 should_stop=_stop,
             )
         ctx_lines = []
+        if audio:
+            # spoken-input reply style (ledger 0407/0422): short, first person,
+            # no recital, no analysis — the written persona prompt alone tends
+            # to assistant-speak and can leak "thinking mode" traces.
+            ctx_lines.append(
+                "（老爹是语音说的：只输出你要对他说的话本身，≤2句；"
+                "禁止复述、念稿、助手腔，禁止输出思考/分析/状态/括号说明。）")
         if self._is_owner():  # never inject private memory into public/group
             try:
                 sl = self.memory.summary_line()
@@ -452,6 +505,7 @@ class ConversationSession:
             with_tools=use_tools,
             early_context="\n".join(ctx_lines),
             images=images,
+            audio=audio,
             allowed_tools=allowed_tools,
             should_stop=_stop,
         )
@@ -505,6 +559,16 @@ class ConversationSession:
         self.history.append({"role": "assistant", "content": result.answer})
         if len(self.history) > self.history_limit:
             self.history = self.history[-self.history_limit:]
+        if audio:
+            # voice write-back (ledger 0406): transcribe with the SAME model in
+            # the background and restamp the placeholder user turn.
+            try:
+                _vt = asyncio.ensure_future(
+                    self._transcribe_audio_turn(list(audio), "（语音）"))
+                self._voice_task = _vt
+                self._summary_tasks.append(_vt)
+            except Exception:
+                pass
         return {
             "answer": result.answer,
             "tool_uses": [
@@ -514,6 +578,57 @@ class ConversationSession:
             "persona_draft": bool(self._persona),
             "contradictions": contradictions,
         }
+
+    async def _transcribe_audio_turn(self, clips: list, placeholder: str) -> None:
+        """Async voice transcript write-back (ledger 0406, owner decision A).
+
+        Uses the same model endpoint as the conversation (no ASR dependency),
+        restamps the placeholder user turn in ``history`` + L1, then re-saves
+        the session.  All failures are swallowed: the reply already went out.
+        """
+        try:
+            import re
+
+            from backend.target_orchestrator import _to_input_audio
+
+            parts = [p for p in (_to_input_audio(c) for c in clips) if p]
+            if not parts:
+                return
+            messages = [
+                {"role": "system",
+                 "content": "你是转写助手，只输出听到的话，不要解释。"},
+                {"role": "user",
+                 "content": parts + [{"type": "text",
+                                      "text": "转写这段音频，只输出内容。"}]},
+            ]
+            msg = await self.llm_turn(messages, [])
+            heard = str(msg.get("content") or "").strip().strip("「」\"'` \n")
+            heard = re.sub(r"^(原话|转写|听到|内容)\s*[:：]\s*", "",
+                           heard).strip()
+            if not heard or heard == str(placeholder):
+                return
+            # auditability (ledger 0418): keep the clip reference next to the
+            # transcript — a noisy clip can still fool the model, and this lets
+            # the turn be re-checked/corrected later (sherpa proved worse than
+            # the model on real clips, so no second-opinion guard).
+            if clips:
+                heard = heard + "（语音：" + Path(str(clips[0])).name + "）"
+            for m in reversed(self.history):
+                if (m.get("role") == "user"
+                        and str(m.get("content", "")) == str(placeholder)):
+                    m["content"] = heard
+                    break
+            try:
+                self.memory.restamp_last_user(heard, placeholder=str(placeholder))
+            except Exception:
+                pass
+            try:
+                if self._session_name:
+                    self.save_session(self._session_name)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     # ---------- reflection (post-session insight -> memory candidates) ----------
     async def reflect(self, llm_turn: Any = None) -> dict:
@@ -612,6 +727,7 @@ class ConversationSession:
 
     def save_session(self, name: str = "default") -> Path:
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+        self._session_name = str(name)
         path = SESSIONS_DIR / f"{name}.json"
         data = {
             "saved_at": time.time(),
@@ -658,6 +774,7 @@ class ConversationSession:
         data = json.loads(path.read_text(encoding="utf-8"))
         history = list(data.get("history", []))[-self.history_limit:]
         self.history = history
+        self._session_name = str(name)
         # rebuild L1 window from restored history
         self.memory._turns = []
         for msg in history:

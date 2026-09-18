@@ -23,6 +23,29 @@ def read_jsonl(p):
     return out
 
 
+def _pick_target(msgs: list):
+    """(prompt, chosen) for one pure-chat sample, or None when unusable.
+
+    v6 fix: chosen = the **last** assistant reply (the old code took the first,
+    which for multi-turn samples was already inside the prompt); prompt =
+    everything before it.  Rows without a user turn or not ending on an
+    assistant are skipped.
+    """
+    if not isinstance(msgs, list) or not msgs:
+        return None
+    if not any(m.get("role") == "user" for m in msgs):
+        return None
+    idxs = [i for i, m in enumerate(msgs) if m.get("role") == "assistant"]
+    if not idxs or msgs[-1].get("role") != "assistant":
+        return None
+    idx = idxs[-1]
+    chosen = str(msgs[idx].get("content") or "").strip()
+    prompt = msgs[:idx]
+    if not chosen or not prompt:
+        return None
+    return prompt, chosen
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
@@ -48,20 +71,22 @@ def main():
                                low_cpu_mem_usage=True, trust_remote_code=True)
     model.eval()
 
-    rows = read_jsonl(args.data)[: args.n]
+    rows = read_jsonl(args.data)
     written = 0
     with Path(args.out).open("w", encoding="utf-8") as f:
         for i, r in enumerate(rows, 1):
-            msgs = r["messages"]
+            if written >= args.n:
+                break
+            msgs = r.get("messages") or []
             # v6: 跳过工具轨迹（含 tools 或 tool_calls/role=tool），
             # 只在纯 chat 上做风格 DPO，避免伤到工具能力。
             if r.get("tools") or any(
                     (m.get("tool_calls") or m.get("role") == "tool") for m in msgs):
                 continue
-            chosen = next((m["content"] for m in msgs if m["role"] == "assistant"), "")
-            prompt = msgs[:-1]
-            if not chosen or not prompt:
+            picked = _pick_target(msgs)
+            if not picked:
                 continue
+            prompt, chosen = picked
             text = tok.apply_chat_template(prompt, tokenize=False, add_generation_prompt=True)
             ids = tok(text, return_tensors="pt").to(model.device)
             with torch.no_grad():
@@ -73,7 +98,7 @@ def main():
             f.write(json.dumps({"prompt": prompt, "chosen": chosen, "rejected": rejected},
                                ensure_ascii=False) + "\n")
             written += 1
-            print(f"[{i}/{len(rows)}] pair ok")
+            print(f"[{i}/{len(rows)}] pair {written}/{args.n}")
     print(json.dumps({"pairs": written, "out": args.out}, ensure_ascii=False))
     return 0
 

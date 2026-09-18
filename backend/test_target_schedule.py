@@ -108,6 +108,24 @@ class ScheduleTest(unittest.TestCase):
         self.assertIn("monthly", sc.add_plan("b4", "monthly", "09:00", ["x"]))
         self.assertIn("daily | weekly | monthly", sc.add_plan("b5", "yearly", "09:00", ["x"]))
 
+    def test_add_plan_dedupes_same_name_and_cadence(self):
+        self.assertIn("已加入", sc.add_plan("重复计划", "daily", "09:00", ["s1"]))
+        before = len(sc._load())
+        r = sc.add_plan("重复计划", "daily", "09:00", ["s2"])
+        self.assertIn("已存在", r)
+        self.assertEqual(len(sc._load()), before)
+        # different time is a different plan
+        self.assertIn("已加入", sc.add_plan("重复计划", "daily", "09:30", ["s3"]))
+
+    def test_add_plan_caps_table(self):
+        # empty temp file -> 2 defaults; fill up to MAX_PLANS
+        for i in range(sc.MAX_PLANS - 2):
+            r = sc.add_plan(f"p{i}", "daily", f"08:{i:02d}", ["s"])
+            self.assertIn("已加入", r)
+        self.assertEqual(len(sc._load()), sc.MAX_PLANS)
+        self.assertIn("计划表已满", sc.add_plan("one-more", "daily", "07:00", ["s"]))
+        self.assertEqual(len(sc._load()), sc.MAX_PLANS)
+
 
 if __name__ == "__main__":
     unittest.main()

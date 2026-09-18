@@ -230,12 +230,45 @@ class DaemonRuntime:
         return c
 
     def turn(self, text: str, channel: str = "private",
-             images: list | None = None) -> dict:
+             images: list | None = None, audio: list | None = None) -> dict:
         key = self._norm_ui_channel(channel)
+        # owner dev console (#dev/#a/#ds/#y/#n/#push) — not a conversation turn
+        # (ledger 0407): mirrors the QQ bridge without hijacking chat.
+        try:
+            from backend.target_entry import is_owner_channel
+
+            if is_owner_channel(key):
+                from backend.target_dev_bridge import handle_dev_command
+
+                cmd_reply = handle_dev_command(str(text or ""))
+                if cmd_reply is not None:
+                    return {"answer": cmd_reply, "tool_uses": [],
+                            "iterations": 0, "dev_command": True}
+        except Exception:
+            pass
         s = self._session(key)
         future = asyncio.run_coroutine_threadsafe(
-            s.run_turn(str(text), images=images), self._loop)
+            s.run_turn(str(text), images=images, audio=audio), self._loop)
         info = future.result(timeout=240)
+        # [[dev: ...]] hand-off to 利贞 (ledger 0406): owner-only, strip the
+        # marker from the answer before it is stored/spoken, dispatch async.
+        try:
+            from backend.target_entry import is_owner_channel
+
+            if is_owner_channel(key):
+                from backend.target_dev_bridge import (
+                    extract_dev_task, start_dev_task,
+                )
+
+                clean, task = extract_dev_task(str(info.get("answer", "")))
+                if task:
+                    info["answer"] = clean
+                    info["dev_task"] = task
+                    note = start_dev_task(task)
+                    if note:
+                        info["answer"] = (clean + "\n" + note).strip()
+        except Exception:
+            pass
         try:
             s.save_session("console" if key == "console" else
                            "qq_" + key if key != "private" else "default")
@@ -612,13 +645,15 @@ class _Handler(ConsoleHandler):
             text = str(payload.get("text", "")).strip()
             imgs = payload.get("images")
             imgs = [str(x) for x in imgs if x][:4] if isinstance(imgs, list) else None
-            if not text and not imgs:
+            auds = payload.get("audio")
+            auds = [str(x) for x in auds if x][:2] if isinstance(auds, list) else None
+            if not text and not imgs and not auds:
                 self._send(400, {"error": "empty text"})
                 return
             try:
                 info = self.runtime.turn(text,
                                          str(payload.get("channel", "private")),
-                                         images=imgs)
+                                         images=imgs, audio=auds)
                 self._send(200, info)
             except Exception as exc:
                 self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:160]}"})

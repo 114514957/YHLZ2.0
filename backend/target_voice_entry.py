@@ -21,8 +21,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="语音对话入口")
     parser.add_argument("--wake", action="store_true",
                         help="声纹唤醒（需先 voiceprint_enroll；默认直接听一句）")
+    parser.add_argument("--engine", default="sherpa",
+                        choices=["sherpa", "funasr", "audio"],
+                        help="audio = 音频直入（不走 ASR，ledger 0408）")
+    parser.add_argument("--tts", default="edge", choices=["edge", "qwen"],
+                        help="edge = 零显存（推荐，ledger 0409）")
+    parser.add_argument("--segment-dsp", dest="segment_dsp", default="agc+lim",
+                        choices=["off", "lim", "agc+lim"],
+                        help="语音段保存前的 AGC/限幅（ledger 0422）")
     parser.add_argument("--duration-s", type=float, default=40.0)
-    parser.add_argument("--device", type=int, default=1)
+    parser.add_argument("--device", type=int, default=None,
+                        help="输入设备索引（默认自动）")
     parser.add_argument("--cap-gain", type=float, default=6.0)
     parser.add_argument("--threshold", type=float, default=0.5)
     args = parser.parse_args()
@@ -31,7 +40,7 @@ def main() -> int:
         from backend.target_wake_dialog import VoiceprintDialogLoop
 
         loop = VoiceprintDialogLoop(duration_s=args.duration_s,
-                                    device=args.device,
+                                    device=args.device if args.device is not None else 1,
                                     cap_gain=args.cap_gain,
                                     threshold=args.threshold)
         print(f"声纹监听中（阈值 {args.threshold}）… 说话即唤醒，命中即停", flush=True)
@@ -47,9 +56,12 @@ def main() -> int:
     else:
         from tools.voice_dialog_probe import voice_dialog_once
 
-        print("聆听一句… 听到即答（命中即停）", flush=True)
-        r = voice_dialog_once(duration_s=args.duration_s, device=args.device,
-                              cap_gain=args.cap_gain, print_text=True)
+        print(f"聆听一句… 听到即答（命中即停；engine={args.engine}）", flush=True)
+        r = voice_dialog_once(duration_s=args.duration_s,
+                              cap_gain=args.cap_gain, print_text=True,
+                              engine=args.engine, tts_engine=args.tts,
+                              device=args.device,
+                              segment_dsp_mode=args.segment_dsp)
         if r["status"] != "answered":
             print("未听到有效语音", flush=True)
             return 1
