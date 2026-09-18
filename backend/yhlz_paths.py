@@ -33,6 +33,13 @@ MODELS_DIR = pathlib.Path(os.getenv("YHLZ_MODELS_DIR", str(EXTERNAL / "models"))
 GEMMA_GGUF = MODELS_DIR / "gemma4" / "gemma4-e4b-aggr-q4km.gguf"
 MMPROJ_GGUF = MODELS_DIR / "gemma4" / "mmproj-gemma4-e4b.gguf"
 
+# v6 生产链（记录 0398/0426）：项目内模型目录（QAT-Q4 + mmproj + yuanheng-v6 LoRA）
+LOCAL_MODELS = ROOT / "models"
+YH_LLAMA_EXE = LOCAL_MODELS / "llama-cuda" / "llama-server.exe"
+YH_BASE_GGUF = LOCAL_MODELS / "gemma4-gguf" / "gemma-4-E4B_q4_0-it.gguf"
+YH_MMPROJ_GGUF = LOCAL_MODELS / "gemma4-gguf" / "gemma-4-E4B-it-mmproj.gguf"
+YH_LORA_GGUF = LOCAL_MODELS / "gguf-lora" / "yuanheng-v6-lora.gguf"
+
 BOT_UIN = str(os.getenv("YHLZ_QQ_BOT_UIN", "3655185302"))
 MASTER_UIN = str(os.getenv("YHLZ_QQ_MASTER_UIN", "2258374446"))
 

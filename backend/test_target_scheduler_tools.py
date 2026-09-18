@@ -79,5 +79,43 @@ class TestSchedulerRegistration(unittest.TestCase):
         self.assertTrue(cats)
 
 
+class TestLedgerQueryVariants(unittest.TestCase):
+    """Multi-variant ledger search (ledger 0425)."""
+
+    def test_squeeze_strips_question_words(self):
+        from backend.target_scheduler_tools import _squeeze_query
+
+        self.assertEqual(_squeeze_query("上次 v6 训练的结果怎么样"), "v6 训练的结果")
+        self.assertEqual(_squeeze_query("查一下元亨的日记"), "元亨的日记")
+        self.assertEqual(_squeeze_query("上次"), "")
+
+    def test_bigram_expand_no_space_query(self):
+        from backend.target_scheduler_tools import _bigram_expand
+
+        self.assertEqual(_bigram_expand("训练结果"), "训练 练结 结果")
+        self.assertEqual(_bigram_expand("v6训练结果"), "v6训练 练结 结果")
+
+    def test_merge_hits_keeps_best_and_ranks(self):
+        from backend.target_scheduler_tools import _merge_hits
+
+        a = [{"docid": "d1", "score": 1.0, "confidence": 0.5},
+             {"docid": "d2", "score": 2.0, "confidence": 0.9}]
+        b = [{"docid": "d1", "score": 3.0, "confidence": 0.7}]
+        out = _merge_hits([a, b])
+        self.assertEqual([h["docid"] for h in out], ["d2", "d1"])
+        self.assertEqual(out[1]["score"], 3.0)  # best copy kept
+
+    def test_sentence_query_brings_result_records(self):
+        result = ledger_search("上次 v6 训练的结果怎么样", limit=8)
+        self.assertIn("[ledger:", result)
+        self.assertIn("v6", result)
+        self.assertGreaterEqual(result.count("[ledger:"), 2)
+
+    def test_no_space_query_is_not_empty(self):
+        result = ledger_search("训练结果", limit=5)
+        self.assertNotIn("台账无匹配", result)
+        self.assertIn("[ledger:", result)
+
+
 if __name__ == "__main__":
     unittest.main()

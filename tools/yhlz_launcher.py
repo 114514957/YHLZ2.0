@@ -27,7 +27,8 @@ sys.path.insert(0, str(_ROOT))
 
 from backend.yhlz_paths import (  # noqa: E402
     BOT_UIN, DESKTOP_DIR, GEMMA_GGUF, LLAMA_EXE, MASTER_UIN, MMPROJ_GGUF,
-    NAPCAT_LAUNCHER, OLLAMA_EXE,
+    NAPCAT_LAUNCHER, OLLAMA_EXE, YH_BASE_GGUF, YH_LLAMA_EXE, YH_LORA_GGUF,
+    YH_MMPROJ_GGUF,
 )
 
 SRC_DIR = DESKTOP_DIR
@@ -100,12 +101,30 @@ def _spawn_ollama():
 
 
 def _spawn_llama():
-    subprocess.Popen(
-        [LLAMA, "-m", str(GEMMA), "--mmproj", str(MMPROJ), "--jinja",
-         "-ngl", "99", "-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0",
-         "-c", "8192", "--port", "8081", "--host", "127.0.0.1",
-         "--temp", "1.0", "--top-p", "0.95", "--top-k", "64"],
-        close_fds=True)
+    """v6 生产链（记录 0398/0426）：QAT-Q4 + mmproj(CPU) + v6 LoRA。
+
+    旧 gemma-aggr 配置只在 v6 资产缺失时兜底——此前 watchdog 会用它抢占
+    8081，导致项目调用到的不是元亨。
+    """
+    if YH_LLAMA_EXE.exists() and YH_BASE_GGUF.exists():
+        argv = [str(YH_LLAMA_EXE), "-m", str(YH_BASE_GGUF),
+                "--mmproj", str(YH_MMPROJ_GGUF), "--no-mmproj-offload"]
+        if YH_LORA_GGUF.exists():
+            argv += ["--lora", str(YH_LORA_GGUF)]
+        argv += ["-ngl", "99", "-c", "8192", "--parallel", "1",
+                 "-rea", "off", "--alias", "gemma-4-e4b",
+                 "--host", "127.0.0.1", "--port", "8081", "--jinja"]
+    else:
+        argv = [LLAMA, "-m", str(GEMMA), "--mmproj", str(MMPROJ), "--jinja",
+                "-ngl", "99", "-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0",
+                "-c", "8192", "--port", "8081", "--host", "127.0.0.1",
+                "--temp", "1.0", "--top-p", "0.95", "--top-k", "64"]
+    log = _ROOT / "cache" / "logs" / "llama-server.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.Popen(argv, cwd=str(_ROOT), stdout=open(log, "ab"),
+                     stderr=subprocess.STDOUT,
+                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                     close_fds=True)
 
 
 def _spawn_daemon():

@@ -1,4 +1,4 @@
-# 元亨 · 本地服务（llama.cpp CUDA + 多模态 + LoRA）
+﻿# 元亨 · 本地服务（llama.cpp CUDA + 多模态 + LoRA）
 # 默认 = 项目生产配置：8081 / 别名 gemma-4-e4b / v6 LoRA / -c 8192（项目 prompt+29工具需 5k+ token）
 # 用法：
 #   powershell -File serve_yuanheng.ps1

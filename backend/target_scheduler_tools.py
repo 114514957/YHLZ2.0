@@ -231,6 +231,13 @@ def _handler_of(func: Any) -> Any:
     return _h
 
 
+_QUERY_STOPWORDS = (
+    "查一下", "看一下", "帮我", "请问", "上次", "上回", "之前", "一下",
+    "怎么样", "怎么", "如何", "是什么", "什么", "为什么", "多少", "是否",
+    "有没有", "告诉", "我想", "我记得",
+)
+
+
 def _split_query(query: str) -> list[str]:
     import re as _re
 
@@ -238,20 +245,77 @@ def _split_query(query: str) -> list[str]:
     return pieces or [str(query or "")]
 
 
+def _squeeze_query(query: str) -> str:
+    """Strip question/stop words so the keyword core survives (ledger 0425)."""
+    q = str(query or "")
+    for w in _QUERY_STOPWORDS:
+        q = q.replace(w, " ")
+    return q.strip()
+
+
+def _bigram_expand(query: str) -> str:
+    """CJK runs longer than 2 chars -> overlapping bigrams (no-space queries).
+
+    ``训练结果`` would otherwise form the strong trigram ``训练结`` which is
+    never indexed; bigrams (``训练 练结 结果``) match the real index terms.
+    """
+    import re as _re
+
+    parts: list[str] = []
+    for run in _re.split(r"([\u4e00-\u9fff]+)", str(query or "")):
+        if run and len(run) > 2 and all("\u4e00" <= ch <= "\u9fff" for ch in run):
+            parts.append(" ".join(run[i:i + 2] for i in range(len(run) - 1)))
+        else:
+            parts.append(run)
+    return "".join(parts).strip()
+
+
+def _merge_hits(lists: list[list[dict]]) -> list[dict]:
+    """Union by docid keeping the best-scored copy; rank by confidence/score."""
+    merged: dict[str, dict] = {}
+    for hits in lists:
+        for h in hits:
+            did = str(h.get("docid", ""))
+            if not did:
+                continue
+            prev = merged.get(did)
+            if prev is None or float(h.get("score", 0.0)) > float(prev.get("score", 0.0)):
+                merged[did] = h
+    return sorted(
+        merged.values(),
+        key=lambda h: (float(h.get("confidence", 0.0)),
+                       float(h.get("score", 0.0))),
+        reverse=True,
+    )
+
+
 def _retry_query(query: str, source: str) -> list[dict]:
-    """Keyword-index query with automatic sub-query fallback (robust to long
-    sentence-style queries from the model)."""
+    """Multi-variant keyword query (ledger 0425).
+
+    A single sentence-style question can hit a literal echo (a record that
+    quotes the very question) and stop there; merging the full query, its
+    pieces, a stopword-squeezed core and a bigram-expanded fallback brings the
+    real records in as well.
+    """
     from backend.target_kw_index import KeywordIndex
 
     kw = KeywordIndex()
-    hits = kw.query(query, limit=6, source=source)
-    if hits:
-        return hits
-    for s in _split_query(query):
-        hits = kw.query(s, limit=4, source=source)
-        if hits:
-            return hits
-    return []
+    variants: list[str] = [str(query or "")]
+    for piece in _split_query(query):
+        # pure stopword pieces ("上次", "一下", …) only pull in unrelated
+        # records that happen to contain the word — drop them (ledger 0425).
+        if _squeeze_query(piece):
+            variants.append(piece)
+    variants.append(_squeeze_query(query))
+    if not kw.query(str(query or ""), limit=4, source=source):
+        variants.append(_bigram_expand(query))
+    uniq: list[str] = []
+    for v in variants:
+        s = str(v or "").strip()
+        if s and s not in uniq:
+            uniq.append(s)
+    all_hits = [kw.query(v, limit=6, source=source) for v in uniq]
+    return _merge_hits(all_hits)[:12]
 
 
 def _queries_handler(func: Any) -> Any:
