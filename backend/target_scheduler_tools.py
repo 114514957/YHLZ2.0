@@ -380,6 +380,55 @@ def _profile_handler(key: str) -> str:
     return "；".join(str(r.get("summary", "")) for r in rows)
 
 
+def memory_why(item_id: str, limit: int = 10) -> str:
+    """TCM v1 (ledger 0438): walk confirmed causal edges around a memory."""
+    svc = TargetMemoryService()
+    target = str(item_id or "").strip()
+    if not target:
+        return "需要记忆 id（先用 memory.recall 拿到 id）"
+    brief = svc._item_brief(target)
+    if brief is None:
+        return f"没有这条记忆：{target}"
+    rows = svc.why(target, depth=2, limit=int(limit or 10))
+    if not rows:
+        return f"「{str(brief.get('summary'))[:40]}」暂时没有已确认的因果关联"
+    lines = []
+    for r in rows:
+        arrow = "→" if r["direction"] == "forward" else "←"
+        other = (r["dst_summary"] if r["direction"] == "forward"
+                 else r["src_summary"])
+        lines.append(f"{arrow}({r['relation']} {float(r['confidence']):.2f}"
+                     f" 第{r['depth']}跳) {str(other)[:50]}")
+    return "；".join(lines[:12])
+
+
+def memory_causal_handle(action: str = "list", src_id: str = "",
+                         dst_id: str = "", relation: str = "",
+                         confidence: float = 0.9, quote: str = "",
+                         edge_id: str = "") -> str:
+    """TCM v1: causal edge admin — list | add (owner-explicit) | undo."""
+    svc = TargetMemoryService()
+    a = str(action or "list").strip().lower()
+    if a in ("list", "show", ""):
+        rows = svc.causal_list(limit=30)
+        if not rows:
+            return "暂无因果边"
+        return "；".join(
+            f"{r['src_id']} -{r['relation']}-> {r['dst_id']}"
+            f" [{r['status']} {float(r['confidence']):.2f}]" for r in rows[:20])
+    if a in ("add", "link", "new"):
+        res = svc.add_causal_edge(str(src_id), str(dst_id), str(relation),
+                                  float(confidence or 0.9), str(quote or ""),
+                                  created_by="owner")
+        return f"因果边：{res.get('status')}（edge={res.get('edge_id', '')}）" + (
+            f" 原因：{'、'.join(res.get('reasons') or [])}"
+            if res.get("reasons") else "")
+    if a in ("undo", "del", "remove"):
+        ok = svc.causal_undo(str(edge_id), by="owner")
+        return "已撤回因果边" if ok else f"未找到可撤回的边：{edge_id}"
+    return f"未知动作 {a}：list | add | undo"
+
+
 def bind_memory_save_service(registry: CapabilityRegistry, service: Any,
                              source: str = "") -> None:
     """Rebind memory.save handler to a session-owned memory service."""
@@ -491,6 +540,35 @@ def scheduler_capabilities() -> list[Capability]:
             handler=lambda p: memory_audit(int(p.get("limit", 20) or 20)),
             input=(),
             optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="low",
+        ),
+        Capability(
+            name="memory.why",
+            description="问因果：某条记忆的来龙去脉（沿已确认因果链走 1-2 跳）。"
+                        "参数 id=记忆 id（先用 memory.recall 拿 id）。",
+            handler=lambda p: memory_why(str(p.get("id", "")),
+                                         int(p.get("limit", 10) or 10)),
+            input=("id",),
+            optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+        ),
+        Capability(
+            name="memory.causal",
+            description="因果边管理：list 查看；add 手动连因果"
+                        "（src_id/dst_id/relation=cause|enable|prevent|follow|contradict）；"
+                        "undo 撤回（edge_id）。",
+            handler=lambda p: memory_causal_handle(
+                str(p.get("action", "list")), str(p.get("src_id", "")),
+                str(p.get("dst_id", "")), str(p.get("relation", "")),
+                float(p.get("confidence", 0.9) or 0.9), str(p.get("quote", "")),
+                str(p.get("edge_id", ""))),
+            input=(),
+            optional_input=("action", "src_id", "dst_id", "relation",
+                            "confidence", "quote", "edge_id"),
             requires=(SCHEDULER_POLICY,),
             side_effect=True,
             risk="low",

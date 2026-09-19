@@ -627,6 +627,18 @@ class ConversationSession:
                     self.save_session(self._session_name)
             except Exception:
                 pass
+            # TCM v1 (ledger 0438): keep the raw voice episode (provenance) —
+            # transcript + clip ref, so casual causal claims can be verified
+            # and re-checked against the original audio later.
+            try:
+                clip = Path(str(clips[0])).name if clips else ""
+                self.memory.add_episode(
+                    channel=self.channel, kind="voice",
+                    source=("老爹" if self._is_owner() else "external"),
+                    raw_ref=clip, raw_path=str(clips[0]) if clips else "",
+                    summary=heard, meta={"clips": [str(c) for c in clips][:3]})
+            except Exception:
+                pass
         except Exception:
             pass
 

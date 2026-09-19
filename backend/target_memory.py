@@ -47,6 +47,66 @@ def _normalize(text: str) -> str:
     return re.sub(r"[\s\u3000,，。.!！?？:：;；、\-]+", "", str(text or ""))
 
 
+# ---- TCM v1 (ledger 0438): source grading + time/causal reasoning ----
+STANCES = ("fact", "opinion", "speculation")
+_FACT_SOURCES = {"老爹", "owner", "user-approved", "memory.save:user-approved"}
+_OPINION_SOURCES = {"agent", "元亨"}
+
+CAUSAL_RELATIONS = ("cause", "enable", "prevent", "follow", "contradict")
+AUTO_RELATIONS = ("cause", "enable", "follow")  # risky kinds always need review
+AUTO_MIN_CONFIDENCE = 0.85
+AUTO_DAILY_CAP = 5
+EXTERNAL_SOURCES = {"群聊", "qq", "QQ", "external", "group"}
+
+
+def infer_stance(source: str, kind: str = "episodic", explicit: str = "") -> str:
+    """A1 (ledger 0438): grade where a belief came from.
+
+    fact        = owner-stated / owner-approved (老爹等可信来源)
+    opinion     = Yuanheng's own inference (agent)
+    speculation = external chatter / anything unverified (群聊, unknown)
+    """
+    s = str(explicit or "").strip().lower()
+    if s in STANCES:
+        return s
+    src = str(source or "").strip()
+    if src in _FACT_SOURCES:
+        return "fact"
+    if src in _OPINION_SOURCES:
+        return "opinion"
+    return "speculation"
+
+
+_SEG = r"([^。！？；;!?，,\n]{2,40})"
+_CAUSAL_PATTERNS = (
+    (re.compile(rf"因为{_SEG}(?:所以|因此|因而|于是|才){_SEG}"), 0.9, "cause"),
+    (re.compile(rf"由于{_SEG}(?:所以|因此|因而|于是|才|导致|致使|使得){_SEG}"), 0.9, "cause"),
+    (re.compile(rf"{_SEG}(?:导致|致使|造成){_SEG}"), 0.9, "cause"),
+    (re.compile(rf"{_SEG}(?:使得|让){_SEG}"), 0.8, "enable"),
+)
+
+
+def extract_causal(text: str) -> list[dict]:
+    """Rule-based causal extraction (TCM v1 trigger #1).
+
+    Only explicit marker sentences produce candidates; the gate in
+    `add_causal_edge` still decides pending vs active."""
+    t = str(text or "")
+    out: list[dict] = []
+    if len(t) < 6:
+        return out
+    for pat, conf, rel in _CAUSAL_PATTERNS:
+        for m in pat.finditer(t):
+            cause = str(m.group(1) or "").strip()
+            effect = str(m.group(2) or "").strip()
+            if not cause or not effect:
+                continue
+            out.append({"cause": cause, "effect": effect,
+                        "quote": m.group(0).strip(), "confidence": conf,
+                        "relation": rel})
+    return out
+
+
 @dataclass(slots=True)
 class L2Item:
     id: str
@@ -72,6 +132,7 @@ class L2Item:
     invalid_at: float = 0.0    # >0 = 已失效（软失效，不删）
     superseded_by: str = ""    # 被哪条取代
     confidence: float = 0.5    # 写入/证据置信
+    stance: str = ""           # A1: fact | opinion | speculation（空=按来源推断）
 
     def to_dict(self) -> dict:
         return {
@@ -91,6 +152,7 @@ class L2Item:
             "last_accessed": self.last_accessed,
             "salience": self.salience,
             "source": self.source,
+            "stance": self.stance,
         }
 
 
@@ -166,9 +228,54 @@ class TargetMemoryService:
                 ("invalid_at", "REAL NOT NULL DEFAULT 0"),
                 ("superseded_by", "TEXT NOT NULL DEFAULT ''"),
                 ("confidence", "REAL NOT NULL DEFAULT 0.5"),
+                # TCM v1 (ledger 0438): source grading (A1)
+                ("stance", "TEXT NOT NULL DEFAULT ''"),
             ):
                 if name not in cols:
                     con.execute(f"ALTER TABLE l2_items ADD COLUMN {name} {decl}")
+            # TCM v1 (ledger 0438): raw episodes (provenance) + causal graph
+            con.execute(
+                """
+                CREATE TABLE IF NOT EXISTS episodes (
+                  id TEXT PRIMARY KEY,
+                  ts REAL NOT NULL DEFAULT 0,
+                  channel TEXT NOT NULL DEFAULT '',
+                  kind TEXT NOT NULL DEFAULT '',
+                  source TEXT NOT NULL DEFAULT '',
+                  raw_ref TEXT NOT NULL DEFAULT '',
+                  raw_path TEXT NOT NULL DEFAULT '',
+                  summary TEXT NOT NULL DEFAULT '',
+                  meta_json TEXT NOT NULL DEFAULT '',
+                  created REAL NOT NULL DEFAULT 0
+                )
+                """
+            )
+            con.execute("CREATE INDEX IF NOT EXISTS idx_episodes_ts ON episodes(ts)")
+            con.execute(
+                """
+                CREATE TABLE IF NOT EXISTS causal_edges (
+                  id TEXT PRIMARY KEY,
+                  src_id TEXT NOT NULL,
+                  dst_id TEXT NOT NULL,
+                  relation TEXT NOT NULL,
+                  confidence REAL NOT NULL DEFAULT 0.5,
+                  quote TEXT NOT NULL DEFAULT '',
+                  evidence_ref TEXT NOT NULL DEFAULT '',
+                  status TEXT NOT NULL DEFAULT 'pending',
+                  created_by TEXT NOT NULL DEFAULT '',
+                  created_at REAL NOT NULL DEFAULT 0,
+                  activated_at REAL NOT NULL DEFAULT 0,
+                  invalid_at REAL NOT NULL DEFAULT 0,
+                  undo_by TEXT NOT NULL DEFAULT '',
+                  undo_at REAL NOT NULL DEFAULT 0,
+                  UNIQUE(src_id, dst_id, relation)
+                )
+                """
+            )
+            con.execute("CREATE INDEX IF NOT EXISTS idx_causal_src "
+                        "ON causal_edges(src_id, status)")
+            con.execute("CREATE INDEX IF NOT EXISTS idx_causal_dst "
+                        "ON causal_edges(dst_id, status)")
             # backfill valid_at from created_at (idempotent)
             con.execute("UPDATE l2_items SET valid_at=created_at "
                         "WHERE valid_at=0 AND created_at>0")
@@ -769,8 +876,8 @@ class TargetMemoryService:
                 con.execute(
                     """
                     INSERT INTO l2_items
-                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source,kind,protected,valid_at,invalid_at,superseded_by,confidence)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source,kind,protected,valid_at,invalid_at,superseded_by,confidence,stance)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                       summary=excluded.summary,
                       keywords=excluded.keywords,
@@ -779,7 +886,9 @@ class TargetMemoryService:
                       salience=MAX(l2_items.salience, excluded.salience),
                       source=excluded.source,
                       kind=excluded.kind,
-                      confidence=MAX(l2_items.confidence, excluded.confidence)
+                      confidence=MAX(l2_items.confidence, excluded.confidence),
+                      stance=CASE WHEN excluded.stance != ''
+                                  THEN excluded.stance ELSE l2_items.stance END
                     """,
                     (
                         item.id, item.tier, item.type, item.importance, item.summary,
@@ -794,6 +903,9 @@ class TargetMemoryService:
                         float(getattr(item, "invalid_at", 0) or 0),
                         str(getattr(item, "superseded_by", "") or ""),
                         float(getattr(item, "confidence", 0.5) or 0.5),
+                        infer_stance(str(getattr(item, "source", "") or ""),
+                                     str(getattr(item, "kind", "episodic") or ""),
+                                     str(getattr(item, "stance", "") or "")),
                     ),
                 )
                 con.execute("DELETE FROM l2_fts WHERE sid=?", (item.id,))
@@ -806,6 +918,72 @@ class TargetMemoryService:
                 con.close()
         self._sync_kw([item])
         self._auto_adjudicate(item)
+        self._auto_link_causal(item)
+
+    def _find_related(self, needle: str, exclude_id: str = "",
+                      limit: int = 200) -> Optional[dict]:
+        """Best active item containing `needle` (or very similar). Endpoint
+        matcher for the rule-based causal linker."""
+        n = _normalize(needle)
+        if len(n) < 2:
+            return None
+        best: Optional[dict] = None
+        best_score = 0.0
+        try:
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                rows = con.execute(
+                    "SELECT id, summary, keywords FROM l2_items"
+                    " WHERE status IN ('active','downgraded')"
+                    " AND COALESCE(invalid_at,0)=0 AND id!=?"
+                    " ORDER BY created_at DESC LIMIT ?",
+                    (str(exclude_id), int(limit))).fetchall()
+            finally:
+                con.close()
+            import difflib
+
+            for iid, summary, keywords in rows:
+                blob = _normalize(str(summary)) + _normalize(str(keywords))
+                if n in blob:
+                    return {"id": iid, "summary": summary}
+                r = difflib.SequenceMatcher(
+                    None, n, _normalize(str(summary))).ratio()
+                if r > best_score:
+                    best_score, best = r, {"id": iid, "summary": summary}
+        except Exception:
+            return None
+        return best if best_score >= 0.55 else None
+
+    def _auto_link_causal(self, item: Any) -> None:
+        """TCM v1 trigger #1 (ledger 0438): an explicit causal sentence in a
+        new memory auto-links to an existing endpoint; the gate decides
+        pending vs active. Never raises."""
+        try:
+            text = str(getattr(item, "summary", "") or "")
+            pairs = extract_causal(text)
+            if not pairs:
+                return
+            for p in pairs:
+                src_hit = self._find_related(p["cause"], str(item.id))
+                dst_hit = self._find_related(p["effect"], str(item.id))
+                if src_hit is not None and dst_hit is not None:
+                    src_id, dst_id = src_hit["id"], dst_hit["id"]
+                elif dst_hit is None and src_hit is not None:
+                    # the new item supplies the effect end
+                    if _normalize(p["effect"]) not in _normalize(text):
+                        continue
+                    src_id, dst_id = src_hit["id"], item.id
+                elif src_hit is None and dst_hit is not None:
+                    if _normalize(p["cause"]) not in _normalize(text):
+                        continue
+                    src_id, dst_id = item.id, dst_hit["id"]
+                else:
+                    continue
+                self.add_causal_edge(
+                    str(src_id), str(dst_id), p["relation"], p["confidence"],
+                    quote=p["quote"], created_by="auto:rule:causal-v1")
+        except Exception:
+            pass
 
     def _auto_adjudicate(self, item: Any) -> None:
         """M2: bounded evidence-based conflict scan over same-topic active
@@ -1002,22 +1180,50 @@ class TargetMemoryService:
         return {"checked": len(rows), "flagged": flagged,
                 "downgraded": downgraded}
 
-    def recall(self, query: str, limit: int = 5) -> list[dict]:
+    def recall(self, query: str, limit: int = 5, as_of: float = 0.0) -> list[dict]:
         """Tool-type recall; never auto-injected.
 
         Ledger 0148: keyword-index (mini inverted catalog) is the primary
         ranking path; the SQLite FTS5/LIKE path is retained as fallback when
         the index is broken/missing (recall never hard-fails).
+        TCM v1 (ledger 0438): `as_of` = time-travel read (valid at that ts).
         """
         q = str(query or "").strip()
         if not q:
             return []
         ranked = self._recall_via_kw(q, int(limit))
         if ranked is not None:
-            return ranked  # kw path already recorded hits (no double-boost)
+            if as_of:
+                return self._filter_as_of(ranked, float(as_of))
+            return self._filter_current(ranked)
         sql = self._recall_via_sqlite(q, int(limit))
         self._boost_recalled(sql)
-        return sql
+        if as_of:
+            return self._filter_as_of(sql, float(as_of))
+        return self._filter_current(sql)
+
+    def _filter_current(self, items: list[dict]) -> list[dict]:
+        """M1 semantics (ledger 0438): default reads see the CURRENT state —
+        soft-invalidated items (invalid_at>0) stay in the store as history but
+        are not recalled unless an explicit as_of time is given."""
+        out: list[dict] = []
+        try:
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                for it in items or []:
+                    row = con.execute(
+                        "SELECT COALESCE(invalid_at,0) FROM l2_items WHERE id=?",
+                        (str(it.get("id", "")),)).fetchone()
+                    if row is None:
+                        continue
+                    if float(row[0] or 0) > 0:
+                        continue
+                    out.append(it)
+            finally:
+                con.close()
+        except Exception:
+            return list(items or [])
+        return out
 
     def _boost_recalled(self, items: list[dict]) -> None:
         """R1 (ledger 0189): using a memory strengthens it — each recall adds a
@@ -1058,7 +1264,7 @@ class TargetMemoryService:
             for h in hits:
                 row = con.execute(
                     """
-                    SELECT id, tier, type, importance, status, evidence_ref, summary
+                    SELECT id, tier, type, importance, status, evidence_ref, summary, stance
                     FROM l2_items WHERE id=?
                     """,
                     (h["docid"],),
@@ -1070,6 +1276,7 @@ class TargetMemoryService:
                         "id": row[0], "tier": row[1], "type": row[2],
                         "importance": row[3], "status": row[4],
                         "evidence_ref": row[5], "summary": row[6],
+                        "stance": row[7],
                     }
                 )
                 if len(out) >= limit:
@@ -1089,7 +1296,7 @@ class TargetMemoryService:
         try:
             rows = con.execute(
                 """
-                SELECT i.id, i.tier, i.type, i.importance, i.status, i.evidence_ref, i.summary
+                SELECT i.id, i.tier, i.type, i.importance, i.status, i.evidence_ref, i.summary, i.stance
                 FROM l2_fts f JOIN l2_items i ON i.id = f.sid
                 WHERE l2_fts MATCH ?
                 ORDER BY i.importance DESC, i.last_accessed DESC
@@ -1103,7 +1310,7 @@ class TargetMemoryService:
             pattern = f"%{q}%"
             rows = con.execute(
                 """
-                SELECT id, tier, type, importance, status, evidence_ref, summary
+                SELECT id, tier, type, importance, status, evidence_ref, summary, stance
                 FROM l2_items
                 WHERE (summary LIKE ? ESCAPE '\\' OR keywords LIKE ? ESCAPE '\\')
                   AND status IN ('active','downgraded')
@@ -1117,6 +1324,7 @@ class TargetMemoryService:
             {
                 "id": r[0], "tier": r[1], "type": r[2], "importance": r[3],
                 "status": r[4], "evidence_ref": r[5], "summary": r[6],
+                "stance": r[7],
             }
             for r in rows
         ]
@@ -1169,10 +1377,285 @@ class TargetMemoryService:
         draft = "；".join(parts)[:max_tokens_chars]
         return draft or SYSTEM_TEMPLATE
 
+    # ---------- TCM v1 (ledger 0438): episodes (raw provenance) ----------
+    def add_episode(self, *, channel: str, kind: str = "", source: str = "",
+                    raw_ref: str = "", raw_path: str = "", summary: str = "",
+                    meta: Optional[dict] = None, ts: float = 0.0) -> str:
+        """Store a raw event for provenance (voice clip ref, QQ line, ...).
+
+        Never raises (journal safety): a failed episode write must not break
+        the caller's reply path."""
+        ts_v = float(ts or time.time())
+        text = str(summary or "")
+        eid = "ep_" + _fingerprint(f"{channel}|{ts_v:.0f}|{text[:120]}")[:12]
+        try:
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                con.execute(
+                    "INSERT INTO episodes"
+                    "(id,ts,channel,kind,source,raw_ref,raw_path,summary,meta_json,created)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
+                    (eid, ts_v, str(channel or ""), str(kind or ""),
+                     str(source or ""), str(raw_ref or ""), str(raw_path or ""),
+                     text[:2000], json.dumps(meta or {}, ensure_ascii=False),
+                     time.time()))
+                con.commit()
+            finally:
+                con.close()
+        except Exception:
+            pass
+        return eid
+
+    def list_episodes(self, *, channel: str = "", limit: int = 20) -> list[dict]:
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            if channel:
+                rows = con.execute(
+                    "SELECT id,ts,channel,kind,source,raw_ref,summary FROM episodes"
+                    " WHERE channel=? ORDER BY ts DESC LIMIT ?",
+                    (str(channel), int(limit))).fetchall()
+            else:
+                rows = con.execute(
+                    "SELECT id,ts,channel,kind,source,raw_ref,summary FROM episodes"
+                    " ORDER BY ts DESC LIMIT ?", (int(limit),)).fetchall()
+        finally:
+            con.close()
+        return [{"id": r[0], "ts": r[1], "channel": r[2], "kind": r[3],
+                 "source": r[4], "raw_ref": r[5], "summary": r[6]} for r in rows]
+
+    # ---------- TCM v1: causal edges ----------
+    def _item_brief(self, item_id: str) -> Optional[dict]:
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            row = con.execute(
+                "SELECT id,summary,source,kind,status,COALESCE(invalid_at,0),stance"
+                " FROM l2_items WHERE id=?", (str(item_id),)).fetchone()
+        finally:
+            con.close()
+        if row is None:
+            return None
+        return {"id": row[0], "summary": row[1], "source": row[2],
+                "kind": row[3], "status": row[4], "invalid_at": row[5],
+                "stance": row[6]}
+
+    def _quote_verified(self, quote: str, briefs: list[dict],
+                        evidence_ref: str = "") -> bool:
+        """The causal quote must exist verbatim (normalized) in an endpoint
+        summary or in the referenced/recent episode."""
+        q = _normalize(quote)
+        if len(q) < 4:
+            return False
+        for b in briefs:
+            if q in _normalize(str(b.get("summary", ""))):
+                return True
+        try:
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                if evidence_ref:
+                    rows = con.execute(
+                        "SELECT summary FROM episodes WHERE id=? OR raw_ref=?",
+                        (str(evidence_ref), str(evidence_ref))).fetchall()
+                else:
+                    rows = con.execute(
+                        "SELECT summary FROM episodes ORDER BY ts DESC LIMIT 20"
+                    ).fetchall()
+            finally:
+                con.close()
+            return any(q in _normalize(r[0]) for r in rows)
+        except Exception:
+            return False
+
+    def add_causal_edge(self, src_id: str, dst_id: str, relation: str,
+                        confidence: float = 0.5, quote: str = "",
+                        evidence_ref: str = "", created_by: str = "auto") -> dict:
+        """TCM v1 gate (ledger 0438).
+
+        `auto` edges activate ONLY when every guard passes; otherwise they are
+        stored as pending for owner review. Owner-explicit edges activate as
+        long as both endpoints exist."""
+        rel = str(relation or "").strip().lower()
+        if rel not in CAUSAL_RELATIONS:
+            return {"status": "rejected", "reason": "bad-relation"}
+        if not str(src_id or "").strip() or not str(dst_id or "").strip():
+            return {"status": "rejected", "reason": "missing-endpoint"}
+        src = self._item_brief(str(src_id))
+        dst = self._item_brief(str(dst_id))
+        if src is None or dst is None:
+            return {"status": "rejected", "reason": "endpoint-missing"}
+        conf = max(0.0, min(1.0, float(confidence or 0.0)))
+        owner_explicit = str(created_by or "").startswith("owner")
+        pending_reasons: list[str] = []
+        now = time.time()
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            existing = con.execute(
+                "SELECT id,status FROM causal_edges"
+                " WHERE src_id=? AND dst_id=? AND relation=?",
+                (src["id"], dst["id"], rel)).fetchone()
+            if existing:
+                return {"status": str(existing[1]), "edge_id": existing[0],
+                        "reason": "exists"}
+            if not owner_explicit:
+                if rel not in AUTO_RELATIONS:
+                    pending_reasons.append("relation-needs-review")
+                if conf < AUTO_MIN_CONFIDENCE:
+                    pending_reasons.append("low-confidence")
+                for b in (src, dst):
+                    if (str(b.get("status") or "") == "archive"
+                            or float(b.get("invalid_at") or 0) > 0):
+                        return {"status": "rejected",
+                                "reason": "endpoint-inactive"}
+                    if b.get("kind") == "profile":
+                        pending_reasons.append("profile-endpoint")
+                    if str(b.get("source") or "") in EXTERNAL_SOURCES:
+                        pending_reasons.append("external-source")
+                if not self._quote_verified(str(quote or ""), [src, dst],
+                                           str(evidence_ref or "")):
+                    pending_reasons.append("quote-unverified")
+                n_auto = con.execute(
+                    "SELECT COUNT(*) FROM causal_edges WHERE status='active'"
+                    " AND created_by LIKE 'auto%' AND activated_at>=?",
+                    (now - 86400,)).fetchone()[0]
+                if int(n_auto) >= AUTO_DAILY_CAP:
+                    pending_reasons.append("daily-cap")
+                conflict = con.execute(
+                    "SELECT id FROM causal_edges WHERE status='active'"
+                    " AND relation!=? AND ((src_id=? AND dst_id=?)"
+                    " OR (src_id=? AND dst_id=?))",
+                    (rel, src["id"], dst["id"], dst["id"], src["id"])).fetchone()
+                if conflict:
+                    pending_reasons.append("pair-conflict")
+            status = "pending" if pending_reasons else "active"
+            eid = "cx_" + _fingerprint(f"{src['id']}|{dst['id']}|{rel}")[:12]
+            con.execute(
+                "INSERT OR IGNORE INTO causal_edges"
+                "(id,src_id,dst_id,relation,confidence,quote,evidence_ref,status,"
+                " created_by,created_at,activated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (eid, src["id"], dst["id"], rel, conf, str(quote or "")[:500],
+                 str(evidence_ref or ""), status, str(created_by or "auto"),
+                 now, now if status == "active" else 0.0))
+            con.commit()
+        finally:
+            con.close()
+        return {"status": status, "edge_id": eid, "reasons": pending_reasons}
+
+    def causal_list(self, status: str = "", limit: int = 50) -> list[dict]:
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            cols = ("id,src_id,dst_id,relation,confidence,quote,evidence_ref,"
+                    "status,created_by,created_at,activated_at")
+            if status:
+                rows = con.execute(
+                    f"SELECT {cols} FROM causal_edges WHERE status=?"
+                    " ORDER BY created_at DESC LIMIT ?",
+                    (str(status), int(limit))).fetchall()
+            else:
+                rows = con.execute(
+                    f"SELECT {cols} FROM causal_edges"
+                    " ORDER BY created_at DESC LIMIT ?", (int(limit),)).fetchall()
+        finally:
+            con.close()
+        keys = ("id", "src_id", "dst_id", "relation", "confidence", "quote",
+                "evidence_ref", "status", "created_by", "created_at",
+                "activated_at")
+        return [dict(zip(keys, r)) for r in rows]
+
+    def causal_undo(self, edge_id: str, by: str = "owner") -> bool:
+        """Soft-invalidate an edge (never delete). Returns True if changed."""
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            cur = con.execute(
+                "UPDATE causal_edges SET status='invalid', invalid_at=?,"
+                " undo_by=?, undo_at=? WHERE id=?"
+                " AND status IN ('active','pending')",
+                (time.time(), str(by or "owner"), time.time(),
+                 str(edge_id or "")))
+            con.commit()
+            return cur.rowcount > 0
+        finally:
+            con.close()
+
+    def why(self, item_id: str, depth: int = 2, limit: int = 10) -> list[dict]:
+        """Walk active causal edges outward (both directions), up to `depth`."""
+        iid = str(item_id or "").strip()
+        if not iid:
+            return []
+        out: list[dict] = []
+        seen = {iid}
+        frontier = [iid]
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            for level in range(1, max(1, int(depth)) + 1):
+                nxt: list[str] = []
+                for cur in frontier:
+                    rows = con.execute(
+                        "SELECT e.id,e.src_id,e.dst_id,e.relation,e.confidence,"
+                        " s.summary,d.summary FROM causal_edges e"
+                        " LEFT JOIN l2_items s ON s.id=e.src_id"
+                        " LEFT JOIN l2_items d ON d.id=e.dst_id"
+                        " WHERE e.status='active' AND (e.src_id=? OR e.dst_id=?)"
+                        " ORDER BY e.confidence DESC LIMIT ?",
+                        (cur, cur, max(1, int(limit)))).fetchall()
+                    for r in rows:
+                        other = r[2] if r[1] == cur else r[1]
+                        if other in seen:
+                            continue
+                        seen.add(other)
+                        nxt.append(other)
+                        out.append({
+                            "edge_id": r[0],
+                            "direction": "forward" if r[1] == cur else "backward",
+                            "from": r[1], "to": r[2], "relation": r[3],
+                            "confidence": r[4], "src_summary": r[5],
+                            "dst_summary": r[6], "depth": level,
+                        })
+                        if len(out) >= int(limit):
+                            return out
+                frontier = nxt
+                if not frontier:
+                    break
+        finally:
+            con.close()
+        return out
+
+    def _filter_as_of(self, items: list[dict], ts: float) -> list[dict]:
+        """Time-travel filter: keep items valid at `ts` (valid_at<=ts<invalid)."""
+        out: list[dict] = []
+        try:
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                for it in items or []:
+                    row = con.execute(
+                        "SELECT COALESCE(valid_at,0),COALESCE(invalid_at,0)"
+                        " FROM l2_items WHERE id=?",
+                        (str(it.get("id", "")),)).fetchone()
+                    if row is None:
+                        continue
+                    va, ia = float(row[0] or 0), float(row[1] or 0)
+                    if (va and va > ts) or (ia and ia <= ts):
+                        continue
+                    out.append(it)
+            finally:
+                con.close()
+        except Exception:
+            return list(items or [])
+        return out
+
     def health(self) -> dict:
         con = sqlite3.connect(str(self.db_path))
         n = con.execute("SELECT COUNT(*) FROM l2_items").fetchone()[0]
         active = con.execute("SELECT COUNT(*) FROM l2_items WHERE status='active'").fetchone()[0]
+        # TCM v1 (ledger 0438): provenance + causal graph counters
+        try:
+            episodes = con.execute("SELECT COUNT(*) FROM episodes").fetchone()[0]
+            causal_active = con.execute(
+                "SELECT COUNT(*) FROM causal_edges WHERE status='active'"
+            ).fetchone()[0]
+            causal_pending = con.execute(
+                "SELECT COUNT(*) FROM causal_edges WHERE status='pending'"
+            ).fetchone()[0]
+        except Exception:
+            episodes = causal_active = causal_pending = 0
         con.close()
         return {
             "provider": "target-memory-v1",
@@ -1180,5 +1663,8 @@ class TargetMemoryService:
             "l2_active": int(active),
             "l1_window": int(len(self._turns)),
             "summary_pending": bool(self._summary_pending),
+            "episodes": int(episodes),
+            "causal_active": int(causal_active),
+            "causal_pending": int(causal_pending),
             "db": str(self.db_path),
         }
