@@ -74,6 +74,19 @@ class TestDaemon(unittest.TestCase):
             h = json.loads(r.read())
         self.assertEqual(h["status"], "ok")
 
+    def test_health_never_touches_memory_db(self):
+        """F3 regression (ledger 0436): even a broken/slow session.status()
+        (busy SQLite) must not fail /health — that bug made the watchdog
+        believe a live daemon was down and respawn it in a loop."""
+        s = self.rt._session("console")
+        orig = s.status
+        s.status = lambda: (_ for _ in ()).throw(RuntimeError("db busy"))
+        try:
+            h = self.rt.health()
+        finally:
+            s.status = orig
+        self.assertEqual(h["status"], "ok")
+
     def test_turn_default_private(self):
         out = self._post("/turn", {"text": "你好"})
         self.assertIn("reply:False:", out["answer"])

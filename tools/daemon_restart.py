@@ -4,11 +4,14 @@ processes, spawn one, verify. Usage: python tools/daemon_restart.py
 from __future__ import annotations
 
 import pathlib
-import subprocess
 import sys
 import time
 
-import psutil
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+import psutil  # noqa: E402
+
+from yhlz_launcher import _spawn_daemon  # noqa: E402
 
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
 PY = _ROOT / ".venv" / "Scripts" / "python.exe"
@@ -36,9 +39,7 @@ def main() -> int:
         except Exception:
             pass
     time.sleep(3)
-    subprocess.Popen([str(PY), "-B", "-m", "backend.target_daemon",
-                      "--port", "8321"], cwd=str(_ROOT), close_fds=True,
-                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    _spawn_daemon()  # F1: shared spawn with cache/logs/daemon.log redirect
     time.sleep(10)
     now = _pids()
     print(f"killed={killed} now={len(now)} pids={now}")

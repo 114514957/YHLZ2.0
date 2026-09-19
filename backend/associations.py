@@ -16,13 +16,10 @@ def _graph():
     import networkx as nx
 
     g = nx.Graph()
-    con = eg._conn()
-    try:
+    with eg._conn() as con:
         for s, r, d in con.execute("SELECT src,rel,dst FROM relations"):
             if s and d:
                 g.add_edge(s, d, rel=r)
-    finally:
-        con.close()
     return g
 
 

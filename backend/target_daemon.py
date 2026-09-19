@@ -32,6 +32,7 @@ LOCAL_BASE = "http://127.0.0.1:11434/v1/chat/completions"
 LOCAL_MODEL = "qwen2.5:3b"
 
 from backend.console_server import ConsoleHandler  # noqa: E402 (workbench UI base)
+from backend import notify_guard  # noqa: E402 (F5 dedupe/rate-limit)
 
 NOTIFY_DIR = _PROJECT / "cache" / "qqwatch"
 NOTIFY_FILE = NOTIFY_DIR / "notifications.json"
@@ -139,7 +140,10 @@ class DaemonRuntime:
                     from backend import qq_outbox
 
                     ans = str(info.get("answer", "")).strip()
-                    if len(ans) >= 30 and not ans.startswith("没有"):
+                    if (len(ans) >= 30 and not ans.startswith("没有")
+                            and notify_guard.allow("autonomy", ans,
+                                                   cooldown=6 * 3600,
+                                                   max_per_day=2)):
                         qq_outbox.push("[自主] " + ans, kind="autonomy")
                 except Exception:
                     pass
@@ -209,8 +213,12 @@ class DaemonRuntime:
             return s
 
     def health(self) -> dict:
+        # F3 (ledger 0436): /health must never touch SQLite/session locks —
+        # the watchdog polls it with a 2s timeout and a busy DB used to make a
+        # live daemon look "down", triggering the respawn storm. Heavy stats
+        # stay on the session /status path.
         try:
-            counts = {k: self._sessions[k].status()["history_turns"]
+            counts = {k: len(getattr(self._sessions[k], "history", [])) // 2
                       for k in self._sessions}
         except Exception as exc:
             return {"status": "degraded", "detail": type(exc).__name__}
@@ -313,7 +321,11 @@ class DaemonRuntime:
             if key == "console" and notify_should(answer, info.get("tool_uses") or []):
                 tools = [u.get("name", "") for u in (info.get("tool_uses") or [])]
                 head = answer[:150].replace("\n", " ")
-                notify_push(f"任务完成汇报：{head}" + (f"（工具：{'、'.join(tools)}）" if tools else ""))
+                msg = (f"任务完成汇报：{head}"
+                       + (f"（工具：{'、'.join(tools)}）" if tools else ""))
+                if notify_guard.allow("task", msg, cooldown=1800.0,
+                                      max_per_day=8):
+                    notify_push(msg)
         except Exception:
             pass
         return info
@@ -342,7 +354,11 @@ class DaemonRuntime:
             info = future.result(timeout=180)
             print(f"[auto-consolidate] {info.get('status')}", flush=True)
             if info.get("status") == "pending-approval":
-                notify_push("有认知提炼待你确认：在 CLI 输入 /review-cognition 逐条 y/n 批准（写进元亨认知根基）")
+                msg = ("有认知提炼待你确认：在 CLI 输入 /review-cognition "
+                       "逐条 y/n 批准（写进元亨认知根基）")
+                if notify_guard.allow("consolidate", msg,
+                                      cooldown=12 * 3600, max_per_day=2):
+                    notify_push(msg)
         except Exception as exc:
             print(f"[auto-consolidate] skip: {type(exc).__name__}", flush=True)
 
@@ -371,6 +387,10 @@ class DaemonRuntime:
                     continue
                 for plan in due:
                     try:
+                        # F4 (ledger 0436): a repeatedly failing plan backs off
+                        # (was: full LLM retry every 30s forever == "重复思考").
+                        if sched_mod.in_backoff(plan, time.time()):
+                            continue
                         steps = plan.get("steps") or []
                         body = (f"（计划表到点）你的例行计划：{plan.get('name')}。"
                                 f"{'步骤：' + '；'.join(steps[:3]) if steps else ''}"
@@ -379,7 +399,17 @@ class DaemonRuntime:
                         sched_mod.mark_run(plan.get("id", ""), now)
                         print(f"[schedule] ran {plan.get('name')}", flush=True)
                     except Exception as exc:
-                        print(f"[schedule] run err {type(exc).__name__}", flush=True)
+                        err = type(exc).__name__
+                        fc = sched_mod.mark_fail(plan.get("id", ""), err)
+                        print(f"[schedule] run err {err} (fail #{fc})",
+                              flush=True)
+                        if fc == 3:
+                            msg = (f"计划「{plan.get('name')}」连续失败 3 次，"
+                                   f"已自动暂停 24 小时：{err}")
+                            if notify_guard.allow("schedule", msg,
+                                                  cooldown=12 * 3600,
+                                                  max_per_day=2):
+                                notify_push(msg)
             except Exception as exc:
                 print(f"[schedule] loop err {type(exc).__name__}", flush=True)
 

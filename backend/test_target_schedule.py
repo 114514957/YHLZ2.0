@@ -73,6 +73,41 @@ class ScheduleTest(unittest.TestCase):
         plans = sc._load()
         self.assertTrue(plans[-1]["last_run"])
 
+    def test_mark_fail_and_backoff(self):
+        """F4 (ledger 0436): 3 consecutive failures -> 24h backoff."""
+        sc.add_plan("bf", "daily", "07:00", ["s"])
+        pid = sc._load()[-1]["id"]
+        t = time.time()
+        self.assertEqual(sc.mark_fail(pid, "BoomError", t), 1)
+        p = next(pp for pp in sc._load() if pp["id"] == pid)
+        self.assertFalse(sc.in_backoff(p, t))
+        self.assertEqual(sc.mark_fail(pid, "BoomError", t + 31), 2)
+        p = next(pp for pp in sc._load() if pp["id"] == pid)
+        self.assertFalse(sc.in_backoff(p, t + 31))
+        self.assertEqual(sc.mark_fail(pid, "BoomError", t + 62), 3)
+        p = next(pp for pp in sc._load() if pp["id"] == pid)
+        self.assertEqual(p["last_result"], "BoomError")
+        self.assertTrue(sc.in_backoff(p, t + 63))
+        self.assertTrue(sc.in_backoff(p, t + 86461))
+        self.assertFalse(sc.in_backoff(p, t + 86463))
+        sc.mark_run(pid, time.localtime())
+        p = next(pp for pp in sc._load() if pp["id"] == pid)
+        self.assertEqual(p["fail_count"], 0)
+        self.assertFalse(sc.in_backoff(p, time.time()))
+
+    def test_update_steps_clears_backoff(self):
+        sc.add_plan("bf2", "daily", "07:30", ["s"])
+        pid = sc._load()[-1]["id"]
+        t = time.time()
+        for i in range(3):
+            sc.mark_fail(pid, "BoomError", t + i)
+        p = next(pp for pp in sc._load() if pp["id"] == pid)
+        self.assertTrue(sc.in_backoff(p, t + 2))
+        sc.update_plan(pid, {"steps": ["fixed step"]})
+        p = next(pp for pp in sc._load() if pp["id"] == pid)
+        self.assertFalse(sc.in_backoff(p, t + 2))
+        self.assertEqual(p["fail_count"], 0)
+
     def test_get_and_update(self):
         sc.add_plan("u1", "daily", "09:00", ["a"])
         pid = sc._load()[-1]["id"]

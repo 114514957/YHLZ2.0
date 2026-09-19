@@ -72,7 +72,10 @@ def _write_mirror(plans: list[dict]) -> None:
         lines.append(f"- **{p.get('name')}** {state}：{freq} {cd.get('time','')}")
         for s in p.get("steps", []):
             lines.append(f"    · {s}")
-        lines.append(f"    （上次执行：{p.get('last_run') or '从未'}）")
+        extra = ""
+        if int(p.get("fail_count") or 0) >= 3:
+            extra = f"，连续失败 {p.get('fail_count')} 次待重试"
+        lines.append(f"    （上次执行：{p.get('last_run') or '从未'}{extra}）")
     MIRROR_FILE.parent.mkdir(parents=True, exist_ok=True)
     MIRROR_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -160,6 +163,11 @@ def update_plan(plan_id: str, fields: dict) -> str:
                 p["enabled"] = bool(f["enabled"])
             if "steps" in f and isinstance(f["steps"], list):
                 p["steps"] = [str(s).strip()[:300] for s in f["steps"] if str(s).strip()][:6]
+                # F4: editing the steps counts as a fix -> clear backoff so the
+                # next cycle may retry immediately.
+                p["fail_count"] = 0
+                p["last_fail"] = 0
+                p["last_result"] = ""
             ct = f.get("cadence_type")
             tm = f.get("time")
             if ct is not None or tm is not None:
@@ -255,10 +263,42 @@ def is_due(plan: dict, now: time.struct_time, last_run: str = "") -> bool:
     return last_d is None or last_d != today_d
 
 
+def in_backoff(plan: dict, now_ts: float) -> bool:
+    """F4 (ledger 0436): a plan that failed >=3 consecutive times waits 24h.
+
+    Before this, a failing plan was retried with a full LLM turn every 30s
+    forever (the 09-19 "重复思考/不停拉进程" symptom).
+    """
+    try:
+        fc = int(plan.get("fail_count") or 0)
+    except Exception:
+        fc = 0
+    if fc < 3:
+        return False
+    last = float(plan.get("last_fail") or 0)
+    return (float(now_ts) - last) < 86400.0
+
+
 def mark_run(plan_id: str, now: time.struct_time) -> None:
     plans = _load()
     for p in plans:
         if p.get("id") == plan_id:
             p["last_run"] = time.strftime("%Y-%m-%d %H:%M", now)
+            p["fail_count"] = 0
+            p["last_fail"] = 0
+            p["last_result"] = "ok"
             _save(plans)
             return
+
+
+def mark_fail(plan_id: str, err: str = "", ts: float | None = None) -> int:
+    """Record a failed run (F4); returns the new consecutive-failure count."""
+    plans = _load()
+    for p in plans:
+        if p.get("id") == plan_id:
+            p["fail_count"] = int(p.get("fail_count") or 0) + 1
+            p["last_fail"] = float(ts if ts is not None else time.time())
+            p["last_result"] = str(err or "error")[:200]
+            _save(plans)
+            return p["fail_count"]
+    return 0

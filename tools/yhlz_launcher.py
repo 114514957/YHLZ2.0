@@ -128,8 +128,15 @@ def _spawn_llama():
 
 
 def _spawn_daemon():
+    # F1 (ledger 0436): log stdout/stderr so crash/flap causes are visible
+    # (previously the daemon was spawned with no redirect at all).
+    log = _ROOT / "cache" / "logs" / "daemon.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
     subprocess.Popen([str(PY), "-B", "-m", "backend.target_daemon",
-                      "--port", "8321"], cwd=str(_ROOT), close_fds=True)
+                      "--port", "8321"], cwd=str(_ROOT),
+                     stdout=open(log, "ab"), stderr=subprocess.STDOUT,
+                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                     close_fds=True)
 
 
 def _spawn_qqbot():
@@ -177,13 +184,50 @@ def _spawn_napcat():
                          cwd=str(NAPCAT_BAT.parent), close_fds=True)
 
 
+SPAWN_GUARD = _ROOT / "cache" / "tmp" / "spawn_guard.json"
+
+
+def _spawn_allowed(key: str, cooldown: float) -> bool:
+    """F2 (ledger 0436): respawn throttle — at most one attempt per cooldown.
+
+    The 09-19 flap: /health timed out while the daemon was actually alive, so
+    every watchdog tick spawned another process (which died on the busy port)
+    or killed the good one via dupes. Process/port checks live in
+    `ensure_stack`; this guard caps even legitimate-looking retries.
+    """
+    try:
+        SPAWN_GUARD.parent.mkdir(parents=True, exist_ok=True)
+        data: dict = {}
+        if SPAWN_GUARD.exists():
+            try:
+                data = json.loads(SPAWN_GUARD.read_text(encoding="utf-8"))
+            except Exception:
+                data = {}
+        now = time.time()
+        if now - float(data.get(key) or 0) < float(cooldown):
+            return False
+        data[key] = now
+        SPAWN_GUARD.write_text(json.dumps(data), encoding="utf-8")
+        return True
+    except Exception:
+        return True
+
+
 def ensure_stack() -> dict:
     st = status()
-    if not st["ollama"]:
+    # F2: never respawn something that is still there (process alive or port
+    # bound) — a slow /health is not a dead service.
+    if (not st["ollama"] and not _proc_alive("ollama")
+            and not _port_open("127.0.0.1", 11434)
+            and _spawn_allowed("ollama", 180)):
         _spawn_ollama()
-    if not st["gemma"]:
+    if (not st["gemma"] and not _port_open("127.0.0.1", 8081)
+            and not _proc_alive("llama-server")
+            and _spawn_allowed("llama", 180)):
         _spawn_llama()
-    if not st["daemon"]:
+    if (not st["daemon"] and not _port_open("127.0.0.1", 8321)
+            and not _proc_alive("target_daemon")
+            and _spawn_allowed("daemon", 120)):
         _spawn_daemon()
     # keep the QQ bridge alive, but only if NapCat's OneBot WS is up
     if _port_open("127.0.0.1", QQBOT_PORT) and not _qqbot_alive():
