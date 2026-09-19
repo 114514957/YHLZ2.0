@@ -116,6 +116,17 @@ class VoiceDspTest(unittest.TestCase):
         self.assertEqual(_spoken_text(leak), "哦。")
         self.assertEqual(_spoken_text(""), "")
 
+    def test_split_sentences_caps_and_keeps_text(self):
+        from tools.voice_dialog_probe import _split_sentences
+
+        self.assertEqual(_split_sentences(""), [])
+        self.assertEqual(_split_sentences("就吃泡面呗。"), ["就吃泡面呗。"])
+        text = "第一句。第二句！第三句？第四句。"
+        parts = _split_sentences(text, max_parts=3)
+        self.assertGreaterEqual(len(parts), 1)
+        self.assertLessEqual(len(parts), 3)
+        self.assertEqual("".join(parts), text)
+
 
 if __name__ == "__main__":
     unittest.main()

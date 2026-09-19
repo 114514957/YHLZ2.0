@@ -90,6 +90,37 @@ def _spoken_text(answer: str, limit: int = 200) -> str:
     return _sentence_cut(t, limit)
 
 
+def _split_sentences(text: str, max_parts: int = 3, min_len: int = 6) -> list[str]:
+    """Split spoken text into <=max_parts pieces at sentence ends (ledger 0434).
+
+    Lets synthesis/playback start on the first sentence while later sentences
+    are still being synthesized — Edge-TTS is the dominant, network-bound stage.
+    """
+    import re
+
+    t = str(text or "").strip()
+    if not t:
+        return []
+    parts = [p.strip() for p in re.split(r"(?<=[。！？!?…])", t) if p.strip()]
+    if len(parts) <= 1:
+        return [t]
+    out: list[str] = []
+    buf = ""
+    for p in parts:
+        buf += p
+        if len(buf) >= int(min_len):
+            out.append(buf)
+            buf = ""
+    if buf:
+        if len(out) < int(max_parts):
+            out.append(buf)
+        elif out:
+            out[-1] += buf
+    if len(out) > int(max_parts):
+        out = out[: int(max_parts) - 1] + ["".join(out[int(max_parts) - 1:])]
+    return out
+
+
 def _write_segment_wav(path: Path, frames: list, samplerate: int) -> bool:
     """float32 frames -> 16k mono PCM16 wav for llama.cpp ``input_audio``."""
     import numpy as np
@@ -428,13 +459,27 @@ def voice_dialog_once(
         result["tts_exit"] = tts.returncode
         result["tts_device"] = tts_device
         return result
-    wav, err = _tts_edge_wav(play_text, _CLIPS_DIR)
-    played = _play_wav(Path(wav)) if wav else False
+    # ledger 0434: sentence-level pipeline — start playing the first sentence
+    # while the rest are still being synthesized (Edge is the dominant stage).
+    pieces = _split_sentences(play_text, max_parts=3)
     result["tts_engine"] = "edge"
-    result["tts_wav"] = wav
+    result["tts_parts"] = len(pieces)
+    played = False
+    wav_last = ""
+    err = ""
+    t0 = time.perf_counter()
+    for i, piece in enumerate(pieces):
+        wav, err = _tts_edge_wav(piece, _CLIPS_DIR / "tts_parts" / str(i))
+        if not wav:
+            continue
+        wav_last = wav
+        if "tts_first_audio_ms" not in result:
+            result["tts_first_audio_ms"] = int((time.perf_counter() - t0) * 1000)
+        played = _play_wav(Path(wav)) or played
+    result["tts_wav"] = wav_last
     result["tts_played"] = played
     result["tts_exit"] = 0 if played else 1
-    if err and not wav:
+    if err and not wav_last:
         result["tts_error"] = err
     return result
 
