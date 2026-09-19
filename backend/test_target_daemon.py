@@ -45,6 +45,18 @@ class TestDaemon(unittest.TestCase):
         #  that the live model then imitated — ledger 0316)
         cls._sess_dir = _te.SESSIONS_DIR
         _te.SESSIONS_DIR = _pl.Path(_tf.mkdtemp()) / "sessions"
+        # B4 (ledger 0437): turns now check the schedule — isolate it so tests
+        # never mark_run / nudge against the real data/yuanheng_schedule.json
+        import backend.target_schedule as _ts
+
+        cls._sched_file, cls._sched_mirror = _ts.SCHED_FILE, _ts.MIRROR_FILE
+        _tmpd = _pl.Path(_tf.mkdtemp())
+        _ts.SCHED_FILE = _tmpd / "sched.json"
+        _ts.MIRROR_FILE = _tmpd / "plan.md"
+        from backend import notify_guard as _ng
+
+        cls._ng_state = _ng.STATE_FILE
+        _ng.STATE_FILE = _tmpd / "notify_guard.json"
         cls.rt = DaemonRuntime(session_factory=_factory)
         cls.srv = make_server(0, "127.0.0.1", cls.rt)
         import threading
@@ -56,8 +68,12 @@ class TestDaemon(unittest.TestCase):
     def tearDownClass(cls):
         cls.srv.shutdown()
         import backend.target_entry as _te
+        import backend.target_schedule as _ts
+        from backend import notify_guard as _ng
 
         _te.SESSIONS_DIR = cls._sess_dir
+        _ts.SCHED_FILE, _ts.MIRROR_FILE = cls._sched_file, cls._sched_mirror
+        _ng.STATE_FILE = cls._ng_state
 
     def _post(self, path, obj):
         req = urllib.request.Request(
@@ -86,6 +102,27 @@ class TestDaemon(unittest.TestCase):
         finally:
             s.status = orig
         self.assertEqual(h["status"], "ok")
+
+    def test_turn_triggers_idle_schedule_check(self):
+        """B4 (ledger 0437): a finished turn immediately checks due plans."""
+        calls = []
+        orig = self.rt._run_due_plans
+        self.rt._run_due_plans = lambda: calls.append(1)
+        try:
+            self._post("/turn", {"text": "B4触发"})
+        finally:
+            self.rt._run_due_plans = orig
+        self.assertGreaterEqual(len(calls), 1)
+
+    def test_run_due_plans_is_non_reentrant(self):
+        """B4: nested call (plan nudge -> turn -> check) must not deadlock."""
+        sched = self.rt._run_due_plans
+        got = self.rt._sched_lock.acquire(blocking=False)
+        self.assertTrue(got)
+        try:
+            sched()  # must return immediately while the lock is held
+        finally:
+            self.rt._sched_lock.release()
 
     def test_turn_default_private(self):
         out = self._post("/turn", {"text": "你好"})

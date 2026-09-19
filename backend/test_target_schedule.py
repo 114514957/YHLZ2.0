@@ -108,6 +108,42 @@ class ScheduleTest(unittest.TestCase):
         self.assertFalse(sc.in_backoff(p, t + 2))
         self.assertEqual(p["fail_count"], 0)
 
+    def test_jitter_ready(self):
+        """B1 (ledger 0437): deterministic 0-120s stagger per plan id."""
+        import hashlib
+
+        p = {"id": "plan_abc", "cadence": {"type": "daily", "time": "13:00"}}
+        jit = int(hashlib.sha1(b"plan_abc").hexdigest()[:4], 16) % 120
+        self.assertFalse(sc.jitter_ready(p, _st(2026, 9, 7, 12, 59, 6)))
+        # at exactly the target minute, only ready once the per-id offset passed
+        self.assertTrue(sc.jitter_ready(p, _st(2026, 9, 7, 13, 2, 0)))
+        if jit > 0:
+            self.assertFalse(sc.jitter_ready(p, _st(2026, 9, 7, 13, 0, 0)))
+        # catch-up (>2min late) is always ready
+        self.assertTrue(sc.jitter_ready(p, _st(2026, 9, 7, 15, 0, 0)))
+        self.assertTrue(sc.jitter_ready({"cadence": {}}, _st(2026, 9, 7, 1, 0, 0)))
+
+    def test_sort_due_priority(self):
+        """B3 (ledger 0437): higher priority runs first."""
+        plans = [
+            {"id": "a", "cadence": {"time": "09:00"}, "priority": 0},
+            {"id": "b", "cadence": {"time": "09:00"}, "priority": 5},
+            {"id": "c", "cadence": {"time": "08:00"}, "priority": -1},
+            {"id": "d", "cadence": {"time": "07:00"}},
+        ]
+        ordered = [p["id"] for p in sc.sort_due(plans)]
+        self.assertEqual(ordered, ["b", "d", "a", "c"])
+
+    def test_priority_add_and_update(self):
+        sc.add_plan("prio", "daily", "06:30", ["s"], priority=3)
+        pid = sc._load()[-1]["id"]
+        p = next(pp for pp in sc._load() if pp["id"] == pid)
+        self.assertEqual(p["priority"], 3)
+        sc.update_plan(pid, {"priority": 7})
+        p = next(pp for pp in sc._load() if pp["id"] == pid)
+        self.assertEqual(p["priority"], 7)
+        self.assertIn("优先级", sc.list_plans())
+
     def test_get_and_update(self):
         sc.add_plan("u1", "daily", "09:00", ["a"])
         pid = sc._load()[-1]["id"]

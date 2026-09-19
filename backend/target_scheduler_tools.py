@@ -953,9 +953,19 @@ def schedule_handle(action: str, name: str = "", time_: str = "",
         if not time_val:
             # last-chance: also try via fields_json
             pass
+        # B3 (ledger 0437): priority may ride along in fields_json
+        prio = 0
+        if fields_json:
+            try:
+                fj = _json.loads(fields_json)
+                if isinstance(fj, dict):
+                    prio = int(fj.get("priority") or 0)
+            except Exception:
+                prio = 0
         return add_plan(name, cadence or "daily", time_val, step_lines,
                         weekday=int(weekday) if str(weekday).isdigit() else None,
-                        day=int(day) if str(day).isdigit() else None)
+                        day=int(day) if str(day).isdigit() else None,
+                        priority=prio)
     if a in ("update", "edit", "modify"):
         f = {}
         if name: f["name"] = name

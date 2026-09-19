@@ -17,6 +17,7 @@ Entry schema:
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import time
@@ -69,7 +70,12 @@ def _write_mirror(plans: list[dict]) -> None:
         freq = {"daily": "每日", "weekly": f"每周{cd.get('weekday','?')}",
                 "monthly": f"每月{cd.get('day','?')}日"}.get(cd.get("type"), cd.get("type", "?"))
         state = "" if p.get("enabled", True) else "（已停用）"
-        lines.append(f"- **{p.get('name')}** {state}：{freq} {cd.get('time','')}")
+        try:
+            prio = int(p.get("priority") or 0)
+        except Exception:
+            prio = 0
+        ptag = f"（优先级{prio:+d}）" if prio else ""
+        lines.append(f"- **{p.get('name')}** {state}{ptag}：{freq} {cd.get('time','')}")
         for s in p.get("steps", []):
             lines.append(f"    · {s}")
         extra = ""
@@ -108,7 +114,8 @@ def _validate(time_: str, cadence_type: str, weekday, day) -> str | None:
 
 
 def add_plan(name: str, cadence_type: str, time_: str, steps: list[str],
-             weekday: int | None = None, day: int | None = None) -> str:
+             weekday: int | None = None, day: int | None = None,
+             priority: int = 0) -> str:
     name = str(name or "").strip()
     if not name or not steps or not str(steps[0]).strip():
         return "需要：name（计划名）、time（HH:MM）、steps（至少一步做什么）"
@@ -134,9 +141,14 @@ def add_plan(name: str, cadence_type: str, time_: str, steps: list[str],
         return (f"计划表已满（{MAX_PLANS} 条），未添加——请先删除或停用旧计划"
                 "（schedule.plan: delete/disable）。")
     iid = "plan_" + str(int(time.time() * 1000))
+    try:
+        prio = max(-9, min(9, int(priority or 0)))
+    except Exception:
+        prio = 0
     plans.append({"id": iid, "name": name, "cadence": cd,
                   "steps": [str(s).strip()[:300] for s in steps if str(s).strip()][:6],
-                  "enabled": True, "last_run": "", "created": time.time()})
+                  "enabled": True, "last_run": "", "created": time.time(),
+                  "priority": prio})
     _save(plans)
     return f"已加入计划表：{name}（{cd['type']} {cd['time']}）→ docs/元亨的计划表.md"
 
@@ -161,6 +173,11 @@ def update_plan(plan_id: str, fields: dict) -> str:
                 p["name"] = str(f["name"]).strip()[:80]
             if "enabled" in f:
                 p["enabled"] = bool(f["enabled"])
+            if "priority" in f:
+                try:
+                    p["priority"] = max(-9, min(9, int(f["priority"])))
+                except Exception:
+                    pass
             if "steps" in f and isinstance(f["steps"], list):
                 p["steps"] = [str(s).strip()[:300] for s in f["steps"] if str(s).strip()][:6]
                 # F4: editing the steps counts as a fix -> clear backoff so the
@@ -277,6 +294,38 @@ def in_backoff(plan: dict, now_ts: float) -> bool:
         return False
     last = float(plan.get("last_fail") or 0)
     return (float(now_ts) - last) < 86400.0
+
+
+def jitter_ready(plan: dict, now: time.struct_time) -> bool:
+    """B1 (ledger 0437): stagger plans sharing the same HH:MM.
+
+    Deterministic offset in [0,120)s derived from the plan id, so a batch of
+    same-minute plans does not nudge one LLM turn after another. Catch-up runs
+    (already >=2 min past target) are always ready."""
+    cd = plan.get("cadence", {}) or {}
+    hhmm = str(cd.get("time", "")).strip()
+    if len(hhmm) != 5:
+        return True
+    cur = now.tm_hour * 60 + now.tm_min
+    target = int(hhmm[:2]) * 60 + int(hhmm[3:5])
+    if cur < target:
+        return False
+    jit = int(hashlib.sha1(str(plan.get("id", "")).encode("utf-8"))
+              .hexdigest()[:4], 16) % 120
+    return (cur - target) * 60 + int(now.tm_sec) >= jit
+
+
+def sort_due(plans: list[dict]) -> list[dict]:
+    """B3 (ledger 0437): higher priority first, then by time, then by id."""
+    def _key(p: dict):
+        try:
+            prio = int(p.get("priority") or 0)
+        except Exception:
+            prio = 0
+        cd = p.get("cadence") or {}
+        return (-prio, str(cd.get("time", "")), str(p.get("id", "")))
+
+    return sorted(list(plans or []), key=_key)
 
 
 def mark_run(plan_id: str, now: time.struct_time) -> None:

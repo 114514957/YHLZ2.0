@@ -99,6 +99,9 @@ class DaemonRuntime:
         # (ledger 0209): Yuanheng designs its own recurring plans; the daemon
         # reads the schedule table and nudges when an entry is due.
         self._sched_checked = ""
+        # B4 (ledger 0437): serializes due-plan processing; non-blocking so a
+        # plan nudge (itself a turn) cannot deadlock the nested check.
+        self._sched_lock = threading.Lock()
         threading.Thread(target=self._schedule_loop, daemon=True).start()
         self._upkeep_last = ""
         threading.Thread(target=self._memory_upkeep_loop, daemon=True).start()
@@ -328,6 +331,8 @@ class DaemonRuntime:
                     notify_push(msg)
         except Exception:
             pass
+        # B4 (ledger 0437): idle right after a finished turn -> deliver due plans now
+        self._run_due_plans()
         return info
 
     # auto-consolidation: every N turns on the private channel run the persona
@@ -363,55 +368,69 @@ class DaemonRuntime:
             print(f"[auto-consolidate] skip: {type(exc).__name__}", flush=True)
 
     def _schedule_loop(self) -> None:
-        """Schedule-driven autonomy (ledger 0209): every 30s, if any recurring
-        plan in data/yuanheng_schedule.json is due now, nudge Yuanheng (private
-        channel) with the plan name + its self-written steps — it decides."""
-        import pathlib as _pl
+        """Schedule-driven autonomy (ledger 0209): 30s fallback tick.
 
-        sched_mod = None
+        B4 (ledger 0437): completed turns also call _run_due_plans() directly,
+        so a due plan is delivered at the first idle moment instead of waiting
+        for the next tick."""
         while True:
             time.sleep(30)
             try:
-                now = time.localtime()
-                if sched_mod is None:
-                    from backend import target_schedule as sched_mod
-                due = []
-                try:
-                    for plan in sched_mod._load():
-                        if not plan.get("enabled", True):
-                            continue
-                        if sched_mod.is_due(plan, now, plan.get("last_run", "")):
-                            due.append(plan)
-                except Exception as exc:
-                    print(f"[schedule] load err {type(exc).__name__}", flush=True)
-                    continue
-                for plan in due:
-                    try:
-                        # F4 (ledger 0436): a repeatedly failing plan backs off
-                        # (was: full LLM retry every 30s forever == "重复思考").
-                        if sched_mod.in_backoff(plan, time.time()):
-                            continue
-                        steps = plan.get("steps") or []
-                        body = (f"（计划表到点）你的例行计划：{plan.get('name')}。"
-                                f"{'步骤：' + '；'.join(steps[:3]) if steps else ''}"
-                                " 想做才做——需要我配合跑工具（如 summarize/consolidate/清理任务表）就说一声。")
-                        self.turn(body, "private")
-                        sched_mod.mark_run(plan.get("id", ""), now)
-                        print(f"[schedule] ran {plan.get('name')}", flush=True)
-                    except Exception as exc:
-                        err = type(exc).__name__
-                        fc = sched_mod.mark_fail(plan.get("id", ""), err)
-                        print(f"[schedule] run err {err} (fail #{fc})",
-                              flush=True)
-                        if fc == 3:
-                            msg = (f"计划「{plan.get('name')}」连续失败 3 次，"
-                                   f"已自动暂停 24 小时：{err}")
-                            if notify_guard.allow("schedule", msg,
-                                                  cooldown=12 * 3600,
-                                                  max_per_day=2):
-                                notify_push(msg)
+                self._run_due_plans()
             except Exception as exc:
                 print(f"[schedule] loop err {type(exc).__name__}", flush=True)
+
+    def _run_due_plans(self) -> None:
+        """Process due plans once (B1 jitter + B3 priority + F4 backoff).
+
+        Non-reentrant: a plan nudge is itself a turn(), whose trailing B4 call
+        re-enters here — the nested call must return immediately."""
+        if not self._sched_lock.acquire(blocking=False):
+            return
+        try:
+            now = time.localtime()
+            from backend import target_schedule as sched_mod
+
+            due = []
+            try:
+                for plan in sched_mod._load():
+                    if not plan.get("enabled", True):
+                        continue
+                    if not sched_mod.is_due(plan, now, plan.get("last_run", "")):
+                        continue
+                    if not sched_mod.jitter_ready(plan, now):
+                        continue
+                    due.append(plan)
+            except Exception as exc:
+                print(f"[schedule] load err {type(exc).__name__}", flush=True)
+                return
+            for plan in sched_mod.sort_due(due):
+                try:
+                    # F4 (ledger 0436): a repeatedly failing plan backs off
+                    # (was: full LLM retry every 30s forever == "重复思考").
+                    if sched_mod.in_backoff(plan, time.time()):
+                        continue
+                    steps = plan.get("steps") or []
+                    body = (f"（计划表到点）你的例行计划：{plan.get('name')}。"
+                            f"{'步骤：' + '；'.join(steps[:3]) if steps else ''}"
+                            " 想做才做——需要我配合跑工具（如 summarize/consolidate/清理任务表）就说一声。")
+                    self.turn(body, "private")
+                    sched_mod.mark_run(plan.get("id", ""), now)
+                    print(f"[schedule] ran {plan.get('name')}", flush=True)
+                except Exception as exc:
+                    err = type(exc).__name__
+                    fc = sched_mod.mark_fail(plan.get("id", ""), err)
+                    print(f"[schedule] run err {err} (fail #{fc})",
+                          flush=True)
+                    if fc == 3:
+                        msg = (f"计划「{plan.get('name')}」连续失败 3 次，"
+                               f"已自动暂停 24 小时：{err}")
+                        if notify_guard.allow("schedule", msg,
+                                              cooldown=12 * 3600,
+                                              max_per_day=2):
+                            notify_push(msg)
+        finally:
+            self._sched_lock.release()
 
     def _memory_upkeep_loop(self) -> None:
         """Weekly memory upkeep (ledger 0189/0301): belief time-decay + downgrades
@@ -505,6 +524,8 @@ class DaemonRuntime:
         except Exception:
             pass
         self._maybe_consolidate("console")
+        # B4 (ledger 0437): deliver due plans at the first idle moment
+        self._run_due_plans()
         return info
 
     def stream_chat(self, payload: dict, sink) -> str:
