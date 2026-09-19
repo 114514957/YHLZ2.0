@@ -127,6 +127,19 @@ class VoiceDspTest(unittest.TestCase):
         self.assertLessEqual(len(parts), 3)
         self.assertEqual("".join(parts), text)
 
+    @unittest.skipUnless(
+        (Path(__file__).resolve().parent.parent / "models" / "tts" / "piper-zh-huayan").exists(),
+        "local tts model not present")
+    def test_local_tts_synthesizes(self):
+        import soundfile as sf
+
+        from tools.voice_dialog_probe import _tts_local_wav
+
+        wav, err = _tts_local_wav("今晚吃啥都行。", Path(tempfile.mkdtemp()))
+        self.assertTrue(wav, err)
+        info = sf.info(wav)
+        self.assertGreaterEqual(info.duration, 0.5)
+
 
 if __name__ == "__main__":
     unittest.main()

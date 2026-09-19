@@ -24,8 +24,8 @@ def main() -> int:
     parser.add_argument("--engine", default="sherpa",
                         choices=["sherpa", "funasr", "audio"],
                         help="audio = 音频直入（不走 ASR，ledger 0408）")
-    parser.add_argument("--tts", default="edge", choices=["edge", "qwen"],
-                        help="edge = 零显存（推荐，ledger 0409）")
+    parser.add_argument("--tts", default="local", choices=["local", "edge", "qwen"],
+                        help="local = CPU 零显存 ~0.8s（推荐，ledger 0435）")
     parser.add_argument("--segment-dsp", dest="segment_dsp", default="agc+lim",
                         choices=["off", "lim", "agc+lim"],
                         help="语音段保存前的 AGC/限幅（ledger 0422）")

@@ -222,6 +222,96 @@ def _tts_edge_wav(text: str, out_dir: Path) -> tuple[str, str]:
     return "", err or "tts failed"
 
 
+# ---------------------------------------------------------------- local TTS
+_LOCAL_TTS_DIR = _PROJECT_ROOT / "models" / "tts" / "piper-zh-huayan"
+_LOCAL_TTS = None
+_LOCAL_TTS_LOCK = None
+
+
+def _ensure_espeak_ascii() -> str:
+    """espeak-ng rejects non-ASCII data dirs ('Illegal byte sequence'); copy
+    the bundled data to an ASCII temp path once (ledger 0435)."""
+    import shutil
+    import tempfile
+
+    src = _LOCAL_TTS_DIR / "espeak-ng-data"
+    if not src.exists():
+        return ""
+    dst = Path(tempfile.gettempdir()) / "yhlz_espeak"
+    if not (dst / "phontab").exists():
+        try:
+            if dst.exists():
+                shutil.rmtree(dst, ignore_errors=True)
+            shutil.copytree(src, dst)
+        except Exception:  # noqa: BLE001
+            return ""
+    return str(dst)
+
+
+def _tts_local_wav(text: str, out_dir: Path) -> tuple[str, str]:
+    """Local sherpa-onnx VITS/Piper synthesis: CPU, zero VRAM, ~0.8 s/sentence.
+
+    Default engine (ledger 0435): Edge measured 3.5-8.6 s network-bound while
+    this is ~0.8 s offline with intelligible output.
+    """
+    import threading
+
+    global _LOCAL_TTS, _LOCAL_TTS_LOCK
+    try:
+        import numpy as np
+        import sherpa_onnx
+        import soundfile as sf
+
+        if not _LOCAL_TTS_DIR.exists():
+            return "", "local tts model missing"
+        if _LOCAL_TTS_LOCK is None:
+            _LOCAL_TTS_LOCK = threading.Lock()
+        espeak = _ensure_espeak_ascii()
+        if espeak:
+            os.environ["ESPEAK_DATA_PATH"] = espeak
+        with _LOCAL_TTS_LOCK:
+            if _LOCAL_TTS is None:
+                onnx = next(_LOCAL_TTS_DIR.glob("*.onnx"), None)
+                tokens = _LOCAL_TTS_DIR / "tokens.txt"
+                if onnx is None or not tokens.exists():
+                    return "", "local tts model incomplete"
+                cfg = sherpa_onnx.OfflineTtsConfig(
+                    model=sherpa_onnx.OfflineTtsModelConfig(
+                        vits=sherpa_onnx.OfflineTtsVitsModelConfig(
+                            model=str(onnx), tokens=str(tokens),
+                            data_dir=espeak),
+                        num_threads=2,
+                    ),
+                    max_num_sentences=1,
+                )
+                _LOCAL_TTS = sherpa_onnx.OfflineTts(cfg)
+            audio = _LOCAL_TTS.generate(str(text), sid=0, speed=1.0)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        wav = out_dir / "reply.wav"
+        sf.write(str(wav), np.asarray(audio.samples, dtype="float32"),
+                 int(audio.sample_rate), subtype="PCM_16")
+        _condition_tts_wav(wav)
+        return str(wav), ""
+    except Exception as exc:  # noqa: BLE001
+        return "", f"local tts {type(exc).__name__}: {str(exc)[:120]}"
+
+
+def _tts_engine_wav(text: str, out_dir: Path, engine: str) -> tuple[str, str, str]:
+    """Dispatch with a local -> edge (-> SAPI) fallback chain."""
+    eng = str(engine or "local").lower()
+    if eng == "local":
+        wav, _err = _tts_local_wav(text, out_dir)
+        if wav:
+            return wav, "", "local"
+        eng = "edge"
+    if eng == "edge":
+        wav, err = _tts_edge_wav(text, out_dir)
+        if wav:
+            return wav, "", "edge"
+        return "", err, "edge"
+    return "", f"unknown tts engine: {engine}", eng
+
+
 def _play_wav(path: Path) -> bool:
     """Play via winmm MCI (ledger 0156: sounddevice swallows the tail)."""
     import ctypes
@@ -245,7 +335,7 @@ def voice_dialog_once(
     print_text: bool = False,
     cap_gain: float = 6.0,
     engine: str = "sherpa",
-    tts_engine: str = "edge",
+    tts_engine: str = "local",
     device: int | None = None,
     min_speech_blocks: int = 3,
     noise_ratio: float = 3.0,
@@ -460,22 +550,26 @@ def voice_dialog_once(
         result["tts_device"] = tts_device
         return result
     # ledger 0434: sentence-level pipeline — start playing the first sentence
-    # while the rest are still being synthesized (Edge is the dominant stage).
+    # while the rest are still being synthesized (TTS was the bottleneck).
     pieces = _split_sentences(play_text, max_parts=3)
-    result["tts_engine"] = "edge"
     result["tts_parts"] = len(pieces)
     played = False
     wav_last = ""
     err = ""
+    used = str(tts_engine).lower()
     t0 = time.perf_counter()
     for i, piece in enumerate(pieces):
-        wav, err = _tts_edge_wav(piece, _CLIPS_DIR / "tts_parts" / str(i))
+        wav, e, eng = _tts_engine_wav(piece, _CLIPS_DIR / "tts_parts" / str(i),
+                                      tts_engine)
+        used = eng
         if not wav:
+            err = e
             continue
         wav_last = wav
         if "tts_first_audio_ms" not in result:
             result["tts_first_audio_ms"] = int((time.perf_counter() - t0) * 1000)
         played = _play_wav(Path(wav)) or played
+    result["tts_engine"] = used
     result["tts_wav"] = wav_last
     result["tts_played"] = played
     result["tts_exit"] = 0 if played else 1
@@ -495,8 +589,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="one voice dialog turn")
     ap.add_argument("--engine", default="sherpa",
                     choices=["sherpa", "funasr", "audio"])
-    ap.add_argument("--tts", default="edge", choices=["edge", "qwen"],
-                    help="edge = 零显存（推荐，与 llama-server 共存）")
+    ap.add_argument("--tts", default="local", choices=["local", "edge", "qwen"],
+                    help="local = CPU 零显存 ~0.8s（推荐，ledger 0435）")
     ap.add_argument("--cap-gain", type=float, default=1.0)
     ap.add_argument("--duration-s", type=float, default=12.0)
     ap.add_argument("--device", type=int, default=None,

@@ -142,12 +142,22 @@ def main() -> int:
               f"llm_text={llm_text_ms[-1]:.0f}ms llm_audio={llm_audio_ms[-1]:.0f}ms",
               flush=True)
 
-    # shared TTS stage
-    from tools.voice_dialog_probe import _tts_edge_wav
+    # shared TTS stage: local (sherpa CPU) vs edge (online)
+    from tools.voice_dialog_probe import _tts_edge_wav, _tts_local_wav
 
+    TTS_TEXT = "今晚吃啥都行，你定。"
     t0 = time.perf_counter()
-    tts_path, err = _tts_edge_wav("今晚吃啥都行，你定。", _ROOT / "cache" / "voice_clips")
-    tts_ms = (time.perf_counter() - t0) * 1000
+    local_wav, local_err = _tts_local_wav(TTS_TEXT, _ROOT / "cache" / "voice_clips" / "bench_local")
+    local_cold_ms = (time.perf_counter() - t0) * 1000
+    warm_times = []
+    for _ in range(2):
+        t0 = time.perf_counter()
+        _tts_local_wav(TTS_TEXT, _ROOT / "cache" / "voice_clips" / "bench_local")
+        warm_times.append((time.perf_counter() - t0) * 1000)
+    local_ms = sum(warm_times) / len(warm_times)
+    t0 = time.perf_counter()
+    edge_wav, edge_err = _tts_edge_wav(TTS_TEXT, _ROOT / "cache" / "voice_clips" / "bench_edge")
+    edge_ms = (time.perf_counter() - t0) * 1000
 
     avg = lambda xs: sum(xs) / len(xs)  # noqa: E731
     print("\n=== voice latency profile (avg of %d, same clip) ===" % a.runs)
@@ -155,11 +165,15 @@ def main() -> int:
     print(f"B  ASR (sherpa, local)  : {avg(asr_ms):.0f} ms   ttft n/a")
     print(f"B  LLM text             : {avg(llm_text_ms):.0f} ms   ttft {avg(ttft_text):.0f} ms")
     print(f"A  LLM audio-direct     : {avg(llm_audio_ms):.0f} ms   ttft {avg(ttft_audio):.0f} ms")
-    print(f"   TTS (edge, shared)   : {tts_ms:.0f} ms -> {tts_path or err}")
-    print(f"B total(crit) = ASR+LLM_text+TTS : "
-          f"{avg(asr_ms) + avg(llm_text_ms) + tts_ms:.0f} ms")
-    print(f"A total(crit) = LLM_audio+TTS    : "
-          f"{avg(llm_audio_ms) + tts_ms:.0f} ms")
+    print(f"   TTS local (sherpa)   : warm {local_ms:.0f} ms / cold {local_cold_ms:.0f} ms"
+          f" -> {local_wav or local_err}")
+    print(f"   TTS edge (online)    : {edge_ms:.0f} ms -> {edge_wav or edge_err}")
+    print(f"B total(crit) ASR+LLM_text+local : "
+          f"{avg(asr_ms) + avg(llm_text_ms) + local_ms:.0f} ms")
+    print(f"A total(crit) LLM_audio+local    : "
+          f"{avg(llm_audio_ms) + local_ms:.0f} ms")
+    print(f"A total(crit) LLM_audio+edge     : "
+          f"{avg(llm_audio_ms) + edge_ms:.0f} ms")
     print(f"transcript: {transcript!r}")
     provider.stop("done")
     return 0
