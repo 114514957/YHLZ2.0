@@ -85,13 +85,35 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
 
   let model = null;
   let hit = null; // {w,h,a:Uint8ClampedArray} alpha mask grid
+  let currentRel = '';   // currently displayed model (rel path)
+  let loadSeq = 0;       // race guard: only the latest switch may commit
 
+  function syncSelects() {
+    for (const id of ['modelSel', 'pSel']) {
+      const el = document.getElementById(id);
+      if (el && currentRel) el.value = currentRel;
+    }
+  }
+
+  // v1.1 fix (ledger 0447): load the new model FIRST and only then swap out
+  // the old one — a failed/interrupted switch keeps the current avatar (the
+  // old code destroyed it before loading, so any failure blanked the pet).
   async function loadModel(rel) {
-    if (model) { app.stage.removeChild(model); try { model.destroy(true); } catch (e) {} }
+    const token = ++loadSeq;
     const url = '/live2d-models/' + rel.split('/').map(encodeURIComponent).join('/');
     log('加载 ' + rel);
-    model = await LM.from(url);
+    let next;
+    try {
+      next = await LM.from(url);
+    } catch (e) {
+      if (token === loadSeq) log('换模型失败，保留当前形象：' + rel);
+      throw e;
+    }
+    if (token !== loadSeq) { try { next.destroy(true); } catch (e) {} return null; }
+    const old = model;
+    model = next;
     app.stage.addChild(model);
+    if (old) { app.stage.removeChild(old); try { old.destroy(true); } catch (e) {} }
     model.anchor.set(0.5, 0.5);
     const s = isPet
       ? Math.min(app.screen.width * 0.5 / model.width, app.screen.height * 0.6 / model.height)
@@ -100,8 +122,12 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
     model.__baseS = s;
     model.x = app.screen.width * (isPet ? 0.78 : 0.5);
     model.y = app.screen.height * (isPet ? 0.72 : 0.55);
+    currentRel = rel;
+    try { localStorage.setItem('yhlz.avatar.model', rel); } catch (e) {}
     log('模型就绪 ' + rel);
     setTimeout(buildHit, 120);
+    syncSelects();
+    return rel;
     // no mouse interactions on the pet: switching/chatting lives in the tray.
   }
 
@@ -246,27 +272,32 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
   document.getElementById('pSend').onclick = pSend;
   pIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pSend(); } });
 
-  const enc = (s) => encodeURIComponent(s);
   try {
     const ml = await (await fetch('/avatar-models')).json();
     const items = ml.items || [];
     const sel = document.getElementById('modelSel');
     const pSel = document.getElementById('pSel');
-    const fill = (selEl, value) => {
+    const fill = (selEl) => {
       if (!selEl) return;
+      while (selEl.firstChild) selEl.removeChild(selEl.firstChild);
       for (const it of items) {
         const o = document.createElement('option');
         o.value = it.rel; o.textContent = it.name;
-        if (it.rel === value) o.selected = true;
         selEl.appendChild(o);
       }
     };
-    await loadModel((sel.value) || (items[0] && items[0].rel) || 'YH3/seethrough_output.model3.json');
-    fill(sel, model && null);
-    fill(pSel, null);
-    const doSwitch = (rel) => loadModel(rel).catch(e => log('换模型错误 ' + (e && e.message || e)));
-    sel.onchange = () => { if (sel.value) doSwitch(sel.value); };
-    pSel.onchange = () => { if (pSel.value) doSwitch(pSel.value); };
+    fill(sel); fill(pSel);
+    const doSwitch = (rel) => loadModel(rel).catch(e => {
+      log('换模型错误 ' + (e && e.message || e));
+      syncSelects();  // show the model that is actually still on stage
+    });
+    sel.onchange = () => { if (sel.value && sel.value !== currentRel) doSwitch(sel.value); };
+    pSel.onchange = () => { if (pSel.value && pSel.value !== currentRel) doSwitch(pSel.value); };
+    let saved = '';
+    try { saved = localStorage.getItem('yhlz.avatar.model') || ''; } catch (e) {}
+    const known = items.some((it) => it.rel === saved);
+    await doSwitch((known && saved) || (items[0] && items[0].rel)
+                   || 'YH3/seethrough_output.model3.json');
   } catch (e) { log('列表/加载错误 ' + (e && e.message || e)); }
 
   // avatar stage from workbench (mouth on speaking etc.)
@@ -364,7 +395,8 @@ function log(t){ dbg.textContent += '\n' + t; dbg.scrollTop = dbg.scrollHeight; 
   setInterval(() => {
     if (pDown && performance.now() - lastMove > 160) { pDown = null; if (window.pet) window.pet.mouseThrough(true); }
   }, 400);
-  window.__petSwitchModel = (rel) => loadModel(rel);
+  window.__petSwitchModel = (rel) => loadModel(rel)
+    .catch(e => log('换模型错误 ' + (e && e.message || e)));
   window._model = () => model;
   log('就绪：托盘 隐藏/拖动/锁定/切形象/对话');
 })().catch(e => log('错误: ' + (e && e.message || e)));
