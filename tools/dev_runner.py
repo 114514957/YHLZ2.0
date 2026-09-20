@@ -44,11 +44,33 @@ WORKDIR = pathlib.Path(os.getenv("YHLZ_DEV_WORKDIR", str(_ROOT))).resolve()
 DSH_WORKER_URL = os.getenv("YHLZ_DSH_WORKER", "http://127.0.0.1:8347")
 DSH_PY = pathlib.Path(os.getenv(
     "YHLZ_DSH_PYTHON", str(_ROOT / "venv-dsh" / "Scripts" / "python.exe")))
+# A1 gray switch (ledger 0450): a persistent backend choice any process can
+# flip at runtime — env wins, then this file, then the safe default.
+BACKEND_FILE = _ROOT / "cache" / "dev" / "backend.txt"
 
 
 def _backend() -> str:
-    b = os.getenv("YHLZ_DEV_BACKEND", "opencode").strip().lower()
+    b = os.getenv("YHLZ_DEV_BACKEND", "").strip().lower()
+    if b not in ("opencode", "dsh"):
+        try:
+            b = BACKEND_FILE.read_text(encoding="utf-8").strip().lower()
+        except Exception:
+            b = ""
     return b if b in ("opencode", "dsh") else "opencode"
+
+
+def set_backend(name: str) -> str:
+    """Persist the backend choice (used by #backend on QQ / dev console)."""
+    b = str(name or "").strip().lower()
+    if b not in ("opencode", "dsh"):
+        return f"用法：#backend opencode|dsh（当前：{_backend()}）"
+    BACKEND_FILE.parent.mkdir(parents=True, exist_ok=True)
+    BACKEND_FILE.write_text(b + "\n", encoding="utf-8")
+    return f"[利贞] 后端已切换为 {b}（回滚同命令）"
+
+
+def backend_status() -> str:
+    return f"[利贞] 当前后端：{_backend()}（#backend opencode|dsh 切换）"
 
 
 def _post_worker(path: str, obj: dict, timeout: float = 30.0) -> dict:

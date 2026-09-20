@@ -34,6 +34,34 @@ class DevBridgeTest(unittest.TestCase):
         self.assertEqual(handle_dev_command("#a"), "用法：#a <给利贞的答复>")
         self.assertIn("不提交", handle_dev_command("#n"))
 
+    def test_backend_command(self):
+        """A1 gray switch (ledger 0450): #backend status/switch via dev console."""
+        import os
+        import pathlib
+        import sys
+        import tempfile
+
+        root = pathlib.Path(__file__).resolve().parent.parent
+        if str(root / "tools") not in sys.path:
+            sys.path.insert(0, str(root / "tools"))
+        import dev_runner as dr
+
+        from backend.target_dev_bridge import handle_dev_command
+
+        old = dr.BACKEND_FILE
+        old_env = os.environ.pop("YHLZ_DEV_BACKEND", None)
+        dr.BACKEND_FILE = pathlib.Path(tempfile.mkdtemp()) / "backend.txt"
+        try:
+            self.assertIn("opencode", handle_dev_command("#backend"))
+            self.assertIn("dsh", handle_dev_command("#backend dsh"))
+            self.assertEqual(dr._backend(), "dsh")
+            self.assertIn("opencode", handle_dev_command("#be opencode"))
+            self.assertEqual(dr._backend(), "opencode")
+        finally:
+            dr.BACKEND_FILE = old
+            if old_env is not None:
+                os.environ["YHLZ_DEV_BACKEND"] = old_env
+
 
 if __name__ == "__main__":
     unittest.main()

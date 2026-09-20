@@ -65,6 +65,11 @@ def _harness_get():
                 cwd=_worker_cfg["workdir"],
                 dsh_home=_worker_cfg["dsh_home"],
                 profile="sdk-minimal",
+                # A1 hardening (ledger 0450): never inherit a wider sandbox —
+                # production gray runs as workspace-write unless explicitly
+                # overridden via YHLZ_DSH_PERMISSION_MODE.
+                env={"DSH_PERMISSION_MODE": os.getenv(
+                    "YHLZ_DSH_PERMISSION_MODE", "workspace-write")},
             )
             _harness.start()
             _log(f"harness started model={_worker_cfg['model']} "

@@ -468,6 +468,16 @@ class QQBridge:
             self._spawn(ws, params,
                         lambda: ("info", dev_runner.push().get("text") or "已推送"),
                         hint=False)
+        elif low in ("#backend", "#be") or low.startswith(("#backend ", "#be ")):
+            arg = low
+            for pfx in ("#backend", "#be"):
+                if arg.startswith(pfx):
+                    arg = arg[len(pfx):].strip()
+                    break
+            if arg:
+                await self._say(ws, params, dev_runner.set_backend(arg))
+            else:
+                await self._say(ws, params, dev_runner.backend_status())
         elif low == "#dev" or low.startswith("#dev "):
             task = low[4:].strip()
             if not task:
@@ -511,6 +521,7 @@ class QQBridge:
         else:
             await self._say(ws, params,
                             "未知指令：#dev <任务> / #y / #n / #push / #devstatus / "
+                            "#backend opencode|dsh / "
                             "#voice on|off / #say <文字> / #img <路径> / #file <路径> / #face <id>")
 
     async def _resolve_image(self, seg) -> str:

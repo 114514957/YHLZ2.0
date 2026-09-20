@@ -106,13 +106,28 @@ def dev_status_text() -> str:
             f"最近：{str(d.get('text', ''))[:120]}")
 
 
+def backend_status_text() -> str:
+    try:
+        return _dev_runner().backend_status()
+    except Exception as exc:  # noqa: BLE001
+        return f"[利贞] 后端读取失败：{type(exc).__name__}"
+
+
 def handle_dev_command(text: str) -> str | None:
-    """Owner-side dev console commands (#dev/#a/#ds/#y/#n/#push).
+    """Owner-side dev console commands (#dev/#a/#ds/#y/#n/#push/#backend).
 
     Returns the reply text, or None when the text is not a dev command.
     """
     low = str(text or "").strip().lower()
     stripped = str(text or "").strip()
+    if low in ("#backend", "#be"):
+        return backend_status_text()
+    for prefix in ("#backend", "#be"):
+        if stripped.startswith(prefix + " "):
+            try:
+                return _dev_runner().set_backend(stripped[len(prefix):])
+            except Exception as exc:  # noqa: BLE001
+                return f"[利贞] 后端切换失败：{type(exc).__name__}"
     if low in ("#devstatus", "#ds"):
         return dev_status_text()
     if low in ("#y", "#commit"):

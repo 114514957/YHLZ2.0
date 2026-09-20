@@ -58,10 +58,14 @@ class DevRunnerBackendTest(unittest.TestCase):
         cls.dr = importlib.reload(importlib.import_module("dev_runner"))
         cls._state = cls.dr.STATE
         cls.dr.STATE = cls.tmp / "state.json"
+        # isolate the A1 gray-switch file too (the repo may be switched to dsh)
+        cls._backend_file = cls.dr.BACKEND_FILE
+        cls.dr.BACKEND_FILE = cls.tmp / "backend.txt"
 
     @classmethod
     def tearDownClass(cls):
         cls.dr.STATE = cls._state
+        cls.dr.BACKEND_FILE = cls._backend_file
         cls.srv.shutdown()
 
     def setUp(self):
@@ -93,6 +97,27 @@ class DevRunnerBackendTest(unittest.TestCase):
             os.environ.pop("YHLZ_DEV_BACKEND", None)
         self.assertEqual([c[0] for c in _FakeWorker.calls], ["/answer"])
         self.assertEqual(_FakeWorker.calls[0][1].get("text"), "用方案 A")
+
+    def test_backend_file_precedence(self):
+        """A1 (ledger 0450): env > backend.txt > opencode default."""
+        import pathlib
+        import tempfile
+
+        old = self.dr.BACKEND_FILE
+        self.dr.BACKEND_FILE = pathlib.Path(tempfile.mkdtemp()) / "backend.txt"
+        os.environ.pop("YHLZ_DEV_BACKEND", None)
+        try:
+            self.assertEqual(self.dr._backend(), "opencode")
+            self.assertIn("dsh", self.dr.set_backend("dsh"))
+            self.assertEqual(self.dr._backend(), "dsh")
+            os.environ["YHLZ_DEV_BACKEND"] = "opencode"
+            self.assertEqual(self.dr._backend(), "opencode")  # env wins
+        finally:
+            os.environ.pop("YHLZ_DEV_BACKEND", None)
+            self.dr.BACKEND_FILE = old
+
+    def test_set_backend_rejects_bad(self):
+        self.assertIn("用法", self.dr.set_backend("bogus"))
 
     def test_dsh_start_fails_when_worker_down_and_venv_missing(self):
         os.environ["YHLZ_DEV_BACKEND"] = "dsh"
