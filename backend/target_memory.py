@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
+import math
 import re
 import sqlite3
 import threading
@@ -1180,13 +1181,16 @@ class TargetMemoryService:
         return {"checked": len(rows), "flagged": flagged,
                 "downgraded": downgraded}
 
-    def recall(self, query: str, limit: int = 5, as_of: float = 0.0) -> list[dict]:
+    def recall(self, query: str, limit: int = 5, as_of: float = 0.0,
+               spread: bool = True) -> list[dict]:
         """Tool-type recall; never auto-injected.
 
         Ledger 0148: keyword-index (mini inverted catalog) is the primary
         ranking path; the SQLite FTS5/LIKE path is retained as fallback when
         the index is broken/missing (recall never hard-fails).
         TCM v1 (ledger 0438): `as_of` = time-travel read (valid at that ts).
+        Ledger 0441: `spread` appends PPR spreading-activation memories when
+        literal hits are thin; multiplicative scoring runs in shadow mode.
         """
         q = str(query or "").strip()
         if not q:
@@ -1194,13 +1198,113 @@ class TargetMemoryService:
         ranked = self._recall_via_kw(q, int(limit))
         if ranked is not None:
             if as_of:
-                return self._filter_as_of(ranked, float(as_of))
-            return self._filter_current(ranked)
-        sql = self._recall_via_sqlite(q, int(limit))
-        self._boost_recalled(sql)
+                out = self._filter_as_of(ranked, float(as_of))
+            else:
+                out = self._filter_current(ranked)
+        else:
+            sql = self._recall_via_sqlite(q, int(limit))
+            self._boost_recalled(sql)
+            if as_of:
+                out = self._filter_as_of(sql, float(as_of))
+            else:
+                out = self._filter_current(sql)
         if as_of:
-            return self._filter_as_of(sql, float(as_of))
-        return self._filter_current(sql)
+            return out
+        if spread and len(out) < int(limit):
+            out = out + self._spread_hits(
+                q, int(limit) - len(out),
+                exclude={str(it.get("id", "")) for it in out})
+        if len(out) >= 2:
+            self._shadow_record(q, out)
+        return out
+
+    def _spread_hits(self, query: str, need: int, exclude: set) -> list[dict]:
+        """Ledger 0441: PPR spreading activation into tool recall — when the
+        literal hits are thin, append memories mentioning activated neighbour
+        entities (marked `via='spread'`). Never raises."""
+        if need <= 0:
+            return []
+        try:
+            from backend import associations as asc
+            from backend import entity_graph as eg
+
+            seeds = eg._entities_in(query, limit=3)
+            if not seeds:
+                return []
+            activated = asc.activate(seeds, top_k=6)
+        except Exception:
+            return []
+        out: list[dict] = []
+        seen = set(exclude)
+        for name, _score in activated:
+            if len(out) >= need:
+                break
+            try:
+                con = sqlite3.connect(str(self.db_path))
+                try:
+                    rows = con.execute(
+                        "SELECT id,tier,type,importance,status,evidence_ref,"
+                        "summary,stance FROM l2_items"
+                        " WHERE status!='archive' AND COALESCE(invalid_at,0)=0"
+                        " AND (summary LIKE ? OR keywords LIKE ?)"
+                        " ORDER BY importance DESC LIMIT 3",
+                        (f"%{name}%", f"%{name}%")).fetchall()
+                finally:
+                    con.close()
+            except Exception:
+                continue
+            for r in rows:
+                if r[0] in seen:
+                    continue
+                seen.add(r[0])
+                out.append({"id": r[0], "tier": r[1], "type": r[2],
+                            "importance": r[3], "status": r[4],
+                            "evidence_ref": r[5], "summary": r[6],
+                            "stance": r[7], "via": "spread"})
+                if len(out) >= need:
+                    break
+        return out
+
+    def _shadow_record(self, query: str, items: list[dict]) -> None:
+        """Ledger 0441 multiplicative-scoring shadow mode: log the ordering of
+        relevance x connectivity x reactivation next to the live ordering.
+        Writes cache/../memory_shadow.jsonl; never changes the output."""
+        try:
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                deg: dict = {}
+                last: dict = {}
+                for it in items:
+                    iid = str(it.get("id", ""))
+                    row = con.execute(
+                        "SELECT COALESCE(access_count,0),COALESCE(last_accessed,0)"
+                        " FROM l2_items WHERE id=?", (iid,)).fetchone()
+                    d = con.execute(
+                        "SELECT COUNT(*) FROM causal_edges WHERE status='active'"
+                        " AND (src_id=? OR dst_id=?)", (iid, iid)).fetchone()[0]
+                    deg[iid] = int(d or 0)
+                    last[iid] = float(row[1] or 0) if row else 0.0
+            finally:
+                con.close()
+            now = time.time()
+            scored = []
+            for pos, it in enumerate(items):
+                iid = str(it.get("id", ""))
+                relevance = 1.0 / (1.0 + pos)
+                connectivity = 1.0 + 0.3 * math.log(1 + deg.get(iid, 0))
+                dt = max(0.0, now - (last.get(iid, 0.0) or now))
+                reactivation = math.exp(-dt / (7 * 86400.0))
+                scored.append((relevance * connectivity * reactivation, iid))
+            scored.sort(key=lambda x: -x[0])
+            base_ids = [str(it.get("id", "")) for it in items]
+            shadow_ids = [iid for _, iid in scored]
+            rec = {"ts": now, "q": str(query)[:60], "base": base_ids,
+                   "shadow": shadow_ids, "changed": shadow_ids != base_ids}
+            path = self.db_path.parent / "memory_shadow.jsonl"
+            with path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     def _filter_current(self, items: list[dict]) -> list[dict]:
         """M1 semantics (ledger 0438): default reads see the CURRENT state —

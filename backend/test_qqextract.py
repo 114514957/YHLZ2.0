@@ -87,6 +87,22 @@ class QqextractTest(unittest.TestCase):
         self.assertIn("ollama", rows[0][2])
         self.assertIn("qq:g1:t123", rows[0][3])
 
+    def test_store_items_records_episode(self):
+        """Ledger 0441: QQ knowledge also lands as a raw episode (provenance)."""
+        from backend.target_kw_index import KeywordIndex
+        from backend.target_memory import TargetMemoryService
+
+        svc = TargetMemoryService(db_path=self.tmp / "m.db",
+                                  kw_index=KeywordIndex(self.tmp / "kw.db"))
+        n = qqextract.store_items(
+            [{"point": "记忆召回要用联想扩散", "quote": "q", "cat": "method"}],
+            group_id="1", ts=123, episode_svc=svc)
+        self.assertEqual(n, 1)
+        eps = svc.list_episodes(channel="qq:1")
+        self.assertEqual(len(eps), 1)
+        self.assertIn("联想扩散", eps[0]["summary"])
+        self.assertEqual(eps[0]["source"], "群聊")
+
     def test_digest(self):
         llm = FakeLLM(json.dumps({"items": [{"point": "知识摘要要点A的内容详细说明", "quote": "q", "cat": "tech"}]}, ensure_ascii=False))
         refined = asyncio.run(qqextract.extract([{"group_id": "1", "text": "x" * 100}], llm))

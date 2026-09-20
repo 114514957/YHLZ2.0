@@ -12,6 +12,7 @@ import pathlib
 import re
 import sys
 import time
+from typing import Any
 
 BASE = pathlib.Path(__file__).resolve().parent.parent
 CAND_DIR = BASE / "cache" / "qqwatch"
@@ -97,11 +98,28 @@ async def extract(items: list[dict], llm_turn) -> list[dict]:
 
 
 def store_items(items: list[dict], *, group_id: str = "", ts: int = 0,
-                db_path: pathlib.Path | None = None) -> int:
+                db_path: pathlib.Path | None = None,
+                episode_svc: Any = None) -> int:
     """Persist refined points into the Yuanheng KB (ledger 0179: knowledge
-    lives in the KB, not in the persona memory pool). Returns stored count."""
+    lives in the KB, not in the persona memory pool). Returns stored count.
+
+    Ledger 0441: each stored point also records an episode (raw provenance:
+    group/ts + quote) unless episodes are disabled via YHLZ_QQ_EPISODES=0.
+    """
+    import os
+
     from backend.yuanheng_kb import kb_add
 
+    svc = episode_svc
+    if svc is None and os.getenv("YHLZ_QQ_EPISODES", "1") != "0":
+        try:
+            from backend.target_memory import TargetMemoryService
+
+            # follow the pipeline's own store (tests patch L2_DB; production
+            # L2_DB is the real memstore) — never silently hit the default db
+            svc = TargetMemoryService(db_path=db_path or L2_DB)
+        except Exception:
+            svc = None
     n = 0
     for it in items:
         cat = str(it.get("cat", "tech")) if it.get("cat") in ("tech", "method") else "tech"
@@ -114,6 +132,16 @@ def store_items(items: list[dict], *, group_id: str = "", ts: int = 0,
         )
         if res.startswith("已入库"):
             n += 1
+            if svc is not None:
+                try:
+                    svc.add_episode(
+                        channel=f"qq:{group_id}", kind="knowledge",
+                        source="群聊", raw_ref=f"qq:g{group_id}:t{ts}",
+                        summary=str(it.get("point", "")),
+                        meta={"quote": str(it.get("quote", ""))},
+                        ts=float(ts or 0) or 0.0)
+                except Exception:
+                    pass
     return n
 
 

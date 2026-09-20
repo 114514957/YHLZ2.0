@@ -1,4 +1,5 @@
 """TCM v1 tests (ledger 0438): A1 stance, episodes, causal gate, why, as-of."""
+import json
 import sqlite3
 import tempfile
 import time
@@ -208,6 +209,32 @@ class TCMTest(unittest.TestCase):
         self.svc.store_item(_it("n1", "今天天气不错", source="老爹"))
         self.svc.store_item(_it("n2", "服务器重启了", source="老爹"))
         self.assertEqual(self.svc.causal_list(), [])
+
+    # ---------- ledger 0441: shadow scoring + spreading ----------
+    def test_shadow_scoring_logs_ordering(self):
+        self.svc.store_item(_it("w1", "量子计算讨论一", source="老爹"))
+        self.svc.store_item(_it("w2", "量子计算讨论二", source="老爹"))
+        hits = self.svc.recall("量子计算")
+        self.assertGreaterEqual(len(hits), 2)
+        p = self.tmp / "memory_shadow.jsonl"
+        self.assertTrue(p.exists())
+        rec = json.loads(p.read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(len(rec["base"]), len(rec["shadow"]))
+        self.assertIn("changed", rec)
+
+    def test_spread_hits_from_entity_graph(self):
+        from backend import entity_graph as eg
+
+        old = eg.DB_PATH
+        eg.DB_PATH = self.tmp / "eg.db"
+        try:
+            eg.upsert([{"subject": "量子计算", "relation": "相关",
+                        "object": "薛定谔猫"}])
+            self.svc.store_item(_it("sp1", "薛定谔猫实验记录", source="老爹"))
+            hits = self.svc.recall("量子计算")
+            self.assertTrue(any(h.get("via") == "spread" for h in hits), hits)
+        finally:
+            eg.DB_PATH = old
 
     # ---------- health ----------
     def test_health_counts(self):
