@@ -84,3 +84,6 @@ config/qqwatch.local.json
 
 # 训练环境（试错用）
 venv-train/
+
+# dsh SDK venv (v1.1)
+venv-dsh/

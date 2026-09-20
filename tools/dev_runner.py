@@ -29,6 +29,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.request
 
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
 STATE = _ROOT / "cache" / "dev" / "state.json"
@@ -36,6 +37,58 @@ LOG = _ROOT / "cache" / "dev" / "opencode.log"
 MODEL = os.getenv("YHLZ_DEV_MODEL", "deepseek/deepseek-v4-flash")
 AGENT = os.getenv("YHLZ_DEV_AGENT", "yhlz-dev")
 TIMEOUT = float(os.getenv("YHLZ_DEV_TIMEOUT", "1800"))
+# v1.1 (ledger 0446): dual-track backend — "opencode" (default, safe) or "dsh"
+# (persistent SDK worker, see tools/dsh_worker.py). Workspace is overridable so
+# evaluation can run in a sandbox without touching the live repo.
+WORKDIR = pathlib.Path(os.getenv("YHLZ_DEV_WORKDIR", str(_ROOT))).resolve()
+DSH_WORKER_URL = os.getenv("YHLZ_DSH_WORKER", "http://127.0.0.1:8347")
+DSH_PY = pathlib.Path(os.getenv(
+    "YHLZ_DSH_PYTHON", str(_ROOT / "venv-dsh" / "Scripts" / "python.exe")))
+
+
+def _backend() -> str:
+    b = os.getenv("YHLZ_DEV_BACKEND", "opencode").strip().lower()
+    return b if b in ("opencode", "dsh") else "opencode"
+
+
+def _post_worker(path: str, obj: dict, timeout: float = 30.0) -> dict:
+    req = urllib.request.Request(
+        DSH_WORKER_URL + path, data=json.dumps(obj).encode("utf-8"),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _worker_healthy(timeout: float = 2.0) -> bool:
+    try:
+        with urllib.request.urlopen(DSH_WORKER_URL + "/health",
+                                    timeout=timeout) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def _ensure_worker(wait_s: float = 60.0) -> bool:
+    """Spawn the dsh worker (venv-dsh) if it is not listening yet."""
+    if _worker_healthy():
+        return True
+    if not DSH_PY.exists():
+        return False
+    try:
+        subprocess.Popen(
+            [str(DSH_PY), "-B", str(_ROOT / "tools" / "dsh_worker.py"),
+             "--workdir", str(WORKDIR)],
+            cwd=str(_ROOT), close_fds=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception:
+        return False
+    end = time.time() + float(wait_s)
+    while time.time() < end:
+        if _worker_healthy():
+            return True
+        time.sleep(2)
+    return False
+
 
 START_PROMPT = """你是 YHLZ 项目的开发执行体，工作目录就是项目根目录。
 这是一个新任务。**这一轮先不要动手**（禁止修改文件、禁止运行会改变状态的命令），
@@ -80,7 +133,7 @@ def _opencode_exe() -> str:
 def _run(prompt: str, session: str | None, timeout: float) -> dict:
     """Run opencode headless; return {text, session, ok}."""
     cmd = [_opencode_exe(), "run", prompt, "-m", MODEL,
-           "--agent", AGENT, "--dir", str(_ROOT), "--format", "json"]
+           "--agent", AGENT, "--dir", str(WORKDIR), "--format", "json"]
     if session:
         cmd += ["--session", session]
     LOG.parent.mkdir(parents=True, exist_ok=True)
@@ -92,7 +145,7 @@ def _run(prompt: str, session: str | None, timeout: float) -> dict:
                f"session={session or '-'} ===\n{prompt}\n")
     try:
         proc = subprocess.Popen(
-            cmd, cwd=str(_ROOT), stdout=subprocess.PIPE,
+            cmd, cwd=str(WORKDIR), stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, text=True, encoding="utf-8",
             errors="replace", bufsize=1,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
@@ -164,6 +217,21 @@ def _classify(text: str) -> str:
 
 
 def start(task: str) -> dict:
+    if _backend() == "dsh":
+        if not _ensure_worker():
+            return {"status": "error", "session": "", "task": task,
+                    "text": "dsh worker 不可用（venv-dsh 缺失或启动失败）"}
+        try:
+            res = _post_worker("/start", {"task": task})
+        except Exception as exc:  # noqa: BLE001
+            return {"status": "error", "session": "", "task": task,
+                    "text": f"dsh worker 调用失败：{type(exc).__name__}"}
+        if not res.get("ok"):
+            return {"status": "error", "session": "", "task": task,
+                    "text": str(res.get("error") or "worker rejected")}
+        out = _load()
+        out["backend"] = "dsh"
+        return out
     d = {"status": "running", "session": "", "task": task, "text": ""}
     _save(d)
     r = _run(START_PROMPT.format(task=task), None, TIMEOUT)
@@ -175,6 +243,20 @@ def start(task: str) -> dict:
 
 
 def answer(text: str) -> dict:
+    if _backend() == "dsh":
+        if not _ensure_worker():
+            return {"status": "error", "text": "dsh worker 不可用",
+                    "session": ""}
+        try:
+            res = _post_worker("/answer", {"text": text})
+        except Exception as exc:  # noqa: BLE001
+            return {"status": "error",
+                    "text": f"dsh worker 调用失败：{type(exc).__name__}",
+                    "session": ""}
+        if not res.get("ok"):
+            return {"status": "error", "text": str(res.get("error") or ""),
+                    "session": ""}
+        return _load()
     d = _load()
     if not d.get("session"):
         return {"status": "error", "text": "没有进行中的会话，先用 #dev <任务> 开始",
@@ -190,7 +272,7 @@ def answer(text: str) -> dict:
 
 def commit(message: str) -> dict:
     def git(*a: str) -> str:
-        p = subprocess.run(["git", *a], cwd=str(_ROOT), capture_output=True,
+        p = subprocess.run(["git", *a], cwd=str(WORKDIR), capture_output=True,
                            text=True, encoding="utf-8", errors="replace")
         return (p.stdout or "") + (p.stderr or "")
 
@@ -204,7 +286,7 @@ def commit(message: str) -> dict:
 
 
 def push() -> dict:
-    p = subprocess.run(["git", "push", "origin", "HEAD"], cwd=str(_ROOT),
+    p = subprocess.run(["git", "push", "origin", "HEAD"], cwd=str(WORKDIR),
                        capture_output=True, text=True, encoding="utf-8",
                        errors="replace")
     return {"text": ((p.stdout or "") + (p.stderr or "")).strip()}
