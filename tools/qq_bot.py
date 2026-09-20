@@ -316,7 +316,9 @@ def _daemon_turn(text: str, channel: str, images: list | None = None) -> str:
     req = urllib.request.Request(DAEMON + "/turn", data=data,
                                  headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        # long tool-using tasks must not lose the reply halfway (daemon allows
+        # up to 240s); ledger 0443
+        with urllib.request.urlopen(req, timeout=280) as r:
             return str(json.loads(r.read())["answer"])
     except Exception:
         return ""
