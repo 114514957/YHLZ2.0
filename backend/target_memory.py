@@ -48,6 +48,16 @@ def _normalize(text: str) -> str:
     return re.sub(r"[\s\u3000,，。.!！?？:：;；、\-]+", "", str(text or ""))
 
 
+def _date_str(ts: float) -> str:
+    """B3 (ledger 0451): dates in recall context measurably help time questions
+    (LoCoMo 13.8% -> 23.8% with date-carrying context)."""
+    try:
+        v = float(ts or 0)
+        return time.strftime("%Y-%m-%d", time.localtime(v)) if v > 0 else ""
+    except Exception:
+        return ""
+
+
 # ---- TCM v1 (ledger 0438): source grading + time/causal reasoning ----
 STANCES = ("fact", "opinion", "speculation")
 _FACT_SOURCES = {"老爹", "owner", "user-approved", "memory.save:user-approved"}
@@ -441,7 +451,8 @@ class TargetMemoryService:
                 con = sqlite3.connect(str(self.db_path))
                 try:
                     rows = con.execute(
-                        "SELECT id, type, importance, status, keywords, summary "
+                        "SELECT id, type, importance, status, keywords, summary, "
+                        "COALESCE(NULLIF(valid_at,0), created_at) "
                         "FROM l2_items").fetchall()
                 finally:
                     con.close()
@@ -487,7 +498,8 @@ class TargetMemoryService:
             if s and len(s) >= 4 and r[0] not in seen:
                 good.append({"id": r[0], "tier": "L2", "type": r[1],
                              "importance": r[2], "status": r[3],
-                             "summary": s, "_score": 0.45})
+                             "summary": s, "_score": 0.45,
+                             "date": _date_str(r[6] if len(r) > 6 else 0)})
                 seen.add(r[0])
         # 3) diary semantic (own words can also be recalled in chat)
         try:
@@ -1244,7 +1256,8 @@ class TargetMemoryService:
                 try:
                     rows = con.execute(
                         "SELECT id,tier,type,importance,status,evidence_ref,"
-                        "summary,stance FROM l2_items"
+                        "summary,stance,"
+                        "COALESCE(NULLIF(valid_at,0), created_at) FROM l2_items"
                         " WHERE status!='archive' AND COALESCE(invalid_at,0)=0"
                         " AND (summary LIKE ? OR keywords LIKE ?)"
                         " ORDER BY importance DESC LIMIT 3",
@@ -1260,7 +1273,8 @@ class TargetMemoryService:
                 out.append({"id": r[0], "tier": r[1], "type": r[2],
                             "importance": r[3], "status": r[4],
                             "evidence_ref": r[5], "summary": r[6],
-                            "stance": r[7], "via": "spread"})
+                            "stance": r[7], "date": _date_str(r[8]),
+                            "via": "spread"})
                 if len(out) >= need:
                     break
         return out
@@ -1368,7 +1382,8 @@ class TargetMemoryService:
             for h in hits:
                 row = con.execute(
                     """
-                    SELECT id, tier, type, importance, status, evidence_ref, summary, stance
+                    SELECT id, tier, type, importance, status, evidence_ref, summary, stance,
+                           COALESCE(NULLIF(valid_at,0), created_at)
                     FROM l2_items WHERE id=?
                     """,
                     (h["docid"],),
@@ -1380,7 +1395,7 @@ class TargetMemoryService:
                         "id": row[0], "tier": row[1], "type": row[2],
                         "importance": row[3], "status": row[4],
                         "evidence_ref": row[5], "summary": row[6],
-                        "stance": row[7],
+                        "stance": row[7], "date": _date_str(row[8]),
                     }
                 )
                 if len(out) >= limit:
@@ -1400,7 +1415,8 @@ class TargetMemoryService:
         try:
             rows = con.execute(
                 """
-                SELECT i.id, i.tier, i.type, i.importance, i.status, i.evidence_ref, i.summary, i.stance
+                SELECT i.id, i.tier, i.type, i.importance, i.status, i.evidence_ref, i.summary, i.stance,
+                       COALESCE(NULLIF(i.valid_at,0), i.created_at)
                 FROM l2_fts f JOIN l2_items i ON i.id = f.sid
                 WHERE l2_fts MATCH ?
                 ORDER BY i.importance DESC, i.last_accessed DESC
@@ -1414,7 +1430,8 @@ class TargetMemoryService:
             pattern = f"%{q}%"
             rows = con.execute(
                 """
-                SELECT id, tier, type, importance, status, evidence_ref, summary, stance
+                SELECT id, tier, type, importance, status, evidence_ref, summary, stance,
+                       COALESCE(NULLIF(valid_at,0), created_at)
                 FROM l2_items
                 WHERE (summary LIKE ? ESCAPE '\\' OR keywords LIKE ? ESCAPE '\\')
                   AND status IN ('active','downgraded')
@@ -1428,7 +1445,7 @@ class TargetMemoryService:
             {
                 "id": r[0], "tier": r[1], "type": r[2], "importance": r[3],
                 "status": r[4], "evidence_ref": r[5], "summary": r[6],
-                "stance": r[7],
+                "stance": r[7], "date": _date_str(r[8]),
             }
             for r in rows
         ]

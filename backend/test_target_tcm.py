@@ -236,6 +236,23 @@ class TCMTest(unittest.TestCase):
         finally:
             eg.DB_PATH = old
 
+    # ---------- ledger 0451: dates in recall context ----------
+    def test_recall_carries_date(self):
+        self.svc.store_item(_it("d1", "老爹去过兰州", source="老爹",
+                                created=1700000000.0, valid_at=1700000000.0))
+        hits = self.svc.recall("兰州")
+        self.assertTrue(hits)
+        self.assertTrue(hits[0].get("date"), hits)
+
+    def test_contextual_recall_carries_date(self):
+        it = _it("d2", "老爹去过兰州拉面馆", source="老爹",
+                 created=1700000000.0, valid_at=1700000000.0)
+        it.type = "event"
+        self.svc.store_item(it)
+        rows = self.svc.contextual_recall("老爹是不是去过兰州拉面馆", limit=3)
+        self.assertTrue(rows)
+        self.assertTrue(rows[0].get("date"), rows)
+
     # ---------- health ----------
     def test_health_counts(self):
         self._seed()

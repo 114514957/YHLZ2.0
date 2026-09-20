@@ -85,7 +85,10 @@ def recall_memory(query: str, limit: int = 5) -> str:
             rows = []
     if not rows:
         return "记忆库无匹配"
-    return "\n".join(f"[{r['importance']}] {r['summary']}" for r in rows)[:2000]
+    # B3 (ledger 0451): carry the date — time questions need it
+    return "\n".join(
+        (f"[{r.get('date')}]" if r.get("date") else "")
+        + f"[{r['importance']}] {r['summary']}" for r in rows)[:2000]
 
 
 def system_time() -> str:

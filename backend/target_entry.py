@@ -421,8 +421,10 @@ class ConversationSession:
                             if now - self._ctx_recent.get(hid, 0.0) < 30.0:
                                 continue
                             self._ctx_recent[hid] = now
+                            _d = str(hit.get("date", "") or "")
                             ctx_lines.append(
                                 "（隐约想起，仅供理解，不要提及）：" +
+                                (f"（{_d}）" if _d else "") +
                                 str(hit.get("summary", ""))[:150])
             except Exception:
                 pass
