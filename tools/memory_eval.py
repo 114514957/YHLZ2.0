@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import pathlib
 import re
 import sys
@@ -57,10 +58,28 @@ def _sessions(conv: dict) -> list[tuple[str, list[dict]]]:
     return out
 
 
-def _llm_turn():
-    from backend.qqextract import build_llm_turn
+def _llm_turn(provider: str = "deepseek"):
+    """Frozen DeepSeek harness (default) or OpenAI-compatible A' fallback.
 
-    return build_llm_turn(max_tokens=400)
+    Protocol is OUR internal frozen one: fixed answerer, fixed judge, fixed
+    prompts, temperature 0 — reproducible across runs but NOT comparable to
+    vendor frozen-protocol figures (different answerer/judge)."""
+    from backend.env_loader import ensure_env_loaded
+    from backend.target_orchestrator import build_openai_compatible_llm_turn
+
+    ensure_env_loaded()
+    if str(provider).lower() in ("openai", "a", "a-prime"):
+        key = os.getenv("OPENAI_API_KEY", "")
+        base = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        url = base.rstrip("/") + "/chat/completions"
+        return build_openai_compatible_llm_turn(
+            base_url=url, api_key=key, model=model, temperature=0.0,
+            max_tokens=400, fallback_base_url=None)
+    key = os.getenv("DEEPSEEK_API_KEY", "")
+    return build_openai_compatible_llm_turn(
+        api_key=key, model="deepseek-chat", temperature=0.0,
+        max_tokens=400, fallback_base_url=None)
 
 
 def _ask(llm, prompt: str) -> str:
@@ -91,7 +110,9 @@ JUDGE_PROMPT = (
 
 def run_locomo(args) -> dict:
     data = json.loads(ensure_dataset(args.download).read_text(encoding="utf-8"))
-    llm = _llm_turn()
+    provider = str(getattr(args, "provider", "deepseek"))
+    prov_label = "A" if provider.lower() in ("openai", "a", "a-prime") else "DS"
+    llm = _llm_turn(provider)
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="yhlz_eval_"))
     results: list[dict] = []
     for si, sample in enumerate(data[: max(1, args.conversations)]):
@@ -142,8 +163,9 @@ def run_locomo(args) -> dict:
         d["n"] += 1
         d["correct"] += 1 if r["verdict"] == "CORRECT" else 0
         d["partial"] += 1 if r["verdict"] == "PARTIAL" else 0
-    return {"mode": "locomo-B", "n": total, "correct": corr, "partial": part,
-            "accuracy": corr / total, "by_cat": by_cat, "results": results}
+    return {"mode": f"locomo-{prov_label}", "n": total, "correct": corr,
+            "partial": part, "accuracy": corr / total, "by_cat": by_cat,
+            "results": results}
 
 
 # ---------------- self scenes (deterministic, no LLM) ----------------
@@ -218,8 +240,9 @@ def write_report(res: dict, out: pathlib.Path) -> None:
     lines = [f"# 记忆评测基线（{res['mode']}）", "",
              f"- 时间：{time.strftime('%Y-%m-%d %H:%M')}",
              f"- 模式：{res['mode']}"
-             + ("（内部基线：DeepSeek answerer + DeepSeek judge，"
-                "不可与冻结协议厂商数字直接比较）" if res["mode"] != "scenes"
+             + ("（内部冻结协议：DeepSeek answerer + DeepSeek judge，"
+                "temperature 0，提示词/样本固定可复现；"
+                "不可与厂商冻结协议数字直接比较）" if res["mode"] != "scenes"
                 else "（确定性检查，无 LLM 判官）"),
              f"- 样本：{res['n']}；正确：{res['correct']}；部分：{res['partial']}；"
              f"准确率：**{res['accuracy']:.1%}**", ""]
@@ -248,6 +271,9 @@ def main() -> int:
     p1.add_argument("--conversations", type=int, default=2)
     p1.add_argument("--questions", type=int, default=15)
     p1.add_argument("--download", action="store_true")
+    p1.add_argument("--provider", default="deepseek",
+                    choices=("deepseek", "openai"),
+                    help="answerer+judge provider (openai needs OPENAI_API_KEY)")
     p1.add_argument("--out", default="")
     p2 = sub.add_parser("scenes")
     p2.add_argument("--out", default="")
