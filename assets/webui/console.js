@@ -179,7 +179,9 @@ async function loadSettings() {
     $("cf-duration").value = String(s.duration || 3);
     $("cf-speaker").value = s.tts_speaker || "Vivian";
     $("cf-speak").checked = s.tts_speak !== false;
-    $("cf-ttsmodel").value = s.tts_model || "0.6B";
+    // 8GB 显存只保留 0.6B：旧的 1.7B 设置归一化（ledger 0448）
+    $("cf-ttsmodel").value = (s.tts_model === "1.7B" || !s.tts_model)
+      ? "0.6B" : s.tts_model;
   } catch (e) {}
 }
 $("cf-save").addEventListener("click", async () => {

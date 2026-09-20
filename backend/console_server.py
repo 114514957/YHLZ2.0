@@ -41,19 +41,24 @@ DEFAULT_SETTINGS = {
 }
 
 TTS_DIRS = {
+    # 8GB VRAM: 1.7B CustomVoice OOM 实锤（0419/0434），仅保留 0.6B（ledger 0448）
     "0.6B": _PROJECT_ROOT / "models" / "qwen3-tts" / "Qwen3-TTS-12Hz-0.6B-CustomVoice",
-    "1.7B": _PROJECT_ROOT / "models" / "qwen3-tts" / "Qwen3-TTS-12Hz-1.7B-CustomVoice",
 }
 _TTS = {"model": None, "key": None}
 
 
 def _get_tts(which: str):
-    """Resident TTS model (load once per process; ledger 0226 perf)."""
+    """Resident TTS model (load once per process; ledger 0226 perf).
+
+    Unknown/disabled keys (e.g. legacy "1.7B") fall back to 0.6B instead of
+    trying to load a model that would OOM the 8GB card (ledger 0448)."""
     import torch
     from faster_qwen3_tts import FasterQwen3TTS
 
     key = str(which or "0.6B")
-    path = TTS_DIRS.get(key) or TTS_DIRS["0.6B"]
+    if key not in TTS_DIRS:
+        key = "0.6B"
+    path = TTS_DIRS[key]
     if _TTS["model"] is None or _TTS["key"] != key:
         try:
             if _TTS["model"] is not None:
