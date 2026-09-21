@@ -768,14 +768,27 @@ class QQBridge:
                 text = str(it.get("text", "")).strip()
                 if not text:
                     continue
+                # verify via a short-lived connection (the main ws is receive-
+                # only here; fire-and-forget used to log a FAKE success —
+                # ledger 0455: sends had been failing with 网络连接异常 1006514)
                 try:
-                    await self._send(ws, "send_msg", {
+                    ev = await _napcat_call(self.ws_url, "send_msg", {
                         "message_type": "private", "user_id": master,
-                        "message": text})
+                        "message": text}, timeout=15)
+                except Exception:
+                    ev = None
+                if ev and ev.get("status") == "ok":
                     sent.append(time.time())
                     self.log(f"主动联系已发: {text[:40]}")
-                except Exception:
-                    pass
+                else:
+                    try:
+                        from backend import qq_outbox
+
+                        qq_outbox.push(text, kind=str(it.get("kind",
+                                                             "proactive")))
+                    except Exception:
+                        pass
+                    self.log(f"主动联系发送失败，已回队: {str(ev)[:80]}")
 
     async def run(self) -> None:
         import websockets
