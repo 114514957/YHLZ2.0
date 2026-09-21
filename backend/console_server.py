@@ -37,28 +37,34 @@ DEFAULT_SETTINGS = {
     "asr": "sensevoice",
     "tts_speaker": "Vivian",
     "tts_speak": True,
-    "tts_model": "0.6B",
+    "tts_model": "clone",  # A4 (0454): default voice = Edge(Xiaoyi) clone
 }
 
 TTS_DIRS = {
     # 8GB VRAM: 1.7B CustomVoice OOM 实锤（0419/0434），仅保留 0.6B（ledger 0448）
     "0.6B": _PROJECT_ROOT / "models" / "qwen3-tts" / "Qwen3-TTS-12Hz-0.6B-CustomVoice",
 }
+# A4 (ledger 0454): Edge(Xiaoyi) timbre cloned into the local 0.6B-Base model
+CLONE_CFG = {
+    "model": _PROJECT_ROOT / "models" / "qwen3-tts" / "Qwen3-TTS-12Hz-0.6B-Base",
+    "ref_dir": _PROJECT_ROOT / "models" / "tts" / "refs" / "xiaoyi",
+    "ref": "ref01",
+    "label": "0.6B·Edge克隆(Xiaoyi)",
+}
 _TTS = {"model": None, "key": None}
 
 
-def _get_tts(which: str):
-    """Resident TTS model (load once per process; ledger 0226 perf).
+def _get_engine(which: str):
+    """Resident Qwen3-TTS engine (single slot): CustomVoice 0.6B or clone-Base.
 
     Unknown/disabled keys (e.g. legacy "1.7B") fall back to 0.6B instead of
     trying to load a model that would OOM the 8GB card (ledger 0448)."""
     import torch
     from faster_qwen3_tts import FasterQwen3TTS
 
-    key = str(which or "0.6B")
-    if key not in TTS_DIRS:
-        key = "0.6B"
-    path = TTS_DIRS[key]
+    key = str(which or "0.6B").strip().lower()
+    key = "clone" if key == "clone" else "0.6B"
+    path = CLONE_CFG["model"] if key == "clone" else TTS_DIRS["0.6B"]
     if _TTS["model"] is None or _TTS["key"] != key:
         try:
             if _TTS["model"] is not None:
@@ -74,6 +80,56 @@ def _get_tts(which: str):
             str(path), device="cuda", dtype=torch.bfloat16)
         _TTS["key"] = key
     return _TTS["model"]
+
+
+def _wav_bytes(audio, sr) -> bytes:
+    """float32 mono audio -> 16-bit PCM WAV bytes (shared by /tts routes)."""
+    import io as _io
+    import wave as _wave
+
+    import numpy as _np
+
+    buf = _io.BytesIO()
+    with _wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(int(sr))
+        pcm = _np.clip(_np.asarray(audio, dtype="float32"), -1.0, 1.0)
+        w.writeframes((pcm * 32767.0).astype("<i2").tobytes())
+    return buf.getvalue()
+
+
+def _synth(which: str, text: str, speaker: str = "Vivian"):
+    """Synthesize one chunk with the selected engine -> (audio, sr).
+
+    "clone" = zero-shot Edge(Xiaoyi) timbre via the 0.6B-Base model
+    (ledger 0453/0454); anything else = CustomVoice preset speaker.
+    Clone failures degrade to the CustomVoice voice instead of silence."""
+    if str(which or "").strip().lower() == "clone":
+        try:
+            m = _get_engine("clone")
+            ref_dir = Path(CLONE_CFG["ref_dir"])
+            ref_wav = ref_dir / f"{CLONE_CFG['ref']}.wav"
+            ref_txt = ""
+            try:
+                ref_txt = (ref_dir / f"{CLONE_CFG['ref']}.txt").read_text(
+                    encoding="utf-8").strip()
+            except Exception:
+                pass
+            wavs, sr = m.generate_voice_clone(
+                text=str(text)[:120], language="Chinese",
+                ref_audio=str(ref_wav), ref_text=ref_txt)
+            audio = wavs[0] if isinstance(wavs, (list, tuple)) else wavs
+            return audio, sr
+        except Exception as exc:  # noqa: BLE001
+            _log("tts", f"clone fail({type(exc).__name__}) -> fallback 0.6B")
+    m = _get_engine("0.6B")
+    wavs, sr = m.generate_custom_voice(
+        text=str(text)[:120], language="Chinese",
+        speaker=str(speaker or "Vivian"),
+        instruct="自然地说，像和亲近的人聊天，别播音腔。")
+    audio = wavs[0] if isinstance(wavs, (list, tuple)) else wavs
+    return audio, sr
 
 
 class _StreamingSpeaker:
@@ -116,7 +172,7 @@ class _StreamingSpeaker:
         import sounddevice as sd
 
         try:
-            m = _get_tts(self._key)
+            _get_engine(self._key)
         except Exception:
             _log("voice", "stream tts load fail")
             return
@@ -133,11 +189,8 @@ class _StreamingSpeaker:
                     self._interrupted = True
                     continue
                 try:
-                    wavs, sr = m.generate_custom_voice(
-                        text=str(s)[:120], language="Chinese",
-                        speaker=self._speaker,
-                        instruct="自然地说，像和亲近的人聊天，别播音腔。")
-                    samples = np.asarray(wavs[0], dtype="float32")
+                    audio, sr = _synth(self._key, s, self._speaker)
+                    samples = np.asarray(audio, dtype="float32")
                 except Exception:
                     continue
                 rms = float(np.sqrt(np.mean(samples * samples)) + 1e-9)
@@ -563,6 +616,9 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(200, self._control(body))
             return
+        if p == "/tts":
+            self._do_tts()
+            return
         if p == "/session":
             try:
                 length = int(self.headers.get("Content-Length", 0))
@@ -576,6 +632,37 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self.console_do_POST()
+
+    def _do_tts(self):
+        """A4b (ledger 0454): synthesize one line -> WAV bytes.
+
+        Lets the QQ bridge use the Edge-clone voice without loading torch in
+        its own process. Body: {"text", "speaker"?, "model"?: "clone"|"0.6B"}.
+        """
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except Exception:
+            self._send_json(400, {"error": "请求格式错误"})
+            return
+        text = str(body.get("text", "")).strip()[:200]
+        if not text:
+            self._send_json(400, {"error": "text 为空"})
+            return
+        st = _settings_load()
+        model = str(body.get("model") or st.get("tts_model", "clone"))
+        speaker = str(body.get("speaker") or st.get("tts_speaker", "Vivian"))
+        try:
+            audio, sr = _synth(model, text, speaker)
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(500, {"error": type(exc).__name__})
+            return
+        data = _wav_bytes(audio, sr)
+        self.send_response(200)
+        self.send_header("Content-Type", "audio/wav")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def _do_reset(self):
         """Clear the console conversation (new chat)."""
@@ -1100,7 +1187,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         import sounddevice as sd
 
         try:
-            m = _get_tts(model_key)
+            _get_engine(model_key)
         except Exception:
             return "done"
         chunks = self._sentences(text)
@@ -1110,11 +1197,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                                 blocksize=1600, latency="low") as inp:
                 for chunk in chunks:
                     try:
-                        wavs, sr = m.generate_custom_voice(
-                            text=str(chunk)[:120], language="Chinese",
-                            speaker=str(speaker),
-                            instruct="自然地说，像和亲近的人聊天，别播音腔。")
-                        samples = np.asarray(wavs[0], dtype="float32")
+                        audio, sr = _synth(model_key, chunk, speaker)
+                        samples = np.asarray(audio, dtype="float32")
                     except Exception:
                         continue
                     play_rms = float(np.sqrt(np.mean(samples * samples)) + 1e-9)
@@ -1157,16 +1241,13 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         import sounddevice as sd
 
         try:
-            m = _get_tts(model_key)
+            _get_engine(model_key)
         except Exception:
             return
         for chunk in self._sentences(text):
             try:
-                wavs, sr = m.generate_custom_voice(
-                    text=str(chunk)[:120], language="Chinese",
-                    speaker=str(speaker),
-                    instruct="自然地说，像和亲近的人聊天，别播音腔。")
-                sd.play(np.asarray(wavs[0], dtype="float32"), int(sr))
+                audio, sr = _synth(model_key, chunk, speaker)
+                sd.play(np.asarray(audio, dtype="float32"), int(sr))
                 sd.wait()
             except Exception:
                 continue

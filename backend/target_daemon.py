@@ -744,6 +744,32 @@ class _Handler(ConsoleHandler):
                 return
             self._send(200, out)
             return
+        if self.path == "/tts":
+            # A4b (ledger 0454): synthesize one line -> WAV bytes for qq_bot
+            from backend.console_server import (
+                _settings_load, _synth, _wav_bytes,
+            )
+
+            text = str(payload.get("text", "")).strip()[:200]
+            if not text:
+                self._send(400, {"error": "empty text"})
+                return
+            st = _settings_load()
+            model = str(payload.get("model") or st.get("tts_model", "clone"))
+            speaker = str(payload.get("speaker") or st.get("tts_speaker",
+                                                          "Vivian"))
+            try:
+                audio, sr = _synth(model, text, speaker)
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"error": type(exc).__name__})
+                return
+            data = _wav_bytes(audio, sr)
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if self.path == "/notifications":
             # owner-side poll: return queued Yuanheng activity then clear
             import pathlib

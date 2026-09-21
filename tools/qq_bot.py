@@ -219,6 +219,21 @@ def _tts_wav(text: str) -> str:
         return ""
     d = pathlib.Path(tempfile.mkdtemp(prefix="yhlz_tts_"))
     wav = d / "t.wav"
+    # 0) A4b (ledger 0454): daemon clone voice (Edge/Xiaoyi timbre, local GPU)
+    if os.getenv("YHLZ_QQ_TTS", "clone").lower() != "edge":
+        try:
+            req = urllib.request.Request(
+                DAEMON + "/tts",
+                data=json.dumps({"text": text, "model": os.getenv(
+                    "YHLZ_QQ_TTS", "clone")}).encode("utf-8"),
+                headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=240) as r:
+                data = r.read()
+            if data[:4] == b"RIFF" and len(data) > 44:
+                wav.write_bytes(data)
+                return str(wav)
+        except Exception:
+            pass
     engine = os.getenv("YHLZ_TTS_ENGINE", "edge").lower()
     # 1) edge-tts (neural, primary; needs network)
     if engine != "sapi":

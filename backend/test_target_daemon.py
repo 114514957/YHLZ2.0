@@ -103,6 +103,26 @@ class TestDaemon(unittest.TestCase):
             s.status = orig
         self.assertEqual(h["status"], "ok")
 
+    def test_tts_endpoint_returns_wav(self):
+        """A4b (ledger 0454): /tts synthesizes via _synth and returns WAV."""
+        import backend.console_server as cs
+
+        old = cs._synth
+        cs._synth = lambda m, t, s="Vivian": ([0.0] * 2400, 24000)
+        try:
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{self.port}/tts",
+                data=json.dumps({"text": "你好", "model": "clone"}).encode(),
+                headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                data = r.read()
+                ctype = r.headers.get("Content-Type")
+        finally:
+            cs._synth = old
+        self.assertEqual(ctype, "audio/wav")
+        self.assertEqual(data[:4], b"RIFF")
+        self.assertGreater(len(data), 44)
+
     def test_turn_triggers_idle_schedule_check(self):
         """B4 (ledger 0437): a finished turn immediately checks due plans."""
         calls = []
