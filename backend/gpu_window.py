@@ -69,10 +69,17 @@ def state() -> dict:
 def open_window(require_free_mb: int = 6500, timeout: float = 150.0) -> dict:
     """Stop the watchdog + LLM and wait until enough VRAM is free."""
     killed = {"watchdog": _kill(_WATCH), "llama": _kill(_LLAMA)}
+    # WSL caches GPU memory for the VM lifetime — drop the distro so the
+    # window actually gets the VRAM back (it restarts in seconds).
+    try:
+        subprocess.run(["wsl.exe", "--terminate", "Ubuntu-22.04"],
+                       capture_output=True, timeout=20)
+    except Exception:
+        pass
     t0 = time.time()
     free = _free_mb()
     while free < require_free_mb and time.time() - t0 < timeout:
-        time.sleep(3)
+        time.sleep(1)
         free = _free_mb()
     return {"ok": free >= require_free_mb, "free_mb": free,
             "killed": killed, "waited_s": round(time.time() - t0, 1)}

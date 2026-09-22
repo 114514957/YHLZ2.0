@@ -171,15 +171,20 @@ def sing_status() -> dict:
     return {"ok": True, **dict(SING_STATE)}
 
 
-def sing_start(target: str, prompt: str = "") -> dict:
-    """Kick off a cover job in a background thread; returns immediately."""
+def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
+    """Kick off a cover job in a background thread; returns immediately.
+
+    Two-stage (ledger 0458): preprocessing (optional vocal separation + F0)
+    runs OUTSIDE the GPU window so the chat stays online; only the SVC stage
+    stops the LLM."""
     tgt = Path(str(target or "")).resolve()
     if not tgt.is_file():
         return {"ok": False, "error": f"目标文件不存在：{target}"}
     if not _sing_lock.acquire(blocking=False):
         return {"ok": False, "error": "已有翻唱任务在跑"}
     SING_STATE.update(status="running", step="排队启动", error="", result="",
-                      log="", started=time.time(), finished=0.0)
+                      log="", started=time.time(), finished=0.0,
+                      vocal_sep=bool(vocal_sep))
     prm = Path(str(prompt or SING_PROMPT)).resolve()
 
     def _job() -> None:
@@ -188,18 +193,32 @@ def sing_start(target: str, prompt: str = "") -> dict:
         try:
             SING_STATE["step"] = "卸载本地 TTS，腾显存"
             _unload_tts()
+            sep = "1" if SING_STATE.get("vocal_sep", True) else "0"
+            SING_STATE["step"] = ("预处理：人声分离+F0（较慢，聊天不中断）"
+                                  if sep == "1" else "预处理：F0（聊天不中断）")
+            r0 = subprocess.run(
+                ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
+                 _wsl_path(_PROJECT_ROOT / "tools" / "wsl_soulx_prep.sh"),
+                 _wsl_path(prm), _wsl_path(tgt), sep],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=3600)
+            if r0.returncode != 0:
+                raise RuntimeError(
+                    f"预处理失败 exit={r0.returncode}: "
+                    f"{(r0.stderr or '')[-200:]}")
             SING_STATE["step"] = "唱窗：暂停 LLM 与看护"
             win = gpu_window.open_window()
             if not win.get("ok"):
                 raise RuntimeError(f"显存不足（free={win.get('free_mb')}MB）")
-            SING_STATE["step"] = "翻唱中（WSL SoulX-SVC，约 1-3 分钟）"
+            SING_STATE["step"] = "翻唱中（SVC，约 2 分钟）"
             out = SING_DIR / "out"
             out.mkdir(parents=True, exist_ok=True)
-            cmd = ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
-                   _wsl_path(_PROJECT_ROOT / "tools" / "wsl_soulx_svc.sh"),
-                   _wsl_path(prm), _wsl_path(tgt), _wsl_path(out)]
-            r = subprocess.run(cmd, capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=1800)
+            r = subprocess.run(
+                ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
+                 _wsl_path(_PROJECT_ROOT / "tools" / "wsl_soulx_svc.sh"),
+                 _wsl_path(out)],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=1800)
             tail = (r.stdout or "")[-1200:] + (r.stderr or "")[-600:]
             SING_STATE["log"] = tail[-900:]
             gen = out / "generated.wav"
@@ -734,7 +753,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "请求格式错误"})
                 return
             self._send_json(200, sing_start(str(body.get("target", "")),
-                                            str(body.get("prompt", ""))))
+                                            str(body.get("prompt", "")),
+                                            bool(body.get("vocal_sep", True))))
             return
         if p == "/sing/upload":
             from urllib.parse import parse_qs, urlparse

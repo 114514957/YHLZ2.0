@@ -3,7 +3,6 @@ import pathlib
 import tempfile
 import types
 import unittest
-from unittest.mock import MagicMock
 
 import backend.console_server as cs
 import backend.gpu_window as gw
@@ -68,12 +67,19 @@ class SingModuleTest(unittest.TestCase):
         finally:
             cs._sing_lock.release()
 
-    def test_job_success(self):
+    def test_job_success_two_stage(self):
+        calls = []
+
         def fake_run(cmd, **kw):
+            calls.append(cmd)
+            if len(calls) == 1:  # prep stage (no window)
+                return types.SimpleNamespace(returncode=0, stdout="prep ok",
+                                             stderr="")
             out = cs.SING_DIR / "out"
             out.mkdir(parents=True, exist_ok=True)
             (out / "generated.wav").write_bytes(b"RIFFxxxx")
-            return types.SimpleNamespace(returncode=0, stdout="ok", stderr="")
+            return types.SimpleNamespace(returncode=0, stdout="svc ok",
+                                         stderr="")
 
         cs.subprocess.run = fake_run
         res = cs.sing_start(str(self.target))
@@ -81,16 +87,42 @@ class SingModuleTest(unittest.TestCase):
         self.assertEqual(cs.SING_STATE["status"], "done")
         self.assertTrue(pathlib.Path(cs.SING_STATE["result"]).exists())
         self.assertTrue(self.closed)  # window always closed
+        self.assertEqual(len(calls), 2)
+        self.assertIn("wsl_soulx_prep.sh", " ".join(map(str, calls[0])))
+        self.assertIn("wsl_soulx_svc.sh", " ".join(map(str, calls[1])))
 
     def test_job_failure_restores_and_reports(self):
-        cs.subprocess.run = MagicMock(
-            return_value=types.SimpleNamespace(returncode=1, stdout="",
-                                               stderr="boom"))
+        calls = []
+
+        def fake_run(cmd, **kw):
+            calls.append(cmd)
+            if len(calls) == 1:
+                return types.SimpleNamespace(returncode=0, stdout="",
+                                             stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="",
+                                         stderr="boom")
+
+        cs.subprocess.run = fake_run
         res = cs.sing_start(str(self.target))
         self.assertTrue(res["ok"])
         self.assertEqual(cs.SING_STATE["status"], "error")
         self.assertIn("SVC 失败", cs.SING_STATE["error"])
         self.assertTrue(self.closed)
+
+    def test_vocal_sep_flag_propagates(self):
+        def fake_run(cmd, **kw):
+            fake_run.n = getattr(fake_run, "n", 0) + 1
+            if fake_run.n == 1:
+                return types.SimpleNamespace(returncode=0, stdout="",
+                                             stderr="")
+            out = cs.SING_DIR / "out"
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "generated.wav").write_bytes(b"RIFF")
+            return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        cs.subprocess.run = fake_run
+        cs.sing_start(str(self.target), vocal_sep=False)
+        self.assertFalse(cs.SING_STATE["vocal_sep"])
 
     def test_sing_status_shape(self):
         st = cs.sing_status()

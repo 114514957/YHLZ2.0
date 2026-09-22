@@ -117,8 +117,12 @@
       <input type="file" id="sing-file" accept="audio/*">
       <button id="sing-go" class="btn-mini" type="button">开始翻唱</button>
     </div>
+    <div class="qrow">
+      <label class="ck"><input type="checkbox" id="sing-sep" checked>
+        人声分离（整歌质量优先，约 +10 分钟；聊天不中断）</label>
+    </div>
     <div id="sing-status" class="qrow" style="opacity:.8;font-size:12px">
-      选一首歌 → 开始：用元亨（Edge 克隆音）翻唱。人声/哼唱效果最好；翻唱期间元亨暂停聊天约 1-3 分钟（显存唱窗）。
+      选一首歌 → 开始：用元亨（Edge 克隆音）翻唱。哼唱可关掉分离更快；仅 SVC 阶段聊天暂停约 2-3 分钟。
     </div>
     <audio id="sing-audio" controls style="width:100%;display:none;margin-top:6px"></audio>
   </section>

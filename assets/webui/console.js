@@ -527,9 +527,10 @@ window.addEventListener("load", () => {
     setSt("启动翻唱…");
     let r;
     try {
+      const sep = $("sing-sep") ? $("sing-sep").checked : true;
       r = await (await fetch("/sing", { method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: up.path }) })).json();
+        body: JSON.stringify({ target: up.path, vocal_sep: sep }) })).json();
     } catch (e) { setSt("启动失败：网络错误"); return; }
     if (!r.ok) { setSt("启动失败：" + (r.error || "")); return; }
     if (au) au.style.display = "none";
