@@ -47,6 +47,17 @@ class SongLibraryTest(unittest.TestCase):
         self.assertEqual(sl.resolve("温柔")["id"], a["id"])
         self.assertIsNone(sl.resolve("欢快"))  # tags replaced
 
+    def test_save_ref_points_external_file(self):
+        """ledger 0464: covers live in 音频素材; the library only references."""
+        ext = self.tmp / "歌名_清亮嗓_20260922-120000.wav"
+        ext.write_bytes(b"RIFF")
+        it = sl.save_ref("歌名（元亨翻唱·清亮嗓）", ext, tags=["翻唱"])
+        self.assertEqual(sl.song_path(it["id"]), ext)
+        self.assertEqual(sl.resolve("翻唱")["id"], it["id"])
+        # no copy was made into the library dir
+        self.assertFalse((sl.SONGS_DIR / "song_x.wav").exists())
+        list(sl.SONGS_DIR.glob("*.wav"))  # dir may not even exist
+
     def test_list_tool_text(self):
         from backend.target_scheduler_tools import song_list_text
 

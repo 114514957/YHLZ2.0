@@ -24,8 +24,10 @@ class SingModuleTest(unittest.TestCase):
     def setUp(self):
         self.tmp = pathlib.Path(tempfile.mkdtemp())
         self._old = {"SING_DIR": cs.SING_DIR, "SING_PROMPT": cs.SING_PROMPT,
-                     "Thread": cs.threading.Thread, "run": cs.subprocess.run}
+                     "Thread": cs.threading.Thread, "run": cs.subprocess.run,
+                     "SING_OUT_DIR": cs.SING_OUT_DIR}
         cs.SING_DIR = self.tmp
+        cs.SING_OUT_DIR = self.tmp / "out_dir"
         prompt = self.tmp / "ref01.wav"
         prompt.write_bytes(b"x")
         cs.SING_PROMPT = prompt
@@ -48,6 +50,7 @@ class SingModuleTest(unittest.TestCase):
     def tearDown(self):
         cs.SING_DIR = self._old["SING_DIR"]
         cs.SING_PROMPT = self._old["SING_PROMPT"]
+        cs.SING_OUT_DIR = self._old["SING_OUT_DIR"]
         cs.threading.Thread = self._old["Thread"]
         cs.subprocess.run = self._old["run"]
         gw.open_window = self._gw_open
@@ -99,11 +102,37 @@ class SingModuleTest(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertIn("wsl_soulx_prep.sh", " ".join(map(str, calls[0])))
         self.assertIn("wsl_soulx_svc.sh", " ".join(map(str, calls[1])))
-        # finished song auto-saved to the local library (ledger 0460)
+        # finished song auto-saved to the local library (ledger 0460/0464:
+        # library REFERENCES the 音频素材/翻唱产出/ file, no second copy)
         import backend.song_library as sl
 
         self.assertTrue(cs.SING_STATE["song_id"])
-        self.assertEqual(len(sl.list_songs()), 1)
+        outs = list(cs.SING_OUT_DIR.glob("*.wav"))
+        self.assertEqual(len(outs), 1)
+        self.assertIn("Xiaoyi嗓", outs[0].name)
+        it = sl.resolve("Xiaoyi嗓")
+        self.assertIsNotNone(it)
+        self.assertEqual(sl.song_path(it["id"]), outs[0])
+
+    def test_voice_bright_uses_bright_prompt(self):
+        calls = []
+
+        def fake_run(cmd, **kw):
+            calls.append(cmd)
+            if len(calls) == 1:
+                return types.SimpleNamespace(returncode=0, stdout="",
+                                             stderr="")
+            out = cs.SING_DIR / "out"
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "generated.wav").write_bytes(b"RIFF")
+            return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        cs.subprocess.run = fake_run
+        res = cs.sing_start(str(self.target), voice="bright")
+        self.assertTrue(res["ok"])
+        self.assertIn("bright", " ".join(map(str, calls[0])))
+        outs = list(cs.SING_OUT_DIR.glob("*.wav"))
+        self.assertTrue(any("清亮嗓" in p.name for p in outs), outs)
 
     def test_job_failure_restores_and_reports(self):
         calls = []

@@ -11,6 +11,8 @@ Serves assets/webui/* on port 8321 and streams Yuanheng turns back as SSE:
 from __future__ import annotations
 
 import json
+import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -167,9 +169,12 @@ def _synth(which: str, text: str, speaker: str = "Vivian"):
 # ---- workbench singing module (Phase B, ledger 0457) ----
 SING_DIR = _PROJECT_ROOT / "cache" / "sing"
 SING_PROMPT = _PROJECT_ROOT / "models" / "tts" / "refs" / "xiaoyi" / "ref01.wav"
+# ledger 0464: finished covers land in the audio materials folder
+SING_OUT_DIR = _PROJECT_ROOT / "音频素材" / "翻唱产出"
 _sing_lock = threading.Lock()
 SING_STATE: dict = {"status": "idle", "step": "", "error": "", "result": "",
-                    "log": "", "started": 0.0, "finished": 0.0}
+                    "output": "", "voice": "xiaoyi", "log": "",
+                    "started": 0.0, "finished": 0.0, "song_id": ""}
 
 
 def _wsl_path(p) -> str:
@@ -202,15 +207,20 @@ def sing_status() -> dict:
     return {"ok": True, **dict(SING_STATE)}
 
 
-def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
+def sing_start(target: str, prompt: str = "", vocal_sep: bool = True,
+               voice: str = "xiaoyi") -> dict:
     """Kick off a cover job in a background thread; returns immediately.
 
     Two-stage (ledger 0458): preprocessing (optional vocal separation + F0)
     runs OUTSIDE the GPU window so the chat stays online; only the SVC stage
-    stops the LLM."""
+    stops the LLM. Ledger 0464: voice picks the SVC prompt; the finished wav
+    lands in 音频素材/翻唱产出/ and the song library references it."""
     tgt = Path(str(target or "")).resolve()
     if not tgt.is_file():
         return {"ok": False, "error": f"目标文件不存在：{target}"}
+    voice = str(voice or "xiaoyi").strip().lower()
+    if voice not in CLONE_VOICES:
+        voice = "xiaoyi"
     from backend import gpu_lock
 
     if not gpu_lock.acquire_sing():
@@ -219,9 +229,13 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
         gpu_lock.release_sing()
         return {"ok": False, "error": "已有翻唱任务在跑"}
     SING_STATE.update(status="running", step="排队启动", error="", result="",
-                      log="", started=time.time(), finished=0.0,
-                      vocal_sep=bool(vocal_sep), song_id="")
-    prm = Path(str(prompt or SING_PROMPT)).resolve()
+                      output="", log="", started=time.time(), finished=0.0,
+                      vocal_sep=bool(vocal_sep), song_id="", voice=voice)
+    if prompt:
+        prm = Path(str(prompt)).resolve()
+    else:
+        cfg = CLONE_VOICES.get(voice) or CLONE_VOICES["xiaoyi"]
+        prm = Path(cfg["ref_dir"]) / f"{cfg['ref']}.wav"
 
     def _job() -> None:
         from backend import gpu_window
@@ -235,7 +249,7 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
             r0 = subprocess.run(
                 ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
                  _wsl_path(_PROJECT_ROOT / "tools" / "wsl_soulx_prep.sh"),
-                 _wsl_path(prm), _wsl_path(tgt), sep],
+                 _wsl_path(prm), _wsl_path(tgt), sep, voice],
                 capture_output=True, text=True, encoding="utf-8",
                 errors="replace", timeout=3600)
             if r0.returncode != 0:
@@ -257,7 +271,7 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
             r = subprocess.run(
                 ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
                  _wsl_path(_PROJECT_ROOT / "tools" / "wsl_soulx_svc.sh"),
-                 _wsl_path(out)],
+                 _wsl_path(out), voice],
                 capture_output=True, text=True, encoding="utf-8",
                 errors="replace", timeout=1800)
             tail = (r.stdout or "")[-1200:] + (r.stderr or "")[-600:]
@@ -265,20 +279,29 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
             gen = out / "generated.wav"
             if r.returncode != 0 or not gen.is_file():
                 raise RuntimeError(f"SVC 失败 exit={r.returncode}")
+            # ledger 0464: final cover -> 音频素材/翻唱产出/<歌名>_<嗓>_<时间>.wav
+            SING_OUT_DIR.mkdir(parents=True, exist_ok=True)
+            stem = re.sub(r"[^\w\u4e00-\u9fff-]+", "_",
+                          Path(tgt).stem)[:40] or "cover"
+            vtag = "清亮嗓" if voice == "bright" else "Xiaoyi嗓"
+            final = SING_OUT_DIR / (
+                f"{stem}_{vtag}_{time.strftime('%Y%m%d-%H%M%S')}.wav")
+            shutil.copy2(gen, final)
             # finished songs are saved locally; QQ/main chain may only use
-            # library items (ledger 0460)
+            # library items — here the library references the materials file
             sid = ""
             try:
                 from backend import song_library
 
-                item = song_library.save(title=Path(tgt).stem, wav_path=gen,
-                                         source="workbench-cover",
-                                         target=str(tgt))
+                item = song_library.save_ref(
+                    title=f"{stem}（元亨翻唱·{vtag}）", wav_path=final,
+                    source="workbench-cover", target=str(tgt),
+                    tags=["翻唱"])
                 sid = str(item.get("id") or "")
             except Exception:
                 sid = ""
             SING_STATE.update(status="done", step="完成", result=str(gen),
-                              song_id=sid)
+                              output=str(final), song_id=sid)
         except Exception as exc:  # noqa: BLE001
             SING_STATE.update(status="error", step="失败",
                               error=f"{type(exc).__name__}: {exc}"[:280])
@@ -873,7 +896,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(200, sing_start(str(body.get("target", "")),
                                             str(body.get("prompt", "")),
-                                            bool(body.get("vocal_sep", True))))
+                                            bool(body.get("vocal_sep", True)),
+                                            str(body.get("voice", "xiaoyi"))))
             return
         if p == "/sing/upload":
             from urllib.parse import parse_qs, urlparse

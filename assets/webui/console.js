@@ -534,7 +534,7 @@ window.addEventListener("load", () => {
       if (timer) { clearInterval(timer); timer = null; }
       if (go) go.disabled = false;
       if (s.status === "done") {
-        setSt("完成 ✓（已存入歌曲库）");
+        setSt("完成 ✓（已存到 音频素材/翻唱产出/，并加入歌曲库）");
         if (au) { au.src = "/sing/result?t=" + Date.now(); au.style.display = "block"; }
         loadSongs();
       } else if (s.status === "error") {
@@ -557,9 +557,11 @@ window.addEventListener("load", () => {
     let r;
     try {
       const sep = $("sing-sep") ? $("sing-sep").checked : true;
+      const voice = $("sing-voice") ? $("sing-voice").value : "xiaoyi";
       r = await (await fetch("/sing", { method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: up.path, vocal_sep: sep }) })).json();
+        body: JSON.stringify({ target: up.path, vocal_sep: sep,
+                               voice: voice }) })).json();
     } catch (e) { setSt("启动失败：网络错误"); return; }
     if (!r.ok) { setSt("启动失败：" + (r.error || "")); return; }
     if (au) au.style.display = "none";

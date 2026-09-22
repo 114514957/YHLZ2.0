@@ -54,6 +54,29 @@ def save(title: str, wav_path, source: str = "", target: str = "",
         return item
 
 
+def save_ref(title: str, wav_path, source: str = "", target: str = "",
+             tags: list | None = None) -> dict:
+    """Index an EXISTING wav in place (no copy) — ledger 0464.
+
+    Used for covers that already live in 音频素材/翻唱产出/; the library only
+    references them so nothing is stored twice."""
+    src = pathlib.Path(wav_path)
+    if not src.is_file():
+        raise FileNotFoundError(str(src))
+    with _lock:
+        d = _load()
+        sid = "song_" + time.strftime("%Y%m%d%H%M%S")
+        while sid in d:
+            sid += "x"
+        item = {"id": sid, "title": str(title or src.stem)[:60], "file": "",
+                "path": str(src), "source": str(source or "")[:60],
+                "target": str(target or "")[:120], "created": time.time(),
+                "tags": [str(t)[:20] for t in (tags or [])][:6]}
+        d[sid] = item
+        _save_index(d)
+        return item
+
+
 def set_tags(song_id: str, tags: list) -> str:
     """Attach mood/topic tags for contextual calls (ledger 0463)."""
     with _lock:
@@ -99,7 +122,10 @@ def song_path(song_id: str) -> pathlib.Path | None:
     it = resolve(song_id)
     if not it:
         return None
-    p = SONGS_DIR / str(it.get("file") or "")
+    if it.get("path"):
+        p = pathlib.Path(str(it["path"]))
+    else:
+        p = SONGS_DIR / str(it.get("file") or "")
     return p if p.is_file() else None
 
 
