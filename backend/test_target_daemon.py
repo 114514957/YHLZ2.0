@@ -103,6 +103,14 @@ class TestDaemon(unittest.TestCase):
             s.status = orig
         self.assertEqual(h["status"], "ok")
 
+    def test_sing_status_route(self):
+        """ledger 0457: daemon exposes /sing/status for the workbench module."""
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{self.port}/sing/status", timeout=10) as r:
+            st = json.loads(r.read())
+        self.assertTrue(st["ok"])
+        self.assertIn(st["status"], ("idle", "running", "done", "error"))
+
     def test_tts_endpoint_returns_wav(self):
         """A4b (ledger 0454): /tts synthesizes via _synth and returns WAV."""
         import backend.console_server as cs

@@ -489,3 +489,52 @@ window.addEventListener("load", () => {
     if (b) { b.classList.add("hide"); setTimeout(() => { b.remove(); }, 550); }
   }, 900);
 });
+
+// ---- singing module (Phase B, ledger 0457) ----
+(function () {
+  const f = $("sing-file"), go = $("sing-go"), st = $("sing-status"), au = $("sing-audio");
+  if (!go) return;
+  let timer = null;
+  const setSt = (t) => { if (st) st.textContent = t; };
+  async function poll() {
+    try {
+      const s = await (await fetch("/sing/status")).json();
+      if (s.status === "running") {
+        const el = s.started ? Math.round(Date.now() / 1000 - s.started) : 0;
+        setSt("进行中：" + (s.step || "") + "（" + el + "s）");
+        return true;
+      }
+      if (timer) { clearInterval(timer); timer = null; }
+      if (s.status === "done") {
+        setSt("完成 ✓");
+        if (au) { au.src = "/sing/result?t=" + Date.now(); au.style.display = "block"; }
+      } else if (s.status === "error") {
+        setSt("失败：" + (s.error || "未知错误"));
+      }
+      return false;
+    } catch (e) { return true; }
+  }
+  go.addEventListener("click", async () => {
+    const file = f && f.files && f.files[0];
+    if (!file) { alert("先选一个音频文件（人声/哼唱效果最好）"); return; }
+    setSt("上传中…");
+    let up;
+    try {
+      up = await (await fetch("/sing/upload?name=" + encodeURIComponent(file.name),
+        { method: "POST", body: file })).json();
+    } catch (e) { setSt("上传失败：网络错误"); return; }
+    if (!up.ok) { setSt("上传失败：" + (up.error || "")); return; }
+    setSt("启动翻唱…");
+    let r;
+    try {
+      r = await (await fetch("/sing", { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: up.path }) })).json();
+    } catch (e) { setSt("启动失败：网络错误"); return; }
+    if (!r.ok) { setSt("启动失败：" + (r.error || "")); return; }
+    if (au) au.style.display = "none";
+    if (timer) clearInterval(timer);
+    timer = setInterval(poll, 2000); poll();
+  });
+  poll().then((running) => { if (running && !timer) timer = setInterval(poll, 2000); });
+})();

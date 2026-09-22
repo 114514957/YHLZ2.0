@@ -11,6 +11,7 @@ Serves assets/webui/* on port 8321 and streams Yuanheng turns back as SSE:
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import threading
 import time
@@ -130,6 +131,98 @@ def _synth(which: str, text: str, speaker: str = "Vivian"):
         instruct="自然地说，像和亲近的人聊天，别播音腔。")
     audio = wavs[0] if isinstance(wavs, (list, tuple)) else wavs
     return audio, sr
+
+
+# ---- workbench singing module (Phase B, ledger 0457) ----
+SING_DIR = _PROJECT_ROOT / "cache" / "sing"
+SING_PROMPT = _PROJECT_ROOT / "models" / "tts" / "refs" / "xiaoyi" / "ref01.wav"
+_sing_lock = threading.Lock()
+SING_STATE: dict = {"status": "idle", "step": "", "error": "", "result": "",
+                    "log": "", "started": 0.0, "finished": 0.0}
+
+
+def _wsl_path(p) -> str:
+    s = str(Path(p).resolve()).replace("\\", "/")
+    if len(s) > 1 and s[1] == ":":
+        return "/mnt/" + s[0].lower() + s[2:]
+    return s
+
+
+def _unload_tts() -> None:
+    try:
+        if _TTS.get("model") is not None:
+            _TTS["model"] = None
+            _TTS["key"] = None
+            import gc
+
+            gc.collect()
+            try:
+                import torch
+
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def sing_status() -> dict:
+    return {"ok": True, **dict(SING_STATE)}
+
+
+def sing_start(target: str, prompt: str = "") -> dict:
+    """Kick off a cover job in a background thread; returns immediately."""
+    tgt = Path(str(target or "")).resolve()
+    if not tgt.is_file():
+        return {"ok": False, "error": f"目标文件不存在：{target}"}
+    if not _sing_lock.acquire(blocking=False):
+        return {"ok": False, "error": "已有翻唱任务在跑"}
+    SING_STATE.update(status="running", step="排队启动", error="", result="",
+                      log="", started=time.time(), finished=0.0)
+    prm = Path(str(prompt or SING_PROMPT)).resolve()
+
+    def _job() -> None:
+        from backend import gpu_window
+
+        try:
+            SING_STATE["step"] = "卸载本地 TTS，腾显存"
+            _unload_tts()
+            SING_STATE["step"] = "唱窗：暂停 LLM 与看护"
+            win = gpu_window.open_window()
+            if not win.get("ok"):
+                raise RuntimeError(f"显存不足（free={win.get('free_mb')}MB）")
+            SING_STATE["step"] = "翻唱中（WSL SoulX-SVC，约 1-3 分钟）"
+            out = SING_DIR / "out"
+            out.mkdir(parents=True, exist_ok=True)
+            cmd = ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
+                   _wsl_path(_PROJECT_ROOT / "tools" / "wsl_soulx_svc.sh"),
+                   _wsl_path(prm), _wsl_path(tgt), _wsl_path(out)]
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=1800)
+            tail = (r.stdout or "")[-1200:] + (r.stderr or "")[-600:]
+            SING_STATE["log"] = tail[-900:]
+            gen = out / "generated.wav"
+            if r.returncode != 0 or not gen.is_file():
+                raise RuntimeError(f"SVC 失败 exit={r.returncode}")
+            SING_STATE.update(status="done", step="完成", result=str(gen))
+        except Exception as exc:  # noqa: BLE001
+            SING_STATE.update(status="error", step="失败",
+                              error=f"{type(exc).__name__}: {exc}"[:280])
+        finally:
+            SING_STATE["step"] = "恢复 LLM 与看护"
+            try:
+                gpu_window.close_window()
+            except Exception:
+                pass
+            SING_STATE["finished"] = time.time()
+            try:
+                _sing_lock.release()
+            except Exception:
+                pass
+
+    threading.Thread(target=_job, daemon=True, name="sing-job").start()
+    return {"ok": True, "status": "running"}
 
 
 class _StreamingSpeaker:
@@ -571,6 +664,20 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "settings": _settings_load()})
         elif p == "/devices":
             self._send_json(200, {"ok": True, "devices": _audio_devices()})
+        elif p == "/sing/status":
+            self._send_json(200, sing_status())
+        elif p == "/sing/result":
+            gen = SING_DIR / "out" / "generated.wav"
+            if not gen.is_file():
+                self._send_json(404, {"error": "还没有翻唱结果"})
+            else:
+                data = gen.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/wav")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
         else:
             self._send_json(404, {"error": "未找到"})
 
@@ -618,6 +725,40 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             return
         if p == "/tts":
             self._do_tts()
+            return
+        if p == "/sing":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                self._send_json(400, {"error": "请求格式错误"})
+                return
+            self._send_json(200, sing_start(str(body.get("target", "")),
+                                            str(body.get("prompt", ""))))
+            return
+        if p == "/sing/upload":
+            from urllib.parse import parse_qs, urlparse
+
+            name = (parse_qs(urlparse(self.path).query).get("name", [""])[0]
+                    or "upload.wav")
+            safe = "".join(c for c in Path(name).name
+                           if c.isalnum() or c in "._-")
+            if not safe:
+                safe = "upload.wav"
+            up = SING_DIR / "uploads"
+            up.mkdir(parents=True, exist_ok=True)
+            dst = up / safe
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                data = self.rfile.read(length) if length > 0 else b""
+                if len(data) < 100:
+                    raise ValueError("empty upload")
+                dst.write_bytes(data)
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(400, {"ok": False,
+                                      "error": type(exc).__name__})
+                return
+            self._send_json(200, {"ok": True, "path": str(dst)})
             return
         if p == "/session":
             try:

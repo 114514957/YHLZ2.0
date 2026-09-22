@@ -112,6 +112,17 @@
     </div>
   </section>
   <section class="card">
+    <h3>唱歌（翻唱）</h3>
+    <div class="qrow">
+      <input type="file" id="sing-file" accept="audio/*">
+      <button id="sing-go" class="btn-mini" type="button">开始翻唱</button>
+    </div>
+    <div id="sing-status" class="qrow" style="opacity:.8;font-size:12px">
+      选一首歌 → 开始：用元亨（Edge 克隆音）翻唱。人声/哼唱效果最好；翻唱期间元亨暂停聊天约 1-3 分钟（显存唱窗）。
+    </div>
+    <audio id="sing-audio" controls style="width:100%;display:none;margin-top:6px"></audio>
+  </section>
+  <section class="card">
     <h3>成长日志</h3>
     <ul id="growthList" class="ql"></ul>
   </section>
