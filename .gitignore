@@ -87,3 +87,6 @@ venv-train/
 
 # dsh SDK venv (v1.1)
 venv-dsh/
+
+# 试听音频素材（本地，不入库）
+音频素材/
