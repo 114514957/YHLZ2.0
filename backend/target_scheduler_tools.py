@@ -432,6 +432,33 @@ def memory_causal_handle(action: str = "list", src_id: str = "",
     return f"未知动作 {a}：list | add | undo"
 
 
+# ---- finished-songs library tools (ledger 0460) ----
+def song_list_text() -> str:
+    """List finished LOCAL songs (read-only). Generation stays in workbench."""
+    from backend import song_library
+
+    items = song_library.list_songs()
+    if not items:
+        return "歌曲库是空的（还没有完成的翻唱作品）"
+    return "\n".join(
+        f"{i + 1}. 《{s.get('title')}》 [{s.get('id')}]"
+        for i, s in enumerate(items[:20]))
+
+
+def song_play_handle(handle: str) -> str:
+    """Play a saved song on the local speaker."""
+    from backend import song_library
+
+    return song_library.play(str(handle or ""))
+
+
+def song_send_handle(handle: str) -> str:
+    """Send a saved song to the master over QQ (best effort)."""
+    from backend import song_library
+
+    return song_library.send_qq(str(handle or ""))
+
+
 def bind_memory_save_service(registry: CapabilityRegistry, service: Any,
                              source: str = "") -> None:
     """Rebind memory.save handler to a session-owned memory service."""
@@ -572,6 +599,34 @@ def scheduler_capabilities() -> list[Capability]:
             input=(),
             optional_input=("action", "src_id", "dst_id", "relation",
                             "confidence", "quote", "edge_id"),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="low",
+        ),
+        Capability(
+            name="song.list",
+            description="列出本地成品歌曲（翻唱作品库，只读）。发送/播放前先看它。",
+            handler=_handler_of(song_list_text),
+            input=(),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+            verify=_verify_nonempty,
+        ),
+        Capability(
+            name="song.play",
+            description="在本地扬声器播放一首成品歌曲（参数 id=歌曲 id/序号/歌名关键词，先 song.list）。",
+            handler=lambda p: song_play_handle(str(p.get("id", ""))),
+            input=("id",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="low",
+        ),
+        Capability(
+            name="song.send",
+            description="把一首本地成品歌曲发到老爹的 QQ（需 QQ 在线，离线会明确报错）。",
+            handler=lambda p: song_send_handle(str(p.get("id", ""))),
+            input=("id",),
             requires=(SCHEDULER_POLICY,),
             side_effect=True,
             risk="low",

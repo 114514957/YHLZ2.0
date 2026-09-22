@@ -131,6 +131,14 @@ class TestDaemon(unittest.TestCase):
         self.assertEqual(data[:4], b"RIFF")
         self.assertGreater(len(data), 44)
 
+    def test_songs_route(self):
+        """ledger 0460: /songs lists the finished-song library."""
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{self.port}/songs", timeout=10) as r:
+            out = json.loads(r.read())
+        self.assertTrue(out["ok"])
+        self.assertIsInstance(out["items"], list)
+
     def test_turn_blocked_during_sing(self):
         """ledger 0459: chat turns are refused while the SVC window runs."""
         from backend import gpu_lock

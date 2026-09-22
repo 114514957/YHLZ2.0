@@ -691,7 +691,7 @@ class _Handler(ConsoleHandler):
     def do_GET(self):
         if self._ui_route("GET"):
             return
-        if self.path.startswith("/sing"):
+        if self.path.startswith(("/sing", "/songs")):
             self.console_do_GET()
             return
         if self.path.startswith("/health"):
@@ -702,8 +702,8 @@ class _Handler(ConsoleHandler):
     def do_POST(self):
         if self._ui_route("POST"):
             return
-        if self.path.startswith("/sing"):
-            # upload/sing routes read the raw body themselves
+        if self.path.startswith(("/sing", "/songs")):
+            # upload/sing/song routes read the raw body themselves
             self.console_do_POST()
             return
         length = int(self.headers.get("Content-Length", 0))

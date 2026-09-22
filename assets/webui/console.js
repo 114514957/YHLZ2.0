@@ -496,18 +496,47 @@ window.addEventListener("load", () => {
   if (!go) return;
   let timer = null;
   const setSt = (t) => { if (st) st.textContent = t; };
+  async function loadSongs() {
+    const box = $("songs-list");
+    if (!box) return;
+    try {
+      const j = await (await fetch("/songs")).json();
+      box.innerHTML = "";
+      const items = j.items || [];
+      if (!items.length) { box.textContent = "歌曲库：暂无成品"; return; }
+      const label = document.createElement("span");
+      label.textContent = "歌曲库：";
+      box.appendChild(label);
+      for (const s of items) {
+        const b = document.createElement("button");
+        b.className = "btn-mini";
+        b.textContent = "▶ " + (s.title || s.id);
+        b.onclick = () => {
+          if (au) {
+            au.src = "/songs/audio?id=" + encodeURIComponent(s.id);
+            au.style.display = "block";
+            au.play();
+          }
+        };
+        box.appendChild(b);
+      }
+    } catch (e) {}
+  }
   async function poll() {
     try {
       const s = await (await fetch("/sing/status")).json();
       if (s.status === "running") {
         const el = s.started ? Math.round(Date.now() / 1000 - s.started) : 0;
         setSt("进行中：" + (s.step || "") + "（" + el + "s）");
+        if (go) go.disabled = true;
         return true;
       }
       if (timer) { clearInterval(timer); timer = null; }
+      if (go) go.disabled = false;
       if (s.status === "done") {
-        setSt("完成 ✓");
+        setSt("完成 ✓（已存入歌曲库）");
         if (au) { au.src = "/sing/result?t=" + Date.now(); au.style.display = "block"; }
+        loadSongs();
       } else if (s.status === "error") {
         setSt("失败：" + (s.error || "未知错误"));
       }
@@ -538,4 +567,5 @@ window.addEventListener("load", () => {
     timer = setInterval(poll, 2000); poll();
   });
   poll().then((running) => { if (running && !timer) timer = setInterval(poll, 2000); });
+  loadSongs();
 })();

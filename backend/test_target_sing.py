@@ -31,7 +31,12 @@ class SingModuleTest(unittest.TestCase):
         cs.SING_PROMPT = prompt
         cs.threading.Thread = _SyncThread
         cs.SING_STATE.update(status="idle", step="", error="", result="",
-                             log="", started=0.0, finished=0.0)
+                             log="", started=0.0, finished=0.0, song_id="")
+        import backend.song_library as sl
+
+        self._sl_dir, self._sl_idx = sl.SONGS_DIR, sl.INDEX
+        sl.SONGS_DIR = self.tmp / "songs"
+        sl.INDEX = sl.SONGS_DIR / "songs.json"
         self._gw_open = gw.open_window
         self._gw_close = gw.close_window
         self.closed = []
@@ -47,6 +52,10 @@ class SingModuleTest(unittest.TestCase):
         cs.subprocess.run = self._old["run"]
         gw.open_window = self._gw_open
         gw.close_window = self._gw_close
+        import backend.song_library as sl
+
+        sl.SONGS_DIR, sl.INDEX = getattr(self, "_sl_dir", sl.SONGS_DIR), \
+            getattr(self, "_sl_idx", sl.INDEX)
 
     def test_wsl_path_conversion(self):
         p = pathlib.Path(r"C:\Users\ACE\song.mp3")
@@ -90,6 +99,11 @@ class SingModuleTest(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertIn("wsl_soulx_prep.sh", " ".join(map(str, calls[0])))
         self.assertIn("wsl_soulx_svc.sh", " ".join(map(str, calls[1])))
+        # finished song auto-saved to the local library (ledger 0460)
+        import backend.song_library as sl
+
+        self.assertTrue(cs.SING_STATE["song_id"])
+        self.assertEqual(len(sl.list_songs()), 1)
 
     def test_job_failure_restores_and_reports(self):
         calls = []

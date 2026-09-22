@@ -189,7 +189,7 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
         return {"ok": False, "error": "已有翻唱任务在跑"}
     SING_STATE.update(status="running", step="排队启动", error="", result="",
                       log="", started=time.time(), finished=0.0,
-                      vocal_sep=bool(vocal_sep))
+                      vocal_sep=bool(vocal_sep), song_id="")
     prm = Path(str(prompt or SING_PROMPT)).resolve()
 
     def _job() -> None:
@@ -234,7 +234,20 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
             gen = out / "generated.wav"
             if r.returncode != 0 or not gen.is_file():
                 raise RuntimeError(f"SVC 失败 exit={r.returncode}")
-            SING_STATE.update(status="done", step="完成", result=str(gen))
+            # finished songs are saved locally; QQ/main chain may only use
+            # library items (ledger 0460)
+            sid = ""
+            try:
+                from backend import song_library
+
+                item = song_library.save(title=Path(tgt).stem, wav_path=gen,
+                                         source="workbench-cover",
+                                         target=str(tgt))
+                sid = str(item.get("id") or "")
+            except Exception:
+                sid = ""
+            SING_STATE.update(status="done", step="完成", result=str(gen),
+                              song_id=sid)
         except Exception as exc:  # noqa: BLE001
             SING_STATE.update(status="error", step="失败",
                               error=f"{type(exc).__name__}: {exc}"[:280])
@@ -699,6 +712,28 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "devices": _audio_devices()})
         elif p == "/sing/status":
             self._send_json(200, sing_status())
+        elif p == "/songs":
+            from backend import song_library
+
+            self._send_json(200, {"ok": True,
+                                  "items": song_library.list_songs()})
+        elif p == "/songs/audio":
+            from urllib.parse import parse_qs, urlparse
+
+            from backend import song_library
+
+            sid = parse_qs(urlparse(self.path).query).get("id", [""])[0]
+            f = song_library.song_path(sid)
+            if f is None:
+                self._send_json(404, {"error": "歌曲不存在"})
+            else:
+                data = f.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/wav")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
         elif p == "/sing/result":
             gen = SING_DIR / "out" / "generated.wav"
             if not gen.is_file():
@@ -832,6 +867,28 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                                       "error": type(exc).__name__})
                 return
             self._send_json(200, {"ok": True, "path": str(dst)})
+            return
+        if p in ("/songs/play", "/songs/send"):
+            from backend import gpu_lock, song_library
+
+            if not gpu_lock.chat_enter():
+                self._send_json(409, {"ok": False, "busy": True,
+                                      "error": "元亨正在唱歌（GPU 互锁）"})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                gpu_lock.chat_exit()
+                self._send_json(400, {"error": "请求格式错误"})
+                return
+            try:
+                sid = str(body.get("id", "")).strip()
+                msg = (song_library.play(sid) if p.endswith("play")
+                       else song_library.send_qq(sid))
+                self._send_json(200, {"ok": True, "message": msg})
+            finally:
+                gpu_lock.chat_exit()
             return
         if p == "/session":
             try:
