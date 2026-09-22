@@ -31,7 +31,8 @@ def _save_index(d: dict) -> None:
                      encoding="utf-8")
 
 
-def save(title: str, wav_path, source: str = "", target: str = "") -> dict:
+def save(title: str, wav_path, source: str = "", target: str = "",
+         tags: list | None = None) -> dict:
     """Copy a finished wav into the library; returns its index item."""
     src = pathlib.Path(wav_path)
     if not src.is_file():
@@ -46,10 +47,23 @@ def save(title: str, wav_path, source: str = "", target: str = "") -> dict:
         dst.write_bytes(src.read_bytes())
         item = {"id": sid, "title": str(title or sid)[:60], "file": dst.name,
                 "source": str(source or "")[:60],
-                "target": str(target or "")[:120], "created": time.time()}
+                "target": str(target or "")[:120], "created": time.time(),
+                "tags": [str(t)[:20] for t in (tags or [])][:6]}
         d[sid] = item
         _save_index(d)
         return item
+
+
+def set_tags(song_id: str, tags: list) -> str:
+    """Attach mood/topic tags for contextual calls (ledger 0463)."""
+    with _lock:
+        d = _load()
+        it = d.get(str(song_id))
+        if it is None:
+            return f"没有这首歌：{song_id}"
+        it["tags"] = [str(t)[:20] for t in (tags or [])][:6]
+        _save_index(d)
+        return f"已标注《{it.get('title')}》：{'、'.join(it['tags']) or '（空）'}"
 
 
 def list_songs() -> list[dict]:
@@ -74,6 +88,9 @@ def resolve(handle: str) -> dict | None:
             return songs[i]
     for s in songs:
         if h and h in str(s.get("title") or ""):
+            return s
+    for s in songs:
+        if any(h and h in str(t) for t in (s.get("tags") or [])):
             return s
     return None
 

@@ -38,6 +38,15 @@ class SongLibraryTest(unittest.TestCase):
         self.assertIn("测试曲", msg)
         self.assertIn("没有这首歌", sl.play("nope"))
 
+    def test_tags_save_and_resolve(self):
+        """ledger 0463: songs carry mood tags for contextual calls."""
+        a = sl.save("翻唱A", self.wav, tags=["欢快", "轻快"])
+        self.assertIn("欢快", a["tags"])
+        self.assertEqual(sl.resolve("欢快")["id"], a["id"])
+        self.assertIn("已标注", sl.set_tags(a["id"], ["温柔"]))
+        self.assertEqual(sl.resolve("温柔")["id"], a["id"])
+        self.assertIsNone(sl.resolve("欢快"))  # tags replaced
+
     def test_list_tool_text(self):
         from backend.target_scheduler_tools import song_list_text
 

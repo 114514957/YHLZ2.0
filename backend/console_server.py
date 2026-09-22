@@ -52,7 +52,36 @@ CLONE_CFG = {
     "ref": "ref01",
     "label": "0.6B·Edge克隆(Xiaoyi)",
 }
+# ledger 0463: accepted voices live side by side and are picked by emotion —
+# xiaoyi (calm default) vs bright (designed 清亮俏皮, for upbeat lines).
+CLONE_VOICES: dict = {
+    "xiaoyi": dict(CLONE_CFG),
+    "bright": {
+        "model": CLONE_CFG["model"],
+        "ref_dir": _PROJECT_ROOT / "models" / "tts" / "refs" / "design_bright",
+        "ref": "ref01",
+        "label": "设计嗓·清亮俏皮",
+    },
+}
+VOICE_BY_EMOTION = {"happy": "bright", "surprised": "bright",
+                    "excited": "bright", "angry": "bright"}
 _TTS = {"model": None, "key": None}
+
+
+def _pick_clone_voice(which: str, text: str) -> str:
+    """clone / clone:auto -> emotion-based pick; clone:<name> explicit."""
+    w = str(which or "").strip().lower()
+    if w.startswith("clone:"):
+        name = w.split(":", 1)[1]
+        if name in CLONE_VOICES:
+            return name
+    try:
+        from backend.emotion_classifier import classify_emotion
+
+        emo = str((classify_emotion(str(text)) or {}).get("emotion") or "")
+    except Exception:
+        emo = ""
+    return VOICE_BY_EMOTION.get(emo, "xiaoyi")
 
 
 def _get_engine(which: str):
@@ -64,7 +93,7 @@ def _get_engine(which: str):
     from faster_qwen3_tts import FasterQwen3TTS
 
     key = str(which or "0.6B").strip().lower()
-    key = "clone" if key == "clone" else "0.6B"
+    key = "clone" if key.startswith("clone") else "0.6B"
     path = CLONE_CFG["model"] if key == "clone" else TTS_DIRS["0.6B"]
     if _TTS["model"] is None or _TTS["key"] != key:
         try:
@@ -106,14 +135,16 @@ def _synth(which: str, text: str, speaker: str = "Vivian"):
     "clone" = zero-shot Edge(Xiaoyi) timbre via the 0.6B-Base model
     (ledger 0453/0454); anything else = CustomVoice preset speaker.
     Clone failures degrade to the CustomVoice voice instead of silence."""
-    if str(which or "").strip().lower() == "clone":
+    if str(which or "").strip().lower().startswith("clone"):
         try:
+            voice = _pick_clone_voice(which, text)
+            cfg = CLONE_VOICES.get(voice) or CLONE_VOICES["xiaoyi"]
             m = _get_engine("clone")
-            ref_dir = Path(CLONE_CFG["ref_dir"])
-            ref_wav = ref_dir / f"{CLONE_CFG['ref']}.wav"
+            ref_dir = Path(cfg["ref_dir"])
+            ref_wav = ref_dir / f"{cfg['ref']}.wav"
             ref_txt = ""
             try:
-                ref_txt = (ref_dir / f"{CLONE_CFG['ref']}.txt").read_text(
+                ref_txt = (ref_dir / f"{cfg['ref']}.txt").read_text(
                     encoding="utf-8").strip()
             except Exception:
                 pass
