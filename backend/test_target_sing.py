@@ -130,6 +130,32 @@ class SingModuleTest(unittest.TestCase):
         for k in ("status", "step", "error", "result"):
             self.assertIn(k, st)
 
+    def test_interlock_blocks_second_job_and_releases(self):
+        """ledger 0459: one singing job owns the GPU; released on finish."""
+        import backend.gpu_lock as gl
+
+        def fake_run(cmd, **kw):
+            fake_run.n = getattr(fake_run, "n", 0) + 1
+            if fake_run.n == 1:
+                return types.SimpleNamespace(returncode=0, stdout="",
+                                             stderr="")
+            out = cs.SING_DIR / "out"
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "generated.wav").write_bytes(b"RIFF")
+            return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        cs.subprocess.run = fake_run
+        self.assertTrue(gl.acquire_sing())  # simulate a running job
+        try:
+            res = cs.sing_start(str(self.target))
+            self.assertFalse(res["ok"])
+            self.assertIn("互锁", res["error"])
+        finally:
+            gl.release_sing()
+        res = cs.sing_start(str(self.target))
+        self.assertTrue(res["ok"])
+        self.assertEqual(gl.owner(), "")  # released after the sync job
+
 
 if __name__ == "__main__":
     unittest.main()

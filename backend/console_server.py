@@ -180,7 +180,12 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
     tgt = Path(str(target or "")).resolve()
     if not tgt.is_file():
         return {"ok": False, "error": f"目标文件不存在：{target}"}
+    from backend import gpu_lock
+
+    if not gpu_lock.acquire_sing():
+        return {"ok": False, "error": "GPU 任务互锁：已有唱歌任务在跑"}
     if not _sing_lock.acquire(blocking=False):
+        gpu_lock.release_sing()
         return {"ok": False, "error": "已有翻唱任务在跑"}
     SING_STATE.update(status="running", step="排队启动", error="", result="",
                       log="", started=time.time(), finished=0.0,
@@ -206,6 +211,11 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
                 raise RuntimeError(
                     f"预处理失败 exit={r0.returncode}: "
                     f"{(r0.stderr or '')[-200:]}")
+            # interlock: block new chat/TTS, then let in-flight turns drain
+            SING_STATE["step"] = "等待聊天结束（GPU 互锁）"
+            if not gpu_lock.enter_window():
+                raise RuntimeError("互锁状态异常（无法进入唱窗）")
+            gpu_lock.wait_chat_idle(timeout=120)
             SING_STATE["step"] = "唱窗：暂停 LLM 与看护"
             win = gpu_window.open_window()
             if not win.get("ok"):
@@ -232,6 +242,10 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True) -> dict:
             SING_STATE["step"] = "恢复 LLM 与看护"
             try:
                 gpu_window.close_window()
+            except Exception:
+                pass
+            try:
+                gpu_lock.release_sing()
             except Exception:
                 pass
             SING_STATE["finished"] = time.time()
@@ -706,19 +720,49 @@ class ConsoleHandler(BaseHTTPRequestHandler):
     def console_do_POST(self):
         p = self.path.split("?", 1)[0]
         if p == "/talk":
-            self._do_talk()
+            from backend import gpu_lock
+
+            if not gpu_lock.chat_enter():
+                self._send_json(409, {"ok": False, "busy": True,
+                                      "error": "元亨正在唱歌（GPU 互锁），"
+                                               "唱完再聊~"})
+                return
+            try:
+                self._do_talk()
+            finally:
+                gpu_lock.chat_exit()
             return
         if p == "/tap":
+            from backend import gpu_lock
+
+            if not gpu_lock.chat_enter():
+                self._send_json(409, {"ok": False, "busy": True,
+                                      "error": "元亨正在唱歌（GPU 互锁）"})
+                return
             try:
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")
             except Exception:
+                gpu_lock.chat_exit()
                 self._send_json(400, {"error": "请求格式错误"})
                 return
-            self._send_json(200, self._tap(body))
+            try:
+                self._send_json(200, self._tap(body))
+            finally:
+                gpu_lock.chat_exit()
             return
         if p == "/voice":
-            self._do_voice()
+            from backend import gpu_lock
+
+            if not gpu_lock.chat_enter():
+                self._send_json(409, {"ok": False, "busy": True,
+                                      "error": "元亨正在唱歌（GPU 互锁），"
+                                               "唱完再聊~"})
+                return
+            try:
+                self._do_voice()
+            finally:
+                gpu_lock.chat_exit()
             return
         if p == "/reset":
             self._do_reset()
@@ -743,7 +787,16 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, self._control(body))
             return
         if p == "/tts":
-            self._do_tts()
+            from backend import gpu_lock
+
+            if not gpu_lock.chat_enter():
+                self._send_json(409, {"ok": False, "busy": True,
+                                      "error": "元亨正在唱歌（GPU 互锁）"})
+                return
+            try:
+                self._do_tts()
+            finally:
+                gpu_lock.chat_exit()
             return
         if p == "/sing":
             try:

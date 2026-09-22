@@ -131,6 +131,35 @@ class TestDaemon(unittest.TestCase):
         self.assertEqual(data[:4], b"RIFF")
         self.assertGreater(len(data), 44)
 
+    def test_turn_blocked_during_sing(self):
+        """ledger 0459: chat turns are refused while the SVC window runs."""
+        from backend import gpu_lock
+
+        self.assertTrue(gpu_lock.acquire_sing())
+        self.assertTrue(gpu_lock.enter_window())
+        try:
+            out = self.rt.turn("你在吗")
+        finally:
+            gpu_lock.release_sing()
+        self.assertTrue(out.get("busy"))
+        self.assertIn("唱歌", out["answer"])
+
+    def test_talk_route_blocked_during_sing(self):
+        from backend import gpu_lock
+
+        self.assertTrue(gpu_lock.acquire_sing())
+        self.assertTrue(gpu_lock.enter_window())
+        try:
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{self.port}/talk",
+                data=json.dumps({"text": "hi"}).encode(),
+                headers={"Content-Type": "application/json"})
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                urllib.request.urlopen(req, timeout=10)
+            self.assertEqual(ctx.exception.code, 409)
+        finally:
+            gpu_lock.release_sing()
+
     def test_turn_triggers_idle_schedule_check(self):
         """B4 (ledger 0437): a finished turn immediately checks due plans."""
         calls = []

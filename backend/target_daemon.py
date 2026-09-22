@@ -242,6 +242,19 @@ class DaemonRuntime:
 
     def turn(self, text: str, channel: str = "private",
              images: list | None = None, audio: list | None = None) -> dict:
+        """GPU interlock (ledger 0459): refuse new turns during the SVC window."""
+        from backend import gpu_lock
+
+        if not gpu_lock.chat_enter():
+            return {"answer": gpu_lock.busy_message(), "tool_uses": [],
+                    "iterations": 0, "busy": True}
+        try:
+            return self._turn_impl(text, channel, images=images, audio=audio)
+        finally:
+            gpu_lock.chat_exit()
+
+    def _turn_impl(self, text: str, channel: str = "private",
+                   images: list | None = None, audio: list | None = None) -> dict:
         key = self._norm_ui_channel(channel)
         # owner dev console (#dev/#a/#ds/#y/#n/#push) — not a conversation turn
         # (ledger 0407): mirrors the QQ bridge without hijacking chat.
@@ -753,10 +766,15 @@ class _Handler(ConsoleHandler):
             return
         if self.path == "/tts":
             # A4b (ledger 0454): synthesize one line -> WAV bytes for qq_bot
+            from backend import gpu_lock
             from backend.console_server import (
                 _settings_load, _synth, _wav_bytes,
             )
 
+            if gpu_lock.chat_blocked():
+                self._send(409, {"ok": False, "busy": True,
+                                 "error": "元亨正在唱歌（GPU 互锁）"})
+                return
             text = str(payload.get("text", "")).strip()[:200]
             if not text:
                 self._send(400, {"error": "empty text"})
