@@ -27,14 +27,21 @@ else
 fi
 
 # target: separation (optional) + F0
+# ledger 0466: demucs is the default separator (seconds vs tens of minutes on
+# the 8GB card); set SOULX_SEP_MODE=roformer for the legacy BS-Roformer path.
 EXT="${TARGET##*.}"
 cp "$TARGET" "example/audio/target_user.$EXT"
 if [ "$SEP" = "1" ]; then
-  echo "[prep] target: vocal separation + F0 (slow, chat stays online)"
-  python -m preprocess.pipeline --audio_path "example/audio/target_user.$EXT" \
-    --save_dir example/transcriptions/target_user --language Mandarin \
-    --device cuda --vocal_sep True --max_merge_duration 120000 \
-    --midi_transcribe False
+  if [ "${SOULX_SEP_MODE:-demucs}" = "roformer" ]; then
+    echo "[prep] target: BS-Roformer separation + F0 (quality mode, slow)"
+    python -m preprocess.pipeline --audio_path "example/audio/target_user.$EXT" \
+      --save_dir example/transcriptions/target_user --language Mandarin \
+      --device cuda --vocal_sep True --max_merge_duration 120000 \
+      --midi_transcribe False
+  else
+    echo "[prep] target: demucs fast separation + F0"
+    bash "$(dirname "$0")/wsl_fast_prep.sh" "$TARGET" "$TAG"
+  fi
 else
   echo "[prep] target: F0 only (fast)"
   python -m preprocess.pipeline --audio_path "example/audio/target_user.$EXT" \
