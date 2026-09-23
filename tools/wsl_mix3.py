@@ -3,7 +3,7 @@
 
 Usage:
   wsl_mix3.py <lead_converted.wav> <backing.wav> <bgm.wav> <out.wav>
-              [--lead-gain 1.0] [--backing-gain 0.85] [--bgm-gain 0.85]
+              [--lead-gain 1.4] [--backing-gain 0.8] [--bgm-gain 0.8]
               [--peak 0.99]
 
 All inputs are resampled to the bgm sample rate (or 44.1k), mono is doubled,
@@ -21,9 +21,9 @@ def main() -> int:
     ap.add_argument("backing")
     ap.add_argument("bgm")
     ap.add_argument("out")
-    ap.add_argument("--lead-gain", type=float, default=1.0)
-    ap.add_argument("--backing-gain", type=float, default=0.85)
-    ap.add_argument("--bgm-gain", type=float, default=0.85)
+    ap.add_argument("--lead-gain", type=float, default=1.4)
+    ap.add_argument("--backing-gain", type=float, default=0.8)
+    ap.add_argument("--bgm-gain", type=float, default=0.8)
     ap.add_argument("--peak", type=float, default=0.99)
     ap.add_argument("--target-sr", type=int, default=44100)
     args = ap.parse_args()

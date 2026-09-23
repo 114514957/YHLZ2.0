@@ -70,9 +70,9 @@ def main() -> int:
     ap.add_argument("--3stem", dest="three_stem", action="store_true",
                     help="3-stem mode: lead(干声)/backing(和声)/bgm(伴奏); "
                          "replace lead only, then mix all three back")
-    ap.add_argument("--lead-gain", type=float, default=1.0)
-    ap.add_argument("--backing-gain", type=float, default=0.85)
-    ap.add_argument("--bgm-gain", type=float, default=0.85)
+    ap.add_argument("--lead-gain", type=float, default=1.4)
+    ap.add_argument("--backing-gain", type=float, default=0.8)
+    ap.add_argument("--bgm-gain", type=float, default=0.8)
     ap.add_argument("--window-mb", type=int, default=6500)
     ap.add_argument("--prep-timeout", type=float, default=2700)
     ap.add_argument("--svc-timeout", type=float, default=1800)
