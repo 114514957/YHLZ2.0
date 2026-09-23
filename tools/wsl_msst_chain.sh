@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# MSST toolkit chain (2026-09-23): vocals/instrumental (Kim) ->
-# lead(主唱)/harmony(和声) (aufr33 karaoke) -> outputs {lead,backing,bgm}.wav
+# MSST toolkit chain (2026-09-23; fixed 0472): vocals/instrumental (Kim) ->
+# lead(主唱+同度叠唱)/harmony(真和三度) via MDX karaoke -> {lead,backing,bgm}.wav
+# NOTE: aufr33 roformer karaoke was replaced — it left the original unison
+# double in the "harmony" stem, so the original voice stayed in the mix.
 # Usage: wsl_msst_chain.sh <mix_audio> <out_dir>
 set -e
 MIX="${1:?usage: wsl_msst_chain.sh <mix> <out_dir>}"
@@ -12,7 +14,7 @@ cd "$GUI"
 export HF_ENDPOINT=https://hf-mirror.com
 
 echo "[chain] reset tmp"
-rm -rf "$TMP"; mkdir -p "$TMP/in" "$TMP/voc" "$TMP/kara/in" "$TMP/kara/out"
+rm -rf "$TMP"; mkdir -p "$TMP/in" "$TMP/voc" "$TMP/kara/out"
 cp "$MIX" "$TMP/in/"
 
 echo "[chain] 1/2 vocals+instrumental (Kim)"
@@ -25,17 +27,15 @@ echo "[chain] 1/2 vocals+instrumental (Kim)"
 VOC=$(find "$TMP/voc" -name "vocals.wav" | head -1)
 BGM=$(find "$TMP/voc" -name "instrumental.wav" | head -1)
 [ -n "$VOC" ] && [ -n "$BGM" ] || { echo "[chain] vocals step failed"; tail -5 "$TMP/voc.log"; exit 2; }
-cp "$VOC" "$TMP/kara/in/"
 
-echo "[chain] 2/2 lead+harmony (aufr33 karaoke)"
-"$PY" inference.py --model_type mel_band_roformer \
-  --config_path configs/config_mel_band_roformer_karaoke.yaml \
-  --start_check_point pretrain/mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt \
-  --input_folder "$TMP/kara/in" --store_dir "$TMP/kara/out" --extract_instrumental \
-  > "$TMP/kara.log" 2>&1
+echo "[chain] 2/2 lead+harmony (MDX karaoke; keeps unison doubles with lead)"
+"$HOME/soulx/venv/bin/audio-separator" "$VOC" \
+  --model_filename UVR_MDXNET_KARA_2.onnx \
+  --model_file_dir "$HOME/soulx/sep_models" \
+  --output_dir "$TMP/kara/out" --output_format WAV > "$TMP/kara.log" 2>&1
 
-LEAD=$(find "$TMP/kara/out" -name "karaoke.wav" | head -1)
-HARM=$(find "$TMP/kara/out" -name "instrumental.wav" | head -1)
+LEAD=$(find "$TMP/kara/out" -name "*_(Vocals)_*" | head -1)
+HARM=$(find "$TMP/kara/out" -name "*_(Instrumental)_*" | head -1)
 [ -n "$LEAD" ] && [ -n "$HARM" ] || { echo "[chain] karaoke step failed"; tail -5 "$TMP/kara.log"; exit 3; }
 
 mkdir -p "$OUT"
