@@ -142,8 +142,8 @@ def main() -> int:
             raise RuntimeError(f"svc failed rc={r1.returncode}")
 
         source_wav = gen
+        stem_dir = _ROOT / "cache" / "sing" / "stem3"
         if args.three_stem:
-            stem_dir = _ROOT / "cache" / "sing" / "stem3"
             mixed = out / "mixed.wav"
             r3 = _run([_wsl_path(_ROOT / "tools" / "wsl_mix3.sh"),
                        _wsl_path(gen), _wsl_path(stem_dir / "backing.wav"),
@@ -157,11 +157,36 @@ def main() -> int:
                 raise RuntimeError(f"mixdown failed rc={r3.returncode}")
             source_wav = mixed
 
-        out_dir.mkdir(parents=True, exist_ok=True)
+        # ledger 0476: one folder per production inside 翻唱产出; type-first
+        # names (干声/和声/伴奏/AI主唱/成品) — operator naming convention.
         stem = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", tgt.stem)[:40] or "cover"
         suffix = "_三轨" if args.three_stem else ""
-        final = out_dir / f"{stem}_{vtag}{suffix}_{time.strftime('%Y%m%d-%H%M%S')}.wav"
+        run_dir = out_dir / f"{time.strftime('%Y%m%d-%H%M%S')}_{stem}"
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        vocal_src = ("/root/soulx/SoulX-Singer/example/transcriptions/"
+                     "target_user/vocal.wav")
+        # 干声 = SVC input; 和声/伴奏 = stems (three-stem mode)
+        staged = [("干声", vocal_src)]
+        if args.three_stem:
+            staged += [("和声", _wsl_path(stem_dir / "backing.wav")),
+                       ("伴奏", _wsl_path(stem_dir / "bgm.wav"))]
+        for type_name, wsl_src in staged:
+            dst = run_dir / f"{type_name}_{stem}.wav"
+            r2 = _run(["-c", f"cp {wsl_src!r} {_wsl_path(dst)!r}"], timeout=120)
+            if r2.returncode == 0:
+                result.setdefault("staged", []).append(str(dst))
+
+        ai_lead = run_dir / f"AI主唱_{stem}_{vtag}.wav"
+        shutil.copy2(gen, ai_lead)
+        final = run_dir / f"成品_{stem}_{vtag}{suffix}.wav"
         shutil.copy2(source_wav, final)
+        (run_dir / "说明.txt").write_text(
+            f"元亨翻唱 · 生产档案\n源曲：{tgt}\n流程：demucs → MDX卡拉OK → "
+            f"DDSP-SVC 换主唱（归一化+th-80）{'+ 三轨混回' if args.three_stem else ''}\n"
+            f"嗓：{vtag}；增益：lead={args.lead_gain} back={args.backing_gain} "
+            f"bgm={args.bgm_gain}\n", encoding="utf-8")
+        result["run_dir"] = str(run_dir)
         result["cover"] = str(final)
 
         sid = ""
@@ -178,8 +203,6 @@ def main() -> int:
             result["library_error"] = str(exc)[:160]
         result["song_id"] = sid
 
-        vocal_src = ("/root/soulx/SoulX-Singer/example/transcriptions/"
-                     "target_user/vocal.wav")
         vocal_dst = _VOCAL_CACHE / f"{stem}_vocal.wav"
         if args.keep_vocal:
             _VOCAL_CACHE.mkdir(parents=True, exist_ok=True)
