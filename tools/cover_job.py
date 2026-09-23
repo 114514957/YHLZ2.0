@@ -24,6 +24,11 @@ import subprocess
 import sys
 import time
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
@@ -62,6 +67,12 @@ def main() -> int:
                     help="SVC with --auto_shift (key may change; default raw)")
     ap.add_argument("--fast-sep", action="store_true",
                     help="demucs fast separation instead of BS-Roformer prep")
+    ap.add_argument("--3stem", dest="three_stem", action="store_true",
+                    help="3-stem mode: lead(干声)/backing(和声)/bgm(伴奏); "
+                         "replace lead only, then mix all three back")
+    ap.add_argument("--lead-gain", type=float, default=1.0)
+    ap.add_argument("--backing-gain", type=float, default=0.85)
+    ap.add_argument("--bgm-gain", type=float, default=0.85)
     ap.add_argument("--window-mb", type=int, default=6500)
     ap.add_argument("--prep-timeout", type=float, default=2700)
     ap.add_argument("--svc-timeout", type=float, default=1800)
@@ -87,6 +98,22 @@ def main() -> int:
         r0 = None
         if args.no_prep:
             result["prep_rc"] = "skipped"
+        elif args.three_stem:
+            stem_dir = _ROOT / "cache" / "sing" / "stem3"
+            stem_dir.mkdir(parents=True, exist_ok=True)
+            r0 = _run([_wsl_path(_ROOT / "tools" / "wsl_stem3_split.sh"),
+                       _wsl_path(tgt), _wsl_path(stem_dir)],
+                      timeout=args.prep_timeout)
+            result["stem3_rc"] = r0.returncode
+            result["stem3_tail"] = (r0.stdout or "")[-300:] + (r0.stderr or "")[-200:]
+            if r0.returncode != 0:
+                raise RuntimeError(f"stem3 split failed rc={r0.returncode}")
+            r0b = _run([_wsl_path(_ROOT / "tools" / "wsl_f0_prep.sh"),
+                        _wsl_path(stem_dir / "lead.wav")], timeout=900)
+            result["f0_rc"] = r0b.returncode
+            result["f0_tail"] = (r0b.stdout or "")[-200:] + (r0b.stderr or "")[-200:]
+            if r0b.returncode != 0:
+                raise RuntimeError(f"f0 prep failed rc={r0b.returncode}")
         else:
             prep = ("wsl_fast_prep.sh" if args.fast_sep
                     else "wsl_soulx_prep.sh")
@@ -114,11 +141,42 @@ def main() -> int:
         if r1.returncode != 0 or not gen.is_file():
             raise RuntimeError(f"svc failed rc={r1.returncode}")
 
+        source_wav = gen
+        if args.three_stem:
+            stem_dir = _ROOT / "cache" / "sing" / "stem3"
+            mixed = out / "mixed.wav"
+            r3 = _run([_wsl_path(_ROOT / "tools" / "wsl_mix3.sh"),
+                       _wsl_path(gen), _wsl_path(stem_dir / "backing.wav"),
+                       _wsl_path(stem_dir / "bgm.wav"), _wsl_path(mixed),
+                       "--lead-gain", str(args.lead_gain),
+                       "--backing-gain", str(args.backing_gain),
+                       "--bgm-gain", str(args.bgm_gain)], timeout=600)
+            result["mix_rc"] = r3.returncode
+            result["mix_tail"] = (r3.stdout or "")[-200:] + (r3.stderr or "")[-200:]
+            if r3.returncode != 0 or not mixed.is_file():
+                raise RuntimeError(f"mixdown failed rc={r3.returncode}")
+            source_wav = mixed
+
         out_dir.mkdir(parents=True, exist_ok=True)
         stem = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", tgt.stem)[:40] or "cover"
-        final = out_dir / f"{stem}_{vtag}_{time.strftime('%Y%m%d-%H%M%S')}.wav"
-        shutil.copy2(gen, final)
+        suffix = "_三轨" if args.three_stem else ""
+        final = out_dir / f"{stem}_{vtag}{suffix}_{time.strftime('%Y%m%d-%H%M%S')}.wav"
+        shutil.copy2(source_wav, final)
         result["cover"] = str(final)
+
+        sid = ""
+        try:
+            from backend import song_library
+
+            tags = ["翻唱", "三轨"] if args.three_stem else ["翻唱"]
+            title = f"{stem}（元亨翻唱·{vtag}{'·三轨' if args.three_stem else ''}）"
+            item = song_library.save_ref(title=title, wav_path=final,
+                                         source="cover-job", target=str(tgt),
+                                         tags=tags)
+            sid = str(item.get("id") or "")
+        except Exception as exc:  # noqa: BLE001
+            result["library_error"] = str(exc)[:160]
+        result["song_id"] = sid
 
         vocal_src = ("/root/soulx/SoulX-Singer/example/transcriptions/"
                      "target_user/vocal.wav")
