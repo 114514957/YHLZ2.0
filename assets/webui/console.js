@@ -182,6 +182,12 @@ async function loadSettings() {
     // 8GB 显存只保留 0.6B：旧的 1.7B 设置归一化（ledger 0448）
     $("cf-ttsmodel").value = (s.tts_model === "1.7B" || !s.tts_model)
       ? "0.6B" : s.tts_model;
+    // 开发模式（QQ 静默）开关，ledger 0470
+    try {
+      const dm = await (await fetch("/devmode", { cache: "no-store" })).json();
+      $("cf-qqsilent").checked = !!dm.qq_silent;
+      if (dm.env) $("cf-qqsilent").title = "已被环境变量 YHLZ_QQ_SILENT 锁定为静默";
+    } catch (e) {}
   } catch (e) {}
 }
 $("cf-save").addEventListener("click", async () => {
@@ -202,6 +208,17 @@ $("cf-free").addEventListener("click", async () => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "release_vram" }) });
   alert("已请求释放 ASR/TTS 显存");
+});
+$("cf-qqsilent").addEventListener("change", async () => {
+  const r = await (await fetch("/devmode", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ qq_silent: $("cf-qqsilent").checked }) })).json();
+  if (r.ok) {
+    $("cf-qqsilent").checked = !!r.qq_silent;
+  } else {
+    $("cf-qqsilent").checked = !$("cf-qqsilent").checked;
+    alert("切换失败：" + (r.error || ""));
+  }
 });
 $("q-wake").addEventListener("click", async () => {
   const r = await (await fetch("/control", { method: "POST",

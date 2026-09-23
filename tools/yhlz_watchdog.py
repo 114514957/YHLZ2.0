@@ -23,7 +23,21 @@ LOG = _ROOT / "cache" / "watchdog.log"
 NOTIFY_FILE = _ROOT / "cache" / "qqwatch" / "notifications.json"
 STATE_FILE = _ROOT / "cache" / "tmp" / "watchdog_state.json"
 LOCK_FILE = _ROOT / "cache" / "tmp" / "watchdog.lock"
+QQ_SILENT_FLAG = _ROOT / "cache" / "tmp" / "qq_silent.flag"
 _LOCK_FD: int | None = None
+
+
+def _qq_silent() -> bool:
+    """Dev-mode QQ silence (0469): skip NapCat auto-start / auto-login.
+
+    Enabled by env YHLZ_QQ_SILENT=1 or by the flag file
+    cache/tmp/qq_silent.flag (exists = silent). While silent the watchdog
+    never launches NapCat windows and never notifies about QQ being offline;
+    it still logs state changes once.
+    """
+    if str(os.getenv("YHLZ_QQ_SILENT", "")).strip().lower() in ("1", "true", "yes", "on"):
+        return True
+    return QQ_SILENT_FLAG.exists()
 
 
 def _acquire_singleton() -> bool:
@@ -164,32 +178,41 @@ def tick() -> dict:
     after = status()
 
     # --- NapCat / 元亨 online watchdog ---
+    # 0469: dev-mode silence — never auto-start NapCat / auto-login / notify.
+    silent = _qq_silent()
     ns = napcat_status()
     online = bool(ns.get("online"))
     ws_up = bool(ns.get("ws"))
-    if not ws_up and not _proc_alive("NapCat"):
-        if time.time() - getattr(tick, "_napcat_try", 0) > 600:
-            _log("NapCat 未运行 -> 尝试拉起")
-            _spawn_napcat()
-            tick._napcat_try = time.time()
-    if ws_up and not online:
-        since = float(ns.get("since") or 0)
-        tries = getattr(tick, "_relogin_tries", 0)
-        if (since and time.time() - since > 120 and tries < 3
-                and time.time() - getattr(tick, "_relogin_try", 0) > 900):
-            _log(f"元亨掉线>2min -> 尝试重启 NapCat 自动登录(第{tries + 1}次)")
-            _spawn_napcat()
-            tick._relogin_try = time.time()
-            tick._relogin_tries = tries + 1
-    elif online:
-        tick._relogin_tries = 0
+    if silent:
+        if not getattr(tick, "_qq_silent_logged", False):
+            _log("QQ 静默中（开发模式）：跳过 NapCat 拉起/自动登录（flag=cache/tmp/qq_silent.flag）")
+            tick._qq_silent_logged = True
+    else:
+        tick._qq_silent_logged = False
+        if not ws_up and not _proc_alive("NapCat"):
+            if time.time() - getattr(tick, "_napcat_try", 0) > 600:
+                _log("NapCat 未运行 -> 尝试拉起")
+                _spawn_napcat()
+                tick._napcat_try = time.time()
+        if ws_up and not online:
+            since = float(ns.get("since") or 0)
+            tries = getattr(tick, "_relogin_tries", 0)
+            if (since and time.time() - since > 120 and tries < 3
+                    and time.time() - getattr(tick, "_relogin_try", 0) > 900):
+                _log(f"元亨掉线>2min -> 尝试重启 NapCat 自动登录(第{tries + 1}次)")
+                _spawn_napcat()
+                tick._relogin_try = time.time()
+                tick._relogin_tries = tries + 1
+        elif online:
+            tick._relogin_tries = 0
     state = (online, ws_up)
     if state != getattr(tick, "_napcat", None):
         msg = ("元亨在线" if online else
                ("NapCat/OneBot 未监听" if not ws_up else
                 "元亨 QQ 掉线，需在 NapCat 重新登录"))
         _log("NapCat状态: " + msg)
-        _notify("【YHLZ】" + msg)
+        if not silent:
+            _notify("【YHLZ】" + msg)
         tick._napcat = state
 
     qb = qqbot_status()

@@ -203,6 +203,35 @@ def _unload_tts() -> None:
         pass
 
 
+# ---- dev mode (QQ 静默) workbench switch, ledger 0469/0470 ----
+QQ_SILENT_FLAG = _PROJECT_ROOT / "cache" / "tmp" / "qq_silent.flag"
+
+
+def devmode_state() -> dict:
+    """开发模式状态：flag 文件（工作台开关）+ 环境变量（部署级锁定）。"""
+    import os
+
+    env = str(os.getenv("YHLZ_QQ_SILENT", "")).strip().lower() in (
+        "1", "true", "yes", "on")
+    flag = QQ_SILENT_FLAG.exists()
+    return {"qq_silent": bool(env or flag), "flag": flag, "env": env}
+
+
+def devmode_set(qq_silent: bool) -> dict:
+    """开/关开发模式（QQ 桥静默）：watchdog 每轮读 flag，无需重启。"""
+    try:
+        if qq_silent:
+            QQ_SILENT_FLAG.parent.mkdir(parents=True, exist_ok=True)
+            QQ_SILENT_FLAG.write_text(
+                "dev mode: QQ bridge silent (workbench toggle)\n",
+                encoding="utf-8")
+        else:
+            QQ_SILENT_FLAG.unlink(missing_ok=True)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    return {"ok": True, **devmode_state()}
+
+
 def sing_status() -> dict:
     return {"ok": True, **dict(SING_STATE)}
 
@@ -585,11 +614,11 @@ GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
           "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html",
-          "/emotion", "/qq-qrcode", "/growth"}
+          "/emotion", "/qq-qrcode", "/growth", "/devmode"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session",
-           "/tap"}
+           "/tap", "/devmode"}
 
 
 class ConsoleHandler(BaseHTTPRequestHandler):
@@ -762,6 +791,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "logs": list(_LOG_RING)})
         elif p == "/settings":
             self._send_json(200, {"ok": True, "settings": _settings_load()})
+        elif p == "/devmode":
+            self._send_json(200, {"ok": True, **devmode_state()})
         elif p == "/devices":
             self._send_json(200, {"ok": True, "devices": _audio_devices()})
         elif p == "/sing/status":
@@ -865,6 +896,15 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(200, {"ok": True,
                                   "settings": _settings_save(body)})
+            return
+        if p == "/devmode":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                self._send_json(400, {"error": "请求格式错误"})
+                return
+            self._send_json(200, devmode_set(bool(body.get("qq_silent"))))
             return
         if p == "/control":
             try:
