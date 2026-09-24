@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Stage B (ledger 0458): SoulX-Singer SVC inference ONLY, using the prompt and
 # target prepared by wsl_soulx_prep.sh. Needs the exclusive GPU window
-# (peaks ~7.4GB). Usage: wsl_soulx_svc.sh <out_dir> [voice_tag]
+# (peaks ~7.4GB). Usage: wsl_soulx_svc.sh <out_dir> [voice_tag] [raw|auto]
+#
+# STANDARD (v7, ledger 0488): keep n_steps/cfg at defaults — do NOT pass
+# --n_steps/--cfg overrides here (v8 proved cfg>3 destroys timbre/level).
 set -e
 cd "$HOME/soulx/SoulX-Singer"
 export PATH="$HOME/soulx/venv/bin:$PATH"
