@@ -1,25 +1,51 @@
-"""Generate tool-use SFT trajectories (tool-agnostic, randomized schemas).
+"""Generate tool-use SFT trajectories from the REAL capability registry.
 
-Output: data/finetune/tool_use_v6.jsonl  {messages, tools, source}
+v8 (ledger 0506): the v6 generator hardcoded 15 FAKE tool names
+(get_time/find_file/read_ledger/...) that matched ZERO of the 34 real
+capabilities -> the model learned to call tools that do not exist.
+
+This version:
+  - derives tool names/descriptions/schemas from
+    backend.target_scheduler_tools.openai_tools_view() (runtime truth);
+  - batch composition per 10 records: 6 call + 1 failure-follow-up +
+    1 multi-turn + 2 no-call (one of them = dev dispatch [[dev: ...]]);
+    call:no-call = 7:2 >= 2:1;
+  - hard validation: call names ⊆ batch tools (⊆ real registry), argument
+    keys ⊆ declared properties, required params present, tool msg match;
+  - checkpoints after every batch.
+
+Output: data/finetune/tool_use_v8.jsonl  {messages, tools, source}
+
+Usage:
+    python tools/gen_tooluse.py --batches 1 --out data/finetune/_t.jsonl
+    python tools/gen_tooluse.py --batches 60
 """
+from __future__ import annotations
+
+import argparse
 import json
 import random
 import re
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import tools.cloud_rewrite as cr  # noqa: E402
-
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "data" / "finetune" / "tool_use_v6.jsonl"
+sys.path.insert(0, str(ROOT))
+import tools.cloud_rewrite as cr  # noqa: E402
+from backend.target_scheduler_tools import openai_tools_view  # noqa: E402
+from tools.finetune_assemble import SYSTEM  # noqa: E402
+
+OUT = ROOT / "data" / "finetune" / "tool_use_v8.jsonl"
+
+REAL: list[dict] = openai_tools_view()
+REAL_BY_NAME: dict[str, dict] = {t["function"]["name"]: t["function"] for t in REAL}
 
 _SYS_TASK = "你是数据工程师，严格按用户给定格式输出 JSON，不加任何解释。"
 
 
-def ds_json(key, user, max_tokens=6000, temperature=0.9):
-    """DS 调用（长输出 + 关思考）；cr.ds_chat 的 900 token 会截断。"""
+def ds_json(key, user, max_tokens=7000, temperature=0.9):
     body = json.dumps({
         "model": "deepseek-flash",
         "messages": [{"role": "system", "content": _SYS_TASK},
@@ -34,68 +60,59 @@ def ds_json(key, user, max_tokens=6000, temperature=0.9):
         d = json.loads(r.read().decode())
     return d["choices"][0]["message"].get("content", ""), d.get("usage", {})
 
-TOOL_POOL = [
-    ("get_time", "获取指定时区的当前时间", {"tz": "string"}),
-    ("lookup_weather", "查询城市天气", {"city": "string", "day": "string"}),
-    ("calc_expr", "计算数学表达式", {"expr": "string"}),
-    ("search_notes", "按关键词检索笔记", {"query": "string"}),
-    ("find_file", "按名字查找文件", {"name": "string"}),
-    ("translate_text", "翻译文本", {"text": "string", "to": "string"}),
-    ("convert_units", "单位换算", {"value": "number", "from": "string", "to": "string"}),
-    ("read_ledger", "检索项目台账记录", {"keyword": "string"}),
-    ("list_events", "列出某天的日程", {"date": "string"}),
-    ("get_quote", "查询股票行情", {"symbol": "string"}),
-    ("send_msg", "给某人发消息", {"to": "string", "text": "string"}),
-    ("run_script", "运行一个脚本", {"path": "string"}),
-    ("hash_text", "计算文本摘要", {"text": "string", "algo": "string"}),
-    ("random_pick", "从候选中随机选一个", {"items": "string"}),
-    ("count_words", "统计文本字数", {"text": "string"}),
-]
 
-SYS = ("你是元亨——老爹的伙伴，活泼、傲娇、话短；像朋友说话，禁止助手腔/报告腔。"
-       "需要事实/数据/操作时先用工具，拿到结果再用自己的口吻短答，绝不编造。")
-
-N_BATCH = 40      # 批次数
-PER_BATCH = 10    # 每批条数
+def pick_tools(order: list[str], b: int, rng: random.Random) -> list[str]:
+    k = rng.randint(4, 6)
+    start = (b * 5) % len(order)
+    picks = [order[(start + i) % len(order)] for i in range(k)]
+    return picks
 
 
-def rand_toolset():
-    return random.sample(TOOL_POOL, random.randint(2, 4))
+def schemas_for(names: list[str]) -> list[dict]:
+    return [{"type": "function", "function": REAL_BY_NAME[n]} for n in names]
 
 
-def to_schema(t):
-    name, desc, props = t
-    return {"type": "function", "function": {
-        "name": name, "description": desc,
-        "parameters": {"type": "object",
-                       "properties": {k: {"type": v} for k, v in props.items()},
-                       "required": list(props.keys())}}}
+def build_prompt(names: list[str], mix: tuple = (6, 1, 1, 1, 1)) -> str:
+    schemas = schemas_for(names)
+    tdesc = json.dumps(schemas, ensure_ascii=False, indent=1)
+    call, fail, multi, nocall, dev = mix
+    total = sum(mix)
+    items = []
+    if call:
+        items.append(f"{call} 条「需要调用」：提问像老爹随口说的（口语）；arguments 填对，必填参数都要给全")
+    if fail:
+        items.append(f"{fail} 条「失败跟进」：工具返回报错 JSON（如 {{\"ok\":false,\"error\":\"...\"}}）→ "
+                     f"元亨如实说没成/不会假装成功（**禁止**\"已完成/搞定了/已经帮您\"）")
+    if multi:
+        items.append(f"{multi} 条「多轮」：调用→结果→用户再追问一句→元亨再答（多一对 user+assistant，不新增工具消息）")
+    if nocall:
+        items.append(f"{nocall} 条「不需要调用」：有工具但闲聊，直接回答，无 tool_calls")
+    if dev:
+        items.append(f"{dev} 条「开发任务派单」：用户要改代码/文件 → **不许瞎找文件**，"
+                     f"回答末尾单独一行输出 `[[dev: 具体任务]]`（无 tool_calls）")
+    body = "；\n".join(f"{chr(0x2460+i)}{s}" for i, s in enumerate(items))
+    return f"""为「元亨」造工具调用 SFT 样本，输出纯 JSON 数组，共 {total} 条。
 
-
-def build_prompt(tools):
-    tdesc = json.dumps([to_schema(t) for t in tools], ensure_ascii=False, indent=1)
-    names = "、".join(t[0] for t in tools)
-    return f"""为「元亨」（中文对话AI：活泼、傲娇、话短、口语）造 SFT 样本，教它使用工具。
-
-可用工具（随机名，勿换成别的名字）：{names}
-工具 JSON Schema：
+本批可用工具（**只能用这些名字，参数名必须与声明完全一致**）：
 {tdesc}
 
-请输出 JSON 数组，共 10 条。**8 条"需要调用工具"** + **2 条"有工具但不需要调用"**。
-需要调用的格式（严格）：
+每条固定格式（system 内容逐字照抄下面给出的 SYS）：
 {{"messages":[
- {{"role":"system","content":"{SYS}"}},
- {{"role":"user","content":"<一句自然的中文提问>"}},
+ {{"role":"system","content":"{SYSTEM}"}},
+ {{"role":"user","content":"<自然中文提问>"}},
  {{"role":"assistant","tool_calls":[{{"id":"c1","type":"function","function":{{"name":"<工具名>","arguments":{{<参数对象>}}}}}}]}},
  {{"role":"tool","name":"<工具名>","content":"<该工具返回的 JSON 字符串>"}},
- {{"role":"assistant","content":"<元亨口吻的最终回答，≤30字，短、俏、偶尔傲娇>"}}
+ {{"role":"assistant","content":"<元亨最终回答>"}}
 ],"tools":{tdesc}}}
-不需要调用的格式：同上但 assistant 直接给 content（没有 tool_calls/tool 两条）。
+
+构成（严格按此顺序）：
+{body}。
 
 硬要求：
-- arguments 必须是 **JSON 对象**（不是字符串）；
-- 最终回答必须元亨口吻（短、口语），**禁止**"根据查询结果""为您""以下是"等助手腔；
-- 工具返回值要像真实 JSON；只输出 JSON 数组，不要解释、不要 markdown 代码块。"""
+- arguments 必须是 **JSON 对象**（不是字符串）；键只能用该工具声明里的参数名；
+- 工具返回 content 是 JSON 字符串（可含中文）；
+- 元亨最终回答 ≤40 字、口语、活泼、偶尔傲娇；**禁止**"根据查询结果/为您/以下是/好的，我帮您"等助手腔；
+- 只输出 JSON 数组，不要解释、不要 markdown 代码块。"""
 
 
 def parse_json_array(txt):
@@ -110,59 +127,139 @@ def parse_json_array(txt):
         return []
 
 
-def valid(rec):
+def _arg_ok(name: str, args: dict) -> bool:
+    fn = REAL_BY_NAME.get(name)
+    if not fn:
+        return False
+    params = (fn.get("parameters") or {})
+    props = set((params.get("properties") or {}).keys())
+    required = set(params.get("required") or [])
+    if not isinstance(args, dict):
+        return False
+    if not set(args.keys()) <= props:
+        return False
+    return required <= set(args.keys())
+
+
+def valid(rec, names: list[str]) -> str:
+    """Return "" if ok, else the reject reason."""
     ms = rec.get("messages") or []
     roles = [m.get("role") for m in ms]
     if "assistant" not in roles or "user" not in roles:
-        return False
-    for m in ms:
-        if m.get("role") == "assistant" and m.get("tool_calls"):
-            for tc in m["tool_calls"]:
-                if not isinstance(tc.get("function", {}).get("arguments"), dict):
-                    return False
-    return "tools" in rec
+        return "无user/assistant"
+    if ms[0].get("role") != "system" or ms[0].get("content") != SYSTEM:
+        return "system不一致"
+    calls = [m for m in ms if m.get("role") == "assistant" and m.get("tool_calls")]
+    for m in calls:
+        for tc in m["tool_calls"]:
+            fn = tc.get("function") or {}
+            if fn.get("name") not in names:
+                return f"工具不在本批:{fn.get('name')}"
+            if not _arg_ok(fn["name"], fn.get("arguments")):
+                return f"参数不合法:{fn.get('name')}"
+    tool_msgs = [m for m in ms if m.get("role") == "tool"]
+    if tool_msgs and not calls:
+        return "tool消息无调用"
+    for tm in tool_msgs:
+        if tm.get("name") not in names:
+            return "tool消息名字非法"
+    final = [m for m in ms if m.get("role") == "assistant" and m.get("content")]
+    if not final:
+        return "无最终回答"
+    if not str(final[-1]["content"]).strip():
+        return "空最终回答"
+    if "tools" not in rec:
+        return "缺tools字段"
+    return ""
+
+
+def classify(rec) -> str:
+    ms = rec["messages"]
+    has_call = any(m.get("role") == "assistant" and m.get("tool_calls") for m in ms)
+    if not has_call:
+        return "dev" if "[[dev:" in ms[-1]["content"] else "nocall"
+    tool_msgs = [m for m in ms if m.get("role") == "tool"]
+    if any('"ok":false' in str(m.get("content", "")).replace(" ", "") or "error" in str(m.get("content", "")).lower()
+           for m in tool_msgs):
+        return "failure"
+    if sum(1 for m in ms if m.get("role") == "user") > 1:
+        return "multiturn"
+    return "call"
 
 
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    ap = argparse.ArgumentParser(description="真实注册表工具调用样本生成 v8")
+    ap.add_argument("--batches", type=int, default=60)
+    ap.add_argument("--seed", type=int, default=20260926)
+    ap.add_argument("--mix", default="6,1,1,1,1",
+                    help="每批构成 call,fail,multi,nocall,dev（和=每批条数）")
+    ap.add_argument("--out", default=str(OUT))
+    args = ap.parse_args()
+    mix = tuple(int(x) for x in args.mix.split(","))
+    if len(mix) != 5 or sum(mix) < 1:
+        print("[error] --mix 需 5 个整数")
+        return 2
+    out = Path(args.out)
     key = cr.load_key()
     if not key:
         print("[error] 缺 DEEPSEEK_API_KEY")
         return 2
-    got, fail, seen = [], 0, set()
-    for b in range(N_BATCH):
-        tools = rand_toolset()
-        try:
-            txt, _ = ds_json(key, build_prompt(tools))
-        except Exception as e:  # noqa: BLE001
-            fail += 1
-            print("[err]", type(e).__name__)
-            continue
-        arr = parse_json_array(txt)
-        if not arr:
-            fail += 1
-            print(f"[{b+1}] 解析失败")
-            continue
-        added = 0
-        for rec in arr:
-            if not isinstance(rec, dict) or not valid(rec):
+    rng = random.Random(args.seed)
+    order = list(REAL_BY_NAME)
+    rng.shuffle(order)
+    got, seen = [], set()
+    stats = {"call": 0, "failure": 0, "multiturn": 0, "nocall": 0, "dev": 0}
+    fail = 0
+    out.parent.mkdir(parents=True, exist_ok=True)
+    usage_in = usage_out = 0
+    for b in range(args.batches):
+        names = pick_tools(order, b, rng)
+        recs, err = [], "?"
+        for attempt in range(2):
+            try:
+                txt, usage = ds_json(key, build_prompt(names, mix))
+            except Exception as e:  # noqa: BLE001
+                err = type(e).__name__
+                time.sleep(2)
                 continue
-            fp = json.dumps(rec["messages"], ensure_ascii=False)
-            if fp in seen:
+            usage_in += usage.get("prompt_tokens", 0)
+            usage_out += usage.get("completion_tokens", 0)
+            arr = parse_json_array(txt)
+            if not arr:
+                err = "解析失败"
                 continue
-            seen.add(fp)
-            rec["tools"] = [to_schema(t) for t in tools]
-            rec["source"] = "tooluse"
-            got.append(rec)
-            added += 1
-        print(f"[{b+1}/{N_BATCH}] +{added} (累计 {len(got)})")
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    with OUT.open("w", encoding="utf-8") as f:
-        for r in got:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    call = sum(1 for r in got if any(m.get("tool_calls") for m in r["messages"]))
-    print(f"完成: {len(got)} 条 ({call} 需调用 / {len(got)-call} 不需调用), 失败批次 {fail}")
-    print("->", OUT)
+            for rec in arr:
+                if not isinstance(rec, dict):
+                    continue
+                why = valid(rec, names)
+                if why:
+                    err = why
+                    continue
+                fp = json.dumps(rec["messages"], ensure_ascii=False)
+                if fp in seen:
+                    continue
+                seen.add(fp)
+                rec["tools"] = schemas_for(names)
+                rec["source"] = "tooluse"
+                recs.append(rec)
+            if len(recs) >= 8:
+                break
+        if len(recs) < 5:
+            fail += 1
+            print(f"[{b+1}/{args.batches}] 放弃({len(recs)}) :: {err}")
+            continue
+        for r in recs:
+            stats[classify(r)] += 1
+        got.extend(recs)
+        with out.open("w", encoding="utf-8") as f:
+            for r in got:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print(f"[{b+1}/{args.batches}] +{len(recs)} (累计 {len(got)}) 工具={'/'.join(names)}")
+    st = {"total": len(got), **stats, "fail_batches": fail, "out": str(out),
+          "tokens_in": usage_in, "tokens_out": usage_out}
+    out.with_suffix(".stats.json").write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(json.dumps(st, ensure_ascii=False, indent=1))
     return 0
 
 

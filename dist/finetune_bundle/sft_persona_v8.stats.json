@@ -1,0 +1,28 @@
+{
+ "tag": "v8",
+ "total": 4047,
+ "real": 31,
+ "golden": 69,
+ "scene": 1978,
+ "lizhen": 300,
+ "memory": 588,
+ "b3": 180,
+ "b4": 120,
+ "d2": 155,
+ "tools": 626,
+ "memory_total": 588,
+ "extra_rejected_fake_tools": 0,
+ "rejects": {},
+ "share": {
+  "real": 0.008,
+  "golden": 0.017,
+  "scene": 0.489,
+  "lizhen": 0.074,
+  "memory": 0.145,
+  "b3": 0.044,
+  "b4": 0.03,
+  "d2": 0.038,
+  "tools": 0.155
+ },
+ "file": "data\\finetune\\sft_persona_v8.jsonl"
+}
