@@ -1,8 +1,8 @@
 """Scheduler capabilities (ledger 0144/0145): ledger.search / memory.recall /
 system.time — the minimal set proving the ADR-007 pipeline end to end.
 
-Read-only handlers.  Execution path is CapabilityRegistry (gated);
-Agent-Core ToolRegistry mapping is provided for LLM tool views only.
+Read-only handlers.  Execution path is CapabilityRegistry (gated); the LLM
+tool view is CapabilityRegistry.export_openai_tools().
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from backend.agent.tool_registry import get_registry, ToolRegistry
 from backend.target_access import file_list, file_read, web_fetch, web_search  # noqa: F401
 from backend.target_capability_registry import Capability, CapabilityRegistry
 from backend.target_memory import TargetMemoryService
@@ -57,7 +56,7 @@ def _ledger_grep_fallback(q: str, limit: int) -> str:
         return "未找到台账或无查询"
     matches: list[str] = []
     for line in LEDGER.read_text(encoding="utf-8").splitlines():
-        if q in line and "记录" not in line[:6]:
+        if q in line:
             matches.append(line[3:].strip() if line.startswith("- ") else line.strip())
             if len(matches) >= limit:
                 break
@@ -294,14 +293,37 @@ _KW_CACHE: dict = {}
 
 
 def _kw_index():
-    """Process-level cached KeywordIndex (ledger 0433): re-creating the index
-    per query re-ran _init_schema (~5 DDL statements + commit) every call."""
+    """Process-level cached KeywordIndex with auto-refresh on ledger change.
+
+    Stores last-built timestamp in SQLite (kw_meta) so it persists across
+    processes; only rebuilds when the ledger file is actually newer.
+    """
     from backend.target_kw_index import KeywordIndex
 
     idx = _KW_CACHE.get("default")
     if idx is None:
         idx = KeywordIndex()
         _KW_CACHE["default"] = idx
+    try:
+        import sqlite3
+        import time
+        ledger_mtime = LEDGER.stat().st_mtime
+        # read last-built from DB
+        con = idx._conn(writable=True)
+        try:
+            con.execute("CREATE TABLE IF NOT EXISTS kw_meta (key TEXT PRIMARY KEY, val REAL)")
+            row = con.execute("SELECT val FROM kw_meta WHERE key='ledger_built_at'").fetchone()
+            last_built = row[0] if row else 0.0
+            if ledger_mtime > last_built:
+                from tools.ledger_mem_import import index_ledger_all_rows
+                index_ledger_all_rows()
+                con.execute("INSERT OR REPLACE INTO kw_meta (key,val) VALUES ('ledger_built_at', ?)",
+                            (ledger_mtime,))
+                con.commit()
+        finally:
+            con.close()
+    except Exception:
+        pass
     return idx
 
 
@@ -1968,28 +1990,3 @@ def setup_scheduler_capabilities(registry: Optional[CapabilityRegistry] = None) 
 
 def openai_tools_view(registry: Optional[CapabilityRegistry] = None) -> list[dict]:
     return setup_scheduler_capabilities(registry).export_openai_tools()
-
-
-def setup_scheduler_tools(registry: Optional[ToolRegistry] = None) -> list[str]:
-    """Agent-Core ToolRegistry view (for LLM tool ingestion); execution stays gated."""
-    if registry is None:
-        registry = get_registry()
-    core = setup_scheduler_capabilities()
-    names: list[str] = []
-    for cap_name in core.names():
-        c = core.get(cap_name)
-        if c is None:
-            continue
-        registry.register_function(
-            name=c.openai_name,
-            description=("只读能力" + (f"；入参: {', '.join(c.all_inputs)}" if c.all_inputs else ""))
-            + "。由调度器统一执行。",
-            parameters={"type": "object",
-                        "properties": {k: {"type": "string"} for k in c.all_inputs},
-                        "required": list(c.input)},
-            handler=c.handler,
-            category=SCHEDULER_CATEGORY,
-            override=True,
-        )
-        names.append(c.openai_name)
-    return names
