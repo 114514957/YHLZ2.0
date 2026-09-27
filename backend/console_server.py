@@ -1114,6 +1114,9 @@ class ConsoleHandler(BaseHTTPRequestHandler):
     def _do_voice(self):
         """One voice turn over SSE: listen(gated 3s) -> SenseVoice -> LLM
         stream -> TTS speak. {text} present => mock mode (skip mic, use text)."""
+        from backend.voice_trace import VoiceTrace
+
+        vt = VoiceTrace(session_id="console", turn_id=0)
         try:
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"{}")
@@ -1171,6 +1174,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             idle = 0
             while alive["ok"] and rounds < (999 if continuous else 4):
                 rounds += 1
+                vt.turn_id = rounds
+                vt.mark("capture_start")
                 emit({"type": "state", "value": "listening"})
                 # streaming recognition worker: transcribe each segment as it
                 # closes, accumulate text, and speculatively prefetch memory
@@ -1262,6 +1267,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 wt.start()
                 r = self._listen(body, st, on_segment=seg_q.put,
                                  on_chunk=(sherpa_q.put if _sherpa is not None else None))
+                vt.mark("speech_end")
                 seg_q.put(_stop)
                 sherpa_q.put(_stop)
                 wt.join(timeout=8)
@@ -1278,6 +1284,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                     break
                 idle = 0
                 text = "".join(parts).strip()
+                vt.mark("asr_final", text[:60])
                 if not text:
                     # fallback: whole-segment transcribe (worker produced none)
                     emit({"type": "state", "value": "asr"})
@@ -1310,7 +1317,10 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                         _spk = None
                 _buf = {"t": ""}
 
-                def _on_delta(c, _b=_buf, _s=_spk, _sp=_spoke):
+                def _on_delta(c, _b=_buf, _s=_spk, _sp=_spoke, _vt=vt):
+                    if not _sp["on"]:
+                        _sp["on"] = True
+                        _vt.mark("llm_first_delta")
                     emit({"type": "delta", "delta": c})
                     if _s is None:
                         return
@@ -1322,12 +1332,15 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                         sent, rest = self._pop_sentence(_b["t"])
                         if not sent:
                             break
+                        _vt.mark("sentence_ready", sent[:30])
                         _s.feed(sent)
                         _b["t"] = rest
 
+                vt.mark("llm_start")
                 info = self.runtime.console_turn_stream(
                     text, _on_delta, pre_recall=pre or None)
                 answer = str(info.get("answer", ""))
+                vt.mark("turn_done", answer[:60])
                 emit({"type": "turn_done", "text": answer,
                       "tool_uses": len(info.get("tool_uses") or [])})
                 if _spk is not None:
@@ -1346,6 +1359,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             emit({"type": "state", "value": "idle"})
             emit({"type": "voice_done", "status": "ok"})
         except Exception as exc:  # noqa: BLE001
+            vt.mark("turn_done", f"error:{type(exc).__name__}")
             import traceback
 
             _log("voice_error", f"{type(exc).__name__}: {str(exc)[:160]}")
@@ -1360,6 +1374,11 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             emit({"type": "error", "message": f"{type(exc).__name__}: "
                                               f"{str(exc)[:200]}"})
             emit({"type": "state", "value": "idle"})
+        finally:
+            try:
+                vt.flush()
+            except Exception:
+                pass
 
     # ---------- voice helpers ----------
     def _control(self, body: dict) -> dict:
