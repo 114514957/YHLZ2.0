@@ -114,6 +114,20 @@ class PlaybackConfig:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class PlaybackReferenceFrame:
+    """A reference frame captured from the playback chain (P0 AEC input).
+
+    Contains the audio that was actually sent to the device (after resampling),
+    with generation info so the AEC can correlate with microphone input.
+    """
+    samples: Any  # np.ndarray float32, device rate
+    sample_rate: int
+    generation: int
+    sequence: int
+    is_final: bool = False
+
+
 class _StreamResampler:
     """Stateful streaming resampler (P0-3).
 
@@ -219,12 +233,15 @@ class SoundDevicePlaybackPort:
         *,
         sounddevice_module: Any = None,
         on_event: Optional[Callable[[PlaybackEvent], Any]] = None,
+        reference_tap: Optional[Callable[[PlaybackReferenceFrame], Any]] = None,
     ) -> None:
         if not isinstance(config, PlaybackConfig):
             raise TypeError("config must be PlaybackConfig")
         self.config = config
         self._sounddevice = sounddevice_module
         self.on_event = on_event
+        self._reference_tap = reference_tap
+        self._ref_seq = 0
         self._lock = threading.RLock()
         self._not_full = threading.Condition(self._lock)
         self._state = PlaybackState.STOPPED
@@ -307,6 +324,7 @@ class SoundDevicePlaybackPort:
         with self._lock:
             slot = self._slot
             if slot is None:
+                self._flush_reference(0)
                 return True
             slot.cancelled = True
             slot.finish_requested = False
@@ -375,6 +393,7 @@ class SoundDevicePlaybackPort:
                 stream.close()
         if slot is not None:
             slot.stopped_event.set()
+        self._flush_reference(0)
 
     shutdown = close
 
@@ -476,9 +495,39 @@ class SoundDevicePlaybackPort:
                 self._blocks.append(block)
                 self._queued_frames += len(block)
                 self._enqueued_frames += len(block)
+                self._emit_reference(block, slot.generation)
                 return True
         self._emit_many(events)
         raise PlaybackError("VOICE-PLAYBACK-BACKPRESSURE", "queue wait timed out")
+
+    def _flush_reference(self, generation: int) -> None:
+        if self._reference_tap is None:
+            return
+        try:
+            self._reference_tap(PlaybackReferenceFrame(
+                samples=np.zeros(0, dtype=np.float32),
+                sample_rate=self.config.resolved_device_sample_rate,
+                generation=generation,
+                sequence=self._ref_seq,
+                is_final=True,
+            ))
+            self._ref_seq += 1
+        except Exception:
+            pass
+
+    def _emit_reference(self, block: Any, generation: int) -> None:
+        if self._reference_tap is None:
+            return
+        try:
+            self._reference_tap(PlaybackReferenceFrame(
+                samples=block,
+                sample_rate=self.config.resolved_device_sample_rate,
+                generation=generation,
+                sequence=self._ref_seq,
+            ))
+            self._ref_seq += 1
+        except Exception:
+            pass
 
     def _normalize_chunk(self, chunk: Any) -> np.ndarray:
         sample_rate = int(getattr(chunk, "sample_rate", 0) or 0)
