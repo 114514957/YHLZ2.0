@@ -1,8 +1,13 @@
 """Bounded physical playback port for the target voice chain.
 
-The port accepts only the target chain's 24 kHz mono ``pcm_s16le`` audio.  It
-uses one persistent sounddevice output callback and never reads or writes the
-legacy audio buffer, a sound cache, business data, or memory.
+The port accepts the target chain's 24 kHz mono ``pcm_s16le`` audio and
+optionally resamples to the device's accepted rate (P0-2/P0-3).  When
+``device_sample_rate`` differs from ``sample_rate``, a stateful streaming
+resampler converts each chunk before queuing.  The sounddevice callback only
+consumes prepared float32 blocks at the device rate.
+
+P0-2 (2026-09-28): separate source/device sample rates with negotiation.
+P0-3 (2026-09-28): streaming resample adapter (stateful, cancel-safe).
 """
 
 from __future__ import annotations
@@ -14,7 +19,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Deque, Dict, Mapping, Optional
+from typing import Any, Callable, Deque, Dict, List, Mapping, Optional, Tuple
 
 import numpy as np
 
@@ -43,10 +48,17 @@ class PlaybackEventKind(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class PlaybackConfig:
-    """Explicit selected-output settings for one persistent stream."""
+    """Explicit selected-output settings for one persistent stream.
+
+    ``sample_rate`` is the *source* rate (TTS output, 24 kHz).  When the
+    physical device rejects 24 kHz (e.g. WASAPI on some Realtek), set
+    ``device_sample_rate`` to a rate the device accepts (e.g. 48000).  The
+    port will resample internally.
+    """
 
     device: int | str
     sample_rate: int = 24_000
+    device_sample_rate: Optional[int] = None
     channels: int = 2
     block_duration_ms: int = 20
     initial_buffer_ms: int = 300
@@ -59,6 +71,8 @@ class PlaybackConfig:
     def __post_init__(self) -> None:
         if self.sample_rate <= 0 or self.channels <= 0:
             raise ValueError("sample_rate and channels must be positive")
+        if self.device_sample_rate is not None and self.device_sample_rate <= 0:
+            raise ValueError("device_sample_rate must be positive")
         if self.block_duration_ms <= 0 or self.initial_buffer_ms < 0:
             raise ValueError("playback durations are invalid")
         if self.max_queue_blocks <= 0 or self.max_queue_duration_ms <= 0:
@@ -72,13 +86,23 @@ class PlaybackConfig:
             raise ValueError("block_duration_ms does not produce a positive frame count")
 
     @property
+    def resolved_device_sample_rate(self) -> int:
+        return self.device_sample_rate or self.sample_rate
+
+    @property
+    def needs_resample(self) -> bool:
+        return self.resolved_device_sample_rate != self.sample_rate
+
+    @property
     def block_frames(self) -> int:
-        return max(1, int(round(self.sample_rate * self.block_duration_ms / 1000)))
+        return max(1, int(round(
+            self.resolved_device_sample_rate * self.block_duration_ms / 1000)))
 
     def to_dict(self) -> dict:
         return {
             "device": self.device,
             "sample_rate": self.sample_rate,
+            "device_sample_rate": self.resolved_device_sample_rate,
             "channels": self.channels,
             "block_duration_ms": self.block_duration_ms,
             "initial_buffer_ms": self.initial_buffer_ms,
@@ -88,6 +112,71 @@ class PlaybackConfig:
             "stop_timeout_s": self.stop_timeout_s,
             "volume": self.volume,
         }
+
+
+class _StreamResampler:
+    """Stateful streaming resampler (P0-3).
+
+    Converts mono float32 audio from source rate to device rate using
+    ``scipy.signal.resample_poly``.  Keeps a small carry buffer so chunk
+    boundaries do not produce clicks.  ``flush()`` emits the tail; ``reset()``
+    clears state (called on cancel/interrupt).
+    """
+
+    def __init__(self, source_rate: int, device_rate: int) -> None:
+        from math import gcd
+        g = gcd(source_rate, device_rate)
+        self._up = device_rate // g
+        self._down = source_rate // g
+        self._source_rate = source_rate
+        self._device_rate = device_rate
+        self._carry = np.zeros(0, dtype=np.float32)
+
+    def process(self, mono: np.ndarray) -> np.ndarray:
+        if len(self._carry):
+            mono = np.concatenate([self._carry, mono])
+        if self._up == self._down:
+            self._carry = np.zeros(0, dtype=np.float32)
+            return mono
+        from scipy.signal import resample_poly
+        out = resample_poly(mono, self._up, self._down).astype(np.float32)
+        carry_n = min(len(mono), 64)
+        self._carry = mono[-carry_n:].copy() if carry_n else np.zeros(0, dtype=np.float32)
+        return out
+
+    def flush(self) -> np.ndarray:
+        if not len(self._carry):
+            return np.zeros(0, dtype=np.float32)
+        from scipy.signal import resample_poly
+        out = resample_poly(self._carry, self._up, self._down).astype(np.float32)
+        self._carry = np.zeros(0, dtype=np.float32)
+        return out
+
+    def reset(self) -> None:
+        self._carry = np.zeros(0, dtype=np.float32)
+
+
+def negotiate_output_format(
+    sd: Any,
+    device: int | str,
+    preferred_rates: Tuple[int, ...] = (24_000, 48_000, 44_100),
+    channels: int = 2,
+) -> int:
+    """Return the first sample rate the device accepts, or raise.
+
+    Tries ``preferred_rates`` in order.  Does NOT silently fall back to a
+    different device; the caller must select the device explicitly.
+    """
+    for rate in preferred_rates:
+        try:
+            sd.check_output_settings(device=device, samplerate=rate,
+                                     channels=channels, dtype="float32")
+            return rate
+        except Exception:
+            continue
+    raise PlaybackError(
+        "VOICE-PLAYBACK-FORMAT-NEGOTIATION-FAILED",
+        f"device {device} rejected rates {preferred_rates}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,6 +245,10 @@ class SoundDevicePlaybackPort:
         self._last_error_code: Optional[str] = None
         self._play_rms = 0.0
         self._last_error_detail = ""
+        self._resampler: Optional[_StreamResampler] = None
+        if config.needs_resample:
+            self._resampler = _StreamResampler(
+                config.sample_rate, config.resolved_device_sample_rate)
 
     @property
     def state(self) -> PlaybackState:
@@ -171,7 +264,7 @@ class SoundDevicePlaybackPort:
             sounddevice = self._module()
             stream = sounddevice.OutputStream(
                 device=self.config.device,
-                samplerate=self.config.sample_rate,
+                samplerate=self.config.resolved_device_sample_rate,
                 channels=self.config.channels,
                 dtype="float32",
                 blocksize=self.config.block_frames,
@@ -221,6 +314,8 @@ class SoundDevicePlaybackPort:
             slot.stopped_event.clear()
             self._last_stop_slot = slot
             self._clear_queue_locked()
+            if self._resampler is not None:
+                self._resampler.reset()
             self._slot = None
             if self._stream is None or not bool(getattr(self._stream, "active", True)):
                 slot.stopped_event.set()
@@ -327,6 +422,8 @@ class SoundDevicePlaybackPort:
         deadline = time.monotonic() + self.config.enqueue_timeout_s
         events: list[tuple[str, Optional[str], dict]] = []
         with self._not_full:
+            if _is_cancelled(signal):
+                return False
             self._require_ready_locked()
             slot = self._slot
             if slot is None:
@@ -340,7 +437,7 @@ class SoundDevicePlaybackPort:
             if slot.finish_requested or slot.cancelled:
                 self._dropped_stale_blocks += 1
                 raise PlaybackError("VOICE-PLAYBACK-TURN-TERMINAL", turn_id)
-            block_duration_ms = _frames_to_ms(len(block), self.config.sample_rate)
+            block_duration_ms = _frames_to_ms(len(block), self.config.resolved_device_sample_rate)
             if block_duration_ms > self.config.max_queue_duration_ms:
                 raise PlaybackError("VOICE-PLAYBACK-CHUNK-TOO-LARGE")
             while (
@@ -365,6 +462,17 @@ class SoundDevicePlaybackPort:
                     break
                 self._not_full.wait(min(remaining, 0.05))
             else:
+                # A wait releases the lock. interrupt() may empty the queue
+                # while cancelling/replacing this slot, making the loop
+                # condition false without its cancellation branch running.
+                if (
+                    _is_cancelled(signal)
+                    or slot.cancelled
+                    or slot.finish_requested
+                    or self._slot is not slot
+                ):
+                    self._dropped_stale_blocks += 1
+                    return False
                 self._blocks.append(block)
                 self._queued_frames += len(block)
                 self._enqueued_frames += len(block)
@@ -395,6 +503,8 @@ class SoundDevicePlaybackPort:
             raise PlaybackError("VOICE-PLAYBACK-PCM-INVALID", "PCM byte length is invalid")
         mono = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
         mono *= float(self.config.volume)
+        if self._resampler is not None:
+            mono = self._resampler.process(mono)
         return np.repeat(mono.reshape(-1, 1), self.config.channels, axis=1)
 
     def _callback(self, outdata: Any, frames: int, time_info: Any, status: Any) -> None:
