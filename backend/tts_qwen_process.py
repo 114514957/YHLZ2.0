@@ -36,7 +36,6 @@ from backend.tts_provider_port import (
 )
 from backend.tts_provider_worker import PersistentTTSProvider
 from backend.tts_qwen_provider import (
-    QWEN_PROVIDER_ID,
     QwenTTSAdapterError,
     QwenTTSConfig,
     QwenTTSWorker,
@@ -295,10 +294,12 @@ class QwenProcessWorker:
         self._last_error_detail = ""
         self._last_metrics: Dict[str, Any] = {}
         self._started_at: Optional[float] = None
+        self._ready_at: Optional[float] = None
+        self._turn_count: int = 0
         self._stopping = False
 
     def describe_capabilities(self) -> TTSProviderCapabilities:
-        return qwen_capabilities(worker_isolated=True)
+        return qwen_capabilities(worker_isolated=True, config=self.config)
 
     def start(self) -> None:
         with self._lock:
@@ -350,6 +351,8 @@ class QwenProcessWorker:
             self._started_at = time.time()
 
     def open(self, request: TTSRequest) -> "QwenProcessSession":
+        with self._lock:
+            self._turn_count += 1
         if not isinstance(request, TTSRequest):
             raise TypeError("request must be TTSRequest")
         self._command("open", {"request": request})
@@ -421,13 +424,20 @@ class QwenProcessWorker:
             if self._last_error_code and not alive:
                 state = "failed" if "STOPPED" not in self._last_error_code else "stopped"
             result: Dict[str, Any] = {
-                "provider_id": QWEN_PROVIDER_ID,
+                "provider_id": self.config.provider_id,
                 "worker_id": self.worker_id,
                 "state": state,
                 "alive": alive,
                 "pid": getattr(process, "pid", None),
                 "worker_isolated": True,
                 "started_at": self._started_at,
+                "ready_at": self._ready_at,
+                "model_load_ms": (
+                    round((self._ready_at - self._started_at) * 1000, 1)
+                    if self._ready_at and self._started_at else None
+                ),
+                "turn_count": self._turn_count,
+                "is_warm": self._turn_count > 0,
             }
             if self._last_error_code:
                 result["last_error_code"] = self._last_error_code
@@ -438,11 +448,17 @@ class QwenProcessWorker:
         with self._lock:
             process = self._process
             return {
-                "provider_id": QWEN_PROVIDER_ID,
+                "provider_id": self.config.provider_id,
                 "worker_id": self.worker_id,
                 "pid": getattr(process, "pid", None),
                 "alive": bool(process is not None and process.is_alive()),
                 "worker_isolated": True,
+                "turn_count": self._turn_count,
+                "is_warm": self._turn_count > 0,
+                "model_load_ms": (
+                    round((self._ready_at - self._started_at) * 1000, 1)
+                    if self._ready_at and self._started_at else None
+                ),
                 "sessions": list(self._sessions),
                 "last": dict(self._last_metrics),
             }
@@ -531,6 +547,7 @@ class QwenProcessWorker:
                     str(message.get("detail") or "child startup failed")[:400],
                 )
             self._ready_event.set()
+            self._ready_at = time.time()
             return
         if message_type == "response":
             request_id = str(message.get("id", ""))
@@ -687,7 +704,7 @@ class QwenProcessSession:
             else:
                 state = "ready"
             return {
-                "provider_id": QWEN_PROVIDER_ID,
+                "provider_id": self.owner.config.provider_id,
                 "speech_id": self.request.speech_id,
                 "provider_epoch": self.request.provider_epoch,
                 "state": state,
@@ -699,7 +716,7 @@ class QwenProcessSession:
             result = dict(self._metrics)
             result.update(
                 {
-                    "provider_id": QWEN_PROVIDER_ID,
+                    "provider_id": self.owner.config.provider_id,
                     "speech_id": self.request.speech_id,
                     "provider_epoch": self.request.provider_epoch,
                     "committed": self._committed,
@@ -802,8 +819,8 @@ def create_qwen_process_provider(
 
     return PersistentTTSProvider(
         factory,
-        capabilities=qwen_capabilities(worker_isolated=True),
-        provider_id=QWEN_PROVIDER_ID,
+        capabilities=qwen_capabilities(worker_isolated=True, config=config),
+        provider_id=config.provider_id,
         worker_isolated=True,
         worker_persistent=True,
         stop_timeout_s=config.stop_timeout_s,
