@@ -360,7 +360,7 @@ class _StreamingSpeaker:
     InputStream; barge-in (or turn cancel) stops playback."""
 
     def __init__(self, speaker: str, device: int, model_key: str,
-                 should_stop=None) -> None:
+                 should_stop=None, on_trace=None) -> None:
         import queue as _q
         import threading as _th
 
@@ -369,8 +369,20 @@ class _StreamingSpeaker:
         self._device = int(device or 1)
         self._key = str(model_key or "0.6B")
         self._should_stop = should_stop
+        self._on_trace = on_trace
+        self._trace_seen: set[str] = set()
         self._interrupted = False
         self._thread = _th.Thread(target=self._run, daemon=True)
+
+    def _trace(self, event: str, detail: str = "") -> None:
+        if event in self._trace_seen:
+            return
+        self._trace_seen.add(event)
+        if self._on_trace is not None:
+            try:
+                self._on_trace(event, detail)
+            except Exception:
+                pass
 
     def start(self) -> None:
         self._thread.start()
@@ -413,12 +425,14 @@ class _StreamingSpeaker:
                 try:
                     audio, sr = _synth(self._key, s, self._speaker)
                     samples = np.asarray(audio, dtype="float32")
+                    self._trace("tts_first_synth", str(len(samples)))
                 except Exception:
                     continue
                 rms = float(np.sqrt(np.mean(samples * samples)) + 1e-9)
                 thr = max(0.03, rms * 1.5)
                 try:
                     sd.play(samples, int(sr))
+                    self._trace("playback_start", str(len(samples)))
                     _log("voice", f"stream tts play {len(samples)}")
                 except Exception:
                     continue
@@ -444,6 +458,7 @@ class _StreamingSpeaker:
                         hot += 1
                         if hot >= 2:
                             self._interrupted = True
+                            self._trace("barge_in", "input_rms")
                             break
                     else:
                         hot = 0
@@ -461,6 +476,8 @@ class _StreamingSpeaker:
             sd.stop()
         except Exception:
             pass
+        finally:
+            self._trace("playback_stop")
 
 
 def _settings_load() -> dict:
@@ -1116,7 +1133,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         stream -> TTS speak. {text} present => mock mode (skip mic, use text)."""
         from backend.voice_trace import VoiceTrace
 
-        vt = VoiceTrace(session_id="console", turn_id=0)
+        vt = None
         try:
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"{}")
@@ -1174,8 +1191,14 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             idle = 0
             while alive["ok"] and rounds < (999 if continuous else 4):
                 rounds += 1
-                vt.turn_id = rounds
+                vt = VoiceTrace(session_id="console", turn_id=rounds)
                 vt.mark("capture_start")
+                capture_seen = {"speech_start": False}
+
+                def _mark_speech_start(*_args):
+                    if not capture_seen["speech_start"]:
+                        capture_seen["speech_start"] = True
+                        vt.mark("speech_start")
                 emit({"type": "state", "value": "listening"})
                 # streaming recognition worker: transcribe each segment as it
                 # closes, accumulate text, and speculatively prefetch memory
@@ -1215,6 +1238,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                                     t = str(getattr(u, "text", "") or "")
                                     if t and t != last:
                                         last = t
+                                        vt.mark("first_partial", t[:60])
                                         emit({"type": "partial", "text": t})
                                         _log("voice_partial", t[:30])
                             except Exception:
@@ -1252,6 +1276,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                             parts.append(t)
                             acc = "".join(parts)
                             if _sherpa is None:  # fallback: segment-based partial
+                                vt.mark("first_partial", acc[:60])
                                 emit({"type": "partial", "text": acc})
                             if len(acc) >= 6 and time.time() - last_pre > 2.0:
                                 last_pre = time.time()
@@ -1265,8 +1290,17 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
                 wt = _th.Thread(target=_worker, daemon=True)
                 wt.start()
+                def _on_chunk(chunk):
+                    # WAV replay has no VAD callback; first delivered frame is
+                    # the best available speech-start mark for that path.
+                    _mark_speech_start()
+                    if _sherpa is not None:
+                        sherpa_q.put(chunk)
+
                 r = self._listen(body, st, on_segment=seg_q.put,
-                                 on_chunk=(sherpa_q.put if _sherpa is not None else None))
+                                 on_chunk=_on_chunk,
+                                 on_level=lambda _level, is_speech:
+                                 _mark_speech_start() if is_speech else None)
                 vt.mark("speech_end")
                 seg_q.put(_stop)
                 sherpa_q.put(_stop)
@@ -1311,7 +1345,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                             st.get("tts_speaker", "Vivian"),
                             int(st.get("device", 1) or 1),
                             st.get("tts_model", "0.6B"),
-                            should_stop=lambda: _tc.cancelled("console"))
+                            should_stop=lambda: _tc.cancelled("console"),
+                            on_trace=vt.mark)
                         _spk.start()
                     except Exception:
                         _spk = None
@@ -1350,9 +1385,17 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                     rr = _spk.finish()
                     if rr in ("interrupted", "cancelled"):
                         emit({"type": "interrupted"})
+                        try:
+                            vt.flush()
+                        except Exception:
+                            pass
                         if rr == "cancelled":
                             break
                         continue  # back to listening (barge-in)
+                try:
+                    vt.flush()
+                except Exception:
+                    pass
                 if not continuous:
                     break
                 # continuous: keep listening for the next turn
@@ -1376,7 +1419,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             emit({"type": "state", "value": "idle"})
         finally:
             try:
-                vt.flush()
+                if vt is not None:
+                    vt.flush()
             except Exception:
                 pass
 
@@ -1499,7 +1543,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": False, "error": f"{type(exc).__name__}"}
         return {"ok": False, "error": "未知操作：" + action}
 
-    def _listen(self, body, st: dict, on_segment=None, on_chunk=None) -> dict:
+    def _listen(self, body, st: dict, on_segment=None, on_chunk=None,
+                on_level=None) -> dict:
         from tools.tts_test_start import _capture_loop
 
         # offline test path: feed a wav file instead of the mic
@@ -1512,14 +1557,19 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         denoise = str(body.get("denoise", st.get("denoise", "rnnoise")))
         emit = self._emit_level
 
-        def on_level(level, is_speech):
+        def _on_level(level, is_speech):
             try:
                 emit(level, is_speech)
             except Exception:
                 pass
+            if on_level is not None:
+                try:
+                    on_level(level, is_speech)
+                except Exception:
+                    pass
 
         return _capture_loop(device, 1.0, dur, denoise, None, False, False,
-                             on_level=on_level, on_segment=on_segment,
+                             on_level=_on_level, on_segment=on_segment,
                              on_chunk=on_chunk)
 
     def _emit_level(self, level, is_speech):
