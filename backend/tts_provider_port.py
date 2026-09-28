@@ -49,6 +49,7 @@ class TTSEventKind(str, Enum):
     READY = "READY"
     PCM_CHUNK = "PCM_CHUNK"
     FIRST_CHUNK = "FIRST_CHUNK"
+    PCM_STREAM_END = "PCM_STREAM_END"
     DONE = "DONE"
     ERROR = "ERROR"
     STOPPED = "STOPPED"
@@ -550,6 +551,8 @@ class TTSStreamNormalizer:
         if kind == TTSEventKind.PCM_CHUNK.value:
             return self._accept_pcm(event)
         if kind == TTSEventKind.READY.value:
+            return (event,)
+        if kind == TTSEventKind.PCM_STREAM_END.value:
             return (event,)
         if kind == TTSEventKind.DONE.value:
             return self._accept_done(event)

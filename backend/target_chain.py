@@ -525,7 +525,8 @@ class TargetVoiceChain:
         if self.tts_provider is not None:
             self._prune_tts_controls()
             if self._tts_cleanup_blocked or any(
-                control.needs_terminal_observation for control in self._tts_controls.values()
+                control.closed and control.needs_terminal_observation
+                for control in self._tts_controls.values()
             ):
                 self.kernel.record_system_event(
                     EventKind.ERROR,
@@ -552,6 +553,14 @@ class TargetVoiceChain:
                 ):
                     self._tts_cleanup_blocked = True
                     raise PipelineError("previous TTS provider stop was not confirmed")
+                # The old worker's finally block can raise the cleanup gate
+                # before the Kernel finishes observing its terminal waiters.
+                # A successful abort has now confirmed BOTH TTS and playback.
+                self._prune_tts_controls()
+                self._tts_cleanup_blocked = any(
+                    control.needs_terminal_observation
+                    for control in self._tts_controls.values()
+                )
             lease = self.kernel.begin_turn(source=source, input_type="transcript")
             if not self.kernel.mark_input_final(lease):
                 raise PipelineError("kernel rejected final input")
@@ -597,6 +606,7 @@ class TargetVoiceChain:
 
     async def interrupt(self, reason: str = "user_interrupt", timeout_s: float = 3.0):
         async with self._submission_lock:
+            cleanup_was_blocked = self._tts_cleanup_blocked
             active_id = self.kernel.snapshot().get("active_turn_id")
             active_task = self._tasks.get(active_id) if active_id else None
             result = await self.kernel.abort_active_turn_async(reason, timeout_s=timeout_s)
@@ -606,6 +616,20 @@ class TargetVoiceChain:
             ):
                 self._tts_cleanup_blocked = True
             self._prune_tts_controls()
+            if (
+                self.tts_provider is not None
+                and active_task is not None
+                and not cleanup_was_blocked
+                and not result.timed_out_tasks
+                and not result.failed_tasks
+                and task_stopped
+            ):
+                # Clear only a gate raised by this successful cancellation;
+                # an idle/repeated interrupt must not clear a previous failure.
+                self._tts_cleanup_blocked = any(
+                    control.needs_terminal_observation
+                    for control in self._tts_controls.values()
+                )
             return result
 
     async def retry_tts_cleanup(self, timeout_s: float = 0.0) -> bool:
@@ -1381,7 +1405,11 @@ class TargetVoiceChain:
                                 signal,
                             )
                         continue
-                    if normalized.kind == TTSEventKind.DONE.value:
+                    if normalized.kind == TTSEventKind.PCM_STREAM_END.value:
+                        # P0 fix (2026-09-28): PCM stream is over — drain the
+                        # playback port now so the queue does not underrun while
+                        # tail_verify runs.  state["done"] is NOT set here; the
+                        # real DONE (after verify) gates worker reuse.
                         if state["speaking"] and self.kernel.is_current(lease):
                             drained = await self._finish_playback(lease, signal)
                             if not drained:
@@ -1399,8 +1427,34 @@ class TargetVoiceChain:
                                     "provider_id": capabilities.provider_id,
                                     "provider_epoch": request.provider_epoch,
                                     "normal": True,
+                                    "reason": "pcm_stream_end",
                                 },
                             )
+                        state["drained"] = True
+                        continue
+                    if normalized.kind == TTSEventKind.DONE.value:
+                        # P0 fix: PCM_STREAM_END already drained playback.
+                        # DONE only marks worker reusable after tail_verify.
+                        if state["speaking"] and self.kernel.is_current(lease):
+                            if not state.get("drained"):
+                                drained = await self._finish_playback(lease, signal)
+                                if not drained:
+                                    if signal.is_cancelled() or not self.kernel.is_current(lease):
+                                        return
+                                    raise TTSProviderPortError(
+                                        "VOICE-PLAYBACK-DRAIN-UNCONFIRMED",
+                                        "playback did not confirm physical drain",
+                                    )
+                                self.kernel.publish_output(
+                                    lease,
+                                    EventKind.AUDIO_DONE,
+                                    {
+                                        "speech_id": speech_id,
+                                        "provider_id": capabilities.provider_id,
+                                        "provider_epoch": request.provider_epoch,
+                                        "normal": True,
+                                    },
+                                )
                         state["done"] = True
                         continue
                     if normalized.kind == TTSEventKind.STOPPED.value:

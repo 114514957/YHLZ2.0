@@ -16,12 +16,13 @@ incremental text-to-audio semantics is verified.
 from __future__ import annotations
 
 import inspect
+import hashlib
 import logging
 import queue
 import re
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, Mapping, Optional, Tuple
 
@@ -41,6 +42,7 @@ from backend.tts_provider_worker import PersistentTTSProvider
 logger = logging.getLogger(__name__)
 
 QWEN_PROVIDER_ID = "qwen3-faster-customvoice"
+QWEN_CLONE_PROVIDER_ID = "qwen3-faster-clone"
 _QUEUE_SENTINEL = object()
 _TORCH_CACHE: Any = None
 _TORCH_IMPORT_ATTEMPTED = False
@@ -53,7 +55,7 @@ class QwenTTSAdapterError(TTSProviderPortError):
 
 @dataclass(frozen=True, slots=True)
 class QwenTTSConfig:
-    """Runtime-only configuration for one Qwen CustomVoice worker.
+    """Runtime-only configuration for one local Qwen streaming worker.
 
     ``model_dir`` is explicit on purpose.  The adapter never falls back to
     the old ``D:\\HF_Models`` path and never downloads missing files.
@@ -79,8 +81,18 @@ class QwenTTSConfig:
     tail_verify_retry: bool = False
     tail_anchor_chars: int = 2
     tail_verify_timeout_s: float = 8.0
+    voice_mode: str = "customvoice"
+    clone_voice_id: str = "xiaoyi"
+    ref_audio: Path | str | None = None
+    ref_text: str = field(default="", repr=False)
 
     def __post_init__(self) -> None:
+        if self.voice_mode not in {"customvoice", "clone"}:
+            raise ValueError("voice_mode must be customvoice or clone")
+        if self.voice_mode == "clone":
+            if not self.clone_voice_id.strip() or self.ref_audio is None or not self.ref_text.strip():
+                raise ValueError("clone requires clone_voice_id, ref_audio and ref_text")
+            object.__setattr__(self, "ref_audio", Path(self.ref_audio))
         path = Path(self.model_dir)
         if not str(path).strip():
             raise ValueError("model_dir must not be empty")
@@ -106,11 +118,24 @@ class QwenTTSConfig:
         if float(self.tail_verify_timeout_s) <= 0:
             raise ValueError("tail_verify_timeout_s must be positive")
 
+    @property
+    def resolved_voice_id(self) -> str:
+        return self.clone_voice_id if self.voice_mode == "clone" else self.speaker
+
+    @property
+    def provider_id(self) -> str:
+        return QWEN_CLONE_PROVIDER_ID if self.voice_mode == "clone" else QWEN_PROVIDER_ID
+
     def to_dict(self) -> dict:
         """Return non-sensitive configuration metadata for diagnostics."""
         return {
             "model_dir": str(self.model_dir),
-            "speaker": self.speaker,
+            "speaker": self.speaker if self.voice_mode == "customvoice" else None,
+            "voice_mode": self.voice_mode,
+            "voice_id": self.resolved_voice_id,
+            "provider_id": self.provider_id,
+            "ref_audio": str(self.ref_audio) if self.ref_audio is not None else None,
+            "ref_text_sha256": hashlib.sha256(self.ref_text.encode("utf-8")).hexdigest() if self.ref_text else None,
             "language": self.language,
             "device": self.device,
             "dtype": self.dtype,
@@ -132,7 +157,7 @@ class QwenTTSConfig:
         }
 
 
-def qwen_capabilities(*, worker_isolated: bool = False) -> TTSProviderCapabilities:
+def qwen_capabilities(*, worker_isolated: bool = False, config: QwenTTSConfig | None = None) -> TTSProviderCapabilities:
     """Return the conservative declaration for this adapter.
 
     Qwen's audio generator is genuinely chunked, but its public API consumes
@@ -141,12 +166,12 @@ def qwen_capabilities(*, worker_isolated: bool = False) -> TTSProviderCapabiliti
     """
 
     return TTSProviderCapabilities(
-        provider_id=QWEN_PROVIDER_ID,
+        provider_id=config.provider_id if config else QWEN_PROVIDER_ID,
         true_audio_stream=True,
         text_stream=False,
         cancel_observable=True,
         offline=True,
-        native_emotion=True,
+        native_emotion=config is None or config.voice_mode == "customvoice",
         worker_isolated=bool(worker_isolated),
         worker_persistent=True,
         output_sample_rate=PCM_SAMPLE_RATE,
@@ -157,7 +182,7 @@ def qwen_capabilities(*, worker_isolated: bool = False) -> TTSProviderCapabiliti
 
 def _safe_metadata(value: Any, key: str = "") -> Any:
     """Keep timing metadata while excluding text/audio payloads."""
-    if key.lower() in {"text", "content", "audio", "samples", "raw_audio", "transcript"}:
+    if key.lower() in {"text", "content", "audio", "samples", "raw_audio", "transcript", "ref_text", "ref_audio"}:
         return "[redacted]"
     if isinstance(value, Mapping):
         return {str(k): _safe_metadata(v, str(k)) for k, v in value.items()}
@@ -244,6 +269,35 @@ def _supported_kwargs(method: Callable[..., Any], values: Mapping[str, Any]) -> 
     if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in signature.parameters.values()):
         return dict(values)
     return {key: value for key, value in values.items() if key in signature.parameters}
+
+
+def _stream_call(model: Any, config: QwenTTSConfig, text: str,
+                 *, voice_id: str = "default", instruct: str | None = None,
+                 warmup: bool = False) -> tuple[Callable[..., Any], dict]:
+    """Resolve the same synthesis route for warmup and live turns, fail closed."""
+    name = "generate_voice_clone_streaming" if config.voice_mode == "clone" else "generate_custom_voice_streaming"
+    method = getattr(model, name, None)
+    if not callable(method):
+        raise QwenTTSAdapterError("VOICE-TTS-QWEN-API-UNSUPPORTED", name + " is unavailable")
+    values = {
+        "text": text, "language": config.language, "instruct": instruct,
+        "non_streaming_mode": False,
+        "max_new_tokens": min(config.max_new_tokens, 512) if warmup else config.max_new_tokens,
+        "min_new_tokens": config.min_new_tokens, "temperature": config.temperature,
+        "top_k": config.top_k, "top_p": config.top_p,
+        "repetition_penalty": config.repetition_penalty, "chunk_size": config.chunk_size,
+    }
+    if config.voice_mode == "clone":
+        if voice_id not in {"default", config.clone_voice_id, "clone:" + config.clone_voice_id}:
+            raise QwenTTSAdapterError("VOICE-TTS-QWEN-VOICE-UNSUPPORTED", "clone worker cannot switch voice references")
+        values.update(ref_audio=str(config.ref_audio), ref_text=config.ref_text, xvec_only=False)
+    else:
+        values["speaker"] = config.speaker if voice_id == "default" else voice_id
+    kwargs = _supported_kwargs(method, values)
+    required = {"text", "language", "ref_audio", "ref_text"} if config.voice_mode == "clone" else {"text", "speaker"}
+    if not required.issubset(kwargs):
+        raise QwenTTSAdapterError("VOICE-TTS-QWEN-API-UNSUPPORTED", "streaming API lacks required voice parameters")
+    return method, kwargs
 
 
 def _load_qwen_model(config: QwenTTSConfig) -> Any:
@@ -462,7 +516,7 @@ class QwenTTSWorker:
         self._warmup_seconds: Optional[float] = None
 
     def describe_capabilities(self) -> TTSProviderCapabilities:
-        return qwen_capabilities(worker_isolated=self.worker_isolated)
+        return qwen_capabilities(worker_isolated=self.worker_isolated, config=self.config)
 
     def start(self) -> None:
         with self._lock:
@@ -474,38 +528,24 @@ class QwenTTSWorker:
             self._last_error_detail = ""
             self._stopped_event.clear()
         try:
+            if self.config.voice_mode == "clone" and (
+                not self.config.ref_audio.is_file() or self.config.ref_audio.stat().st_size == 0
+            ):
+                raise QwenTTSAdapterError("VOICE-TTS-QWEN-REFERENCE-MISSING", "local clone reference audio missing or empty")
             model = _invoke_factory(self._model_factory, self.config)
             if model is None:
                 raise QwenTTSAdapterError(
                     "VOICE-TTS-QWEN-MODEL-LOAD-FAILED", "model factory returned None"
                 )
-            if not callable(getattr(model, "generate_custom_voice_streaming", None)):
-                raise QwenTTSAdapterError(
-                    "VOICE-TTS-QWEN-API-UNSUPPORTED",
-                    "generate_custom_voice_streaming is unavailable",
-                )
+            _stream_call(model, self.config, "", warmup=True)
             # Import and initialize the optional telemetry path before any
             # request can be cancelled; lazy CUDA initialization here would
             # otherwise inflate the first cancellation budget.
             _gpu_snapshot()
             if self.config.warmup_text is not None:
                 warmup_started = time.perf_counter()
-                method = getattr(model, "generate_custom_voice_streaming")
-                values = {
-                    "text": self.config.warmup_text,
-                    "speaker": self.config.speaker,
-                    "language": self.config.language,
-                    "instruct": None,
-                    "non_streaming_mode": False,
-                    "max_new_tokens": min(self.config.max_new_tokens, 512),
-                    "min_new_tokens": self.config.min_new_tokens,
-                    "temperature": self.config.temperature,
-                    "top_k": self.config.top_k,
-                    "top_p": self.config.top_p,
-                    "repetition_penalty": self.config.repetition_penalty,
-                    "chunk_size": self.config.chunk_size,
-                }
-                warmup_stream = method(**_supported_kwargs(method, values))
+                method, values = _stream_call(model, self.config, self.config.warmup_text, warmup=True)
+                warmup_stream = method(**values)
                 try:
                     for _ in warmup_stream:
                         pass
@@ -605,7 +645,7 @@ class QwenTTSWorker:
             else:
                 state = "stopped"
             result: Dict[str, Any] = {
-                "provider_id": QWEN_PROVIDER_ID,
+                "provider_id": self.config.provider_id,
                 "worker_id": self.worker_id,
                 "state": state,
                 "alive": self._alive,
@@ -626,7 +666,7 @@ class QwenTTSWorker:
     def metrics(self) -> Mapping[str, Any]:
         with self._lock:
             return {
-                "provider_id": QWEN_PROVIDER_ID,
+                "provider_id": self.config.provider_id,
                 "worker_id": self.worker_id,
                 "worker_generation": self._generation,
                 "model_loaded": self._model is not None,
@@ -693,6 +733,7 @@ class QwenTTSSession:
         self._cancel_requested = threading.Event()
         self._finished_event = threading.Event()
         self._drained_event = threading.Event()
+        self._consumer_closed = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._done_emitted = False
         self._stopped_emitted = False
@@ -707,12 +748,13 @@ class QwenTTSSession:
         self._pcm_duration_ms = 0
         self._rtf: Optional[float] = None
         self._tail_verify: Optional[Dict[str, Any]] = None
+        self._tail_verify_timing: Optional[Dict[str, Any]] = None
         self._queue_event(
             TTSProviderEvent(
                 kind=TTSEventKind.READY.value,
                 speech_id=request.speech_id,
                 provider_epoch=request.provider_epoch,
-                payload={"provider_id": QWEN_PROVIDER_ID},
+                payload={"provider_id": self.owner.config.provider_id},
             )
         )
 
@@ -759,13 +801,21 @@ class QwenTTSSession:
             return True
 
     def audio_events(self) -> Iterator[TTSProviderEvent]:
-        while True:
-            item = self._queue.get()
-            if item is _QUEUE_SENTINEL:
-                self._drained_event.set()
-                self.owner._session_drained(self)
-                return
-            yield item
+        try:
+            while True:
+                item = self._queue.get()
+                if item is _QUEUE_SENTINEL:
+                    self._drained_event.set()
+                    self.owner._session_drained(self)
+                    return
+                yield item
+        finally:
+            # A cancelled pipeline can close its consumer before it reads the
+            # terminal sentinel. Release that abandoned queue only once the
+            # producer has really stopped; do not weaken the busy-worker gate.
+            self._consumer_closed.set()
+            if self._cancel_requested.is_set() and self.is_finished:
+                self.force_drain()
 
     def cancel(self, reason: str = "cancelled") -> bool:
         self._cancel_requested.set()
@@ -774,13 +824,17 @@ class QwenTTSSession:
             if thread is None and not self._finished_event.is_set():
                 self._finish_without_thread()
                 self._emit_stopped(reason)
+        # Cancellation can arrive last, after generation and consumer closure.
+        # Those two earlier finally blocks could not discard a normal session.
+        if self._consumer_closed.is_set() and self.is_finished:
+            self.force_drain()
         return True
 
     def wait_stopped(self, timeout_s: float) -> bool:
         return self._finished_event.wait(max(float(timeout_s), 0.0))
 
     def force_drain(self) -> None:
-        """Discard queued events during explicit worker shutdown."""
+        """Discard events on shutdown or after a cancelled producer has stopped."""
         while True:
             try:
                 self._queue.get_nowait()
@@ -802,7 +856,7 @@ class QwenTTSSession:
             else:
                 state = "ready"
             return {
-                "provider_id": QWEN_PROVIDER_ID,
+                "provider_id": self.owner.config.provider_id,
                 "speech_id": self.request.speech_id,
                 "provider_epoch": self.request.provider_epoch,
                 "state": state,
@@ -816,7 +870,7 @@ class QwenTTSSession:
             if self._started_at is not None and self._first_chunk_at is not None:
                 first_chunk_ms = max(0, int(round((self._first_chunk_at - self._started_at) * 1000)))
             return {
-                "provider_id": QWEN_PROVIDER_ID,
+                "provider_id": self.owner.config.provider_id,
                 "speech_id": self.request.speech_id,
                 "provider_epoch": self.request.provider_epoch,
                 "state": "stopped" if self.is_finished else ("streaming" if self._committed else "ready"),
@@ -831,6 +885,7 @@ class QwenTTSSession:
                 "real_time_factor": self._rtf,
                 "error_code": self._error_code,
                 "tail_verify": self._tail_verify,
+                "tail_verify_timing": self._tail_verify_timing,
                 "gpu": _gpu_snapshot(),
             }
 
@@ -845,30 +900,12 @@ class QwenTTSSession:
     def _run_generation(self, text: str) -> None:
         generator: Any = None
         try:
-            values = {
-                "text": text,
-                "speaker": self.request.voice_id
-                if self.request.voice_id != "default"
-                else self.owner.config.speaker,
-                "language": self.owner.config.language,
-                "instruct": self.request.style.get("instruct")
-                if isinstance(self.request.style.get("instruct"), str)
-                else None,
-                "non_streaming_mode": False,
-                "max_new_tokens": self.owner.config.max_new_tokens,
-                "min_new_tokens": self.owner.config.min_new_tokens,
-                "temperature": self.owner.config.temperature,
-                "top_k": self.owner.config.top_k,
-                "top_p": self.owner.config.top_p,
-                "repetition_penalty": self.owner.config.repetition_penalty,
-                "chunk_size": self.owner.config.chunk_size,
-            }
-            method = getattr(self.model, "generate_custom_voice_streaming", None)
-            if not callable(method):
-                raise QwenTTSAdapterError(
-                    "VOICE-TTS-QWEN-API-UNSUPPORTED", "streaming method is unavailable"
-                )
-            generator = method(**_supported_kwargs(method, values))
+            method, values = _stream_call(
+                self.model, self.owner.config, text, voice_id=self.request.voice_id,
+                instruct=self.request.style.get("instruct")
+                if isinstance(self.request.style.get("instruct"), str) else None,
+            )
+            generator = method(**values)
             _gpu_snapshot(reset_peak=True)
             for item in generator:
                 if self._cancel_requested.is_set():
@@ -907,8 +944,27 @@ class QwenTTSSession:
                 # has actually finished and its metrics have been finalized.
                 pass
             else:
+                # P0 fix (2026-09-28): emit PCM_STREAM_END immediately after
+                # the last PCM chunk so the playback port knows no more audio
+                # is coming.  DONE is delayed by tail_verify and must NOT be
+                # used as the "stream is over" signal.
+                pcm_end_ts = time.perf_counter()
+                self._queue_event(
+                    TTSProviderEvent(
+                        kind=TTSEventKind.PCM_STREAM_END.value,
+                        speech_id=self.request.speech_id,
+                        provider_epoch=self.request.provider_epoch,
+                        sequence=self._chunk_count,
+                        payload={
+                            "chunk_count": self._chunk_count,
+                            "pcm_duration_ms": self._pcm_duration_ms,
+                            "pcm_end_mono_ms": round(pcm_end_ts * 1000, 1),
+                        },
+                    )
+                )
                 verifier = self.owner.verifier
                 if verifier is not None:
+                    verify_start_ts = time.perf_counter()
                     try:
                         verify = verifier.verify(
                             str(text), bytes(self._pcm_all), PCM_SAMPLE_RATE
@@ -919,8 +975,15 @@ class QwenTTSSession:
                             "ok": None,
                             "error": type(exc).__name__,
                         }
+                    verify_end_ts = time.perf_counter()
                     with self._lock:
                         self._tail_verify = verify
+                        self._tail_verify_timing = {
+                            "start_mono_ms": round(verify_start_ts * 1000, 1),
+                            "end_mono_ms": round(verify_end_ts * 1000, 1),
+                            "duration_ms": round((verify_end_ts - verify_start_ts) * 1000, 1),
+                        }
+                done_ts = time.perf_counter()
                 with self._lock:
                     self._done_emitted = True
                 self._queue_event(
@@ -932,6 +995,8 @@ class QwenTTSSession:
                         payload={
                             "chunk_count": self._chunk_count,
                             "pcm_duration_ms": self._pcm_duration_ms,
+                            "done_mono_ms": round(done_ts * 1000, 1),
+                            "pcm_end_mono_ms": round(pcm_end_ts * 1000, 1),
                         },
                     )
                 )
@@ -960,6 +1025,8 @@ class QwenTTSSession:
                 # The sentinel follows the finished flag so a consumer that
                 # drains immediately can safely release the session.
                 self._queue_event(_QUEUE_SENTINEL)
+            if self._cancel_requested.is_set() and self._consumer_closed.is_set():
+                self.force_drain()
             self.owner._session_finished(self)
 
     def _finish_without_thread(self) -> None:
@@ -1028,7 +1095,7 @@ def create_qwen_provider(
     worker_id: Optional[str] = None,
 ) -> PersistentTTSProvider:
     """Build a lazy persistent provider without touching the application root."""
-    capabilities = qwen_capabilities(worker_isolated=worker_isolated)
+    capabilities = qwen_capabilities(worker_isolated=worker_isolated, config=config)
 
     def factory() -> QwenTTSWorker:
         return QwenTTSWorker(
@@ -1041,7 +1108,7 @@ def create_qwen_provider(
     return PersistentTTSProvider(
         factory,
         capabilities=capabilities,
-        provider_id=QWEN_PROVIDER_ID,
+        provider_id=config.provider_id,
         worker_isolated=worker_isolated,
         worker_persistent=True,
         stop_timeout_s=config.stop_timeout_s,
