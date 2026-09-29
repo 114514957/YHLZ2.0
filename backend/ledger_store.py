@@ -4,10 +4,12 @@
 (opencode, the daemon, the QQ bot, DeepSeek desktop, cron scripts) should mutate
 it through this module so that writes are:
 
-* **atomic**  — temp file + ``os.replace`` (a crash never truncates the ledger);
-* **locked**  — a cross-process file lock serialises concurrent writers;
+* **surgical**  — only the affected record's lines change; the rest of the file
+  is preserved byte-for-byte (no whole-file re-render / blank-line churn);
+* **atomic**    — temp file + ``os.replace`` (a crash never truncates the ledger);
+* **locked**    — a cross-process file lock serialises concurrent writers;
 * **backed up** — the previous revision is copied to ``cache/ledger_backup/``;
-* **guarded** — secret-looking lines are refused (ledger 0129/0131 privacy rule);
+* **guarded**   — secret-looking lines are refused (ledger 0129/0131 privacy rule);
 * **index-synced** — the keyword search face is refreshed after a write.
 
 The public surface is deliberately tiny and stable (all return plain dicts so
@@ -68,14 +70,13 @@ class LedgerRecord:
     header: str
     body_lines: list[str] = field(default_factory=list)
     start: int = 0  # 1-based line of the header
-    end: int = 0    # 1-based line of the last body line
+    end: int = 0    # 1-based line of the block's last line (before next header)
 
     def body_text(self) -> str:
         return "\n".join(self.body_lines).strip("\n")
 
     def text(self) -> str:
-        body = self.body_text()
-        return f"{self.header}\n\n{body}" if body else self.header
+        return "\n".join([self.header, *self.body_lines])
 
     def to_dict(self, *, with_text: bool = False) -> dict:
         d = {"no": self.no, "title": self.title, "start": self.start,
@@ -89,15 +90,10 @@ class LedgerRecord:
 class _Doc:
     preamble: list[str]
     records: list[LedgerRecord]
+    lines: list[str]
 
-    def render(self) -> str:
-        chunks: list[str] = []
-        if self.preamble:
-            chunks.append("\n".join(self.preamble).rstrip("\n"))
-        for rec in self.records:
-            chunks.append(rec.text())
-        text = "\n\n".join(chunks).rstrip("\n") + "\n"
-        return text
+    def text(self) -> str:
+        return "\n".join(self.lines) + ("\n" if self.lines else "")
 
 
 # ---------------------------------------------------------------- parsing
@@ -115,22 +111,21 @@ def _parse_doc(text: Optional[str] = None, path: Path = LEDGER) -> _Doc:
     for i, line in enumerate(lines, 1):
         m = _HEADER_RE.match(line)
         if m:
+            if cur is not None:
+                cur.end = i - 1
             cur = LedgerRecord(no=int(m.group(1)), title=m.group(2).strip(),
-                               header=line, start=i, end=i)
+                               header=line, start=i, end=len(lines))
             records.append(cur)
-            continue
-        if cur is None:
+        elif cur is None:
             preamble.append(line)
-        else:
-            cur.body_lines.append(line)
-            cur.end = i
-    return _Doc(preamble=preamble, records=records)
+    for rec in records:
+        rec.body_lines = lines[rec.start:rec.end]  # header at start-1; body after
+    return _Doc(preamble=preamble, records=records, lines=lines)
 
 
 # ---------------------------------------------------------------- read
 def next_record_no(path: Path = LEDGER) -> int:
-    recs = parse_records(path=path)
-    return (max((r.no for r in recs), default=0) + 1)
+    return max((r.no for r in parse_records(path=path)), default=0) + 1
 
 
 def get_record(no: int, path: Path = LEDGER) -> Optional[dict]:
@@ -304,10 +299,18 @@ def _atomic_write(path: Path, text: str) -> None:
         raise
 
 
-def _commit(path: Path, doc: _Doc) -> Optional[Path]:
+def _write_lines(path: Path, lines: list[str]) -> Optional[Path]:
     backup = _backup(path)
-    _atomic_write(path, doc.render())
+    _atomic_write(path, "\n".join(lines) + ("\n" if lines else ""))
     return backup
+
+
+def _block(header: str, body: list[str]) -> list[str]:
+    """Header + one blank line (unless body already leads with one) + body."""
+    if not body:
+        return [header]
+    lead = [] if body[0].strip() == "" else [""]
+    return [header, *lead, *body]
 
 
 # ---------------------------------------------------------------- CRUD
@@ -322,22 +325,25 @@ def add_record(title: str, body: Iterable[str] | str = (), *,
         raise LedgerError("标题过长（>200 字）")
     lines = _normalise_body(body)
     if stamp_time and not any(l.lstrip("- ").startswith("时间：") for l in lines):
-        lines = [f"- 时间：{_today()}", ""] + lines
+        lines = [f"- 时间：{_today()}", *lines]
     _assert_clean(title + "\n" + "\n".join(lines))
 
     timestamp = time.time()
     with _file_lock():
-        doc = _parse_doc(path=path)
+        raw = path.read_text(encoding="utf-8") if path.exists() else ""
+        doc = _parse_doc(raw, path)
         used = {r.no for r in doc.records}
         new_no = int(no) if no is not None else (max(used, default=0) + 1)
         if new_no in used:
             raise LedgerError(f"记录 {new_no:04d} 已存在")
         header = f"## 记录 {new_no:04d}：{title}"
-        doc.records.append(
-            LedgerRecord(no=new_no, title=title, header=header,
-                         body_lines=["", *lines],
-                         start=0, end=0))
-        _commit(path, doc)
+        file_lines = list(doc.lines)
+        while file_lines and file_lines[-1].strip() == "":
+            file_lines.pop()
+        if file_lines:
+            file_lines.append("")  # single separator before the new record
+        file_lines.extend(_block(header, lines))
+        _write_lines(path, file_lines)
     if sync_index:
         _sync_index("incremental")
     return {"ok": True, "action": "add", "no": new_no, "title": title,
@@ -354,22 +360,29 @@ def update_record(no: int, *, title: Optional[str] = None,
         raise LedgerError("没有要修改的内容（title/append_lines/replace_body 至少一项）")
     timestamp = time.time()
     with _file_lock():
-        doc = _parse_doc(path=path)
+        doc = _parse_doc(None, path)
         rec = next((r for r in doc.records if r.no == int(no)), None)
         if rec is None:
             raise LedgerError(f"未找到记录 {int(no):04d}")
+        header = rec.header
         if title is not None:
             new_title = str(title).strip()
             if not new_title:
                 raise LedgerError("标题不能为空")
-            rec.title = new_title
-            rec.header = f"## 记录 {rec.no:04d}：{new_title}"
+            header = f"## 记录 {rec.no:04d}：{new_title}"
         if replace_body is not None:
-            rec.body_lines = ["", *_normalise_body(replace_body)]
+            body = _normalise_body(replace_body)
         elif append_lines is not None:
-            rec.body_lines = [*rec.body_lines, *_normalise_body(append_lines)]
-        _assert_clean(rec.title + "\n" + rec.body_text())
-        _commit(path, doc)
+            body = list(rec.body_lines)
+            while body and body[-1].strip() == "":
+                body.pop()
+            body.extend(_normalise_body(append_lines))
+        else:
+            body = list(rec.body_lines)
+        _assert_clean(header + "\n" + "\n".join(body))
+        new_block = _block(header, body)
+        new_lines = doc.lines[:rec.start - 1] + new_block + doc.lines[rec.end:]
+        _write_lines(path, new_lines)
     if sync_index:
         _sync_index("rebuild")
     return {"ok": True, "action": "update", "no": int(no),
@@ -384,12 +397,17 @@ def delete_record(no: int, *, path: Path = LEDGER, sync_index: bool = True,
         raise LedgerError("删除是破坏性操作，需显式 confirm=True")
     timestamp = time.time()
     with _file_lock():
-        doc = _parse_doc(path=path)
-        before = len(doc.records)
-        doc.records = [r for r in doc.records if r.no != int(no)]
-        if len(doc.records) == before:
+        doc = _parse_doc(None, path)
+        rec = next((r for r in doc.records if r.no == int(no)), None)
+        if rec is None:
             raise LedgerError(f"未找到记录 {int(no):04d}")
-        _commit(path, doc)
+        a, b = rec.start - 1, rec.end
+        new_lines = doc.lines[:a] + doc.lines[b:]
+        # avoid two blank lines left at the seam
+        if 0 < a <= len(new_lines) - 1 and new_lines[a - 1].strip() == "" \
+                and new_lines[a].strip() == "":
+            del new_lines[a]
+        _write_lines(path, new_lines)
     if sync_index:
         _sync_index("rebuild")
     return {"ok": True, "action": "delete", "no": int(no),
@@ -419,12 +437,12 @@ def _sync_index(mode: str) -> None:
     * ``incremental`` — index only new rows (fast, for pure appends).
     * ``rebuild``     — a full rebuild (142s) is spawned as a detached process
       so the caller returns immediately; a stale index only costs recall
-      ranking, never correctness (search falls back to the live file).
+      ranking, never correctness (search reads the live file).
     """
     try:
-        from tools.ledger_mem_import import index_ledger_new_rows
-
         if mode == "incremental":
+            from tools.ledger_mem_import import index_ledger_new_rows
+
             index_ledger_new_rows(LEDGER, since_line=_last_indexed_line())
             return
     except Exception:
