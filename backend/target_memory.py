@@ -642,6 +642,9 @@ class TargetMemoryService:
                 seen.add(b["id"])
         except Exception:
             pass
+        current_ids = {it["id"] for it in self._filter_current(
+            [it for it in good if it.get("tier") == "L2"])}
+        good = [it for it in good if it.get("tier") != "L2" or it["id"] in current_ids]
         if len(good) > 1:
             try:
                 from backend.vector_memory import rerank
@@ -1248,12 +1251,12 @@ class TargetMemoryService:
 
     def supersede(self, old_id: str, new_id: str, when: float = 0.0) -> bool:
         """Soft-invalidate an old item in favor of a new one (M1): sets
-        invalid_at + superseded_by. Never deletes; reversible."""
+        invalid_at + superseded_by + archive.  Never deletes; reversible."""
         with self._lock:
             con = sqlite3.connect(str(self.db_path))
             try:
                 cur = con.execute(
-                    "UPDATE l2_items SET invalid_at=?, superseded_by=? "
+                    "UPDATE l2_items SET invalid_at=?, superseded_by=?, status='archive' "
                     "WHERE id=? AND COALESCE(invalid_at,0)=0",
                     (float(when or time.time()), str(new_id), str(old_id)),
                 )
@@ -1269,6 +1272,101 @@ class TargetMemoryService:
         con.execute("UPDATE l2_items SET status=? WHERE id=?", (status, item_id))
         con.commit()
         con.close()
+
+    # ---------- Step 3: memory governance (ledger 0518) ----------
+
+    def approve(self, item_id: str, approved_by: str = "owner") -> bool:
+        """Approve a pending/candidate item -> active.  Never deletes."""
+        with self._lock:
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                cur = con.execute(
+                    "UPDATE l2_items SET status='active', "
+                    "source=CASE WHEN source='' THEN ? ELSE source END "
+                    "WHERE id=? AND status IN ('pending','candidate','downgraded')",
+                    (str(approved_by), str(item_id)),
+                )
+                con.commit()
+                return cur.rowcount > 0
+            finally:
+                con.close()
+
+    def reject(self, item_id: str, reason: str = "") -> bool:
+        """Reject a pending/candidate item -> archive (soft, never deleted)."""
+        with self._lock:
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                cur = con.execute(
+                    "UPDATE l2_items SET status='archive' "
+                    "WHERE id=? AND status IN ('pending','candidate')",
+                    (str(item_id),),
+                )
+                con.commit()
+                return cur.rowcount > 0
+            finally:
+                con.close()
+
+    def correct(
+        self,
+        old_id: str,
+        new_summary: str,
+        *,
+        speaker: str = "",
+        channel: str = "",
+        evidence_ref: str = "",
+        kind: str = "correction",
+    ) -> str:
+        """Correct a fact: store new item, supersede old one.
+
+        Speaker/channel provenance is preserved.  The old item is soft-
+        invalidated (superseded_by=new_id), never deleted.  Returns new_id.
+        """
+        new_id = "corr_" + _fingerprint(f"{old_id}|{new_summary}")[:12]
+        new_item = L2Item(
+            id=new_id, tier="L2", type="fact",
+            importance=7, summary=str(new_summary)[:2000],
+            content_hash=_fingerprint(str(new_summary))[:16],
+            keywords="correction",
+            status="active",
+            evidence_ref=str(evidence_ref)[:200],
+            source=str(speaker or "correction"),
+            kind=str(kind),
+            created_at=time.time(),
+        )
+        self.store_item(new_item)
+        self.supersede(old_id, new_id)
+        return new_id
+
+    def invalidate(self, item_id: str, reason: str = "") -> bool:
+        """Soft-invalidate a fact (invalid_at=now).  Never deletes."""
+        with self._lock:
+            con = sqlite3.connect(str(self.db_path))
+            try:
+                cur = con.execute(
+                    "UPDATE l2_items SET invalid_at=?, status='archive' "
+                    "WHERE id=? AND COALESCE(invalid_at,0)=0",
+                    (float(time.time()), str(item_id)),
+                )
+                con.commit()
+                return cur.rowcount > 0
+            finally:
+                con.close()
+
+    def list_by_status(self, status: str = "active", limit: int = 20) -> list[dict]:
+        """List items by status for governance visibility."""
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            rows = con.execute(
+                "SELECT id,summary,status,source,evidence_ref,valid_at,invalid_at,"
+                "superseded_by,importance FROM l2_items WHERE status=? "
+                "ORDER BY created_at DESC, id DESC LIMIT ?",
+                (str(status), int(limit)),
+            ).fetchall()
+        finally:
+            con.close()
+        return [{"id": r[0], "summary": r[1], "status": r[2], "source": r[3],
+                 "evidence_ref": r[4], "valid_at": r[5], "invalid_at": r[6],
+                 "superseded_by": r[7], "importance": r[8]} for r in rows]
 
     def audit_suspicious(self, limit: int = 20) -> dict:
         """Memory health check (ledger 0226): sample recent active L2 items,
@@ -1343,27 +1441,27 @@ class TargetMemoryService:
         if not q:
             return []
         self._recall_count += 1
+        self._last_recall_timing = {}
         _t0 = time.perf_counter()
         ranked = self._recall_via_kw(q, int(limit))
         _t1 = time.perf_counter()
         self._last_recall_timing["keyword_ms"] = round((_t1 - _t0) * 1000, 2)
         self._last_recall_timing["keyword_hits"] = len(ranked) if ranked else 0
-        if ranked is not None:
-            if as_of:
-                out = self._filter_as_of(ranked, float(as_of))
-            else:
-                out = self._filter_current(ranked)
-        else:
+        filter_rows = (lambda rows: self._filter_as_of(rows, float(as_of))) if as_of else self._filter_current
+        out = filter_rows(ranked or [])
+        # A rebuildable keyword mirror may lag an approved transaction. Fill
+        # thin results from authoritative L2/FTS before invoking any model.
+        if len(out) < int(limit):
             _t2 = time.perf_counter()
-            sql = self._recall_via_sqlite(q, int(limit))
-            _t3 = time.perf_counter()
-            self._last_recall_timing["sql_ms"] = round((_t3 - _t2) * 1000, 2)
+            sql = self._recall_via_sqlite(q, max(int(limit) * 4, 20))
+            self._last_recall_timing["sql_ms"] = round((time.perf_counter() - _t2) * 1000, 2)
             self._last_recall_timing["sql_hits"] = len(sql)
-            self._boost_recalled(sql)
-            if as_of:
-                out = self._filter_as_of(sql, float(as_of))
-            else:
-                out = self._filter_current(sql)
+            seen = {it["id"] for it in out}
+            additions = [it for it in filter_rows(sql) if it["id"] not in seen]
+            additions = additions[:max(0, int(limit) - len(out))]
+            if not as_of:
+                self._boost_recalled(additions)
+            out.extend(additions)
         if as_of:
             self._last_recall_timing["total_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
             return out
@@ -1520,17 +1618,18 @@ class TargetMemoryService:
             try:
                 for it in items or []:
                     row = con.execute(
-                        "SELECT COALESCE(invalid_at,0) FROM l2_items WHERE id=?",
+                        "SELECT COALESCE(invalid_at,0),status FROM l2_items WHERE id=?",
                         (str(it.get("id", "")),)).fetchone()
                     if row is None:
                         continue
-                    if float(row[0] or 0) > 0:
+                    if float(row[0] or 0) > 0 or row[1] != "active":
                         continue
                     out.append(it)
             finally:
                 con.close()
         except Exception:
-            return list(items or [])
+            # Stale mirrors are not authority when current state cannot be read.
+            return []
         return out
 
     def _boost_recalled(self, items: list[dict]) -> None:
