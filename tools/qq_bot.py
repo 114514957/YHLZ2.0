@@ -3,8 +3,7 @@ r"""YHLZ QQ bot bridge (ledger 0226): OneBot11 forward WebSocket -> daemon.
 
 Listens on a NapCat OneBot11 WebSocket server and turns private messages /
 group @-mentions into daemon turns (channel qq_p<uid> / qq_g<gid>), then sends
-Yuanheng's answer back. Owner persona for all QQ conversations (no public
-convergence clause).
+Yuanheng's answer back. Owner private chat and public groups have separate memory/persona boundaries.
 
 Usage:
     python tools/qq_bot.py --uin 2258374446          # use qqwatch onebot config
@@ -15,6 +14,7 @@ Env DAEMON=http://127.0.0.1:8321
 from __future__ import annotations
 
 import argparse
+from collections import OrderedDict
 import asyncio
 import json
 import os
@@ -43,6 +43,8 @@ AUDIO_MAX_BYTES = 10 * 1024 * 1024
 AUDIO_MAX_SECONDS = 60                 # voice clip cap
 GROUP_USER_COOLDOWN = 8.0              # per-user min gap between group replies
 GROUP_CHAN_PER_MIN = 20                # per-group reply budget / minute
+MESSAGE_DEDUP_TTL = 15 * 60           # process-local reconnect replay protection
+MESSAGE_DEDUP_LIMIT = 2048
 
 
 def _save_media(data: bytes, ext: str, max_bytes: int = 0) -> str:
@@ -309,6 +311,13 @@ def _find_onebot_config(uin: str | None) -> pathlib.Path:
     if not cands:
         raise SystemExit("未找到 onebot11 配置：请先让 NapCat 登录小号生成配置，"
                          "或用 --config 指定")
+    if not uin and len(cands) > 1:
+        # 2026-09-29 fix: default must be the BOT account, not the master's.
+        # onebot11_*.json sorts the master (2258...) first; pick a non-master
+        # config so private messages are received as the bot.
+        non_master = [c for c in cands if str(MASTER_UIN) not in c.stem]
+        if non_master:
+            return non_master[0]
     return cands[0]
 
 
@@ -335,8 +344,9 @@ def _daemon_turn(text: str, channel: str, images: list | None = None) -> str:
         # up to 240s); ledger 0443
         with urllib.request.urlopen(req, timeout=280) as r:
             return str(json.loads(r.read())["answer"])
-    except Exception:
-        return ""
+    except Exception as exc:
+        # Do not turn transport errors into a successful-looking silent reply.
+        raise RuntimeError("daemon turn failed") from exc
 
 
 class QQBridge:
@@ -345,11 +355,14 @@ class QQBridge:
         self.ws_url = ws
         self.uin = str(uin)
         self.cfg = cfg
-        self.masters = masters or {MASTER_UIN}  # owner QQ (command source)
+        self.masters = set(masters) if masters is not None else {MASTER_UIN}
         self.log_n = 0
         self.loop = None
         self._last_reply: dict = {}
         self._chan_reply: dict = {}
+        self._seen_events: OrderedDict[tuple, float] = OrderedDict()
+        self.duplicate_events = 0
+        self.backend_errors = 0
 
     def log(self, msg: str) -> None:
         print(f"[qqbot] {msg}", flush=True)
@@ -358,7 +371,9 @@ class QQBridge:
         texts, ats = [], []
         for seg in msg_array or []:
             if seg.get("type") == "text":
-                texts.append(seg.get("data", {}).get("text", ""))
+                value = seg.get("data", {}).get("text", "")
+                if isinstance(value, str):
+                    texts.append(value)
             elif seg.get("type") == "at":
                 ats.append(str(seg.get("data", {}).get("qq", "")))
         return "".join(texts).strip(), ats
@@ -650,16 +665,38 @@ class QQBridge:
         times.append(now)
         return False
 
+    def _claim_message(self, ev: dict, channel: str) -> bool:
+        """Bounded replay protection, not a durable exactly-once guarantee."""
+        mid = ev.get("message_id")
+        if mid is None or str(mid) == "":
+            return True  # legacy events without IDs cannot be deduplicated
+        now = time.monotonic()
+        while self._seen_events:
+            first, ts = next(iter(self._seen_events.items()))
+            if now - ts < MESSAGE_DEDUP_TTL:
+                break
+            self._seen_events.pop(first)
+        key = (self.uin, channel, str(ev.get("user_id", "")), str(mid))
+        if key in self._seen_events:
+            self.duplicate_events += 1
+            return False
+        self._seen_events[key] = now
+        while len(self._seen_events) > MESSAGE_DEDUP_LIMIT:
+            self._seen_events.popitem(last=False)
+        return True
+
     async def handle(self, ws, ev: dict) -> None:
         if ev.get("post_type") != "message":
             return
         msg_type = ev.get("message_type")
         user_id = str(ev.get("user_id", ""))
-        if user_id == self.uin:
+        if not user_id.isdigit() or user_id == self.uin:
             return
         msg = ev.get("message", [])
         if not isinstance(msg, list):
             return
+        msg = [s for s in msg if isinstance(s, dict)
+               and isinstance(s.get("data", {}), dict)]
         text, ats = self._text_of(msg)
         cmd = text.strip().replace("＃", "#")
         is_master_cmd = user_id in self.masters and cmd.startswith("#")
@@ -669,10 +706,14 @@ class QQBridge:
                 return
             channel = f"qq_p{user_id}"
         elif msg_type == "group":
+            if not str(ev.get("group_id", "")).isdigit():
+                return
             if self.uin not in ats and not is_master_cmd:
                 return
             channel = f"qq_g{ev.get('group_id', user_id)}"
         else:
+            return
+        if not self._claim_message(ev, channel):
             return
         # remote dev channel (master only): #dev / #y / #n / #push / #devstatus
         if dev_runner is not None:
@@ -714,7 +755,19 @@ class QQBridge:
             return
         self.log(f"来自 {user_id}: {text[:40]}"
                  + (f" [+{len(imgs)}图]" if imgs else ""))
-        ans = _daemon_turn(text, channel, images=imgs)
+        # urllib's request may take minutes; never block WS heartbeat/outbox.
+        # Speaker attribution stays inside the isolated group conversation.
+        turn_text = (f"[QQ群发言者 user_id={user_id}] {text}"
+                     if msg_type == "group" else text)
+        try:
+            ans = await asyncio.to_thread(_daemon_turn, turn_text, channel, images=imgs)
+        except Exception as exc:
+            self.backend_errors += 1
+            self.log(f"对话请求失败: {type(exc).__name__}，不自动重放")
+            if msg_type == "private":
+                await self._say(ws, self._params(msg_type, user_id, ev),
+                                "这次请求没有完成，请稍后重新发送；我没有自动重复执行。")
+            return
         if not ans:
             return
         ans, out_imgs, out_files, out_faces, vmark, out_devs = _extract_markers(ans.strip())
@@ -726,11 +779,15 @@ class QQBridge:
             params.update(message_type="group",
                           group_id=int(ev.get("group_id", 0)))
         # Yuanheng handed a real dev task to opencode (owner only)
-        if out_devs and user_id in self.masters:
+        if out_devs and msg_type == "private" and user_id in self.masters:
             await self._start_dev(ws, params, out_devs[0])
         for fid in out_faces:
             await self._send_segment(
                 ws, params, {"type": "face", "data": {"id": int(fid)}})
+        if msg_type != "private":
+            # Untrusted public model text must not turn a guessed local path
+            # into a file disclosure. Public publishing needs an explicit gate.
+            out_imgs, out_files = [], []
         for ip in out_imgs:
             if pathlib.Path(ip).exists():
                 await self._send_image(ws, params, ip)
@@ -750,6 +807,8 @@ class QQBridge:
     async def _relay_outbox(self, ws) -> None:
         """P2e: relay queued proactive messages (from the daemon) to the master.
         Only runs while connected; rate-limited to <=2/hour."""
+        if not self.masters:
+            return  # explicitly disabled owner delivery; do not drain the outbox
         sent: list = []
         master = int(next(iter(self.masters)))
         while True:
