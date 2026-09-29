@@ -235,9 +235,15 @@ class CapabilityRegistry:
             return {"ok": False, "error": reason, "name": name}
         started = time.perf_counter()
         try:
-            output = cap.handler(params)
-            if inspect.isawaitable(output):
-                output = await output
+            # Sync handlers (memory_recall loads an embedding model, ~10s) must
+            # run off the event loop; calling them inline blocks the MCP stdio
+            # transport and the client hangs.  Async handlers are awaited.
+            if inspect.iscoroutinefunction(cap.handler):
+                output = await cap.handler(params)
+            else:
+                output = await asyncio.to_thread(cap.handler, params)
+                if inspect.isawaitable(output):
+                    output = await output
         except Exception as exc:
             self._safe_rollback(cap)
             return {"ok": False,

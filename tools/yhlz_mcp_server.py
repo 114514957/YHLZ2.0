@@ -107,4 +107,12 @@ async def web_search(query: str, limit: int = 5) -> str:
 
 
 if __name__ == "__main__":
+    # Preload the memory embedding model BEFORE serving.  Loading it lazily
+    # inside the first memory_recall call blocks the stdio transport and the
+    # client hangs (2026-09-29 fix).  ~12s one-time cost, then 0.1s per call.
+    try:
+        from backend.vector_memory import _load_model as _preload_vm
+        _preload_vm()
+    except Exception:
+        pass
     mcp.run(transport="stdio")

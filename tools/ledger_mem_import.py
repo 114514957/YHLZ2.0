@@ -200,15 +200,14 @@ def write_items(items: list[LedgerItem], db_path: Path = DEFAULT_DB) -> int:
     return written
 
 
-def index_ledger_all_rows(ledger: Path = LEDGER) -> int:
-    """Index every ledger line (search surface = full ledger; memory stays limited)."""
-    from backend.target_kw_index import KeywordIndex
+def index_ledger_all_rows(ledger: Path = LEDGER, *, db_path: Optional[Path] = None) -> int:
+    """Atomically rebuild the ledger search source in one SQLite transaction."""
+    from backend.target_kw_index import DEFAULT_DB as KW_DEFAULT_DB, KeywordIndex
 
-    kw = KeywordIndex()
     raw = ledger.read_text(encoding="utf-8").splitlines()
     cur_record = "0000"
     title = ""
-    n = 0
+    docs: list[dict[str, object]] = []
     for idx, line in enumerate(raw, start=1):
         m = _TRACK_NUM.match(line.strip())
         if m:
@@ -216,21 +215,67 @@ def index_ledger_all_rows(ledger: Path = LEDGER) -> int:
             title = line.strip().replace("## ", "", 1)
             continue
         stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if _is_sensitive(stripped):
+        if not stripped or stripped.startswith("#") or _is_sensitive(stripped):
             continue
         body = stripped[2:].strip() if stripped.startswith("- ") else stripped
         if len(body) < 4:
             continue
-        kw.upsert_doc(
-            docid=f"ledger:{cur_record}:{idx}",
-            source="ledger",
-            summary=body[:500],
-            record_title=title[:120],
-        )
-        n += 1
-    return n
+        docs.append({
+            "docid": f"ledger:{cur_record}:{idx}",
+            "source": "ledger",
+            "summary": body[:500],
+            "record_title": title[:120],
+        })
+    kw = KeywordIndex(db_path or KW_DEFAULT_DB)
+    return kw.bulk_upsert_docs(docs, clear_source="ledger")
+
+
+def index_ledger_new_rows(
+    ledger: Path = LEDGER, since_line: int = 0, *, db_path: Optional[Path] = None,
+) -> tuple[int, int]:
+    """Incrementally index only lines after ``since_line`` (append-only ledger).
+
+    Returns ``(indexed_count, total_line_count)``.  Fast (<1s) vs the ~300s
+    full rebuild, so MCP search after a ledger append no longer times out.
+    If the ledger shrank (rewritten), the caller should do a full rebuild.
+    """
+    from backend.target_kw_index import DEFAULT_DB as KW_DEFAULT_DB, KeywordIndex
+
+    raw = ledger.read_text(encoding="utf-8").splitlines()
+    total = len(raw)
+    if total < since_line:
+        raise ValueError("ledger shrank; full rebuild required")
+    since_line = max(0, int(since_line))
+    # recover the record/title context at the boundary
+    cur_record = "0000"
+    title = ""
+    for line in raw[:since_line]:
+        m = _TRACK_NUM.match(line.strip())
+        if m:
+            cur_record = m.group(1)
+            title = line.strip().replace("## ", "", 1)
+    docs: list[dict[str, object]] = []
+    for idx, line in enumerate(raw[since_line:], start=since_line + 1):
+        m = _TRACK_NUM.match(line.strip())
+        if m:
+            cur_record = m.group(1)
+            title = line.strip().replace("## ", "", 1)
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or _is_sensitive(stripped):
+            continue
+        body = stripped[2:].strip() if stripped.startswith("- ") else stripped
+        if len(body) < 4:
+            continue
+        docs.append({
+            "docid": f"ledger:{cur_record}:{idx}",
+            "source": "ledger",
+            "summary": body[:500],
+            "record_title": title[:120],
+        })
+    kw = KeywordIndex(db_path or KW_DEFAULT_DB)
+    n = kw.bulk_upsert_docs(docs) if docs else 0
+    return n, total
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

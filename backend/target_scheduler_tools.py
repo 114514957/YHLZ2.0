@@ -32,12 +32,20 @@ def _policy_always_true() -> bool:
 
 
 def ledger_search(query: str, limit: int = 8) -> str:
-    """Search the project ledger; keyword index first, file scan fallback."""
+    """Search the project ledger without making a request wait for a rebuild.
+
+    The SQLite catalog is an optimization. If its build marker is behind the
+    ledger, use the bounded text fallback immediately; a stale catalog must
+    never make MCP appear hung or return old records as current results.
+    """
     q = str(query or "").strip()
     if not q:
         return "未找到台账或无查询"
+    safe_limit = max(1, min(int(limit), 10))
     try:
-        hits = _retry_query(q, source="ledger")[: max(1, min(int(limit), 10))]
+        if not _ledger_index_fresh():
+            return _ledger_grep_fallback(q, safe_limit)
+        hits = _retry_query(q, source="ledger", refresh=False)[:safe_limit]
     except Exception:
         hits = []
     if hits:
@@ -48,19 +56,48 @@ def ledger_search(query: str, limit: int = 8) -> str:
                 line = f"[{h['record_title'][:60]}] " + line
             parts.append(f"[{h['docid']}] {line}")
         return "\n".join(parts)[:4000]
-    return _ledger_grep_fallback(q, int(limit))
+    return _ledger_grep_fallback(q, safe_limit)
+
+
+def _ledger_index_fresh() -> bool:
+    """Return whether the catalog was built from this ledger version."""
+    try:
+        idx = _kw_index(refresh=False)
+        ledger_mtime = LEDGER.stat().st_mtime
+        con = idx._conn(writable=False)
+        try:
+            row = con.execute("SELECT val FROM kw_meta WHERE key='ledger_built_at'").fetchone()
+        finally:
+            con.close()
+        return bool(row and float(row[0]) >= ledger_mtime)
+    except Exception:
+        return False
 
 
 def _ledger_grep_fallback(q: str, limit: int) -> str:
+    """Small, bounded fallback with stable ledger IDs (not raw lines)."""
     if not LEDGER.exists():
         return "未找到台账或无查询"
+    import re as _re
+    record = "0000"
     matches: list[str] = []
-    for line in LEDGER.read_text(encoding="utf-8").splitlines():
-        if q in line:
-            matches.append(line[3:].strip() if line.startswith("- ") else line.strip())
-            if len(matches) >= limit:
-                break
-    return "\n".join(matches[:limit]) if matches else "台账无匹配"
+    for line_no, raw in enumerate(LEDGER.read_text(encoding="utf-8").splitlines(), 1):
+        stripped = raw.strip()
+        heading = _re.match(r"^##\s+记录\s+(\d+)", stripped)
+        if heading:
+            record = heading.group(1)
+            continue
+        if not stripped or stripped.startswith("#") or q not in stripped:
+            continue
+        if _re.search(r"sk-\w+|DEEPSEEK_API_KEY|api[_-]?key\s*[:=]|指纹", stripped, _re.I):
+            continue
+        body = stripped[2:].strip() if stripped.startswith("- ") else stripped
+        if len(body) < 4:
+            continue
+        matches.append(f"[ledger:{record}:{line_no}] {body[:400]}")
+        if len(matches) >= max(1, int(limit)):
+            break
+    return "\n".join(matches) if matches else "台账无匹配"
 
 
 def recall_memory(query: str, limit: int = 5) -> str:
@@ -72,7 +109,7 @@ def recall_memory(query: str, limit: int = 5) -> str:
             from backend.target_memory import TargetMemoryService as _S
 
             service = _S()
-            kw = _kw_index()
+            kw = _kw_index(refresh=False)
             for sub in _split_query(q):
                 hits = kw.query(sub, limit=4, source="l2")
                 if hits:
@@ -292,11 +329,12 @@ def _merge_hits(lists: list[list[dict]]) -> list[dict]:
 _KW_CACHE: dict = {}
 
 
-def _kw_index():
-    """Process-level cached KeywordIndex with auto-refresh on ledger change.
+def _kw_index(*, refresh: bool = True):
+    """Return the cached keyword index; refresh is incremental and cheap.
 
-    Stores last-built timestamp in SQLite (kw_meta) so it persists across
-    processes; only rebuilds when the ledger file is actually newer.
+    Full rebuilds (~300s on a 6000-line ledger) used to block every search
+    after a ledger append, making MCP search look hung.  Now we index only the
+    new lines; a full rebuild happens only when the ledger shrank (rewritten).
     """
     from backend.target_kw_index import KeywordIndex
 
@@ -304,30 +342,39 @@ def _kw_index():
     if idx is None:
         idx = KeywordIndex()
         _KW_CACHE["default"] = idx
+    if not refresh:
+        return idx
     try:
-        import sqlite3
-        import time
-        ledger_mtime = LEDGER.stat().st_mtime
-        # read last-built from DB
+        raw_total = len(LEDGER.read_text(encoding="utf-8").splitlines())
+        # find the highest line already indexed (docid = ledger:<rec>:<line>)
         con = idx._conn(writable=True)
         try:
-            con.execute("CREATE TABLE IF NOT EXISTS kw_meta (key TEXT PRIMARY KEY, val REAL)")
-            row = con.execute("SELECT val FROM kw_meta WHERE key='ledger_built_at'").fetchone()
-            last_built = row[0] if row else 0.0
-            if ledger_mtime > last_built:
-                from tools.ledger_mem_import import index_ledger_all_rows
-                index_ledger_all_rows()
-                con.execute("INSERT OR REPLACE INTO kw_meta (key,val) VALUES ('ledger_built_at', ?)",
-                            (ledger_mtime,))
-                con.commit()
+            rows = con.execute(
+                "SELECT docid FROM kw_docs WHERE source='ledger'").fetchall()
         finally:
             con.close()
+        indexed_lines = 0
+        for (docid,) in rows:
+            try:
+                part = str(docid).rsplit(":", 1)[-1]
+                if part.isdigit():
+                    indexed_lines = max(indexed_lines, int(part))
+            except Exception:
+                continue
+        from tools.ledger_mem_import import (
+            index_ledger_all_rows, index_ledger_new_rows,
+        )
+        if indexed_lines == 0 or raw_total < indexed_lines:
+            index_ledger_all_rows(db_path=idx.db_path)  # first build / rewritten
+        elif raw_total > indexed_lines:
+            index_ledger_new_rows(LEDGER, since_line=indexed_lines,
+                                  db_path=idx.db_path)
     except Exception:
         pass
     return idx
 
 
-def _retry_query(query: str, source: str) -> list[dict]:
+def _retry_query(query: str, source: str, *, refresh: bool = True) -> list[dict]:
     """Multi-variant keyword query (ledger 0425).
 
     A single sentence-style question can hit a literal echo (a record that
@@ -335,7 +382,7 @@ def _retry_query(query: str, source: str) -> list[dict]:
     pieces, a stopword-squeezed core and a bigram-expanded fallback brings the
     real records in as well.
     """
-    kw = _kw_index()
+    kw = _kw_index(refresh=refresh)
     variants: list[str] = [str(query or "")]
     for piece in _split_query(query):
         # pure stopword pieces ("上次", "一下", …) only pull in unrelated
