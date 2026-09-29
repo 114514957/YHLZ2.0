@@ -22,6 +22,7 @@ import math
 import re
 import sqlite3
 import threading
+import uuid
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -176,19 +177,34 @@ class TargetMemoryService:
         db_path: Path = DEFAULT_DB,
         window_turns: int = L1_WINDOW_TURNS,
         kw_index: Any = None,
+        l1_scope: str = "",
+        summary_batch_size: int = 40,
     ) -> None:
         self.db_path = Path(db_path)
         self.window_turns = int(window_turns)
+        self.l1_scope = str(l1_scope or "")
+        self.summary_batch_size = int(summary_batch_size)
+        if self.window_turns < 1 or self.summary_batch_size < 1:
+            raise ValueError("memory window and summary batch must be positive")
+        self._summary_running = False
+        self._summary_failures = 0
+        self._summary_error = ""
+        self._l1_save_error = ""
         self._kw = kw_index
         self._lock = threading.RLock()
         self._turns: list[dict[str, str]] = []
         self._summary: str = ""
         self._summary_pending = False
         self._summary_version = 0
+        self._history_digest = ""
+        self._archive_digest = ""
         self._pending_dropped: list[dict[str, str]] = []
         self._extractor: Any = None  # cloud candidate generator (Hybrid, local-first)
         self._judge: Any = None  # local judge (importance/adjudication)
         self._boost_ts: dict[str, float] = {}  # recall-use boost dedup window (ledger 0189)
+        self._last_recall_timing: dict[str, float] = {}
+        self._recall_count: int = 0
+        self._summary_provider_status: str = "unknown"
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
         self._load_l1()
@@ -300,47 +316,122 @@ class TargetMemoryService:
 
     # ---------- L1 transient ----------
     def _l1_path(self) -> Path:
-        return self.db_path.with_name(self.db_path.name + ".l1.json")
+        # An owner can share durable L2 facts, but not a rolling conversation
+        # window with another channel. Never import the old shared cache here.
+        scope = "." + _fingerprint(self.l1_scope) if self.l1_scope else ""
+        return self.db_path.with_name(self.db_path.name + ".l1" + scope + ".json")
+
+    @staticmethod
+    def _valid_turns(value: Any) -> list[dict[str, str]]:
+        if not isinstance(value, list):
+            return []
+        return [{"role": t["role"], "text": t["text"]}
+                for t in value if isinstance(t, dict)
+                and t.get("role") in ("user", "assistant")
+                and isinstance(t.get("text"), str)]
 
     def _load_l1(self) -> None:
-        """Restore the rolling window + compressed memo across restarts
-        (ledger 0308). Derived cache: safe to lose, never the source of truth."""
+        """Restore this channel's window and unacknowledged summary work."""
         try:
             d = json.loads(self._l1_path().read_text(encoding="utf-8"))
-        except Exception:
+            if not isinstance(d, dict) or d.get("scope", "") != self.l1_scope:
+                return
+            version = max(0, int(d.get("version", 0) or 0))
+        except (OSError, ValueError, TypeError):
             return
         with self._lock:
             self._summary = str(d.get("summary", "") or "")
-            self._summary_version = int(d.get("version", 0) or 0)
-            turns = d.get("turns")
-            if isinstance(turns, list):
-                self._turns = [
-                    {"role": str(t.get("role", "")),
-                     "text": str(t.get("text", ""))}
-                    for t in turns
-                    if isinstance(t, dict) and "role" in t and "text" in t
-                ][-self.window_turns:]
+            self._summary_version = version
+            self._history_digest = str(d.get("history_digest", ""))
+            self._archive_digest = str(d.get("archive_digest", ""))
+            self._turns = self._valid_turns(d.get("turns"))[-self.window_turns:]
+            self._pending_dropped = self._valid_turns(d.get("pending"))
+            self._summary_pending = bool(self._pending_dropped)
 
     def _save_l1(self) -> None:
+        # A unique temporary name avoids different instances clobbering the
+        # same .tmp file. A failed save is observable; do not clear memory.
+        tmp = None
         try:
-            p = self._l1_path()
-            p.parent.mkdir(parents=True, exist_ok=True)
-            tmp = p.with_name(p.name + ".tmp")
-            tmp.write_text(json.dumps(
-                {"summary": self._summary, "version": self._summary_version,
-                 "turns": self._turns}, ensure_ascii=False), encoding="utf-8")
-            tmp.replace(p)
-        except Exception:
-            pass
+            with self._lock:
+                p = self._l1_path()
+                p.parent.mkdir(parents=True, exist_ok=True)
+                tmp = p.with_name(p.name + "." + uuid.uuid4().hex + ".tmp")
+                tmp.write_text(json.dumps(
+                    {"schema": 3, "scope": self.l1_scope,
+                     "history_digest": self._history_digest, "archive_digest": self._archive_digest,
+                     "summary": self._summary, "version": self._summary_version,
+                     "turns": self._turns, "pending": self._pending_dropped},
+                    ensure_ascii=False), encoding="utf-8")
+                tmp.replace(p)
+                self._l1_save_error = ""
+        except Exception as exc:
+            self._l1_save_error = type(exc).__name__
+        finally:
+            if tmp is not None and tmp.exists():
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+
+    @staticmethod
+    def _extend_history_digest(digest: str, turn: dict) -> str:
+        payload = json.dumps([digest, turn["role"], turn["text"]], ensure_ascii=False)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def bind_archive(self, history: list[dict]) -> None:
+        """Bind a bounded, successfully saved archive to the current full memo.
+
+        Session archives retain only history_limit entries. Their digest is
+        therefore not the digest of the complete live conversation stream.
+        """
+        turns = self._valid_turns([
+            {"role": m.get("role"), "text": m.get("content")}
+            for m in history if isinstance(m, dict)])
+        digest = ""
+        for turn in turns:
+            digest = self._extend_history_digest(digest, turn)
+        with self._lock:
+            self._archive_digest = digest if turns[-self.window_turns:] == self._turns else ""
+            self._save_l1()
+
+    def restore_history(self, history: list[dict]) -> None:
+        """Restore an archive without re-enqueuing a previously restored tail.
+
+        A matching live cache retains its memo/backlog. For a different archive
+        only that archive supplies context; its older messages need compression.
+        """
+        turns = self._valid_turns([
+            {"role": m.get("role"), "text": m.get("content")}
+            for m in history if isinstance(m, dict)])
+        recent = turns[-self.window_turns:]
+        digest = ""
+        for turn in turns:
+            digest = self._extend_history_digest(digest, turn)
+        with self._lock:
+            if self._summary_running:
+                raise RuntimeError("cannot restore history during summary processing")
+            if digest not in (self._history_digest, self._archive_digest) or self._turns != recent:
+                self._history_digest = digest
+                self._archive_digest = ""
+                self._turns = recent
+                self._summary = ""
+                self._summary_version = 0
+                self._pending_dropped = turns[:-self.window_turns]
+                self._summary_pending = bool(self._pending_dropped)
+            self._save_l1()
 
     def append_turn(self, *, role: str, text: str) -> None:
         with self._lock:
-            self._turns.append({"role": role, "text": str(text)})
+            self._archive_digest = ""
+            turn = {"role": role, "text": str(text)}
+            self._history_digest = self._extend_history_digest(self._history_digest, turn)
+            self._turns.append(turn)
             if len(self._turns) > self.window_turns:
                 dropped = self._turns[: len(self._turns) - self.window_turns]
                 self._turns = self._turns[-self.window_turns:]
                 if dropped:
-                    self._pending_dropped = list(dropped)
+                    self._pending_dropped.extend(dropped)
                     self._summary_pending = True
             self._save_l1()
 
@@ -359,41 +450,56 @@ class TargetMemoryService:
                 if (turn.get("role") == "user"
                         and str(turn.get("text", "")) == str(placeholder)):
                     turn["text"] = text
+                    self._archive_digest = ""
                     self._save_l1()
                     return True
         return False
 
     async def process_summary(self) -> None:
-        """Run the pending Summary Compression (non-blocking by caller)."""
+        """Single-flight, bounded compression with acknowledge-on-success.
+
+        The prefix captured for this call is removed only after a valid result.
+        New turns, provider failures and cancellation never erase pending work.
+        """
         extractor = self._extractor
         with self._lock:
-            dropped = self._pending_dropped or []
-        if not dropped:
-            return
-        if extractor is None or not callable(getattr(extractor, "compress", None)):
-            with self._lock:
-                self._pending_dropped = []
-                self._summary_pending = False
-            return
+            if self._summary_running or not self._pending_dropped:
+                return
+            if extractor is None or not callable(getattr(extractor, "compress", None)):
+                self._summary_error = "extractor_unavailable"
+                return
+            dropped = [dict(t) for t in self._pending_dropped[:self.summary_batch_size]]
+            previous = self._summary
+            self._summary_running = True
         try:
+            compress = extractor.compress
             try:
-                raw = extractor.compress(dropped, prev=self._summary)
+                inspect.signature(compress).bind(dropped, prev=previous)
             except TypeError:
-                raw = extractor.compress(dropped)
+                raw = compress(dropped)  # legacy hooks without a prev argument
+            else:
+                raw = compress(dropped, prev=previous)
             if inspect.isawaitable(raw):
                 raw = await raw
             summary_text, version = raw
+            if not isinstance(summary_text, str) or not summary_text.strip():
+                raise ValueError("empty memory summary")
+            version = int(version or 0)
             with self._lock:
-                self._summary = str(summary_text or "")
-                self._summary_pending = False
-                self._summary_version = int(version or 0)
+                self._summary = summary_text.strip()
+                self._summary_version = max(self._summary_version + 1, version)
+                del self._pending_dropped[:len(dropped)]
+                self._summary_pending = bool(self._pending_dropped)
+                self._summary_error = ""
                 self._save_l1()
-        except Exception:
+        except Exception as exc:
             with self._lock:
-                self._summary_pending = False
+                self._summary_failures += 1
+                self._summary_error = type(exc).__name__
         finally:
             with self._lock:
-                self._pending_dropped = []
+                self._summary_running = False
+                self._summary_pending = bool(self._pending_dropped)
 
     def summary_line(self) -> str:
         """Rolling L1 summary as one context line (injected ahead of recent
@@ -464,7 +570,8 @@ class TargetMemoryService:
         try:
             from backend.vector_memory import semantic_l2
 
-            for it in semantic_l2(q, top=limit * 3, min_score=0.42):
+            for it in semantic_l2(q, top=limit * 3, min_score=0.42,
+                                  db_path=self.db_path):
                 if int(it.get("importance", 0) or 0) < 5:
                     continue
                 if it.get("status") not in (None, "", "active"):
@@ -474,6 +581,7 @@ class TargetMemoryService:
                              "importance": it.get("importance", 5),
                              "status": "active",
                              "summary": it.get("summary", ""),
+                             "date": it.get("date", ""),
                              "_score": float(it.get("score", 0.0))})
                 seen.add(it["id"])
         except Exception:
@@ -590,11 +698,22 @@ class TargetMemoryService:
                 raw = await raw
         except Exception:
             return items
-        for cand in raw or []:
-            importance = int(cand.get("importance", 3) or 3)
-            summary = str(cand.get("summary", "") or "")
+        if not isinstance(raw, list):
+            return items
+        for cand in raw:
+            if not isinstance(cand, dict):
+                continue
+            try:
+                importance = max(1, min(10, int(cand.get("importance", 3))))
+            except (ValueError, TypeError, OverflowError):
+                continue
+            if not isinstance(cand.get("summary"), str):
+                continue
+            summary = cand["summary"].strip()
             type_ = str(cand.get("type", "fact") or "fact")
-            tier = str(cand.get("tier", "L2") or "L2")
+            # A model proposes L2 evidence; it cannot promote itself into the
+            # long-lived persona/foundation or overwrite source attribution.
+            tier = "L2"
             if not summary:
                 continue
             items.append(
@@ -609,6 +728,7 @@ class TargetMemoryService:
                     content_hash=_fingerprint(summary),
                     keywords=str(cand.get("keywords", "") or "")[:400],
                     evidence_ref=str(evidence_ref),
+                    source=str(source),
                     created_at=time.time(),
                     access_count=0,
                 )
@@ -667,27 +787,41 @@ class TargetMemoryService:
             con.commit()
             con.close()
         try:
-            # vector side-table for semantic recall (ledger 0226); lazy model
-            keep = [it for it in items if it.status != "archive" and it.summary]
-            if keep:
-                from backend.vector_memory import _conn as _vc, embed as _emb
-
-                texts = [f"{it.summary} {it.keywords}".strip()[:256]
-                         for it in keep]
-                vs = _emb(texts)
-                vc = _vc()
-                try:
-                    for it, v in zip(keep, vs):
-                        vc.execute(
-                            "INSERT OR REPLACE INTO vec(id,scope,vec)"
-                            " VALUES(?,?,?)", (it.id, "l2", v.tobytes()))
-                    vc.commit()
-                finally:
-                    vc.close()
+            # vector side-table for semantic recall (ledger 0226)
+            self._vec_upsert(items)
         except Exception:
             pass
         self._sync_kw(items)
         return items
+
+    def _vec_upsert(self, items: list[L2Item]) -> None:
+        """写入/更新 L2 向量（0499）——两条写入路径共用。
+
+        过去只有批次裁决写入会建向量，``store_item``（memory.save 显式存的记忆）
+        不建 → **语义召回对这类条目永远为空**。scope 按库区分（:func:`l2_scope`）。
+        向量是增强不是事实源：任何失败都只吞掉，不影响写入主流程。
+        """
+        keep = [it for it in items if it.status != "archive" and it.summary]
+        if not keep:
+            return
+        try:
+            from backend.vector_memory import (_conn as _vc, embed as _emb,
+                                               l2_scope)
+
+            texts = [f"{it.summary} {it.keywords}".strip()[:256] for it in keep]
+            vs = _emb(texts)
+            scope = l2_scope(self.db_path)
+            vc = _vc()
+            try:
+                for it, v in zip(keep, vs):
+                    vc.execute(
+                        "INSERT OR REPLACE INTO vec(id,scope,vec)"
+                        " VALUES(?,?,?)", (it.id, scope, v.tobytes()))
+                vc.commit()
+            finally:
+                vc.close()
+        except Exception:
+            pass
 
     def _sync_kw(self, items: list[L2Item]) -> None:
         """Mirror written L2 items into the keyword index (best-effort)."""
@@ -930,6 +1064,7 @@ class TargetMemoryService:
             finally:
                 con.close()
         self._sync_kw([item])
+        self._vec_upsert([item])
         self._auto_adjudicate(item)
         self._auto_link_causal(item)
 
@@ -1207,27 +1342,82 @@ class TargetMemoryService:
         q = str(query or "").strip()
         if not q:
             return []
+        self._recall_count += 1
+        _t0 = time.perf_counter()
         ranked = self._recall_via_kw(q, int(limit))
+        _t1 = time.perf_counter()
+        self._last_recall_timing["keyword_ms"] = round((_t1 - _t0) * 1000, 2)
+        self._last_recall_timing["keyword_hits"] = len(ranked) if ranked else 0
         if ranked is not None:
             if as_of:
                 out = self._filter_as_of(ranked, float(as_of))
             else:
                 out = self._filter_current(ranked)
         else:
+            _t2 = time.perf_counter()
             sql = self._recall_via_sqlite(q, int(limit))
+            _t3 = time.perf_counter()
+            self._last_recall_timing["sql_ms"] = round((_t3 - _t2) * 1000, 2)
+            self._last_recall_timing["sql_hits"] = len(sql)
             self._boost_recalled(sql)
             if as_of:
                 out = self._filter_as_of(sql, float(as_of))
             else:
                 out = self._filter_current(sql)
         if as_of:
+            self._last_recall_timing["total_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
             return out
         if spread and len(out) < int(limit):
+            _ts = time.perf_counter()
             out = out + self._spread_hits(
                 q, int(limit) - len(out),
                 exclude={str(it.get("id", "")) for it in out})
+            self._last_recall_timing["spread_ms"] = round((time.perf_counter() - _ts) * 1000, 2)
+        if len(out) < int(limit):
+            # 0499 向量召回进主路径：字面（关键词/FTS）命中不足时补语义命中，
+            # 换说法也能召回；高阈值 + via='semantic' 标记，绝不替代字面命中。
+            _ts = time.perf_counter()
+            out = out + self._semantic_hits(
+                q, int(limit) - len(out),
+                exclude={str(it.get("id", "")) for it in out})
+            self._last_recall_timing["semantic_ms"] = round((time.perf_counter() - _ts) * 1000, 2)
         if len(out) >= 2:
             self._shadow_record(q, out)
+        self._last_recall_timing["total_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
+        self._last_recall_timing["total_hits"] = len(out)
+        return out
+
+    def _semantic_hits(self, query: str, need: int, exclude: set) -> list[dict]:
+        """语义召回（0499）：字面命中不足时的补充路径，标注 via='semantic'。
+
+        阈值 0.45（自动注入用 0.42）：实测真·换说法（"作息不规律该怎么调整" ↔
+        "睡眠不好想早点睡"）得分 **0.496**，取 0.5 会把这种真命中漏掉；工具结果
+        会直接进模型上下文，所以也不放到自动注入那么低。绝不抛异常。
+        """
+        if need <= 0:
+            return []
+        try:
+            from backend.vector_memory import semantic_l2
+
+            hits = semantic_l2(query, top=max(need * 2, 4), min_score=0.45,
+                               db_path=self.db_path)
+        except Exception:
+            return []
+        out: list[dict] = []
+        for h in hits:
+            iid = str(h.get("id") or "")
+            if not iid or iid in exclude:
+                continue
+            if h.get("status") not in (None, "", "active"):
+                continue
+            exclude.add(iid)
+            out.append({"id": iid, "tier": "L2", "type": h.get("type", "fact"),
+                        "importance": h.get("importance", 5),
+                        "status": "active", "summary": h.get("summary", ""),
+                        "date": h.get("date", ""), "score": h.get("score", 0.0),
+                        "via": "semantic"})
+            if len(out) >= need:
+                break
         return out
 
     def _spread_hits(self, query: str, need: int, exclude: set) -> list[dict]:
@@ -1784,6 +1974,15 @@ class TargetMemoryService:
             "l2_active": int(active),
             "l1_window": int(len(self._turns)),
             "summary_pending": bool(self._summary_pending),
+            "summary_backlog": len(self._pending_dropped),
+            "summary_running": self._summary_running,
+            "summary_failures": self._summary_failures,
+            "summary_error": self._summary_error,
+            "l1_scope": self.l1_scope,
+            "l1_save_error": self._l1_save_error,
+            "recall_count": self._recall_count,
+            "last_recall_timing": dict(self._last_recall_timing),
+            "summary_provider_status": self._summary_provider_status,
             "episodes": int(episodes),
             "causal_active": int(causal_active),
             "causal_pending": int(causal_pending),
