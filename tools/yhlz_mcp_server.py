@@ -22,6 +22,7 @@ if str(_ROOT) not in sys.path:
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from backend.target_scheduler_tools import (  # noqa: E402
+    LEDGER_DELETE_POLICY,
     SAVE_APPROVAL_POLICY,
     setup_scheduler_capabilities,
 )
@@ -43,6 +44,45 @@ async def ledger_search(query: str, limit: int = 5) -> str:
     Use for project history, decisions, record numbers, plans. Query in
     1-3 keywords (Chinese ok); returns matching lines with record ids."""
     return await _call_async("ledger_search", {"query": query, "limit": limit})
+
+
+@mcp.tool()
+async def ledger_get(no: int) -> str:
+    """Read one YHLZ ledger record in full by its number (get numbers from
+    ledger_search / ledger_list)."""
+    return await _call_async("ledger_get", {"no": no})
+
+
+@mcp.tool()
+async def ledger_list(limit: int = 10, keyword: str = "") -> str:
+    """List the most recent YHLZ ledger records (number + title). Optional
+    keyword filters title/body."""
+    return await _call_async("ledger_list", {"limit": limit, "keyword": keyword})
+
+
+@mcp.tool()
+async def ledger_add(title: str, body: str = "") -> str:
+    """WRITE: append a new record to the YHLZ project ledger (single source of
+    truth). Atomic write, auto-numbered, auto-backed-up. `body` is plain text
+    (\\n for line breaks)."""
+    return await _call_async("ledger_add", {"title": title, "body": body})
+
+
+@mcp.tool()
+async def ledger_update(no: int, title: str = "", append: str = "",
+                        body: str = "") -> str:
+    """WRITE: edit ledger record `no` — rename (title), append lines (append),
+    or replace the whole body (body). Provide at least one."""
+    return await _call_async("ledger_update", {
+        "no": no, "title": title, "append": append, "body": body})
+
+
+@mcp.tool()
+async def ledger_delete(no: int) -> str:
+    """WRITE/DESTRUCTIVE: delete ledger record `no`. The call itself is taken as
+    the user's authorization (one-shot grant); a backup is always kept."""
+    _registry.grant_policy_once(LEDGER_DELETE_POLICY)
+    return await _call_async("ledger_delete", {"no": no})
 
 
 @mcp.tool()

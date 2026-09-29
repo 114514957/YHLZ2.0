@@ -46,6 +46,8 @@
 
 - opencode 通过 `opencode.json` 的 `yhlz` MCP 工具查询台账 / 记忆（`tools/yhlz_mcp_server.py`）
 - 台账（**唯一事实源**）：`docs/上下文台账.md`
+- 台账增删查改（任何 agent 通用程序）：`python tools/ledger_cli.py {search,list,get,add,update,delete,stats,index}`
+  （Python 直接 `import backend.ledger_store`；MCP 工具 `ledger_search/get/list/add/update/delete` 同源）
 - 规则：`AGENTS.md`
 
 ## 说明

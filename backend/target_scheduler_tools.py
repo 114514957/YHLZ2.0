@@ -86,6 +86,14 @@ def _ledger_grep_fallback(q: str, limit: int) -> str:
         heading = _re.match(r"^##\s+记录\s+(\d+)", stripped)
         if heading:
             record = heading.group(1)
+            # a title hit is a hit: previously headings were skipped, so a newly
+            # added record could not be found by its title (2026-09-29).
+            title = _re.sub(r"^#+\s*", "", stripped)
+            if q in title and not _re.search(
+                    r"sk-\w+|DEEPSEEK_API_KEY|api[_-]?key\s*[:=]|指纹", title, _re.I):
+                matches.append(f"[ledger:{record}:{line_no}] {title[:200]}")
+                if len(matches) >= max(1, int(limit)):
+                    break
             continue
         if not stripped or stripped.startswith("#") or q not in stripped:
             continue
@@ -98,6 +106,54 @@ def _ledger_grep_fallback(q: str, limit: int) -> str:
         if len(matches) >= max(1, int(limit)):
             break
     return "\n".join(matches) if matches else "台账无匹配"
+
+
+# ---- ledger CRUD (增删查改; ledger 0525) — one program, all agents ----------
+def _ledger_store():
+    from backend import ledger_store
+
+    return ledger_store
+
+
+def ledger_get(no: int) -> str:
+    """Read one ledger record in full (by number)."""
+    rec = _ledger_store().get_record(int(no))
+    if rec is None:
+        return f"未找到记录 {int(no):04d}"
+    return f"记录 {rec['no']:04d}（行 {rec['start']}-{rec['end']}）\n{rec['text']}"[:4000]
+
+
+def ledger_list(limit: int = 10, keyword: str = "") -> str:
+    """List recent ledger records (number + title)."""
+    rows = _ledger_store().list_records(
+        limit=max(1, min(int(limit or 10), 50)), keyword=str(keyword or ""))
+    if not rows:
+        return "台账没有匹配的记录"
+    return "\n".join(f"{r['no']:04d} | {r['title']}" for r in rows)
+
+
+def ledger_add(title: str, body: str = "") -> str:
+    """Append a new ledger record (atomic write + auto backup)."""
+    res = _ledger_store().add_record(str(title or ""), str(body or ""))
+    return f"已追加 记录 {res['no']:04d}：{res['title']}"
+
+
+def ledger_update(no: int, title: str = "", append: str = "",
+                  body: str = "") -> str:
+    """Edit a ledger record: rename / append / replace body."""
+    res = _ledger_store().update_record(
+        int(no),
+        title=(str(title) if title else None),
+        append_lines=(str(append) if append else None),
+        replace_body=(str(body) if body else None),
+    )
+    return f"已更新 记录 {res['no']:04d}"
+
+
+def ledger_delete(no: int) -> str:
+    """Delete a ledger record (destructive; gated by approval)."""
+    res = _ledger_store().delete_record(int(no), confirm=True)
+    return f"已删除 记录 {res['no']:04d}"
 
 
 def recall_memory(query: str, limit: int = 5) -> str:
@@ -418,6 +474,22 @@ class _SaveArgs(BaseModel):
     importance: int = Field(0, ge=0, le=10, description="0=交裁决默认")
 
 
+class _LedgerGetArgs(BaseModel):
+    no: int = Field(..., ge=1, le=9999, description="记录编号（如 524）")
+
+
+class _LedgerAddArgs(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200, description="记录标题")
+    body: str = Field("", max_length=8000, description="正文（\\n 分隔）")
+
+
+class _LedgerUpdateArgs(BaseModel):
+    no: int = Field(..., ge=1, le=9999, description="记录编号")
+    title: str = Field("", max_length=200, description="改标题（可选）")
+    append: str = Field("", max_length=8000, description="追加正文（可选）")
+    body: str = Field("", max_length=8000, description="替换整段正文（可选）")
+
+
 def _verify_nonempty(output: Any) -> bool:
     return bool(str(output or "").strip())
 
@@ -577,6 +649,68 @@ def scheduler_capabilities() -> list[Capability]:
             risk="low",
             verify=_verify_nonempty,
             input_model=_QueryArgs,
+        ),
+        Capability(
+            name="ledger.get",
+            description="按编号读台账单条记录全文（编号先由 ledger.search / ledger.list 得到）。",
+            handler=lambda p: ledger_get(int(p.get("no", 0) or 0)),
+            input=("no",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+            verify=_verify_nonempty,
+            input_model=_LedgerGetArgs,
+        ),
+        Capability(
+            name="ledger.list",
+            description="列出最近的台账记录（编号+标题）；可按关键词过滤。",
+            handler=lambda p: ledger_list(int(p.get("limit", 10) or 10),
+                                          str(p.get("keyword", ""))),
+            input=(),
+            optional_input=("limit", "keyword"),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+            verify=_verify_nonempty,
+        ),
+        Capability(
+            name="ledger.add",
+            description="往项目台账追加一条新记录（台账是唯一事实源；自动编号、原子写、自动备份、自动刷新检索索引）。",
+            handler=lambda p: ledger_add(str(p.get("title", "")),
+                                         str(p.get("body", ""))),
+            input=("title",),
+            optional_input=("body",),
+            requires=(LEDGER_WRITE_POLICY,),
+            side_effect=True,
+            risk="medium",
+            verify=_verify_nonempty,
+            input_model=_LedgerAddArgs,
+        ),
+        Capability(
+            name="ledger.update",
+            description="修改台账记录：改标题(title)/追加(append)/替换正文(body)，至少一项。",
+            handler=lambda p: ledger_update(int(p.get("no", 0) or 0),
+                                            str(p.get("title", "")),
+                                            str(p.get("append", "")),
+                                            str(p.get("body", ""))),
+            input=("no",),
+            optional_input=("title", "append", "body"),
+            requires=(LEDGER_WRITE_POLICY,),
+            side_effect=True,
+            risk="medium",
+            verify=_verify_nonempty,
+            input_model=_LedgerUpdateArgs,
+        ),
+        Capability(
+            name="ledger.delete",
+            description="删除一条台账记录（破坏性，需审批；CLI 需 --yes）。",
+            handler=lambda p: ledger_delete(int(p.get("no", 0) or 0)),
+            input=("no",),
+            requires=(LEDGER_WRITE_POLICY, LEDGER_DELETE_POLICY),
+            side_effect=True,
+            risk="high",
+            verify=_verify_nonempty,
+            input_model=_LedgerGetArgs,
         ),
         Capability(
             name="memory.recall",
@@ -962,6 +1096,8 @@ def scheduler_capabilities() -> list[Capability]:
 
 SAVE_APPROVAL_POLICY = "memory.save.approval"
 DIARY_AUTO_POLICY = "diary.auto_allowed"
+LEDGER_WRITE_POLICY = "ledger.write.allowed"
+LEDGER_DELETE_POLICY = "ledger.delete.approval"
 DIARY_FILE = _PROJECT_ROOT / "docs" / "元亨的日记.md"
 TASK_AUTO_POLICY = "task.self_allowed"
 TASK_FILE = _PROJECT_ROOT / "docs" / "元亨的任务表.md"
@@ -2032,6 +2168,10 @@ def setup_scheduler_capabilities(registry: Optional[CapabilityRegistry] = None) 
         registry.register_policy(APPROVE_POLICY, _policy_always_true)
     if not registry.get_policy("diary.delete.approval"):
         registry.register_policy("diary.delete.approval", _policy_deny_all)
+    if not registry.get_policy(LEDGER_WRITE_POLICY):
+        registry.register_policy(LEDGER_WRITE_POLICY, _policy_always_true)
+    if not registry.get_policy(LEDGER_DELETE_POLICY):
+        registry.register_policy(LEDGER_DELETE_POLICY, _policy_deny_all)
     return registry
 
 
