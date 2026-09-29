@@ -333,7 +333,10 @@ def _ws_settings(cfg: pathlib.Path) -> dict | None:
 
 
 def _daemon_turn(text: str, channel: str, images: list | None = None) -> str:
-    body: dict = {"text": str(text)[:1500], "channel": channel}
+    # ChannelAuth (Step 1, 2026-09-29): the daemon now requires a matching
+    # `source`; QQ channels must declare qq_bridge or they get 403.
+    source = "qq_bridge" if str(channel).startswith("qq_") else "console"
+    body: dict = {"text": str(text)[:1500], "channel": channel, "source": source}
     if images:
         body["images"] = [str(p) for p in images][:4]
     data = json.dumps(body).encode()
