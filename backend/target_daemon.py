@@ -45,6 +45,64 @@ NOTIFY_TOOL_HINTS = ("qq.export", "qq.process", "qq.runbatch", "qq.bootstrap",
                      "memory.save", "diary.write", "task.plan",
                      "skill.add", "kb.add")
 
+# 自主可审计（0496）：每次自主 tick 落一条决策——时间 / 驱动值 / 选题 / 是否推送 / 拦截原因
+AUTONOMY_LOG_FILE = NOTIFY_DIR / "autonomy_ticks.json"
+AUTONOMY_LOG_KEEP = 40  # 3h 一次 → 约 5 天
+
+
+def log_autonomy_tick(entry: dict) -> None:
+    """Append one autonomy-tick decision (bounded; never raises)."""
+    try:
+        NOTIFY_DIR.mkdir(parents=True, exist_ok=True)
+        rows = []
+        if AUTONOMY_LOG_FILE.exists():
+            try:
+                rows = json.loads(AUTONOMY_LOG_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                rows = []
+        if not isinstance(rows, list):
+            rows = []
+        rows.append(entry)
+        del rows[:-AUTONOMY_LOG_KEEP]
+        AUTONOMY_LOG_FILE.write_text(json.dumps(rows, ensure_ascii=False),
+                                     encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001 — 记账失败不能打断自主链路
+        print(f"[autonomy] 决策日志写入失败 {type(exc).__name__}", flush=True)
+
+
+def read_autonomy_ticks(limit: int = 20) -> list[dict]:
+    """Recent autonomy-tick decisions, newest first (audit / workbench)."""
+    try:
+        rows = json.loads(AUTONOMY_LOG_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    if not isinstance(rows, list):
+        return []
+    rows = [r for r in rows if isinstance(r, dict)]
+    return list(reversed(rows[-max(1, int(limit)):]))
+
+
+def _drive_snapshot(limit: int = 3) -> list[dict]:
+    """Top intrinsic drives at tick time (the values that were supposed to drive it)."""
+    try:
+        from backend import intrinsic_drives
+
+        return [{"name": d.get("name"), "category": d.get("category"),
+                 "strength": d.get("strength"), "priority": d.get("priority")}
+                for d in intrinsic_drives.active(limit)]
+    except Exception:
+        return []
+
+
+def _drive_urge() -> dict:
+    """内因触发信号（0501）；任何失败都退化为"没有内因推动"。"""
+    try:
+        from backend import intrinsic_drives
+
+        return intrinsic_drives.urge()
+    except Exception:
+        return {"name": "", "category": "", "strength": 0.0, "note": ""}
+
 
 def notify_push(text: str) -> None:
     """Append a Yuanheng activity notification (bounded queue)."""
@@ -70,6 +128,29 @@ def notify_should(text: str, tools: list[dict]) -> bool:
     if any(h in joined for h in NOTIFY_TOOL_HINTS):
         return True
     return any(w in text for w in NOTIFY_RESULT_WORDS)
+
+
+# 自主触发（0501）：过去只有 3h 定时器 —— 内在因只进 prompt、不影响**何时**发生。
+# 现在多一条内因通路：某条非「期待」驱动被顶到阈值以上且过了冷却 → 提前起身。
+AUTONOMY_URGE_THRESHOLD = 0.75   # 单条驱动强度 ≥ 此值 = 该动一动
+AUTONOMY_URGE_COOLDOWN = 3600.0  # 内因触发的两次之间至少隔 1h（防抖）
+AUTONOMY_POLL_SECONDS = 300.0    # 轮询步长：判定只是读一个小 json，很便宜
+
+
+def autonomy_due(*, last_tick: float, now: float, timer_seconds: float,
+                 urge_strength: float, last_urge: float = 0.0,
+                 urge_threshold: float = AUTONOMY_URGE_THRESHOLD,
+                 urge_cooldown: float = AUTONOMY_URGE_COOLDOWN) -> tuple[bool, str]:
+    """该不该跑一次自主（纯函数，可单测）。返回 (是否, 触发原因)。
+
+    原因 ∈ timer（到点）/ urge（内因顶高）/ wait。
+    """
+    if float(now) - float(last_tick) >= float(timer_seconds):
+        return True, "timer"
+    if (float(urge_strength) >= float(urge_threshold)
+            and float(now) - float(last_urge) >= float(urge_cooldown)):
+        return True, "urge"
+    return False, "wait"
 
 
 class DaemonRuntime:
@@ -105,21 +186,41 @@ class DaemonRuntime:
         threading.Thread(target=self._schedule_loop, daemon=True).start()
         self._upkeep_last = ""
         threading.Thread(target=self._memory_upkeep_loop, daemon=True).start()
-        self._autonomy_last = 0.0
+        # 0501: 起点=现在（与旧的"先睡 3h 再首次 tick"一致）；内因通道也以启动时刻
+        # 起算冷却——否则重启时若某条驱动恰好高位，会立刻触发一次自主（不是我们想要的）
+        self._autonomy_last = time.time()
+        self._autonomy_urge_last = time.time()
         threading.Thread(target=self._autonomy_loop, daemon=True).start()
 
     def _autonomy_loop(self) -> None:
-        """Unified autonomy cadence (ledger 0226): one self-initiated moment
-        every autonomy_seconds (default 3h). Kept low-frequency so real,
-        grounded content outweighs any hallucinated bits."""
+        """Unified autonomy cadence (ledger 0226 / 0501): one self-initiated moment
+        either on the timer (default 3h) **or** earlier when an intrinsic drive
+        is pushed above the urge threshold. Polls cheaply; the decision itself
+        is the pure function `autonomy_due`."""
         while True:
-            time.sleep(self.autonomy_seconds)
+            time.sleep(min(AUTONOMY_POLL_SECONDS, max(30.0, self.autonomy_seconds / 10)))
             try:
+                u = _drive_urge()
+                now = time.time()
+                due, trigger = autonomy_due(
+                    last_tick=self._autonomy_last, now=now,
+                    timer_seconds=self.autonomy_seconds,
+                    urge_strength=u.get("strength", 0.0),
+                    last_urge=self._autonomy_urge_last)
+                if not due:
+                    continue
                 s = self._session("console")
 
                 async def _run():
+                    # 0501: 内因触发的 tick 要说明"为什么是现在"，否则元亨会
+                    # 以为是例行公事（这是内因驱动的意义所在）。
+                    if trigger == "urge" and u.get("name"):
+                        why = (f"（这次不是到点，是你内在的「{u.get('name')}」"
+                               f"被顶起来了——强度 {u.get('strength')}）")
+                    else:
+                        why = "（到点的例行自主）"
                     return await s.proactive_tick(
-                        "这是你的自主时刻（每 3 小时一次）：读你的内在因，"
+                        f"这是你的自主时刻{why}：读你的内在因，"
                         "据此行动——去探索未知、推进你的渴望、或对齐老爹的期待。"
                         "简短、真实；没有就说没有，别硬凑。若确实想通了值得长期"
                         "坚持的原则，可用 memory.save(importance 8-9) 记下。",
@@ -140,19 +241,42 @@ class DaemonRuntime:
                 try:
                     # P2e: proactive contact — queue a substantive autonomous
                     # thought for the QQ bridge to relay to the master.
+                    # 0496: the decision is now explicit and logged (was a single
+                    # compound `if`, which left no trace of why nothing was sent).
                     from backend import qq_outbox
 
                     ans = str(info.get("answer", "")).strip()
-                    if (len(ans) >= 30 and not ans.startswith("没有")
-                            and notify_guard.allow("autonomy", ans,
-                                                   cooldown=6 * 3600,
-                                                   max_per_day=2)):
-                        qq_outbox.push("[自主] " + ans, kind="autonomy")
-                except Exception:
-                    pass
+                    if len(ans) < 30:
+                        pushed, reason = False, "too_short"
+                    elif ans.startswith("没有"):
+                        pushed, reason = False, "model_says_none"
+                    else:
+                        ok, reason = notify_guard.allow_ex(
+                            "autonomy", ans, cooldown=6 * 3600, max_per_day=2)
+                        pushed = bool(ok)
+                        if pushed:
+                            qq_outbox.push("[自主] " + ans, kind="autonomy")
+                except Exception as exc:  # noqa: BLE001
+                    pushed, reason, ans = False, "error", str(
+                        info.get("answer", "")).strip()
+                    print(f"[autonomy] push 失败 {type(exc).__name__}", flush=True)
+                log_autonomy_tick({
+                    "ts": time.time(),
+                    "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "trigger": trigger,
+                    "urge": u,
+                    "drives": _drive_snapshot(),
+                    "tool_uses": info.get("tool_uses", []),
+                    "answer_head": ans[:120],
+                    "pushed": pushed,
+                    "reason": reason,
+                })
                 self._autonomy_last = time.time()
-                print("[autonomy] tick: "
-                      + str(info.get("answer", ""))[:90], flush=True)
+                if trigger == "urge":
+                    self._autonomy_urge_last = time.time()
+                print("[autonomy] tick(" + trigger + "): "
+                      + str(info.get("answer", ""))[:90]
+                      + f" | push={pushed}/{reason}", flush=True)
             except Exception as exc:  # noqa: BLE001
                 print(f"[autonomy] skip {type(exc).__name__}", flush=True)
 
@@ -180,18 +304,10 @@ class DaemonRuntime:
             except Exception:
                 pass
             return s
-        if not is_owner_channel(channel):
-            # public/group: isolated small memory db (never touches owner memory)
-            from backend.target_memory import TargetMemoryService
-
-            safe = "".join(ch if (ch.isalnum() or ch in "_-") else "_"
-                           for ch in str(channel or "public"))
-            gdb = _PROJECT / "cache" / "qq_groups" / f"{safe}.db"
-            gdb.parent.mkdir(parents=True, exist_ok=True)
-            s = ConversationSession(llm_turn=llm, channel=channel,
-                                    memory=TargetMemoryService(db_path=gdb))
-        else:
-            s = ConversationSession(llm_turn=llm, channel=channel)
+        # ConversationSession owns channel isolation and summary-hook wiring
+        # for both owner and group sessions. Injecting a bare group service here
+        # previously bypassed those hooks and lost its rolling summary.
+        s = ConversationSession(llm_turn=llm, channel=channel)
         if channel != "private":
             try:
                 s.load_session(f"qq_{channel}")
@@ -696,6 +812,10 @@ class _Handler(ConsoleHandler):
             return
         if self.path.startswith("/health"):
             self._send(200, self.runtime.health())
+        elif self.path.startswith("/autonomy"):
+            # 自主可审计（0496）: 最近几次自主 tick 的决策（驱动值/选题/推送/原因）
+            self._send(200, {"items": read_autonomy_ticks(20),
+                             "decisions": notify_guard.recent(20)})
         else:
             self._send(404, {"error": "not found"})
 
@@ -721,9 +841,18 @@ class _Handler(ConsoleHandler):
             if not text and not imgs and not auds:
                 self._send(400, {"error": "empty text"})
                 return
+            # Channel identity auth (Step 1, 2026-09-29): source must match channel.
+            from backend.channel_auth import ChannelAuthError, validate_channel
             try:
-                info = self.runtime.turn(text,
-                                         str(payload.get("channel", "private")),
+                channel = validate_channel(
+                    str(payload.get("source", "")),
+                    str(payload.get("channel", "console")),
+                )
+            except ChannelAuthError as exc:
+                self._send(403, {"error": f"{exc.code}: {exc.detail}"})
+                return
+            try:
+                info = self.runtime.turn(text, channel,
                                          images=imgs, audio=auds)
                 self._send(200, info)
             except Exception as exc:
