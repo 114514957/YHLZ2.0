@@ -86,7 +86,22 @@ class ConversationSession:
         history_limit: int = HISTORY_LIMIT,
         channel: str = "private",
     ) -> None:
-        self.memory = memory or TargetMemoryService()
+        self.channel = str(channel or "private")
+        if memory is None:
+            from backend.target_memory import DEFAULT_DB
+            import hashlib
+            import re
+
+            db = DEFAULT_DB
+            if not self._is_owner():
+                # Preserve existing normal QQ group DB names. Non-canonical
+                # names get a collision-resistant key, never the owner's DB.
+                safe = self.channel if re.fullmatch(r"[a-z0-9_-]{1,100}", self.channel) else (
+                    "channel_" + hashlib.sha256(self.channel.encode()).hexdigest()[:20])
+                db = DEFAULT_DB.parent.parent / "qq_groups" / f"{safe}.db"
+            self.memory = TargetMemoryService(db_path=db, l1_scope=self.channel)
+        else:
+            self.memory = memory
         if memory is None:
             # Wire the L1 rolling-summary / adjudication hooks (ledger 0217):
             # they were never connected in production, so long-conversation
@@ -103,7 +118,6 @@ class ConversationSession:
                                           MemoryLLMService(_q, local=_q))
             except Exception:
                 pass
-        self.channel = str(channel or "private")
         self._ctx_recent: dict[str, float] = {}  # de-dup of auto-recalled memories
         self._last_reviewed = 0          # turns count at last auto review
         self._reviewing = False
@@ -157,12 +171,31 @@ class ConversationSession:
         Group chats (qq_g*) and any other channel are 'public'."""
         return is_owner_channel(self.channel)
 
+    def _clean_history(self) -> list:
+        """Filter out autonomous/scheduled turns from history so regular chat
+        responses are not polluted by '（自主时刻）' etc."""
+        _AUTO_MARKERS = ("[自主]", "这是你的自主时刻", "（计划表到点）",
+                         "（自主时刻）", "（日记整理）", "（例行）")
+        out = []
+        for h in self.history:
+            c = str(h.get("content", ""))
+            if any(m in c for m in _AUTO_MARKERS):
+                continue
+            out.append(h)
+        return out
+
     def render_system(self) -> str:
         tools = self.registry.export_openai_tools()
-        try:
-            draft = self.memory.persona_draft()
-        except Exception:
-            draft = ""
+        # Public replies use the curated public persona, not private owner
+        # foundation/preferences followed by a request to "please not leak".
+        draft = ""
+        if self._is_owner():
+            try:
+                draft = self.memory.persona_draft()
+            except Exception:
+                pass
+        else:
+            tools = [t for t in tools if t.get("function", {}).get("name") in PUBLIC_TOOLS]
         self._persona = draft or ""
         persona_arg = None
         if draft and draft.strip():
@@ -503,7 +536,7 @@ class ConversationSession:
             turn_text=text,
             system_prompt=system,
             llm_turn=llm_turn,
-            history=self.history[-6:],  # latency (ledger 0206): cap in-context turns
+            history=self._clean_history()[-6:],  # latency (ledger 0206): cap in-context turns
             with_tools=use_tools,
             early_context="\n".join(ctx_lines),
             images=images,
@@ -541,8 +574,8 @@ class ConversationSession:
             except Exception:
                 pass
         if str(self.channel).startswith("qq_g"):
-            # P3b: group chats selectively internalize (tech/style/method/
-            # philosophy only; never private) into the OWNER memory, sourced.
+            # S3: group extraction may submit review candidates only.
+            # It cannot write owner L2 facts or approve its own proposals.
             try:
                 self._summary_tasks.append(asyncio.ensure_future(
                     self._promote_group(text, result.answer)))
@@ -739,11 +772,37 @@ class ConversationSession:
                 return str(m.get("content", "")).strip().replace("\n", " ")[:40]
         return "(空会话)"
 
+    @staticmethod
+    def _archive_path(name: str) -> Path:
+        import re
+        value = str(name)
+        if (not re.fullmatch(r"[\w.-]{1,100}", value) or value in (".", "..")
+                or value.endswith(".") or value.split(".")[0].upper() in
+                {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1,10)),
+                 *(f"LPT{i}" for i in range(1,10))}):
+            raise ValueError("invalid session archive name")
+        return SESSIONS_DIR / f"{value}.json"
+
+    def _check_archive_channel(self, data: dict) -> None:
+        if not isinstance(data, dict):
+            raise ValueError("invalid session archive")
+        channel = data.get("channel")
+        if channel is None:
+            # Legacy owner archives remain usable. Unknown public provenance
+            # must be explicitly migrated, never silently adopted/overwritten.
+            if not self._is_owner():
+                raise ValueError("legacy public archive requires channel migration")
+        elif channel != self.channel:
+            raise ValueError("session archive belongs to a different channel")
+
     def save_session(self, name: str = "default") -> Path:
+        path = self._archive_path(name)
+        if path.exists():
+            self._check_archive_channel(json.loads(path.read_text(encoding="utf-8")))
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-        self._session_name = str(name)
-        path = SESSIONS_DIR / f"{name}.json"
         data = {
+            "schema": 2,
+            "channel": self.channel,
             "saved_at": time.time(),
             "title": self._session_title(),
             "turns": len(self.history) // 2,
@@ -754,6 +813,8 @@ class ConversationSession:
         tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1),
                        encoding="utf-8")
         tmp.replace(path)
+        self.memory.bind_archive(data["history"])
+        self._session_name = str(name)
         return path
 
     @classmethod
@@ -782,18 +843,22 @@ class ConversationSession:
         return sorted(out, key=lambda x: x["saved_at"], reverse=True)[:limit]
 
     def load_session(self, name: str = "default") -> int:
-        path = SESSIONS_DIR / f"{name}.json"
+        path = self._archive_path(name)
         if not path.exists():
             return 0
         data = json.loads(path.read_text(encoding="utf-8"))
-        history = list(data.get("history", []))[-self.history_limit:]
+        self._check_archive_channel(data)
+        raw = data.get("history", [])
+        if not isinstance(raw, list):
+            raise ValueError("invalid session history")
+        history = [m for m in raw if isinstance(m, dict)
+                   and m.get("role") in ("user", "assistant")
+                   and isinstance(m.get("content"), str)][-self.history_limit:]
+        # Restore once; replaying append_turn used to re-compress the same
+        # archived messages and overwrite the real pending summary queue.
+        self.memory.restore_history(history)
         self.history = history
         self._session_name = str(name)
-        # rebuild L1 window from restored history
-        self.memory._turns = []
-        for msg in history:
-            role = "user" if msg.get("role") == "user" else "assistant"
-            self.memory.append_turn(role=role, text=str(msg.get("content", ""))[:2000])
         return len(history)
 
     def style_tendencies(self) -> dict:
@@ -835,15 +900,21 @@ class ConversationSession:
             return []
 
     async def _promote_group(self, text: str, answer: str) -> int:
-        """P3b: extract tech/style/method/philosophy from a group turn and
-        internalize into the owner memory (source='群聊'); never private."""
+        """Extract up to five external claims into pending review, never L2.
+
+        The legacy name is retained for callers; approval is local-only until
+        daemon caller identity is authenticated (source strings are not proof).
+        """
+        if not str(self.channel).startswith("qq_g"):
+            return 0
+        self._group_review_error = ""
+        n = 0
         try:
-            import json as _j
-
-            from backend.target_memory import TargetMemoryService
+            import hashlib
+            from backend.memory_review import MemoryReviewQueue
             from backend.target_prompts import GROUP_PROMOTE_PROMPT
-            from backend.target_scheduler_tools import memory_save
 
+            observed_at = time.time()
             prompt = GROUP_PROMOTE_PROMPT.replace(
                 "<TEXT>", (str(text) + "\n" + str(answer))[:800])
             msg = await self.llm_turn([{"role": "user", "content": prompt}], [])
@@ -851,19 +922,35 @@ class ConversationSession:
             a, b = raw.find("["), raw.rfind("]")
             if a < 0 or b < a:
                 return 0
-            data = _j.loads(raw[a:b + 1])
-            owner = TargetMemoryService()
-            n = 0
-            for it in (data if isinstance(data, list) else []):
-                s = str((it or {}).get("summary") or "").strip()
-                if not s:
-                    continue
-                memory_save(s, kind=str(it.get("kind") or "fact"), importance=5,
-                            service=owner, source="群聊")
-                n += 1
-            return n
-        except Exception:
-            return 0
+            data = json.loads(raw[a:b + 1])
+            if not isinstance(data, list):
+                return 0
+            ref = "group-turn:" + hashlib.sha256(
+                (str(self.channel) + "\n" + str(text) + "\n" + str(answer)).encode()).hexdigest()
+            # Keep SQLite lock waits off the conversation event loop.
+            def enqueue():
+                nonlocal n
+                queue = MemoryReviewQueue()
+                for it in data[:5]:
+                    if not isinstance(it, dict):
+                        continue
+                    summary = str(it.get("summary") or "").strip()
+                    if not 4 <= len(summary) <= 500:
+                        continue
+                    kind = str(it.get("kind") or "fact")
+                    if kind not in {"fact", "event", "preference", "decision"}:
+                        kind = "fact"
+                    candidate = queue.submit(
+                        summary=summary, kind=kind, channel=str(self.channel),
+                        speaker="unknown", observed_at=observed_at,
+                        evidence_ref=ref, user_text=str(text), assistant_text=str(answer))
+                    n += int(candidate["created"])
+            await asyncio.to_thread(enqueue)
+        except Exception as exc:
+            # No message text/secrets in diagnostics. Pending capacity or disk
+            # failures must not be reported as successful promotion.
+            self._group_review_error = type(exc).__name__
+        return n
 
     def autonomy_prompt(self, question: str,
                         extra: str = "") -> str:
@@ -902,8 +989,12 @@ class ConversationSession:
             history=self.history[-4:],
         )
         self.memory.append_turn(role="assistant", text=result.answer)
-        self.history.append({"role": "user", "content": question})
-        self.history.append({"role": "assistant", "content": result.answer})
+        # P0 fix (2026-09-29): autonomous ticks must NOT pollute regular chat
+        # history.  Use a separate autonomy history so the next user turn
+        # doesn't see "（自主时刻）..." in context and echo it.
+        self._autonomy_history = getattr(self, "_autonomy_history", [])
+        self._autonomy_history.append({"role": "user", "content": question})
+        self._autonomy_history.append({"role": "assistant", "content": result.answer})
         return {
             "answer": result.answer,
             "tool_uses": [
