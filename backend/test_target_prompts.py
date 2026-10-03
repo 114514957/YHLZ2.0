@@ -54,7 +54,7 @@ class TestPromptsBaseline(unittest.TestCase):
         self.assertNotIn("你可以调用以下工具", text)
 
     def test_version_stable(self):
-        self.assertEqual(PROMPTS_VERSION, "zh-1.5")
+        self.assertEqual(PROMPTS_VERSION, "zh-2.1")
 
     def test_trailing_question_clause_present(self):
         text = render_system_prompt()
