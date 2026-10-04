@@ -284,6 +284,8 @@ class ToolUse:
     output: Optional[str] = None
     error: str = ""
     elapsed_ms: float = 0.0
+    trace_id: str = ""
+    readback: str = ""
 
 
 @dataclass(slots=True)
@@ -292,6 +294,7 @@ class TurnResult:
     tool_uses: list[ToolUse] = field(default_factory=list)
     iterations: int = 0
     elapsed_ms: float = 0.0
+    trace_id: str = ""
 
 
 class TurnOrchestrator:
@@ -331,8 +334,12 @@ class TurnOrchestrator:
         audio: Optional[list[str]] = None,
         allowed_tools: Optional[set] = None,
         should_stop: Optional[Callable[[], bool]] = None,
+        text_contract: Any = None,
     ) -> TurnResult:
         started = time.perf_counter()
+        from backend import turn_evidence
+
+        trace_id = turn_evidence.new_id("tr")
         frame = PromptFrame(system_prompt, str(early_context or "")[:1500])
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": frame.render()},
@@ -362,6 +369,8 @@ class TurnOrchestrator:
         if allowed_tools is not None:
             tools = [t for t in tools
                      if t.get("function", {}).get("name") in allowed_tools]
+        if text_contract is not None and not tools:
+            return TurnResult(answer=text_contract.failure_reply("unavailable"))
         tool_uses: list[ToolUse] = []
         answer = ""
         iterations = 0
@@ -369,17 +378,33 @@ class TurnOrchestrator:
             if should_stop is not None and should_stop():
                 break  # 优雅停止：保留已产出
             iterations += 1
-            with_tools = iterations <= self.max_tool_rounds and bool(tools)
+            with_tools = (iterations <= self.max_tool_rounds and bool(tools)
+                          and not (text_contract is not None and tool_uses))
             control = FINAL_CONTROL if not with_tools and iterations > 1 else ""
+            if text_contract is not None:
+                control += "\n" + text_contract.instruction()
             execution_state = [{"name": u.name, "ok": u.ok} for u in tool_uses]
             request = frame.request(messages, control=control, executions=execution_state)
-            msg = await llm_turn(request, tools if with_tools else [])
+            # Explicit bounded reads/actions share native registry execution,
+            # approval and error reporting with model-issued calls.
+            call = text_contract.initial_call(turn_text) if text_contract is not None else None
+            offered_names = {t.get("function", {}).get("name") for t in tools}
+            if iterations == 1 and call and call[0] in offered_names:
+                msg = {"tool_calls": [{"id": "text_request_1", "type": "function",
+                    "function": {"name": call[0], "arguments": json.dumps(call[1], ensure_ascii=False)}}]}
+            else:
+                msg = await llm_turn(request, tools if with_tools else [])
             content = _strip_leaked_toolcall(str(msg.get("content") or ""))
             tcs = msg.get("tool_calls") or []
             if not tcs:
                 cut = content.find("<tool_calls>")
                 if cut >= 0:
                     content = content[:cut].strip()
+                # Only one bounded correction when NO tool was attempted. Never
+                # replay a write or turn an attempted failure into an auto-retry.
+                if (text_contract is not None and not tool_uses and iterations == 1
+                        and with_tools and "[[dev" not in content.lower()):
+                    continue
                 answer = content
                 break
             messages.append(
@@ -403,6 +428,12 @@ class TurnOrchestrator:
                     args = json.loads(tc["function"].get("arguments") or "{}")
                 except Exception:
                     args = {}
+                if text_contract is not None and not text_contract.accepts(name, args):
+                    error = "tool action does not match explicit text request"
+                    tool_uses.append(ToolUse(name=name, arguments=args, ok=False, error=error))
+                    messages.append({"role": "tool", "tool_call_id": tc["id"],
+                                     "name": name, "content": json.dumps({"error": error})})
+                    continue
                 cap = self.registry.get_by_openai_name(name)
                 denied = False
                 needs_approval = (
@@ -436,6 +467,8 @@ class TurnOrchestrator:
                 if denied:
                     continue
                 t0 = time.perf_counter()
+                pre_state = (turn_evidence.carrier_state(name)
+                             if (cap is not None and cap.side_effect) else None)
                 out = await self.registry.execute_openai_async(name, args)
                 use = ToolUse(
                     name=name,
@@ -444,7 +477,13 @@ class TurnOrchestrator:
                     output=str(out.get("output") or "") if out.get("ok") else None,
                     error=str(out.get("error") or "") if not out.get("ok") else "",
                     elapsed_ms=round((time.perf_counter() - t0) * 1000, 1),
+                    trace_id=trace_id,
                 )
+                # R1 独立读回（ledger 0592/0593 + R3 包B）：写类工具成功后，
+                # 再从载体只读核对「确有变化 且 内容命中」，否则 effect_missing。
+                if use.ok and cap is not None and cap.side_effect:
+                    rb = turn_evidence.readback(name, args, use.output or "", before=pre_state)
+                    use.readback = str(rb.get("status") or "")
                 tool_uses.append(use)
                 messages.append(
                     {
@@ -481,4 +520,5 @@ class TurnOrchestrator:
             tool_uses=tool_uses,
             iterations=iterations,
             elapsed_ms=round((time.perf_counter() - started) * 1000, 1),
+            trace_id=trace_id,
         )

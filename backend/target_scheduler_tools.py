@@ -6,6 +6,8 @@ tool view is CapabilityRegistry.export_openai_tools().
 """
 
 from __future__ import annotations
+from typing import Literal
+from pydantic import model_validator
 
 import datetime
 from pathlib import Path
@@ -156,22 +158,17 @@ def ledger_delete(no: int) -> str:
     return f"已删除 记录 {res['no']:04d}"
 
 
-def recall_memory(query: str, limit: int = 5) -> str:
+def recall_memory(query: str, limit: int = 5, *, service: Any = None) -> str:
     """Recall project/user memory items from L2 store (read-only; never deletes)."""
     q = str(query or "").strip()
-    rows = TargetMemoryService().recall(q, limit=max(1, min(int(limit), 10)))
+    # A bound session must never fall back to a different (owner/default) DB.
+    svc = service if service is not None else TargetMemoryService()
+    rows = svc.recall(q, limit=max(1, min(int(limit), 10)))
     if not rows:
         try:
-            from backend.target_memory import TargetMemoryService as _S
-
-            service = _S()
-            kw = _kw_index(refresh=False)
             for sub in _split_query(q):
-                hits = kw.query(sub, limit=4, source="l2")
-                if hits:
-                    rows = [
-                        r for r in service._recall_via_kw(sub, 5)
-                    ]
+                rows = svc._recall_via_kw(sub, max(1, min(int(limit), 10)))
+                if rows:
                     break
         except Exception:
             rows = []
@@ -188,6 +185,46 @@ def system_time() -> str:
     now = datetime.datetime.now()
     weekday = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"][now.weekday()]
     return f"{now.strftime('%Y-%m-%d %H:%M:%S')} {weekday}"
+
+
+def runtime_status() -> str:
+    """只读运行状态（R2, ledger 0594）：模型服务/适配器/训练标记。
+
+    只报**能核对**的字段；无法核对的返回 unknown，**不因端口在线推导"已训练"**。
+    只读，不提供启动/停止进程权限。
+    """
+    import json as _json
+    import os as _os
+    import urllib.request as _url
+
+    out: dict[str, Any] = {
+        "observed_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "source": "local process introspection",
+        "server": "unknown", "model": "unknown", "lora": "unknown",
+        "training": "unknown", "stale": False,
+    }
+    try:
+        with _url.urlopen("http://127.0.0.1:8081/health", timeout=2) as r:
+            out["server"] = "ok" if "ok" in r.read().decode("utf-8", "replace").lower() else "reachable"
+    except Exception:
+        out["server"] = "unreachable"
+    if out["server"] == "ok":
+        try:
+            with _url.urlopen("http://127.0.0.1:8081/props", timeout=2) as r:
+                props = _json.load(r)
+            out["model"] = str(props.get("model_alias") or "unknown")
+        except Exception:
+            pass
+        try:
+            from tools.llama_lora_up import running_lora
+
+            out["lora"] = running_lora() or "unknown"
+        except Exception:
+            pass
+    # 训练状态：本地无可靠训练记录 → 恒 unknown（绝不因端口在线推导）
+    if _os.environ.get("YHLZ_TRAINING_ACTIVE") or _os.environ.get("YHLZ_FINETUNE_ACTIVE"):
+        out["training"] = "active(env flag)"
+    return _json.dumps(out, ensure_ascii=False)
 
 
 _constitution_lock: Any = None
@@ -246,7 +283,7 @@ def _memory_fault_alert(content: str) -> None:
 
 def memory_save(content: str, kind: str = "preference", importance: int = 0,
                 service: Any = None, source: str = "",
-                kind_profile: bool = False) -> str:
+                kind_profile: bool = False, evidence_ref: str = "") -> str:
     """Save a notable item into long-term memory (自主写入).
 
     kind_profile=True (M1): owner explicitly marked it -> Profile layer
@@ -279,7 +316,7 @@ def memory_save(content: str, kind: str = "preference", importance: int = 0,
         summary=content_txt,
         content_hash=hashlib.sha256(content_txt.encode("utf-8")).hexdigest()[:16],
         keywords=content_txt[:40].replace(" ", ""),
-        evidence_ref="memory.save:user-approved",
+        evidence_ref=str(evidence_ref or "memory.save:user-approved"),
         created_at=_time.time(),
         source=str(source or ""),
         kind=("profile" if kind_profile else "episodic"),
@@ -468,6 +505,17 @@ class _QueryArgs(BaseModel):
     limit: int = Field(5, ge=1, le=500, description="返回条数上限")
 
 
+class _TaskArgs(BaseModel):
+    content: str = Field("", max_length=200, description="add/done 必填任务内容；list 无需内容")
+    action: Literal["add", "done", "list"] = "add"
+
+    @model_validator(mode="after")
+    def require_mutation_content(self):
+        if self.action != "list" and not self.content.strip():
+            raise ValueError("add/done require task content")
+        return self
+
+
 class _SaveArgs(BaseModel):
     content: str = Field(..., min_length=2, max_length=500, description="要保存的内容")
     kind: str = Field("preference", description="preference|fact|event|decision")
@@ -614,7 +662,7 @@ def bind_memory_save_service(registry: CapabilityRegistry, service: Any,
                 str(p.get("kind", "preference")),
                 int(p.get("importance", 0) or 0),
                 service=_s,
-                source=str(p.get("source", "") or _src),
+                source=str(_src),
                 kind_profile=bool(
                     p.get("profile")
                     or _looks_like_profile(str(p.get("content", "")))),
@@ -630,6 +678,17 @@ def bind_memory_save_service(registry: CapabilityRegistry, service: Any,
         ),
         override=True,
     )
+
+
+def bind_memory_recall_service(registry: CapabilityRegistry, service: Any) -> None:
+    """Bind reads to the same session store as writes, retaining capability gates."""
+    from dataclasses import replace
+    cap = registry.get("memory.recall")
+    if cap is not None:
+        registry.register_capability(replace(
+            cap, handler=lambda p, _s=service: recall_memory(
+                str(p.get("query", "")), int(p.get("limit", 5)), service=_s)),
+            override=True)
 
 
 def _verify_time(output: Any) -> bool:
@@ -733,6 +792,19 @@ def scheduler_capabilities() -> list[Capability]:
             side_effect=False,
             risk="low",
             verify=_verify_time,
+        ),
+        Capability(
+            name="runtime.status",
+            description=(
+                "查看本机数字人运行状态（模型服务/适配器/训练标记）。只读；"
+                "无法核对的字段一律返回 unknown，不因端口在线就断言已训练。"
+            ),
+            handler=_handler_of(runtime_status),
+            input=(),
+            requires=(),
+            side_effect=False,
+            risk="low",
+            verify=_verify_nonempty,
         ),
         Capability(
             name="memory.save",
@@ -876,6 +948,7 @@ def scheduler_capabilities() -> list[Capability]:
             side_effect=True,
             risk="low",
             verify=_verify_nonempty,
+            input_model=_TaskArgs,
         ),
         Capability(
             name="kb.add",
@@ -906,7 +979,7 @@ def scheduler_capabilities() -> list[Capability]:
             requires=(KB_POLICY,),
             side_effect=False,
             risk="low",
-            verify=_verify_nonempty,
+            verify=lambda output: isinstance(output, list),
         ),
         Capability(
             name="qq.bootstrap",
@@ -1541,6 +1614,9 @@ async def skill_learn(dad_text: str, tool_uses: list, answer: str,
 
     ok_tools = [u for u in (tool_uses or [])
                 if u.get("ok") and u.get("name") in _SKILL_ACTION_TOOLS]
+    from backend.memory_resource_policy import load_memory_resource_policy
+    if not load_memory_resource_policy().llm_enabled:
+        return ""
     if len(ok_tools) < 2 or llm_turn is None:
         return ""
     acts = "\n".join(
@@ -1549,28 +1625,33 @@ async def skill_learn(dad_text: str, tool_uses: list, answer: str,
     key = hashlib.sha1(
         ("|".join(sorted(str(u.get('name')) for u in ok_tools))
          + "|" + str(dad_text)[:60]).encode("utf-8")).hexdigest()[:16]
-    if not _skill_seen_add(key):
-        return ""  # already learned this pattern
-    try:
-        content = (SKILL_LEARN_PROMPT
-                   .replace("<TEXT>", str(dad_text)[:400])
-                   .replace("<ACTS>", acts)
-                   .replace("<ANSWER>", str(answer)[:400]))
-        msg = await llm_turn([{"role": "user", "content": content}], [])
-        raw = str(msg.get("content") or "")
-    except Exception:
-        return ""
-    raw = raw.strip().strip("`")
-    if raw.lower().startswith("json"):
-        raw = raw[4:].strip()
-    try:
-        data = _j.loads(raw[raw.find("{"): raw.rfind("}") + 1])
-    except Exception:
-        return ""
-    if data.get("skip"):
-        return ""
-    return _write_skill_draft(data.get("name", ""), data.get("trigger", ""),
-                              data.get("steps", ""))
+    from backend.text_memory_inference_gate import inference_gate
+    async with inference_gate().slot(background=True):
+        if not load_memory_resource_policy().llm_enabled or key in _skill_seen_load():
+            return ""
+        try:
+            content = (SKILL_LEARN_PROMPT
+                       .replace("<TEXT>", str(dad_text)[:400])
+                       .replace("<ACTS>", acts)
+                       .replace("<ANSWER>", str(answer)[:400]))
+            msg = await llm_turn([{"role": "user", "content": content}], [])
+            from backend.target_memory_llm import MemoryLLMService
+            data = MemoryLLMService._json_value(str(msg.get("content") or ""), dict)
+            if not isinstance(data, dict):
+                return ""
+            if data.get("skip") is True:
+                _skill_seen_add(key)  # validated explicit skip, not a timeout
+                return ""
+            if any(not isinstance(data.get(k), str) or not data[k].strip()
+                   for k in ("name", "trigger", "steps")):
+                return ""
+            draft = _write_skill_draft(data["name"], data["trigger"], data["steps"])
+            if draft:
+                _skill_seen_add(key)  # acknowledge only after durable draft write
+            return draft
+        except Exception:
+            return ""
+
 
 
 

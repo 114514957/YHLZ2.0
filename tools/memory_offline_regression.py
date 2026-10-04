@@ -22,11 +22,13 @@ os.environ.update(YHLZ_TRAINING_ACTIVE='1',YHLZ_FINETUNE_ACTIVE='1',PYTHONUTF8='
 MODULES = [
  'test_memory_carriers','test_memory_summary_scheduler','test_memory_endurance',
  'test_memory_resource_policy','test_memory_channel_lifecycle','test_memory_index_audit',
- 'test_memory_health',
+ 'test_memory_health','test_persona_eval_evidence', 'test_persona_live_safety','test_persona_effects','test_text_tool_contract','test_text_memory_inference_gate','test_persona_text_boundary','test_target_dev_bridge','test_qq_security',
  'test_prompt_structure','test_context_compaction','test_target_orchestrator',
  'test_persona_versions','test_memory_recall_budget','test_memory_review',
  'test_target_memory','test_target_entry','test_target_prompts',
  'test_cognition_governance','test_target_persona_loop','test_qq_memory_boundaries',
+ 'test_qq_connection','test_qq_delivery','test_notify_guard','test_qq_group_features',
+ 'test_console_text_routes', 'test_memory_review_retry', 'test_turn_evidence',
 ]
 
 def main():

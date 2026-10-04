@@ -165,7 +165,7 @@ class TestTurnOrchestrator(unittest.TestCase):
         self.assertEqual(
             names,
             {             "ledger_search", "ledger_get", "ledger_list", "ledger_add", "ledger_update", "ledger_delete",
-             "memory_recall", "memory_save", "system_time",
+             "memory_recall", "memory_save", "system_time", "runtime_status",
              "diary_write", "diary_list", "diary_delete",
              "file_list", "file_read", "task_plan", "web_fetch", "web_search",
              "kb_add", "kb_query", "memory_audit", "memory_profile", "memory_causal", "memory_why", "report_qq_weekly",
