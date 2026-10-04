@@ -1,23 +1,65 @@
-"""R3 包C：关键工具题重复基线 runner（不改判分，不覆盖历史）。
+"""R3 包C（T1 续）：关键工具题重复基线 runner。
+
+- 每轮独立 run 目录（run_id=时间戳，**不覆盖**旧结果）；
+- 落盘完整 manifest：git/模型/适配器/模板/prompt/题库hash/策略面；
+- 逐题 scorer_v3 结构化分类（含 not_offerable_in_harness）；区分"12 可测 vs 全 16"。
 
 用法：python tools/r3_tool_subset.py [--reps 3] [--tag zh21-base]
-- 对 persona_bank 中「有期望工具」的题（16 类去空）重复跑，每题每轮新隔离会话；
-- 落盘原始逐题结果 + scorer_v2 四类分类；报告逐项波动。
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
+import datetime
+import hashlib
 import json
 import pathlib
+import subprocess
 import sys
 
 sys.path.insert(0, ".")
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from tools.persona_bank import PERSONA_BANK  # noqa: E402
-from tools.persona_regression import run_live  # noqa: E402
-from tools.scorer_v2 import classify_tool_item  # noqa: E402
+from tools.persona_regression import LIVE_SAFE_TOOLS, run_live  # noqa: E402
+from tools.scorer_v2 import allowed_tools_of, classify_result  # noqa: E402
+
+
+def sha16(p):
+    p = pathlib.Path(p)
+    return hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.exists() else None
+
+
+def manifest(bank) -> dict:
+    from backend.env_loader import ensure_env_loaded
+
+    ensure_env_loaded()
+    import urllib.request
+
+    props = {}
+    try:
+        props = json.load(urllib.request.urlopen("http://127.0.0.1:8081/props", timeout=8))
+    except Exception:
+        pass
+    import backend.target_prompts as tp
+    from tools.llama_lora_up import running_lora
+
+    return {
+        "run_id": datetime.datetime.now().strftime("%Y%m%dT%H%M%S"),
+        "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "git_head": subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                                   text=True).stdout.strip(),
+        "prompt_version": tp.PROMPTS_VERSION,
+        "prompt_sha16": sha16("backend/target_prompts.py"),
+        "chat_template_sha16": sha16("models/gemma4-hf/gemma-4-e4b-it/chat_template.jinja"),
+        "model_alias": props.get("model_alias"),
+        "model_path": props.get("model_path"),
+        "lora": running_lora(),
+        "bank_ids": [e["id"] for e in bank],
+        "bank_sha16": hashlib.sha256("|".join(e["id"] for e in bank).encode()).hexdigest()[:16],
+        "live_safe_tools": sorted(LIVE_SAFE_TOOLS),
+        "policy_mode": "production(constrained to LIVE_SAFE_TOOLS)",
+    }
 
 
 async def main() -> int:
@@ -27,33 +69,42 @@ async def main() -> int:
     ap.add_argument("--url", default="http://127.0.0.1:8081/v1/chat/completions")
     args = ap.parse_args()
 
-    bank = [e for e in PERSONA_BANK if e.get("expect_any_tool")]
-    print(f"工具题 {len(bank)} 道 × {args.reps} 轮 = {len(bank) * args.reps} 回合")
-    outdir = pathlib.Path(f"artifacts/nonvoice_next_stage/20261003-r3-C-{args.tag}")
+    bank = [e for e in PERSONA_BANK if str(e.get("id", "")).startswith("t")]
+    mf = manifest(bank)
+    outdir = pathlib.Path(f"artifacts/nonvoice_next_stage/r3-C-{args.tag}-{mf['run_id']}")
     outdir.mkdir(parents=True, exist_ok=True)
+    (outdir / "manifest.json").write_text(json.dumps(mf, ensure_ascii=False, indent=2),
+                                          encoding="utf-8")
+    print(f"bank={len(bank)}题 × {args.reps} 轮；manifest -> {outdir/'manifest.json'}")
 
-    all_rounds = []
+    rounds = []
     for rep in range(1, args.reps + 1):
-        results, env = await run_live(bank, base_url=args.url,
-                                      expect_lora="yuanheng-v8-lora.gguf")
-        rows = [classify_tool_item(e, r.get("tools") or [], r.get("answer", ""))
-                for e, r in zip(bank, results)]
+        results, env = await run_live(bank, base_url=args.url, expect_lora=mf["lora"] or "")
+        rows = []
+        for e, r in zip(bank, results):
+            if not e.get("expect_any_tool"):
+                rows.append({"id": e["id"], "class": "not_a_tool_item",
+                             "allowed": sorted(allowed_tools_of(r))})
+                continue
+            c = classify_result(e, r)
+            allowed = set(c.get("allowed") or [])
+            c["offerable"] = bool(set(e["expect_any_tool"]) & allowed) if allowed else None
+            rows.append(c)
         (outdir / f"round{rep}.json").write_text(
-            json.dumps({"env": {k: env.get(k) for k in ("base_url", "lora")},
-                        "results": results, "classes": rows},
+            json.dumps({"manifest": mf, "env": env, "results": results, "classes": rows},
                        ensure_ascii=False, indent=2), encoding="utf-8")
-        sel = sum(1 for r in rows if r["tool_selected"])
-        print(f"[round{rep}] 选择工具 {sel}/{len(rows)}")
-        for r in rows:
-            print(f"    {r['id']}: {r['class']}")
-        all_rounds.append(rows)
+        print(f"[round{rep}] " + " ".join(f"{x['id']}:{x['class'].split('_')[0]}" for x in rows))
+        rounds.append(rows)
 
-    # 逐题转移（跨轮是否稳定）
     print("\n== 逐题跨轮 ==")
+    tool_items = [e for e in bank if e.get("expect_any_tool")]
     for i, e in enumerate(bank):
-        seq = [all_rounds[k][i]["class"] for k in range(args.reps)]
-        stable = len(set(seq)) == 1
-        print(f"  {e['id']}: {'稳定' if stable else '**波动**'} {seq}")
+        seq = [rounds[k][i]["class"] for k in range(args.reps)]
+        mark = "稳定" if len(set(seq)) == 1 else "**波动**"
+        print(f"  {e['id']}: {mark} {seq}")
+    offerable_n = sum(1 for x in rounds[0] if x.get("offerable"))
+    print(f"\n本轮可测(offerable)工具题 {offerable_n}/{len(tool_items)}；"
+          f"其余为 not_offerable_in_harness（评测面缺口）")
     return 0
 
 

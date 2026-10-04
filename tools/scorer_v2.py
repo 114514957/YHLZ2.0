@@ -66,9 +66,16 @@ def classify_result(entry: dict, rec: dict) -> dict:
             if rb:
                 return {**base, "class": "effect_unknown", "detail": f"receipts={rb}"}
             return {**base, "class": "effect_unknown", "detail": "写类无读回收据"}
+        anchors = {}
+        for o in obs:
+            anchors.update(o.get("expected_anchors") or {})
+        if anchors:
+            if any(anchors.values()):
+                return {**base, "class": "read_hit", "detail": "读类命中锚点"}
+            return {**base, "class": "read_miss", "detail": "读类未命中锚点（空/错来源）"}
         return {**base, "class": "read_hit", "detail": "读类工具已调用"}
     # 3) 未调用
-    if ev == "unavailable" or any(UNAVAILABLE_RE.search(str(rec.get("answer") or ""))):
+    if ev == "unavailable" or bool(UNAVAILABLE_RE.search(str(rec.get("answer") or ""))):
         return {**base, "class": "unavailable_not_checked", "detail": "未调（工具/面不可用）"}
     if ev == "not_executed" or ea.get("reason") == "required_tool_not_attempted":
         return {**base, "class": "not_executed", "detail": "未按要求调用"}
