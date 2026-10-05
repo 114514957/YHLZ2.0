@@ -213,7 +213,7 @@ def _sandbox_writes(tmp: pathlib.Path) -> dict:
     fs_root = tmp / "fs"
     fs_root.mkdir(parents=True, exist_ok=True)
     (fs_root / "README.md").write_text(
-        "# 合成 README（评测沙箱）\n\n这是隔离文件根，仅含合成内容。\n", encoding="utf-8")
+        "# YHLZ · 元亨（评测合成 README）\n\n数字生命体，仅含合成内容。\n", encoding="utf-8")
     ledger_file = tmp / "上下文台账.md"
     ledger_file.write_text(
         "# 合成台账（评测沙箱）\n\n## 记录 0001：合成占位（评测用）\n- 内容：沙箱合成记录，无真实业务。\n",
