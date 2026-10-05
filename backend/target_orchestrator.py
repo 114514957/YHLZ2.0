@@ -228,6 +228,8 @@ def build_openai_compatible_llm_turn(
             "messages": messages,
             "temperature": float(temperature),
             "max_tokens": int(max_tokens),
+            # 0639：阻止"自续轮"（新轮起始标记即停）
+            "stop": ["<|turn"],
         }
         if reasoning_effort:
             payload["reasoning_effort"] = reasoning_effort

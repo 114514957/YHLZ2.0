@@ -55,6 +55,8 @@ async def stream_openai_compatible(
         "max_tokens": int(max_tokens),
         "stream": True,
         "stream_options": {"include_usage": True},
+        # 0639：阻止模型"自续轮"——一出现新轮起始标记即停止生成（非删标记）
+        "stop": ["<|turn"],
     }
     if reasoning_effort:
         payload["reasoning_effort"] = reasoning_effort
