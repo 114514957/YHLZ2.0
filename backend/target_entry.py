@@ -142,6 +142,33 @@ class ConversationSession:
         from backend.memory_carriers import bind_memory_carriers
         bind_memory_carriers(self.registry, self.memory, channel=self.channel,
                              owner_access=self._is_owner())
+        # 段2(0626)：注册 memory 只读探测（普通路径连接=评测守卫可放行；不更新 salience）
+        try:
+            import pathlib as _pl
+
+            from backend import turn_evidence as _te
+
+            _dbp = _pl.Path(str(self.memory.db_path))
+
+            def _mem_probe(needle, _p=_dbp):
+                if not needle or not _p.exists():
+                    return {"found": False}
+                import sqlite3 as _sq
+
+                con = _sq.connect(str(_p))
+                try:
+                    row = con.execute(
+                        "SELECT id,version FROM l2_items WHERE summary LIKE ? "
+                        "ORDER BY created_at DESC LIMIT 1",
+                        (f"%{needle[:24]}%",)).fetchone()
+                finally:
+                    con.close()
+                return {"found": bool(row), "id": row[0] if row else "",
+                        "version": row[1] if row else ""}
+
+            _te.set_memory_probe(_mem_probe)
+        except Exception:
+            pass
         from backend.target_orchestrator import build_openai_compatible_llm_turn
         from backend.env_loader import ensure_env_loaded
         from backend.target_daemon import LOCAL_BASE, LOCAL_MODEL
