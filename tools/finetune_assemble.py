@@ -40,6 +40,11 @@ TURN = re.compile(r"^###\s*([^\n#]*?)(问|答)(\d+)\s*$", re.MULTILINE)
 META = re.compile(r"^[ \t]*-[ \t]*([A-Za-z_]+)[ \t]*:[ \t]*(.*)$", re.MULTILINE)
 VALID_STATUS = {"candidate", "keep", "drop", "fixed"}
 USER_ROLES = ("老爹", "陌生人", "朋友", "群友")
+# R1(0652): 旧版只保留 USER_ROLES，利贞等在场角色的发言被丢弃，导致
+# 「元亨答1 → (利贞问2被丢) → 元亨答2」变成相邻 assistant（实测 1000/3440）。
+# 现改为：未列名角色（含利贞）一律保留为 user 上下文；同角色相邻合并。
+_REPAIR_REPEATS = False
+_REPAIR_COUNT = 0
 
 SYSTEM_LZ = (
     "你是利贞——元亨的伙伴、靠谱的技术担当。稳重、博学、直接，话不多但到位；"
@@ -69,17 +74,36 @@ def _read_jsonl(path: Path) -> list[dict]:
     return out
 
 
-def _to_messages(turns: list[tuple[str, str]], keep_owner: bool = True) -> list[dict] | None:
+def _repair_repeat(text: str, min_len: int = 20) -> tuple[str, bool]:
+    """R1: 去掉同一消息内相邻重复段（v8 第 20 行有 ~164 字复读）。"""
+    global _REPAIR_COUNT
+    pat = re.compile(r"(.{%d,}?)\1" % min_len, re.S)
+    changed = False
+    for _ in range(4):
+        m = pat.search(text)
+        if not m:
+            break
+        text = text[: m.start()] + m.group(1) + text[m.end():]
+        changed = True
+    if changed:
+        _REPAIR_COUNT += 1
+    return text, changed
+
+
+def _to_messages(turns: list[tuple[str, str, str]], keep_owner: bool = True) -> list[dict] | None:
     msgs: list[dict] = [{"role": "system", "content": SYSTEM}]
-    for role, text in turns:
+    for turn in turns:
+        role, text = turn[0], turn[-1]
+        if _REPAIR_REPEATS:
+            text, _ = _repair_repeat(text)
         if role == "元亨":
             who, content = "assistant", text
-        elif role in USER_ROLES:
-            who = "user"
-            content = text if role == "老爹" else f"{role}：{text}"
+        elif role == "老爹":
+            who, content = "user", text
         else:
-            continue
-        if msgs[-1]["role"] == who and who == "user":
+            # R1: 利贞/陌生人/朋友/群友/未列名角色保留为 user 上下文
+            who, content = "user", f"{role}：{text}"
+        if msgs[-1]["role"] == who:
             msgs[-1]["content"] += "\n" + content
         else:
             msgs.append({"role": who, "content": content})
@@ -99,14 +123,14 @@ def _block_meta(blk: str) -> dict:
     return {m.group(1).lower(): m.group(2).strip() for m in META.finditer(blk)}
 
 
-def _block_turns(blk: str) -> list[tuple[str, str]]:
+def _block_turns(blk: str) -> list[tuple[str, str, str]]:
     ms = list(TURN.finditer(blk))
     out = []
     for i, m in enumerate(ms):
         end = ms[i + 1].start() if i + 1 < len(ms) else len(blk)
         text = blk[m.end():end].strip()
         if text:
-            out.append((m.group(1).strip(), text))
+            out.append((m.group(1).strip(), m.group(2), text))
     return out
 
 
@@ -179,7 +203,11 @@ def main() -> int:
     ap.add_argument("--lizhen-cap", type=int, default=300)
     ap.add_argument("--extra", default=None)
     ap.add_argument("--extra-cap", type=int, default=0)
+    ap.add_argument("--repair-repeats", action="store_true",
+                    help="R1: 修复消息内相邻重复段（洁净候选用）")
     args = ap.parse_args()
+    global _REPAIR_REPEATS
+    _REPAIR_REPEATS = bool(args.repair_repeats)
     out_dir = ROOT / "data" / "finetune"
     out_dir.mkdir(parents=True, exist_ok=True)
     D = ROOT / "docs" / "素材"
@@ -306,10 +334,29 @@ def main() -> int:
                    encoding="utf-8")
     dims = {"real": n_real, "golden": n_gold, "scene": n_scene, "lizhen": n_lz,
             "memory": n_mem, "b3": n_b3, "b4": n_b4, "d2": n_d2, "tools": n_extra}
+    adjacent_assistant = leading_assistant = lizhen_user_turns = 0
+    for r in records:
+        msgs = r["messages"]
+        first_non_sys = next((m for m in msgs if m["role"] != "system"), None)
+        if first_non_sys is not None and first_non_sys["role"] == "assistant":
+            leading_assistant += 1
+        for a, b in zip(msgs, msgs[1:]):
+            if a["role"] == "assistant" and b["role"] == "assistant":
+                adjacent_assistant += 1
+                break
+        for m in msgs:
+            if m["role"] == "user" and str(m["content"]).startswith("利贞："):
+                lizhen_user_turns += 1
     stats = {"tag": args.tag, "total": total, **dims,
              "memory_total": mem_total,
              "extra_rejected_fake_tools": n_extra_bad,
              "rejects": rejects,
+             "quality_gates": {
+                 "adjacent_assistant": adjacent_assistant,
+                 "leading_assistant": leading_assistant,
+                 "lizhen_user_turns": lizhen_user_turns,
+                 "repeat_repairs": _REPAIR_COUNT,
+             },
              "share": {k: round(v / max(1, total), 3) for k, v in dims.items()},
              "file": str(out.relative_to(ROOT))}
     (out_dir / f"sft_persona_{args.tag}.stats.json").write_text(
