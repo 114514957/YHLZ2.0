@@ -18,6 +18,7 @@ from typing import Any, Awaitable, Callable
 
 _sem: asyncio.Semaphore | None = None
 _fg: int = 0
+_fg_entered: int = 0
 _recent: deque = deque(maxlen=200)
 _counters = {"started": 0, "done": 0, "timeout": 0, "error": 0, "skipped_policy": 0}
 
@@ -30,8 +31,9 @@ def _semaphore() -> asyncio.Semaphore:
 
 
 def foreground_enter() -> None:
-    global _fg
+    global _fg, _fg_entered
     _fg += 1
+    _fg_entered += 1
 
 
 def foreground_exit() -> None:
@@ -49,11 +51,16 @@ async def run(fn: Callable[[], Awaitable[Any]], *, kind: str = "background",
               poll_s: float = 0.01) -> dict:
     """统一后台推理入口。返回 {ok,status,result,wait_ms,run_ms}。"""
     t0 = time.perf_counter()
-    # 前台优先：有前台活动时让路（不启动新后台）
-    while _fg > 0:
-        await asyncio.sleep(poll_s)
     sem = _semaphore()
-    async with sem:
+    # 前台优先 + 拿槽后**再复核**（0622 §5.2）：等待期间出现前台则让位重试
+    while True:
+        while _fg > 0:
+            await asyncio.sleep(poll_s)
+        await sem.acquire()
+        if _fg == 0:
+            break
+        sem.release()
+    try:
         wait_ms = round((time.perf_counter() - t0) * 1000, 1)
         if policy_check is not None and not policy_check():
             _counters["skipped_policy"] += 1
@@ -79,10 +86,13 @@ async def run(fn: Callable[[], Awaitable[Any]], *, kind: str = "background",
                         "wait_ms": wait_ms, "run_ms": run_ms})
         return {"ok": status == "done", "status": status, "result": out,
                 "wait_ms": wait_ms, "run_ms": run_ms}
+    finally:
+        sem.release()
 
 
 def status() -> dict:
-    return {"foreground_active": _fg, "counters": dict(_counters),
+    return {"foreground_active": _fg, "fg_entered": _fg_entered,
+            "counters": dict(_counters),
             "active": 1 if (_sem is not None and _sem.locked()) else 0,
             "recent": list(_recent)[-20:]}
 
@@ -111,9 +121,10 @@ def wrap_llm_turn(provider: Callable[..., Awaitable[Any]], *, kind: str,
 
 
 def reset_for_tests() -> None:
-    global _sem, _fg
+    global _sem, _fg, _fg_entered
     _sem = None
     _fg = 0
+    _fg_entered = 0
     _recent.clear()
     for k in _counters:
         _counters[k] = 0

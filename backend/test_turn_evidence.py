@@ -82,6 +82,22 @@ class ReadbackTest(unittest.TestCase):
         r = te.readback("diary.write", {"content": "老爹怕冷"}, before=before)
         self.assertEqual(r["status"], "idempotent_existing")
 
+    def test_kb_exact_not_fuzzy(self):
+        kb.kb_add(summary="R1 精确条目测试", category="tech")
+        self.assertEqual(te.readback("kb.add", {"summary": "R1 精确条目测试"})["status"],
+                         "verified")
+        self.assertEqual(te.readback("kb.add", {"summary": "R1 精确条目"})["status"],
+                         "effect_missing")
+
+    def test_task_done_requires_x(self):
+        st.TASK_FILE.write_text("- [ ] 整理素材\n", encoding="utf-8")
+        before = te.carrier_state("task.plan", {"content": "整理素材"})
+        r = te.readback("task.plan", {"action": "done", "content": "整理素材"}, before=before)
+        self.assertEqual(r["status"], "effect_missing")
+        st.TASK_FILE.write_text("- [x] 整理素材\n", encoding="utf-8")
+        r2 = te.readback("task.plan", {"action": "done", "content": "整理素材"}, before=before)
+        self.assertEqual(r2["status"], "verified")
+
     def test_memory_probe_verified_missing_and_unbound(self):
         te.set_memory_probe(None)
         self.assertEqual(te.readback("memory_save", {"content": "x"})["status"], "unsupported")

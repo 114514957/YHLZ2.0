@@ -74,6 +74,27 @@ class WiringTest(unittest.TestCase):
             asyncio.run(wrapped([], None))
         self.assertEqual(bg.status()["counters"]["skipped_policy"], 1)
 
+    def test_session_turn_marks_foreground(self):
+        """真实前台接线：会话 turn 必须调 foreground_enter/exit（非花瓶）。"""
+        from unittest.mock import Mock
+
+        import backend.target_entry as te_mod
+
+        async def provider(messages, tools=None, **kw):
+            return {"role": "assistant", "content": "ok"}
+
+        with patch("backend.target_memory.TargetMemoryService", Mock()), \
+             patch("backend.target_kw_index.KeywordIndex", Mock()):
+            s = te_mod.ConversationSession(llm_turn=provider, memory=Mock(),
+                                           channel="console")
+        try:
+            asyncio.run(s.run_turn("在吗？"))
+        except Exception:  # noqa: BLE001 — 接线验证：异常也要 exit
+            pass
+        st = bg.status()
+        self.assertGreaterEqual(st["fg_entered"], 1)
+        self.assertEqual(st["foreground_active"], 0)  # 进出平衡
+
 
 if __name__ == "__main__":
     unittest.main()

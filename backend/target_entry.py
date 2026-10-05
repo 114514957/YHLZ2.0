@@ -407,9 +407,16 @@ class ConversationSession:
         trace_mark("session_queue_enter")
         async with self._turn_lock:
             trace_mark("session_queue_exit")
-            return await self._run_turn_serial(
-                text, on_delta=on_delta, mode=mode, pre_recall=pre_recall,
-                images=images, audio=audio, voice_tools_enabled=voice_tools_enabled)
+            # 段3(0627)：真实前台标记——后台推理据此让路（前后台共用同一权威）
+            from backend import bg_scheduler as _bg
+
+            _bg.foreground_enter()
+            try:
+                return await self._run_turn_serial(
+                    text, on_delta=on_delta, mode=mode, pre_recall=pre_recall,
+                    images=images, audio=audio, voice_tools_enabled=voice_tools_enabled)
+            finally:
+                _bg.foreground_exit()
 
     async def _run_turn_serial(self, text: str,
                        on_delta: Optional[Callable[[str], None]] = None,

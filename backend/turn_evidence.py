@@ -140,6 +140,14 @@ def readback(tool_name: str, arguments: dict[str, Any] | None = None,
             body = _read_text(path)
             present = bool(needle) and needle[:24] in body
             ver = {"version": f"size:{after.get('size')}"}
+            # task done：以**状态转换**为准（[x]），不受"内容已存在"影响
+            if (carrier == "task_file"
+                    and str(args.get("action") or "").lower() in ("done", "complete", "finish", "完成")
+                    and present):
+                done = _task_done(body, needle)
+                return {**_struct(carrier, "verified" if done else "effect_missing",
+                                  "updated" if done else "unknown", needle, ver),
+                        "detail": "task 状态已转完成" if done else "task 未显示完成（状态未变）"}
             if present and before and not changed and before.get("needle_present"):
                 return {**_struct(carrier, "idempotent_existing", "noop", needle, ver),
                         "detail": "写前已存在同内容且载体未变（合法幂等）"}
@@ -157,10 +165,22 @@ def readback(tool_name: str, arguments: dict[str, Any] | None = None,
             if not p.exists():
                 return {**_struct(carrier, "effect_missing", "unknown", needle),
                         "detail": "kb 库不存在"}
-            hits = kb.kb_query(query=needle[:24], limit=3)
-            return {**_struct(carrier, "verified" if hits else "effect_missing",
-                                    "created" if hits else "unknown", needle),
-                    "detail": f"kb_query 命中 {len(hits)}"}
+            exact = False
+            try:
+                import sqlite3 as _sq
+
+                con = _sq.connect(str(p))   # 普通路径（评测守卫可放行）
+                try:
+                    row = con.execute(
+                        "SELECT 1 FROM kb_items WHERE summary=? LIMIT 1", (needle,)).fetchone()
+                    exact = bool(row)
+                finally:
+                    con.close()
+            except Exception:
+                exact = bool(kb.kb_query(query=needle[:24], limit=3))  # 表结构差异时退回
+            return {**_struct(carrier, "verified" if exact else "effect_missing",
+                              "created" if exact else "unknown", needle),
+                    "detail": "kb 精确条目命中" if exact else "无精确条目（相似不算命中）"}
         if carrier == "memstore_db":
             if _MEMORY_PROBE is None:
                 return {**_struct(carrier, "unsupported", "unknown", needle),
@@ -177,6 +197,15 @@ def readback(tool_name: str, arguments: dict[str, Any] | None = None,
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "carrier": carrier,
                 "detail": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
+
+def _task_done(body: str, needle: str) -> bool:
+    """task 是否真的处于完成态：找到含该内容的行且带 [x]。"""
+    key = needle[:24]
+    for line in str(body or "").splitlines():
+        if key in line and "[x]" in line.lower():
+            return True
+    return False
 
 
 def _verdict(body: str, needle: str, carrier: str) -> dict[str, Any]:
