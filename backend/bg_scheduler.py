@@ -87,6 +87,29 @@ def status() -> dict:
             "recent": list(_recent)[-20:]}
 
 
+def wrap_llm_turn(provider: Callable[..., Awaitable[Any]], *, kind: str,
+                  endpoint: str = "", timeout_s: float = 60.0,
+                  policy_check: Callable[[], bool] | None = None) -> Callable[..., Awaitable[Any]]:
+    """把一个 llm_turn 包成"经统一后台入口"的版本（接线用）。
+
+    非 done 状态（timeout/error/skipped_policy）→ 抛 RuntimeError，调用方可观测地失败，
+    绝不静默返回空结果冒充成功。
+    """
+
+    async def wrapped(messages, tools=None, **kw):
+        async def _call():
+            return await provider(messages, tools, **kw)
+
+        r = await run(_call, kind=kind, endpoint=endpoint, timeout_s=timeout_s,
+                      policy_check=policy_check)
+        if not r["ok"]:
+            raise RuntimeError(f"bg_scheduler:{kind}:{r['status']}")
+        return r["result"]
+
+    wrapped.__wrapped_kind__ = kind  # type: ignore[attr-defined]
+    return wrapped
+
+
 def reset_for_tests() -> None:
     global _sem, _fg
     _sem = None

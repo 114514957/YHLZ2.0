@@ -26,6 +26,9 @@ def _local_llm():
             base_url="http://127.0.0.1:8081/v1/chat/completions",
             api_key="", model="gemma-4-e4b", temperature=0.4, max_tokens=700,
             reasoning_effort="none")
+        from backend.bg_scheduler import wrap_llm_turn
+
+        _LLM = wrap_llm_turn(_LLM, kind="reflection", endpoint="8081")
     return _LLM
 
 

@@ -154,10 +154,13 @@ def build_llm_turn(max_tokens: int = 1200):
 
     ensure_env_loaded()
     key = os.getenv("DEEPSEEK_API_KEY", "")
-    return build_openai_compatible_llm_turn(
+    provider = build_openai_compatible_llm_turn(
         api_key=key, model="deepseek-chat", temperature=0.1,
         max_tokens=int(max_tokens), fallback_base_url=None,
     )
+    from backend.bg_scheduler import wrap_llm_turn
+
+    return wrap_llm_turn(provider, kind="qqextract", endpoint="deepseek")
 
 
 async def run_batch(max_items: int = 12, dry: bool = False,
