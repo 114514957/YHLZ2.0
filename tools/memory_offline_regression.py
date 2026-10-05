@@ -29,7 +29,7 @@ MODULES = [
  'test_cognition_governance','test_target_persona_loop','test_qq_memory_boundaries',
  'test_qq_connection','test_qq_delivery','test_notify_guard','test_qq_group_features',
  'test_console_text_routes', 'test_memory_review_retry', 'test_turn_evidence',
- 'test_scorer_v2',
+ 'test_scorer_v2', 'test_qq_delivery_store',
 ]
 
 def main():
