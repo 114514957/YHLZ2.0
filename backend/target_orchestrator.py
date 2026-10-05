@@ -467,7 +467,7 @@ class TurnOrchestrator:
                 if denied:
                     continue
                 t0 = time.perf_counter()
-                pre_state = (turn_evidence.carrier_state(name)
+                pre_state = (turn_evidence.carrier_state(name, args)
                              if (cap is not None and cap.side_effect) else None)
                 out = await self.registry.execute_openai_async(name, args)
                 use = ToolUse(

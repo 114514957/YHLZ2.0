@@ -80,19 +80,31 @@ def _carrier_path(carrier: str) -> Any:
     return None
 
 
-def carrier_state(tool_name: str) -> dict:
-    """写前快照（仅文件类载体）；不支持返回 {}。"""
+def carrier_state(tool_name: str, arguments: dict[str, Any] | None = None) -> dict:
+    """写前快照（仅文件类载体）；含"该内容写前是否已存在"用于幂等判定。"""
     carrier = _WRITE_CARRIERS.get(_norm(tool_name), "")
     try:
         p = _carrier_path(carrier)
-        return _file_state(p) if p is not None else {}
+        if p is None:
+            return {}
+        st = _file_state(p)
+        needle = str((arguments or {}).get("content")
+                     or (arguments or {}).get("summary")
+                     or (arguments or {}).get("name") or "").strip()
+        if needle and st.get("exists"):
+            st["needle_present"] = needle[:24] in _read_text(p)
+        return st
     except Exception:
         return {}
 
 
 def readback(tool_name: str, arguments: dict[str, Any] | None = None,
              output: str = "", before: dict | None = None) -> dict[str, Any]:
-    """独立只读回读写类工具的载体，核对副作用是否发生（含"确有变化"检查）。"""
+    """独立只读回读，精确区分：新建成功 / 幂等已有 / 未见变化 / 未命中。
+
+    T2(0608)：`idempotent_existing` 表示写前已存在同内容且载体未变（合法幂等，
+    非失败）；`effect_missing` 表示本次未产生可核对变化。
+    """
     name = _norm(tool_name)
     args = dict(arguments or {})
     carrier = _WRITE_CARRIERS.get(name, "")
@@ -102,11 +114,18 @@ def readback(tool_name: str, arguments: dict[str, Any] | None = None,
     try:
         path = _carrier_path(carrier)
         if path is not None:
-            after = _file_state(path)
-            if before is not None and not _changed(before, after):
+            changed = True
+            if before:
+                changed = _changed(before, _file_state(path))
+            body = _read_text(path)
+            present = bool(needle) and needle[:24] in body
+            if present and before and not changed and before.get("needle_present"):
+                return {"status": "idempotent_existing", "carrier": carrier,
+                        "detail": "写前已存在同内容且载体未变（合法幂等）",
+                        "action": "noop", "effect_id": ""}
+            if not changed:
                 return {"status": "effect_missing", "carrier": carrier,
                         "detail": "载体未见变化（疑似本次未写入）"}
-            body = _read_text(path)
             return _verdict(body, needle, carrier)
         if carrier == "kb_db":
             import backend.yuanheng_kb as kb

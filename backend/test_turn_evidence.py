@@ -76,6 +76,12 @@ class ReadbackTest(unittest.TestCase):
         r = te.readback("diary.write", {"content": "老爹怕冷，空调别太低"}, before=before)
         self.assertEqual(r["status"], "verified")
 
+    def test_readback_idempotent_existing(self):
+        st.DIARY_FILE.write_text("已有：老爹怕冷（旧）", encoding="utf-8")
+        before = te.carrier_state("diary.write", {"content": "老爹怕冷"})
+        r = te.readback("diary.write", {"content": "老爹怕冷"}, before=before)
+        self.assertEqual(r["status"], "idempotent_existing")
+
     def test_summarize_hides_raw_args(self):
         class U:
             name = "diary.write"
