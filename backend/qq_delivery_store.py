@@ -100,6 +100,38 @@ def claim_due(con: sqlite3.Connection, owner: str, *, now: float | None = None,
         raise
 
 
+def claim_by_id(con: sqlite3.Connection, delivery_id: str, owner: str, *,
+                now: float | None = None, lease_s: float = 90.0) -> dict:
+    """按 id 领取（供统一发送适配器；仍有租约与 epoch）。"""
+    now = time.time() if now is None else now
+    con.execute("BEGIN IMMEDIATE")
+    try:
+        row = con.execute("SELECT lease_epoch,state FROM deliveries WHERE delivery_id=?",
+                          (delivery_id,)).fetchone()
+        if not row or row[1] not in ("queued", "retryable"):
+            con.rollback()
+            return {}
+        con.execute(
+            "UPDATE deliveries SET state='sending', lease_owner=?, lease_epoch=lease_epoch+1, "
+            "lease_until=?, submission_marker=?, attempts=attempts+1 WHERE delivery_id=?",
+            (owner, now + lease_s, f"intent:{now}", delivery_id))
+        con.commit()
+        return {"delivery_id": delivery_id, "lease_epoch": row[0] + 1}
+    except Exception:
+        con.rollback()
+        raise
+
+
+def mark_rejected(con: sqlite3.Connection, delivery_id: str, *, lease_epoch: int,
+                  error_code: str = "") -> bool:
+    cur = con.execute(
+        "UPDATE deliveries SET state='rejected', last_error_code=?, lease_owner='', "
+        "lease_until=NULL WHERE delivery_id=? AND lease_epoch=? AND state='sending'",
+        (error_code, delivery_id, lease_epoch))
+    con.commit()
+    return cur.rowcount == 1
+
+
 def mark_confirmed(con: sqlite3.Connection, delivery_id: str, *, lease_epoch: int,
                    remote_message_id: str = "", ack_ref: str = "") -> bool:
     cur = con.execute(
