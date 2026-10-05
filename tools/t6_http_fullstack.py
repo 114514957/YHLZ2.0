@@ -1,8 +1,8 @@
-"""T6：真实 UI/HTTP 整机——真实 console HTTP 服务 + /talk SSE + 现有 Gemma。
+"""T6/段5：真实 UI/HTTP 整机——增量消费 SSE（首字/到达时间/完整拼接核对）。
 
-- 真实：`make_console_server`/`ConsoleHandler`/`/talk` 路由/SSE 事件。
-- 隔离：临时沙箱载体 + 临时 memstore + 独立 runtime（不起生产 daemon、不碰真实会话）。
-- 验证：SSE 事件序列（state/thinking → delta* → turn_done → idle）+ 答案 + 工具数。
+- 增量：按行消费 `text/event-stream`，记录每个事件的**到达单调时间**；
+- 核对：**拼接(deltas) == turn_done 文本**（合成数据）；工具轮标"核验后发布"；
+- 模板残片定位：打印拼接全文，检查是否含 `<|turn>` 类 marker 及其位置。
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ ensure_env_loaded()
 
 from tools.persona_regression import _restore_writes, _sandbox_writes  # noqa: E402
 
-tmp = pathlib.Path(tempfile.mkdtemp(prefix="t6_http_"))
+tmp = pathlib.Path(tempfile.mkdtemp(prefix="t6_http2_"))
 saved = _sandbox_writes(tmp)
 
 from backend.console_server import make_console_server  # noqa: E402
@@ -35,15 +35,12 @@ import asyncio  # noqa: E402
 
 
 class IsoRuntime:
-    """独立 runtime 适配（真实 HTTP 服务调用它；载体全临时）。"""
-
     def __init__(self):
         self._sessions = {}
 
     def _session(self, key="console"):
         if key not in self._sessions:
-            mem = TargetMemoryService(db_path=tmp / "mem.db",
-                                      kw_index=KeywordIndex(tmp / "kw.db"))
+            mem = TargetMemoryService(db_path=tmp / "mem.db", kw_index=KeywordIndex(tmp / "kw.db"))
             mem._auto_adjudicate = lambda item: None  # type: ignore[method-assign]
             mem._auto_link_causal = lambda item: None  # type: ignore[method-assign]
             self._sessions[key] = ConversationSession(memory=mem, channel=key)
@@ -53,7 +50,6 @@ class IsoRuntime:
         s = self._session("console")
 
         async def run():
-            # 同真 daemon：把 on_delta 交给会话，启用真实 token 流式
             return await s.run_turn(text, on_delta=on_delta)
 
         return asyncio.run(run())
@@ -62,43 +58,54 @@ class IsoRuntime:
         return {"status": "ok"}
 
 
-PORT = 18421
-rt = IsoRuntime()
-srv = make_console_server(PORT, "127.0.0.1", rt)
+PORT = 18422
+srv = make_console_server(PORT, "127.0.0.1", IsoRuntime())
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 time.sleep(0.3)
-print(f"HTTP server on 127.0.0.1:{PORT}")
 
 results = []
 for text in ("现在几点了？", "在吗？"):
     conn = http.client.HTTPConnection("127.0.0.1", PORT, timeout=180)
-    body = json.dumps({"text": text})
-    conn.request("POST", "/talk", body, {"Content-Type": "application/json"})
+    conn.request("POST", "/talk", json.dumps({"text": text}),
+                 {"Content-Type": "application/json"})
     resp = conn.getresponse()
-    raw = resp.read().decode("utf-8", "replace")
+    t0 = time.monotonic()
     events = []
-    for line in raw.splitlines():
-        if line.startswith("data: "):
-            try:
-                events.append(json.loads(line[6:]))
-            except Exception:
-                pass
-    kinds = [e.get("type") for e in events]
-    done = next((e for e in events if e.get("type") == "turn_done"), {})
-    results.append({"q": text, "status": resp.status, "events": kinds,
-                    "answer": str(done.get("text", ""))[:80],
-                    "tool_uses": done.get("tool_uses")})
-    print(f"\nQ: {text}")
-    print(f"  HTTP {resp.status} | SSE 事件: {kinds}")
-    print(f"  turn_done: text={str(done.get('text',''))[:60]!r} tool_uses={done.get('tool_uses')}")
+    for raw in resp:  # 增量按行消费
+        t = round(time.monotonic() - t0, 3)
+        line = raw.decode("utf-8", "replace").strip()
+        if not line.startswith("data: "):
+            continue
+        try:
+            ev = json.loads(line[6:])
+        except Exception:
+            continue
+        ev["_t"] = t
+        events.append(ev)
     conn.close()
+
+    deltas = [e for e in events if e.get("type") == "delta"]
+    assembled = "".join(str(e.get("delta", "")) for e in deltas)
+    done = next((e for e in events if e.get("type") == "turn_done"), {})
+    done_text = str(done.get("text", ""))
+    first_delta_t = deltas[0]["_t"] if deltas else None
+    last_t = events[-1]["_t"] if events else None
+    has_marker = "<|turn" in assembled or "<|turn" in done_text
+    rec = {"q": text, "n_delta": len(deltas), "first_delta_t": first_delta_t,
+           "last_event_t": last_t, "assembled_eq_done": assembled.strip() == done_text.strip(),
+           "tool_uses": done.get("tool_uses"), "has_turn_marker": has_marker,
+           "assembled_head": assembled[:90]}
+    results.append(rec)
+    print(f"\nQ: {text} | HTTP {resp.status}")
+    print(f"  deltas={len(deltas)} 首段@{first_delta_t}s 末事件@{last_t}s")
+    print(f"  拼接==turn_done: {rec['assembled_eq_done']} | tool_uses={done.get('tool_uses')}")
+    print(f"  含模板marker: {has_marker}")
+    print(f"  拼接全文: {assembled[:120]!r}")
 
 srv.shutdown()
 _restore_writes(saved)
-
-out = pathlib.Path("artifacts/nonvoice_next_stage/t6_http_fullstack.json")
+out = pathlib.Path("artifacts/nonvoice_next_stage/t6_http_incremental.json")
 out.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-ok = all(r["status"] == 200 and "turn_done" in r["events"] and r["answer"]
-         and r["events"].count("delta") > 0 for r in results)
+ok = all(r["n_delta"] > 0 and r["assembled_eq_done"] for r in results)
 print("\nVERDICT:", "PASS" if ok else "CHECK", "| ->", out)
 raise SystemExit(0 if ok else 1)
