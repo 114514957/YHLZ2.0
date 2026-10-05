@@ -10,9 +10,12 @@
 """
 from __future__ import annotations
 
+import pathlib
 import sqlite3
 import time
 import uuid
+
+DEFAULT_DB = pathlib.Path(__file__).resolve().parent.parent / "cache" / "qq_deliveries.db"
 
 STATES = ("queued", "sending", "confirmed", "rejected", "retryable", "unknown", "expired")
 
