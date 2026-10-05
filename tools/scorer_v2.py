@@ -106,6 +106,28 @@ def classify_tool_item(entry: dict, tools: list, answer: str) -> dict:
     return {**base, "class": "4_not_confirmed", "detail": "未调用期望工具"}
 
 
+def rejudge_items(payload: dict) -> list:
+    """G2（0637）：对含结构化字段的 answers（items 格式）做语义重判。
+
+    - 工具题 → `classify_result`（结构化类）；
+    - 人格/关系题 → `semantic_pending`（**需人工语义评审**，不用关键词冒充）。
+    """
+    bank = {e["id"]: e for e in pb.PERSONA_BANK}
+    rows = []
+    for it in payload.get("items", []):
+        e = bank.get(it.get("id"))
+        if not e:
+            continue
+        old_ok, _ = pb.verify(e, it.get("answer", ""), it.get("tools") or [])
+        row = {"id": it["id"], "cat": it.get("cat"), "old_ok": bool(old_ok)}
+        if e.get("expect_any_tool"):
+            row.update(classify_result(e, it))
+        else:
+            row["class"] = "semantic_pending"
+        rows.append(row)
+    return rows
+
+
 def score_round(payload: dict) -> dict:
     """对 persona_regression round 文件（含结构化字段）做 v3 分类。"""
     bank = {e["id"]: e for e in pb.PERSONA_BANK}
