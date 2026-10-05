@@ -36,6 +36,8 @@ _BIN_SIGNATURES = (b"\x00", b"\xff\xd8\xff", b"PK\x03\x04", b"\x89PNG")
 # R3(a, ledger 0607): 可选只读根限制。None = 不限制（生产默认不变）；
 # 评测沙箱把它设为临时根，使 file.read/file.list 可在隔离面下安全提供。
 ALLOWED_ROOTS: Optional[list] = None
+# R3(a): 可选允许主机（None=不限制）。评测沙箱设为 {"127.0.0.1"} 以隔离外网。
+WEB_ALLOWED_HOSTS: Optional[set] = None
 
 
 def _within_allowed(p: Path) -> bool:
@@ -217,6 +219,12 @@ async def web_fetch(url: str, max_chars: int = 4000) -> str:
         return "仅支持 http/https 链接"
     if _host_blocked(url):
         return "拒绝访问：该域名在拦截名单"
+    if WEB_ALLOWED_HOSTS:
+        from urllib.parse import urlparse
+
+        host = urlparse(url).hostname or ""
+        if host not in WEB_ALLOWED_HOSTS:
+            return "拒绝访问：主机不在允许列表（评测隔离）"
     import httpx
 
     raw = b""

@@ -165,8 +165,9 @@ SAFE_EVAL_TOOLS = frozenset({
 # Keep the broad constant above for policy-manifest compatibility and tests.
 LIVE_SAFE_TOOLS = frozenset({"system_time", "memory_recall", "kb_query", "diary_list",
                              "memory_save", "diary_write", "task_plan", "schedule_plan", "kb_add",
-                             # R3(a, ledger 0607): 沙箱化后的只读工具（file 根/台账/KB 均已重定向）
-                             "file_read", "file_list", "ledger_search", "skill_search"})
+                             # R3(a, ledger 0607/0608): 沙箱化后的只读工具（file 根/台账/KB/web 均已隔离）
+                             "file_read", "file_list", "ledger_search", "skill_search",
+                             "web_search", "web_fetch"})
 # 评测期禁止的兜底：8081 一旦不可用，绝不静默换成 ollama 的 qwen——
 # 那会让分数变成"另一个模型的分数"却记在元亨头上。指向死端口 = 响亮失败。
 DEAD_FALLBACK = "http://127.0.0.1:9/v1/chat/completions"
@@ -221,6 +222,18 @@ def _sandbox_writes(tmp: pathlib.Path) -> dict:
     saved["ALLOWED_ROOTS"] = ta.ALLOWED_ROOTS
     st.LEDGER = ledger_file
     ta.ALLOWED_ROOTS = [fs_root]
+    # R3(a): web 桩——搜索走合成结果、fetch 只允许本机，隔离外网。
+    import backend.search_crawler as sc
+
+    saved["bing_search"] = sc.bing_search
+    saved["WEB_ALLOWED_HOSTS"] = ta.WEB_ALLOWED_HOSTS
+
+    def _stub_bing(q, limit=5):
+        return [{"title": f"合成搜索结果：{q}", "url": "http://127.0.0.1/synthetic",
+                 "snippet": "评测沙箱合成结果（非真实网络）。"}]
+
+    sc.bing_search = _stub_bing
+    ta.WEB_ALLOWED_HOSTS = {"127.0.0.1"}
     return saved
 
 
@@ -248,6 +261,10 @@ def _restore_writes(saved: dict) -> None:
 
     st.LEDGER = saved["LEDGER"]
     ta.ALLOWED_ROOTS = saved["ALLOWED_ROOTS"]
+    import backend.search_crawler as sc
+
+    sc.bing_search = saved["bing_search"]
+    ta.WEB_ALLOWED_HOSTS = saved["WEB_ALLOWED_HOSTS"]
 
 
 def _kill_llm_fallback(dead_url: str = DEAD_FALLBACK) -> str:
