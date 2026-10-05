@@ -1,4 +1,4 @@
-"""T5 接线"防花瓶"测试（ledger 0614）：证明后台 caller 真的经统一入口。
+﻿"""T5 接线"防花瓶"测试（ledger 0614）：证明后台 caller 真的经统一入口。
 
 - 反射/社区/QQ抽取的 `_local_llm()/build_llm_turn()` 返回的 provider 必须
   在 bg_scheduler 计数里出现（kind 正确）——否则接线是花瓶。
@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import unittest
 from unittest.mock import patch
@@ -28,6 +29,14 @@ class WiringTest(unittest.TestCase):
         bg.reset_for_tests()
         refl._LLM = None
         comm._LLM = None
+        # 路由测试不测策略门：临时清掉训练标记（离线套件会设置它们）
+        self._saved_env = {k: os.environ.pop(k, None)
+                           for k in ("YHLZ_TRAINING_ACTIVE", "YHLZ_FINETUNE_ACTIVE")}
+
+    def tearDown(self):
+        for k, v in self._saved_env.items():
+            if v is not None:
+                os.environ[k] = v
 
     def test_reflection_routes_through_scheduler(self):
         with patch("backend.target_orchestrator.build_openai_compatible_llm_turn",

@@ -82,6 +82,19 @@ class ReadbackTest(unittest.TestCase):
         r = te.readback("diary.write", {"content": "老爹怕冷"}, before=before)
         self.assertEqual(r["status"], "idempotent_existing")
 
+    def test_schedule_readback_by_id(self):
+        sched.SCHED_FILE.write_text(
+            '{"plans":[{"id":"p1","name":"早课","time":"09:30"}]}', encoding="utf-8")
+        r = te.readback("schedule.plan", {"action": "add", "name": "早课"})
+        self.assertEqual(r["status"], "verified")
+        self.assertEqual(r["effect_id"], "p1")
+
+    def test_diary_entry_count_version(self):
+        st.DIARY_FILE.write_text("a\n\nb\n", encoding="utf-8")
+        r = te.readback("diary.write", {"content": "b"})
+        self.assertEqual(r["status"], "verified")
+        self.assertEqual(r["version"], "entries:2")
+
     def test_kb_exact_not_fuzzy(self):
         kb.kb_add(summary="R1 精确条目测试", category="tech")
         self.assertEqual(te.readback("kb.add", {"summary": "R1 精确条目测试"})["status"],

@@ -34,7 +34,14 @@ def _local_llm():
             reasoning_effort="none")
         from backend.bg_scheduler import wrap_llm_turn
 
-        _LLM = wrap_llm_turn(_LLM, kind="communities", endpoint="8081")
+        def _policy_ok():
+            import os
+
+            return not (os.environ.get("YHLZ_TRAINING_ACTIVE")
+                        or os.environ.get("YHLZ_FINETUNE_ACTIVE"))
+
+        _LLM = wrap_llm_turn(_LLM, kind="communities", endpoint="8081",
+                             policy_check=_policy_ok)
     return _LLM
 
 

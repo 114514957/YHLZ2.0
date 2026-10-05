@@ -154,6 +154,30 @@ def readback(tool_name: str, arguments: dict[str, Any] | None = None,
             if not changed:
                 return {**_struct(carrier, "effect_missing", "unknown", needle, ver),
                         "detail": "载体未见变化（疑似本次未写入）"}
+            if present and carrier == "schedule_file":
+                # 段2（0636）：schedule **按 ID/name** 核验（非纯文本命中）
+                import json as _json
+
+                try:
+                    _data = _json.loads(body)
+                except Exception:
+                    _data = {}
+                _plans = _data.get("plans") if isinstance(_data, dict) else None
+                _hit = None
+                for _p in (_plans or []):
+                    if isinstance(_p, dict) and needle and needle[:24] in str(_p.get("name", "")):
+                        _hit = _p
+                        break
+                if _hit is not None:
+                    _pid = str(_hit.get("id") or _hit.get("name") or "")
+                    return {**_struct(carrier, "verified", "created", needle,
+                                      {"version": _pid, "effect_id": _pid}),
+                            "detail": f"schedule 命中 id={_pid}"}
+            if present and carrier == "diary_file":
+                _n = len([ln for ln in body.splitlines() if ln.strip()])
+                return {**_struct(carrier, "verified", "created", needle,
+                                  {"version": f"entries:{_n}"}),
+                        "detail": f"diary 条目数={_n}"}
             if present:
                 return {**_struct(carrier, "verified", "created", needle, ver),
                         "detail": "载体命中"}
