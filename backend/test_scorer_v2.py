@@ -110,12 +110,25 @@ class ScorerV3Test(unittest.TestCase):
             policy_trace=[{"allowed_tools": ["web_search"]}]))
         self.assertEqual(r["class"], "unsupported_evidence")
 
-    def test_expected_anchors_partial_still_hit(self):
+    def test_expected_anchors_partial_is_partial_not_hit(self):
         r = classify_result(E("file_read"), R(
             policy_trace=[{"allowed_tools": ["file_read"]}], tools=["file_read"],
             tool_observations=[{"name": "file_read", "ok": True,
                                 "expected_anchors": {"A": False, "B": True}}]))
-        self.assertEqual(r["class"], "read_hit")
+        self.assertEqual(r["class"], "read_partial")
+        self.assertNotIn(r["class"], {"read_hit"})
+
+    def test_read_no_anchor_is_not_hit(self):
+        r = classify_result(E("ledger_search"), R(
+            policy_trace=[{"allowed_tools": ["ledger_search"]}], tools=["ledger_search"],
+            tool_observations=[{"name": "ledger_search", "ok": True}]))
+        self.assertEqual(r["class"], "read_called_no_anchor")
+        self.assertNotIn(r["class"], {"read_hit"})
+
+    def test_allowed_missing_is_evidence_gap(self):
+        r = classify_result(E("file_read"), R(tools=["file_read"],
+                            tool_observations=[{"name": "file_read", "ok": True}]))
+        self.assertEqual(r["class"], "policy_evidence_missing")
 
 
 if __name__ == "__main__":

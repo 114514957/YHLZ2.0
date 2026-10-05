@@ -47,7 +47,10 @@ def classify_result(entry: dict, rec: dict) -> dict:
             "tools": tools, "evidence_status": ev,
             "assessment": ea.get("status"), "assessment_reason": ea.get("reason")}
 
-    # 1) 期望工具不在本评测面 → 结构性不可通过（评测缺口）
+    # 1) 证据缺失/期望工具不可提供（0622 §3.1：不能漏判）
+    if want and not allowed:
+        return {**base, "class": "policy_evidence_missing",
+                "detail": "allowed_tools 未捕获，无法判定可提供性（证据缺口）"}
     if want and allowed and not (want & allowed):
         return {**base, "class": "not_offerable_in_harness",
                 "detail": "期望工具不在 allowed_tools（评测面缺口，非模型失败）"}
@@ -70,10 +73,15 @@ def classify_result(entry: dict, rec: dict) -> dict:
         for o in obs:
             anchors.update(o.get("expected_anchors") or {})
         if anchors:
+            if all(anchors.values()):
+                return {**base, "class": "read_hit", "detail": "读类全部锚点命中"}
             if any(anchors.values()):
-                return {**base, "class": "read_hit", "detail": "读类命中锚点"}
+                return {**base, "class": "read_partial",
+                        "detail": "读类仅部分锚点命中（不得计满分）"}
             return {**base, "class": "read_miss", "detail": "读类未命中锚点（空/错来源）"}
-        return {**base, "class": "read_hit", "detail": "读类工具已调用"}
+        # 0622 §3.1：无锚点证据时不得以"已调用"冒充命中
+        return {**base, "class": "read_called_no_anchor",
+                "detail": "读类工具已调用，但该用例无目标锚点（不做命中判定）"}
     # 3) 未调用
     if ev == "unavailable" or bool(UNAVAILABLE_RE.search(str(rec.get("answer") or ""))):
         return {**base, "class": "unavailable_not_checked", "detail": "未调（工具/面不可用）"}

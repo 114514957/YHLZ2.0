@@ -348,6 +348,7 @@ async def run_live(bank: list[dict], *, base_url: str,
     from tools.persona_live_safety import endpoint_process_evidence, adapter_api_evidence
     env["endpoint_process"] = endpoint_process_evidence(base_url)
     env["lora"] = env["endpoint_process"]["lora"]
+    env["effective_model"] = env["lora"] or "unknown"   # 0622 §3.1：不能凭文件名定版本
     env["expect_lora"] = expect_lora
     if expect_lora and env["lora"] != expect_lora:
         raise RuntimeError(
