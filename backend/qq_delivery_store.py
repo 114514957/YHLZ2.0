@@ -49,6 +49,7 @@ def connect(path) -> sqlite3.Connection:
     con = sqlite3.connect(str(path))
     con.execute("PRAGMA journal_mode=WAL")
     con.executescript(_SCHEMA)
+    con.commit()
     return con
 
 
