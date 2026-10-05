@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import uuid
@@ -98,12 +99,23 @@ def carrier_state(tool_name: str, arguments: dict[str, Any] | None = None) -> di
         return {}
 
 
+def _struct(carrier: str, status: str, action: str, needle: str, extra: dict | None = None) -> dict:
+    """T2(0610): 结构化效果字段（供统一发布/恢复路径使用）。"""
+    out = {"status": status, "carrier": carrier, "action": action,
+           "subject_ref": carrier,
+           "effect_id": (hashlib.sha256(needle[:24].encode("utf-8")).hexdigest()[:12]
+                         if needle else "")}
+    if extra:
+        out.update(extra)
+    return out
+
+
 def readback(tool_name: str, arguments: dict[str, Any] | None = None,
              output: str = "", before: dict | None = None) -> dict[str, Any]:
     """独立只读回读，精确区分：新建成功 / 幂等已有 / 未见变化 / 未命中。
 
-    T2(0608)：`idempotent_existing` 表示写前已存在同内容且载体未变（合法幂等，
-    非失败）；`effect_missing` 表示本次未产生可核对变化。
+    T2(0608/0610)：返回结构化字段 `action/subject_ref/effect_id/version` 供统一
+    发布与恢复路径使用；`idempotent_existing` 为合法幂等（非失败）。
     """
     name = _norm(tool_name)
     args = dict(arguments or {})
@@ -114,27 +126,32 @@ def readback(tool_name: str, arguments: dict[str, Any] | None = None,
     try:
         path = _carrier_path(carrier)
         if path is not None:
-            changed = True
-            if before:
-                changed = _changed(before, _file_state(path))
+            after = _file_state(path)
+            changed = _changed(before, after) if before else True
             body = _read_text(path)
             present = bool(needle) and needle[:24] in body
+            ver = {"version": f"size:{after.get('size')}"}
             if present and before and not changed and before.get("needle_present"):
-                return {"status": "idempotent_existing", "carrier": carrier,
-                        "detail": "写前已存在同内容且载体未变（合法幂等）",
-                        "action": "noop", "effect_id": ""}
+                return {**_struct(carrier, "idempotent_existing", "noop", needle, ver),
+                        "detail": "写前已存在同内容且载体未变（合法幂等）"}
             if not changed:
-                return {"status": "effect_missing", "carrier": carrier,
+                return {**_struct(carrier, "effect_missing", "unknown", needle, ver),
                         "detail": "载体未见变化（疑似本次未写入）"}
-            return _verdict(body, needle, carrier)
+            if present:
+                return {**_struct(carrier, "verified", "created", needle, ver),
+                        "detail": "载体命中"}
+            return {**_struct(carrier, "effect_missing", "unknown", needle, ver),
+                    "detail": "载体未读到该内容"}
         if carrier == "kb_db":
             import backend.yuanheng_kb as kb
             p = pathlib.Path(str(kb.DEFAULT_KB_DB))
             if not p.exists():
-                return {"status": "effect_missing", "carrier": carrier, "detail": "kb 库不存在"}
+                return {**_struct(carrier, "effect_missing", "unknown", needle),
+                        "detail": "kb 库不存在"}
             hits = kb.kb_query(query=needle[:24], limit=3)
-            return {"status": "verified" if hits else "effect_missing",
-                    "carrier": carrier, "detail": f"kb_query 命中 {len(hits)}"}
+            return {**_struct(carrier, "verified" if hits else "effect_missing",
+                                    "created" if hits else "unknown", needle),
+                    "detail": f"kb_query 命中 {len(hits)}"}
         return {"status": "unsupported", "carrier": carrier,
                 "detail": "需会话级 carrier 引用（R4 载体收口时接入）"}
     except Exception as exc:  # noqa: BLE001
