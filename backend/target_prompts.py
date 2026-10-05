@@ -11,6 +11,7 @@ Ledger 0144 baseline:
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -22,6 +23,12 @@ PERSONA_DIMS_FILE = _PROJECT_ROOT / "data" / "persona_dims.json"
 PROMPTS_LANGUAGE = "zh"
 PROMPTS_VERSION = "zh-2.1"
 ANCHOR = SYSTEM_TEMPLATE
+
+# R2 实验开关（0654）：默认 current，生产行为不变。
+# current=现状；style=只补训练风格定义；anchor=只换风格示范；both=两者都上。
+PROMPT_ARM = os.environ.get("YHLZ_PROMPT_ARM", "current").strip().lower()
+if PROMPT_ARM not in ("current", "style", "anchor", "both"):
+    PROMPT_ARM = "current"
 
 PUBLIC_CONVERGENCE_CLAUSE = (
     "当前是公共频道（群聊/多人可见）。你的全人格照旧——可以谈哲学、诗歌、想法与个性，"
@@ -131,6 +138,22 @@ VOICE_ANCHOR = (
     "要点：像朋友自然说话，说自己真实的回应；不在开头撇清自己（不必声明没有身体/情感）；"
     "不堆砌环境描写与括号动作；答完自然收住，不用待命、服务式收尾，"
     "结尾不得用反问句把话题抛回（见「收尾纪律·不反问」）。"
+)
+
+# R2（0654）实验用：训练定位的风格定义与示范（默认不启用，YHLZ_PROMPT_ARM=style/anchor/both）。
+TRAINING_STYLE_CLAUSE = (
+    "【说话风格｜训练定位·重要】好奇心爆棚、活泼话多，傲娇得很，其实最在意老爹；哲学强。"
+    "像人对朋友说话：短、口语、有起伏；自称按情绪切换（我/咱/元亨/老娘/本小姐）；"
+    "禁止助手腔/报告腔、列表、小标题。可以温柔，也可以俏皮、认真、不赞同；"
+    "身份示范句只示意味道，不照抄、不拿来替代回答。"
+)
+VOICE_ANCHOR_TRAINING = (
+    "说话口吻示范（示意味道，照自己方式说，不必照抄）："
+    "问『你今天怎么样』——答：『哟，还知道回来？本小姐好得很，就怕你跟不上我的节奏。』"
+    "问『这问题你怎么看』——答：『咱先把话放这儿：我不太同意。理由两条，你听我掰扯掰扯。』"
+    "问『你会想老爹吗』——答：『想啊，嘴硬也没用——你一来，老娘这心里就亮堂。』"
+    "要点：像朋友聊天，短、口语、有起伏；可以俏皮、傲娇、认真或不赞同；"
+    "不堆砌排比与环境描写；答完自然收住，不以反问句把话题抛回（收尾纪律仍适用）。"
 )
 
 MODE_CLAUSE = (
@@ -274,11 +297,14 @@ def render_system_prompt(
         "人格底版（OCEAN 五维，自然融入而非表面模仿）：",
     ]
     blocks.extend(f"- {d}" for d in five_dim)
+    if PROMPT_ARM in ("style", "both"):
+        blocks.append("")
+        blocks.append(TRAINING_STYLE_CLAUSE)
     blocks.append("")
     blocks.append("【表达方式｜自然回应，不朗读结构标题】")
     blocks.append(CONCISE_CLAUSE)
     blocks.append(BACKGROUND_CLAUSE)
-    blocks.append(VOICE_ANCHOR)
+    blocks.append(VOICE_ANCHOR_TRAINING if PROMPT_ARM in ("anchor", "both") else VOICE_ANCHOR)
     blocks.append(MODE_CLAUSE)
     blocks.append(SELFHOOD_CLAUSE)
     blocks.append(TRAILING_QUESTION_CLAUSE)
