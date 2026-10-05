@@ -82,6 +82,18 @@ class ReadbackTest(unittest.TestCase):
         r = te.readback("diary.write", {"content": "老爹怕冷"}, before=before)
         self.assertEqual(r["status"], "idempotent_existing")
 
+    def test_memory_probe_verified_missing_and_unbound(self):
+        te.set_memory_probe(None)
+        self.assertEqual(te.readback("memory_save", {"content": "x"})["status"], "unsupported")
+        te.set_memory_probe(lambda needle: {"found": True, "id": "m1", "version": 2})
+        ok = te.readback("memory_save", {"content": "老爹怕冷"})
+        self.assertEqual(ok["status"], "verified")
+        self.assertEqual(ok["effect_id"] != "", True)
+        te.set_memory_probe(lambda needle: {"found": False})
+        self.assertEqual(te.readback("memory_save", {"content": "nope"})["status"],
+                         "effect_missing")
+        te.set_memory_probe(None)
+
     def test_summarize_hides_raw_args(self):
         class U:
             name = "diary.write"

@@ -99,6 +99,15 @@ def carrier_state(tool_name: str, arguments: dict[str, Any] | None = None) -> di
         return {}
 
 
+_MEMORY_PROBE: Any = None
+
+
+def set_memory_probe(fn: Any) -> None:
+    """会话绑定：注册 memory 只读探测（fn(needle) -> {"found","id","version"}）。"""
+    global _MEMORY_PROBE
+    _MEMORY_PROBE = fn
+
+
 def _struct(carrier: str, status: str, action: str, needle: str, extra: dict | None = None) -> dict:
     """T2(0610): 结构化效果字段（供统一发布/恢复路径使用）。"""
     out = {"status": status, "carrier": carrier, "action": action,
@@ -152,6 +161,17 @@ def readback(tool_name: str, arguments: dict[str, Any] | None = None,
             return {**_struct(carrier, "verified" if hits else "effect_missing",
                                     "created" if hits else "unknown", needle),
                     "detail": f"kb_query 命中 {len(hits)}"}
+        if carrier == "memstore_db":
+            if _MEMORY_PROBE is None:
+                return {**_struct(carrier, "unsupported", "unknown", needle),
+                        "detail": "未绑定会话 memory carrier（R4 收口）"}
+            r = _MEMORY_PROBE(needle) or {}
+            if r.get("found"):
+                return {**_struct(carrier, "verified", "created", needle,
+                                  {"version": str(r.get("version", ""))}),
+                        "detail": f"l2 命中 id={r.get('id', '')}"}
+            return {**_struct(carrier, "effect_missing", "unknown", needle),
+                    "detail": "l2 未命中本次内容"}
         return {"status": "unsupported", "carrier": carrier,
                 "detail": "需会话级 carrier 引用（R4 载体收口时接入）"}
     except Exception as exc:  # noqa: BLE001
