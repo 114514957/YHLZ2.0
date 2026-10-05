@@ -13,9 +13,14 @@
 from __future__ import annotations
 
 import hashlib
+import pathlib
 import sqlite3
 import time
 import uuid
+
+DEFAULT_DB = pathlib.Path(__file__).resolve().parent.parent / "cache" / "review_jobs.db"
+# 离线测试套件可置 False（避免连生产库触发评测守卫）；生产/评测沙箱保持 True。
+ENABLED = True
 
 STATES = ("pending", "leased", "extracting", "adjudicating", "committing",
           "done", "retry_wait", "needs_review", "validated_empty")
@@ -90,6 +95,28 @@ def enqueue_window(con, *, channel: str, principal_id: str = "", session_id: str
         row = con.execute("SELECT job_id,state FROM review_jobs WHERE idempotency_key=?",
                           (key,)).fetchone()
         return {"ok": True, "job_id": row[0], "state": row[1], "idempotent": True}
+
+
+def claim_by_id(con, job_id: str, owner: str, *, now: float | None = None,
+                lease_s: float = 90.0) -> dict:
+    """按 id 领取（供会话复盘真实入口）。"""
+    now = time.time() if now is None else now
+    con.execute("BEGIN IMMEDIATE")
+    try:
+        row = con.execute("SELECT lease_epoch,state FROM review_jobs WHERE job_id=?",
+                          (job_id,)).fetchone()
+        if not row or row[1] not in ("pending", "retry_wait"):
+            con.rollback()
+            return {}
+        con.execute(
+            "UPDATE review_jobs SET state='leased', lease_owner=?, lease_epoch=lease_epoch+1, "
+            "lease_until=?, attempts=attempts+1, updated_at=? WHERE job_id=?",
+            (owner, now + lease_s, now, job_id))
+        con.commit()
+        return {"job_id": job_id, "lease_epoch": row[0] + 1}
+    except Exception:
+        con.rollback()
+        raise
 
 
 def claim_due(con, owner: str, *, now: float | None = None, lease_s: float = 90.0,

@@ -972,6 +972,33 @@ class ConversationSession:
         review_turn = self._turn_count
         recent = [dict(m) for m in self.history[-16:]]
         out = {"reason": reason, "review_turn": review_turn, "acknowledged": False}
+        # T4 真实入口（0630）：冻结窗口 → 持久 review job（幂等）→ 短事务提交水位
+        _rcon = None
+        _rjob = ""
+        _rep = 0
+        try:
+            from backend import review_queue_store as _rq
+
+            if not getattr(_rq, "ENABLED", True):
+                raise RuntimeError("review store disabled")
+            _rcon = _rq.connect(_rq.DEFAULT_DB)
+            # T4 真实入口（0630）：首次复盘时从持久水位恢复检查点（重启续跑）
+            if not self._last_reviewed:
+                _wm = _rq.watermark(_rcon, channel=self.channel,
+                                    principal_id=("owner" if self._is_owner() else "guest"),
+                                    session_id="s1")
+                if _wm:
+                    self._last_reviewed = int(_wm)
+            _enq = _rq.enqueue_window(
+                _rcon, channel=self.channel,
+                principal_id=("owner" if self._is_owner() else "guest"),
+                session_id="s1", start_seq=int(self._last_reviewed),
+                end_seq=int(review_turn))
+            _rjob = _enq["job_id"]
+            _c = _rq.claim_by_id(_rcon, _rjob, "session")
+            _rep = int(_c.get("lease_epoch") or 0)
+        except Exception:
+            _rcon = None
         successful = True
         try:
             try:
@@ -1016,14 +1043,36 @@ class ConversationSession:
                 self._review_failures = 0
                 self._review_retry_at = 0.0
                 out["acknowledged"] = True
+                if _rcon is not None and _rjob:
+                    try:
+                        from backend import review_queue_store as _rq
+
+                        _rq.commit_review(_rcon, _rjob, lease_epoch=_rep,
+                                          committed_seq=review_turn)
+                    except Exception:
+                        pass
             else:
                 self._review_failures += 1
                 delay = min(300, 5 * 2 ** min(self._review_failures - 1, 6))
                 self._review_retry_at = time.monotonic() + delay
                 out["retry_after_s"] = delay
+                if _rcon is not None and _rjob:
+                    try:
+                        from backend import review_queue_store as _rq
+
+                        _rq.schedule_retry(_rcon, _rjob, lease_epoch=_rep,
+                                           error_code="review_failed",
+                                           retry_at=time.time() + delay)
+                    except Exception:
+                        pass
             return out
         finally:
             self._reviewing = False
+            try:
+                if _rcon is not None:
+                    _rcon.close()
+            except Exception:
+                pass
 
 
     # ---------- persistence (message-level, cache/sessions) ----------

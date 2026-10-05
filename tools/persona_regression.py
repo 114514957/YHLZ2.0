@@ -234,6 +234,11 @@ def _sandbox_writes(tmp: pathlib.Path) -> dict:
 
     sc.bing_search = _stub_bing
     ta.WEB_ALLOWED_HOSTS = {"127.0.0.1"}
+    # T4(0630)：复盘 job 库也纳入沙箱（session 会连它，守卫要求沙箱路径）
+    import backend.review_queue_store as rq
+
+    saved["REVIEW_DB"] = rq.DEFAULT_DB
+    rq.DEFAULT_DB = tmp / "review_jobs.db"
     return saved
 
 
@@ -265,6 +270,9 @@ def _restore_writes(saved: dict) -> None:
 
     sc.bing_search = saved["bing_search"]
     ta.WEB_ALLOWED_HOSTS = saved["WEB_ALLOWED_HOSTS"]
+    import backend.review_queue_store as rq
+
+    rq.DEFAULT_DB = saved["REVIEW_DB"]
 
 
 def _kill_llm_fallback(dead_url: str = DEAD_FALLBACK) -> str:
