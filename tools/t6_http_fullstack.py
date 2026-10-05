@@ -53,17 +53,8 @@ class IsoRuntime:
         s = self._session("console")
 
         async def run():
-            streamed = []
-
-            def _d(chunk):
-                streamed.append(chunk)
-                on_delta(chunk)
-
-            # 若会话支持流式回调则用之；否则退回普通 run_turn
-            try:
-                return await s.run_turn(text)
-            finally:
-                pass
+            # 同真 daemon：把 on_delta 交给会话，启用真实 token 流式
+            return await s.run_turn(text, on_delta=on_delta)
 
         return asyncio.run(run())
 
@@ -107,6 +98,7 @@ _restore_writes(saved)
 
 out = pathlib.Path("artifacts/nonvoice_next_stage/t6_http_fullstack.json")
 out.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-ok = all(r["status"] == 200 and "turn_done" in r["events"] and r["answer"] for r in results)
+ok = all(r["status"] == 200 and "turn_done" in r["events"] and r["answer"]
+         and r["events"].count("delta") > 0 for r in results)
 print("\nVERDICT:", "PASS" if ok else "CHECK", "| ->", out)
 raise SystemExit(0 if ok else 1)
