@@ -420,6 +420,7 @@ async def run_live(bank: list[dict], *, base_url: str,
                     anchors = turn_entry.get("expected_read_anchors", [])
                     tool_observations.append({"name": name, "ok": bool(result.get("ok")),
                         "output_sha256": digest(output),
+                        "output_head": output[:120],   # 0639：限长诊断（t09 定性用）
                         "error_code": str(result.get("error") or "").split(":", 1)[0][:64],
                         "expected_anchors": {anchor: anchor in output for anchor in anchors}})
                     return result
