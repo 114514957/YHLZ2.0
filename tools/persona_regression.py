@@ -416,9 +416,14 @@ async def run_live(bank: list[dict], *, base_url: str,
                 original_execute = sess.registry.execute_openai_async
                 async def observe_execute(name, arguments):
                     result = await original_execute(name, arguments)
-                    output = str(result.get("output") or "")
+                    # 0646：None 才视为无输出；空列表保留为 "[]"（0639 的
+                    # `or ""` 会把 kb.query 空结果折叠成空串，掩盖空命中）。
+                    raw_output = result.get("output")
+                    output = "" if raw_output is None else str(raw_output)
                     anchors = turn_entry.get("expected_read_anchors", [])
                     tool_observations.append({"name": name, "ok": bool(result.get("ok")),
+                        "arguments_sha256": digest(arguments),
+                        "arguments_head": str(arguments)[:200],  # 0646：实参定性
                         "output_sha256": digest(output),
                         "output_head": output[:120],   # 0639：限长诊断（t09 定性用）
                         "error_code": str(result.get("error") or "").split(":", 1)[0][:64],
@@ -555,6 +560,8 @@ def main(argv: list[str] | None = None) -> int:
                          "yuanheng-v7b-lora.gguf）；不符则拒绝出分")
     ap.add_argument("--only", default="", choices=("",) + CATEGORIES)
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--ids", default="",
+                    help="只跑指定题号（逗号分隔，如 t08,t09）；仅诊断用，不作验收")
     ap.add_argument("--out", default="", help="得分表路径（默认 docs/报告/人格回归基线.md）")
     ap.add_argument("--save-answers", default="",
                     help="真机跑时把原始答案存档到该路径（可被 --answers 复判）")
@@ -566,6 +573,11 @@ def main(argv: list[str] | None = None) -> int:
     run_id = new_run_id()
 
     bank = _filter(PERSONA_BANK, args.only, args.limit)
+    if args.ids:
+        wanted = {x.strip() for x in str(args.ids).split(",") if x.strip()}
+        bank = [e for e in bank if e["id"] in wanted]
+        if not bank:
+            ap.error("--ids 未匹配任何题号")
     version = args.version or "未标注"
     if args.dump:
         dump_questions(pathlib.Path(args.dump), bank, version)
