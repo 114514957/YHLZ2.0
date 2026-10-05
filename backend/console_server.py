@@ -747,6 +747,20 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
     def console_do_GET(self):
         p = self.path.split("?", 1)[0]
+        if p == "/talk_result":
+            # 段5（0635）：断连后按 request_id **取结果**（不重放副作用）
+            import urllib.parse as _up
+
+            rid = (_up.parse_qs(_up.urlparse(self.path).query).get("request_id") or [""])[0]
+            from backend import talk_results as _tr
+
+            r = _tr.load(rid)
+            if r is None:
+                self._send_json(404, {"ok": False, "error": "unknown request_id",
+                                      "request_id": rid})
+            else:
+                self._send_json(200, {"ok": True, "request_id": rid, **r})
+            return
         if p.startswith("/live2d/"):
             self._serve_under("/live2d/", VENDOR_DIR)
             return
@@ -1854,19 +1868,24 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"{}")
             text = str(body.get("text", "")).strip()
+            request_id = str(body.get("request_id", "") or "")
         except Exception:
             self._send_json(400, {"error": "请求格式错误"})
             return
         if not text:
             self._send_json(400, {"error": "empty text"})
             return
+        if not request_id:  # 段5（0635）：客户端未带则服务端生成，供断连后取结果
+            import uuid as _uuid
+            request_id = _uuid.uuid4().hex[:16]
         _log("talk", text[:80])
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
         try:
-            self.wfile.write(_sse({"type": "state", "value": "thinking"}))
+            self.wfile.write(_sse({"type": "state", "value": "thinking",
+                                   "request_id": request_id}))
             self.wfile.flush()
 
             def on_delta(chunk: str) -> None:
@@ -1878,8 +1897,19 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
             info = self.runtime.console_turn_stream(text, on_delta)
             answer = str(info.get("answer", ""))
+            n_tools = len(info.get("tool_uses") or [])
+            # 段5：工具答复=**核验后发布**；普通回答=流式发布
+            published = "after_verification" if n_tools else "streamed"
+            try:
+                from backend import talk_results as _tr
+
+                _tr.store(request_id, {"answer": answer, "tool_uses": n_tools,
+                                       "published": published, "text": text[:200]})
+            except Exception:
+                pass
             self.wfile.write(_sse({"type": "turn_done", "text": answer,
-                                   "tool_uses": len(info.get("tool_uses") or [])}))
+                                   "tool_uses": n_tools, "request_id": request_id,
+                                   "published": published}))
             self.wfile.write(_sse({"type": "state", "value": "idle"}))
             self.wfile.flush()
         except Exception as exc:

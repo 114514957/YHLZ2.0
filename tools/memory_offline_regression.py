@@ -83,9 +83,11 @@ def main():
         from backend import target_scheduler_tools as tools, target_persona_loop as persona
         from backend import yuanheng_kb as kb, qq_delivery
         from backend import review_queue_store as _rq
+        from backend import talk_results as _tr
         from tools import qq_bot
         replacements=[(memory,'DEFAULT_DB',sandbox/'memstore'/'mem.db'),
           (_rq,'DEFAULT_DB',sandbox/'review_jobs.db'),
+          (_tr,'DIR',sandbox/'talk_results'),
           (kw,'DEFAULT_DB',sandbox/'kw.db'),(entry,'SESSIONS_DIR',sandbox/'sessions'),
           (growth_log,'GROWTH_FILE',sandbox/'growth.md'),(entity_graph,'DB_PATH',sandbox/'entities.db'),
           (intrinsic_drives,'DRIVES_FILE',sandbox/'drives.json'),
