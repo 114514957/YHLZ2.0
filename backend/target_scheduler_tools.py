@@ -968,7 +968,8 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="kb.query",
-            description="从知识库检索已学知识。回答技术类问题或想回顾学过的内容时用。",
+            description="从知识库检索已学知识。回答技术类问题或想回顾学过的内容时用。"
+                        "query 用短关键词（如「变调算法」），不要整句问句。",
             handler=lambda p: kb_query(
                 str(p.get("query", "")),
                 limit=int(p.get("limit", 6) or 6),

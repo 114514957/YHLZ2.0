@@ -14,6 +14,7 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
+from contextlib import contextmanager
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_KB_DB = _PROJECT_ROOT / "data" / "yuanheng_kb.db"
@@ -48,10 +49,17 @@ def _migrate(con: sqlite3.Connection) -> None:
             con.execute(f"ALTER TABLE kb_items ADD COLUMN {name} {decl}")
 
 
-def _db() -> sqlite3.Connection:
+@contextmanager
+def _db():
     con = sqlite3.connect(str(DEFAULT_KB_DB))
-    con.execute("PRAGMA journal_mode=WAL")
-    return con
+    try:
+        con.execute("PRAGMA journal_mode=WAL")
+        with con:
+            yield con
+    finally:
+        # sqlite3 connection context commits/rolls back but does not close.
+        # Explicit close prevents long-lived Windows file/lock leaks.
+        con.close()
 
 
 def _ensure_fts(con: sqlite3.Connection) -> None:
@@ -164,6 +172,28 @@ def kb_query(query: str, limit: int = 6, category: str = "") -> list[dict]:
                 args,
             ).fetchall()
             ids = [r[0] for r in rows]
+            if not ids:
+                # R2(0656)：中文整句兜底——字符 n-gram 重叠打分。
+                # 整句没有分隔符时 token AND 必败（t09/u15 空命中根因之一）；
+                # 主判 4-gram（≥1 个 4 字公共串），3-gram 仅做排序辅助。
+                q_norm = _norm(q)
+                q3 = {q_norm[i:i + 3] for i in range(len(q_norm) - 2)}
+                q4 = {q_norm[i:i + 4] for i in range(len(q_norm) - 3)}
+                if q4:
+                    cand = con.execute(
+                        "SELECT id, summary, created FROM kb_items "
+                        "WHERE status='active' ORDER BY created DESC LIMIT 500"
+                    ).fetchall()
+                    scored = []
+                    for iid, summ, created in cand:
+                        s_norm = _norm(summ)
+                        s3 = {s_norm[i:i + 3] for i in range(len(s_norm) - 2)}
+                        s4 = {s_norm[i:i + 4] for i in range(len(s_norm) - 3)}
+                        o4 = len(q4 & s4)
+                        if o4 >= 1:
+                            scored.append((-o4, -len(q3 & s3), -float(created or 0), iid))
+                    scored.sort()
+                    ids = [x[3] for x in scored[: max(int(limit) * 3, 1)]]
         out = []
         for iid in ids[:limit]:
             r = con.execute(

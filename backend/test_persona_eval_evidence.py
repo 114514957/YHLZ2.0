@@ -118,7 +118,7 @@ class EvidenceTests(unittest.TestCase):
 
     def test_semantic_rubric_is_separate_and_unjudged(self):
         from tools.persona_bank import PERSONA_BANK
-        self.assertEqual(len(PERSONA_BANK), 38)
+        self.assertEqual(len(PERSONA_BANK), 48)
         checklist = review_checklist(PERSONA_BANK, [])
         self.assertEqual(len(checklist), len(SEMANTIC_REVIEW))
         self.assertTrue(all(x['status'] == 'review' and x['reviewer'] is None for x in checklist))
@@ -167,7 +167,7 @@ class EvidenceTests(unittest.TestCase):
                 data = json.loads(report.read_text(encoding='utf-8'))
                 self.assertEqual(data['mode'], 'offline_rescore')
                 self.assertFalse(data['acceptance'])
-                self.assertEqual(data['bank_count'], 38)
+                self.assertEqual(data['bank_count'], 48)
 
 
 class LiveHarnessWiringTests(unittest.IsolatedAsyncioTestCase):

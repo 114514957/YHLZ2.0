@@ -37,6 +37,17 @@ class KbTest(unittest.TestCase):
         st = kb.kb_stats()
         self.assertEqual(st["by_category"], {"tech": 1})
 
+    def test_sentence_query_trigram_fallback(self):
+        """R2(0656)：中文整句查询无分隔符时，3-gram 重叠兜底应能召回。"""
+        kb.kb_add("变调算法用 WORLD 比 PSOLA 更稳", category="tech")
+        hits = kb.kb_query("查查知识库里变调算法的条目。")
+        self.assertGreaterEqual(len(hits), 1)
+        self.assertTrue(any("变调" in h["summary"] for h in hits))
+        # 无关条目不得因兜底被顶上来
+        kb.kb_add("今天天气不错适合出门散步", category="fact")
+        hits2 = kb.kb_query("查查知识库里变调算法的条目。")
+        self.assertTrue(all("变调" in h["summary"] for h in hits2))
+
     def test_digest_uses_kb(self):
         from backend import qqextract
 

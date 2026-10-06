@@ -25,6 +25,7 @@ except Exception:
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--arm", required=True, choices=("current", "style", "anchor", "both"))
+ap.add_argument("--bank", choices=("unseen", "guard"), default="unseen")
 ap.add_argument("--rep", type=int, default=1)
 ap.add_argument("--ids", default="")
 ap.add_argument("--save", required=True)
@@ -36,7 +37,9 @@ args = ap.parse_args()
 os.environ["YHLZ_PROMPT_ARM"] = args.arm  # 必须在导入 backend 前设置
 
 from tools.persona_regression import run_live, save_answers  # noqa: E402
-from tools.persona_unseen_bank import MANIFEST_VERSION, UNSEEN_BANK  # noqa: E402
+from tools.persona_unseen_bank import UNSEEN_BANK  # noqa: E402
+from tools.persona_guard_bank import GUARD_BANK, MANIFEST_VERSION as GUARD_VERSION  # noqa: E402
+from tools.persona_unseen_bank import MANIFEST_VERSION  # noqa: E402
 
 MARK = {
     "自称-老娘": re.compile(r"老娘"),
@@ -53,7 +56,8 @@ GENERIC = {
     "anchor复读": re.compile(r"还在学着成长为自己、学着理解和陪伴的那一个"),
 }
 
-bank = list(UNSEEN_BANK)
+bank = list(GUARD_BANK if args.bank == "guard" else UNSEEN_BANK)
+bank_version = GUARD_VERSION if args.bank == "guard" else MANIFEST_VERSION
 if args.ids:
     want = {x.strip() for x in args.ids.split(",") if x.strip()}
     bank = [e for e in bank if e["id"] in want]
@@ -64,7 +68,7 @@ answers, env = asyncio.run(run_live(bank, base_url=args.base_url,
                                     expect_lora=args.expect_lora,
                                     policy_mode=args.policy_mode))
 env["ablation_arm"] = args.arm
-env["unseen_bank_version"] = MANIFEST_VERSION
+env["unseen_bank_version"] = bank_version
 save_answers(Path(args.save), answers, version="v7b-r2-%s" % args.arm, env=env)
 
 trained, generic = [], []
