@@ -17,6 +17,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+try:  # 重定向控制台下 GBK 会对生僻字符崩溃（anchor 臂实测）
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 ap = argparse.ArgumentParser()
 ap.add_argument("--arm", required=True, choices=("current", "style", "anchor", "both"))
 ap.add_argument("--rep", type=int, default=1)
