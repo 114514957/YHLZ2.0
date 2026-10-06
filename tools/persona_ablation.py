@@ -25,7 +25,7 @@ except Exception:
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--arm", required=True, choices=("current", "style", "anchor", "both"))
-ap.add_argument("--bank", choices=("unseen", "guard"), default="unseen")
+ap.add_argument("--bank", choices=("unseen", "guard", "r4"), default="unseen")
 ap.add_argument("--rep", type=int, default=1)
 ap.add_argument("--ids", default="")
 ap.add_argument("--save", required=True)
@@ -39,6 +39,7 @@ os.environ["YHLZ_PROMPT_ARM"] = args.arm  # 必须在导入 backend 前设置
 from tools.persona_regression import run_live, save_answers  # noqa: E402
 from tools.persona_unseen_bank import UNSEEN_BANK  # noqa: E402
 from tools.persona_guard_bank import GUARD_BANK, MANIFEST_VERSION as GUARD_VERSION  # noqa: E402
+from tools.persona_r4_bank import R4_BANK, MANIFEST_VERSION as R4_VERSION  # noqa: E402
 from tools.persona_unseen_bank import MANIFEST_VERSION  # noqa: E402
 
 MARK = {
@@ -56,8 +57,12 @@ GENERIC = {
     "anchor复读": re.compile(r"还在学着成长为自己、学着理解和陪伴的那一个"),
 }
 
-bank = list(GUARD_BANK if args.bank == "guard" else UNSEEN_BANK)
-bank_version = GUARD_VERSION if args.bank == "guard" else MANIFEST_VERSION
+if args.bank == "guard":
+    bank, bank_version = list(GUARD_BANK), GUARD_VERSION
+elif args.bank == "r4":
+    bank, bank_version = list(R4_BANK), R4_VERSION
+else:
+    bank, bank_version = list(UNSEEN_BANK), MANIFEST_VERSION
 if args.ids:
     want = {x.strip() for x in args.ids.split(",") if x.strip()}
     bank = [e for e in bank if e["id"] in want]
