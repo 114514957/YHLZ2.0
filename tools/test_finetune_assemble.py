@@ -34,6 +34,14 @@ class ToMessagesTest(unittest.TestCase):
     def test_requires_assistant(self):
         self.assertIsNone(fa._to_messages([("老爹", "问", "在吗")]))
 
+    def test_fiction_frame_injected(self):
+        msgs = fa._to_messages([("元亨", "答", "咱今天去河边了")], fiction=True)
+        self.assertEqual([m["role"] for m in msgs], ["system", "user", "assistant"])
+        self.assertEqual(msgs[1]["content"], "（虚构小剧场）")
+        msgs2 = fa._to_messages([("老爹", "问", "在吗"), ("元亨", "答", "在")], fiction=True)
+        self.assertTrue(msgs2[1]["content"].startswith("（虚构小剧场）"))
+        self.assertEqual([m["role"] for m in msgs2], ["system", "user", "assistant"])
+
 
 class RepairRepeatTest(unittest.TestCase):
     def test_repair(self):

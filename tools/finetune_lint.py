@@ -45,6 +45,9 @@ def main() -> int:
         msgs = r.get("messages") or []
         src = str(r.get("source", ""))[:40]
         has_tool = any(m.get("role") == "tool" or m.get("tool_calls") for m in msgs)
+        has_fiction = any(
+            k in str(m.get("content") or "")
+            for m in msgs for k in FICTION)
         for m in msgs:
             if m.get("role") != "assistant":
                 continue
@@ -55,7 +58,7 @@ def main() -> int:
             for w in WATCH:
                 if w in c:
                     watch_hits.append((src, w, c[:120]))
-            if EXPERIENCE.search(c) and not has_tool and not any(k in c for k in FICTION):
+            if (EXPERIENCE.search(c) and not has_tool and not has_fiction):
                 exp_hits.append((src, c[:160]))
 
     lines = ["# R1 数据体检报告（%s）" % args.input, "",

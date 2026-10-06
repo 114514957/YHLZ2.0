@@ -90,8 +90,13 @@ def _repair_repeat(text: str, min_len: int = 20) -> tuple[str, bool]:
     return text, changed
 
 
-def _to_messages(turns: list[tuple[str, str, str]], keep_owner: bool = True) -> list[dict] | None:
+def _to_messages(turns: list[tuple[str, str, str]], keep_owner: bool = True,
+                 fiction: bool = False) -> list[dict] | None:
     msgs: list[dict] = [{"role": "system", "content": SYSTEM}]
+    if fiction:
+        # R1b(0657)：日常/闲聊场景是角色创作，显式注入虚构框架，
+        # 防止教会"编造真实经历"（Codex 节点 A：把创作放进创作语境）。
+        msgs.append({"role": "user", "content": "（虚构小剧场）"})
     for turn in turns:
         role, text = turn[0], turn[-1]
         if _REPAIR_REPEATS:
@@ -145,7 +150,8 @@ def parse_doc(path: Path, dim: str, require_meta: bool = True):
         if require_meta and not all(meta.get(k) for k in ("emotion", "length_tier", "contract")):
             yield None, "缺元数据"
             continue
-        msgs = _to_messages(_block_turns(blk))
+        fiction = str(meta.get("fiction", "")).strip().lower() in ("1", "true", "yes", "是")
+        msgs = _to_messages(_block_turns(blk), fiction=fiction)
         if msgs:
             yield {"messages": msgs, "source": f"{dim}:" + blk.splitlines()[0][3:][:24]}, ""
 
