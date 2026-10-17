@@ -77,6 +77,17 @@ class IconAssetsTest(unittest.TestCase):
         self.assertIn(16, ICO_SIZES)
         self.assertIn(256, ICO_SIZES)
 
+    def test_launcher_bat_clears_electron_run_as_node(self):
+        """从带 ELECTRON_RUN_AS_NODE=1 的环境启动时，Electron 会退化成 Node
+        （require('electron') 只给路径字符串 → ipcMain undefined → 桌宠秒崩，
+        托盘图标也就不出现）。启动脚本必须先清掉它再拉桌宠。"""
+        bat = (_ROOT / "YHLZ_全家桶.bat").read_text(encoding="utf-8",
+                                                 errors="replace")
+        clear_at = bat.find('set "ELECTRON_RUN_AS_NODE="')
+        pet_at = bat.find("yhlz-pet")
+        self.assertGreaterEqual(clear_at, 0, "启动脚本未清 ELECTRON_RUN_AS_NODE")
+        self.assertGreater(pet_at, clear_at, "清理必须发生在起桌宠之前")
+
 
 if __name__ == "__main__":
     unittest.main()
