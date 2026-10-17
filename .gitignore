@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -45,6 +45,7 @@ vts_auth_token.txt
 
 # User-specific config
 gui_config.json
+config/live.local.json
 
 # Database
 backend/data/*.db
@@ -90,3 +91,9 @@ venv-dsh/
 
 # 试听音频素材（本地，不入库）
 音频素材/
+
+# 运行期缓存：jieba 词典缓存（9MB，ledger 0828）
+/jieba.cache
+
+# 图标原图备份（本地留档，不入库；tools/make_icons.py 生成）
+assets/icons/_backup_*/

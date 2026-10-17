@@ -1,8 +1,8 @@
-"""YHLZ remote dev runner (ledger 0226): drive 利贞 (opencode) headless from QQ.
+"""YHLZ remote dev runner (ledger 0226): drive 利贞 headless from QQ.
 
 Flow (per user's workflow):
   master QQ -> qq_bot `#dev <task>` -> DevRunner.start(task)
-  -> `opencode run` (headless, dir = project root)
+  -> harness run (resident gateway `tools/dsh_worker.py`, dir = project root)
   -> agent may ask ONE key question  -> relay to QQ, wait for master's answer
   -> master answers -> DevRunner.answer(text) -> continue the SAME session
   -> agent finishes -> report result to QQ
@@ -11,6 +11,9 @@ does the runner commit (push still needs a separate `#push`).
 
 Safety: only the whitelisted master (qq_bot enforces); no auto push; the
 agent prompt forbids git commit/push; work is confined to --dir (project).
+
+Executor (ledger 0797): harness only. opencode 退役——切换命令只读，
+`_opencode_exe`/`_run` 保留一个观察期但已无调用点。
 
 Usage:
   python tools/dev_runner.py --task "把 X 改成 Y"
@@ -29,7 +32,13 @@ import shutil
 import subprocess
 import sys
 import time
-import urllib.request
+
+_TOOLS = pathlib.Path(__file__).resolve().parent
+if str(_TOOLS) not in sys.path:
+    sys.path.insert(0, str(_TOOLS))
+
+import dev_contract as dc  # noqa: E402
+import harness_gateway as gw  # noqa: E402
 
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
 STATE = _ROOT / "cache" / "dev" / "state.json"
@@ -37,102 +46,63 @@ LOG = _ROOT / "cache" / "dev" / "opencode.log"
 MODEL = os.getenv("YHLZ_DEV_MODEL", "deepseek/deepseek-v4-flash")
 AGENT = os.getenv("YHLZ_DEV_AGENT", "yhlz-dev")
 TIMEOUT = float(os.getenv("YHLZ_DEV_TIMEOUT", "1800"))
-# v1.1 (ledger 0446): dual-track backend — "opencode" (default, safe) or "dsh"
-# (persistent SDK worker, see tools/dsh_worker.py). Workspace is overridable so
-# evaluation can run in a sandbox without touching the live repo.
+# v1.1 (ledger 0446) dual track → v1.2 (ledger 0797) harness only:
+# "dsh" is the sole backend, executed by the resident gateway
+# (tools/dsh_worker.py). Workspace is overridable so evaluation can run in a
+# sandbox without touching the live repo.
 WORKDIR = pathlib.Path(os.getenv("YHLZ_DEV_WORKDIR", str(_ROOT))).resolve()
 DSH_WORKER_URL = os.getenv("YHLZ_DSH_WORKER", "http://127.0.0.1:8347")
 DSH_PY = pathlib.Path(os.getenv(
     "YHLZ_DSH_PYTHON", str(_ROOT / "venv-dsh" / "Scripts" / "python.exe")))
-# A1 gray switch (ledger 0450): a persistent backend choice any process can
-# flip at runtime — env wins, then this file, then the safe default.
+# Retired A1 gray switch (ledger 0450): kept as a path so old tests/tools that
+# reference it still import; nothing reads or writes it any more.
 BACKEND_FILE = _ROOT / "cache" / "dev" / "backend.txt"
+HARNESS_BACKEND = "dsh"
+RETIRED_BACKENDS = ("opencode",)
 
 
 def _backend() -> str:
-    b = os.getenv("YHLZ_DEV_BACKEND", "").strip().lower()
-    if b not in ("opencode", "dsh"):
-        try:
-            b = BACKEND_FILE.read_text(encoding="utf-8").strip().lower()
-        except Exception:
-            b = ""
-    return b if b in ("opencode", "dsh") else "opencode"
+    """Harness-only (ledger 0797): opencode 退役，历史开关不再影响行为。"""
+    return HARNESS_BACKEND
 
 
 def set_backend(name: str) -> str:
-    """Persist the backend choice (used by #backend on QQ / dev console)."""
+    """Retired switch: reports the fixed backend instead of changing it."""
     b = str(name or "").strip().lower()
-    if b not in ("opencode", "dsh"):
-        return f"用法：#backend opencode|dsh（当前：{_backend()}）"
-    BACKEND_FILE.parent.mkdir(parents=True, exist_ok=True)
-    BACKEND_FILE.write_text(b + "\n", encoding="utf-8")
-    return f"[利贞] 后端已切换为 {b}（回滚同命令）"
+    if b in RETIRED_BACKENDS:
+        return ("[利贞] opencode 后端已退役（ledger 0797）：利贞现在只跑 harness，"
+                "无需切换。")
+    if b and b != HARNESS_BACKEND:
+        return f"用法：#backend（只读）——利贞固定跑 harness，当前：{_backend()}"
+    return f"[利贞] 后端固定 harness（{_backend()}），opencode 已退役。"
 
 
 def backend_status() -> str:
-    return f"[利贞] 当前后端：{_backend()}（#backend opencode|dsh 切换）"
+    return "[利贞] 当前后端：harness（dsh）——唯一后端；opencode 已退役（#backend 只读）"
 
 
 def _post_worker(path: str, obj: dict, timeout: float = 30.0) -> dict:
-    req = urllib.request.Request(
-        DSH_WORKER_URL + path, data=json.dumps(obj).encode("utf-8"),
-        headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8"))
+    return gw.post(path, obj, url=DSH_WORKER_URL, timeout=timeout)
 
 
 def _worker_healthy(timeout: float = 2.0) -> bool:
-    try:
-        with urllib.request.urlopen(DSH_WORKER_URL + "/health",
-                                    timeout=timeout) as r:
-            return r.status == 200
-    except Exception:
-        return False
+    return gw.healthy(url=DSH_WORKER_URL, timeout=timeout)
 
 
 def _ensure_worker(wait_s: float = 60.0) -> bool:
     """Spawn the dsh worker (venv-dsh) if it is not listening yet."""
-    if _worker_healthy():
-        return True
-    if not DSH_PY.exists():
-        return False
-    try:
-        subprocess.Popen(
-            [str(DSH_PY), "-B", str(_ROOT / "tools" / "dsh_worker.py"),
-             "--workdir", str(WORKDIR)],
-            cwd=str(_ROOT), close_fds=True,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    except Exception:
-        return False
-    end = time.time() + float(wait_s)
-    while time.time() < end:
-        if _worker_healthy():
-            return True
-        time.sleep(2)
-    return False
+    return gw.ensure(url=DSH_WORKER_URL, py=DSH_PY, workdir=str(WORKDIR),
+                     wait_s=wait_s)
 
 
-START_PROMPT = """你是 YHLZ 项目的开发执行体，工作目录就是项目根目录。
-这是一个新任务。**这一轮先不要动手**（禁止修改文件、禁止运行会改变状态的命令），
-只做三件事：
-1) 用 1-3 个最关键的问题澄清需求（确实没有疑问就写"无问题"）；
-2) 给出你打算怎么做的简短方案；
-3) 给出你的把握程度（高/中/低）和理由。
-以 [QUESTION] 开头输出以上内容，然后停止，等待用户答复后再执行。
-执行阶段的规则：只在本项目内改动；禁止 git commit / git push（提交由外部确认）。
-任务：{task}"""
-
-ANSWER_PROMPT = """（用户答复）{answer}
-
-请据此继续：
-- 若信息已足够，就执行任务；完成后用**自然语言中文**写一段汇报，可以写得详细些，
-  但重点讲清楚**实际做了什么**（改了什么/新增了什么、怎么验证的、结果如何），
-  别只罗列文件名，也别写空泛套话；以 [DONE] 开头。
-- 若仍需澄清，只问最关键的问题并以 [QUESTION] 开头，然后停止等待。
-- 全程只在本项目内改动；禁止 git commit / git push。"""
+# Prompt contract lives in tools/dev_contract.py (shared with the Lite worker
+# and the harness gateway); the names stay importable from here.
+START_PROMPT = dc.START_PROMPT
+ANSWER_PROMPT = dc.ANSWER_PROMPT
 
 
 def _opencode_exe() -> str:
+    """Retired (ledger 0797): opencode executor kept one window, unused."""
     cand = shutil.which("opencode")
     if cand:
         p = pathlib.Path(cand)
@@ -153,7 +123,7 @@ def _opencode_exe() -> str:
 
 
 def _run(prompt: str, session: str | None, timeout: float) -> dict:
-    """Run opencode headless; return {text, session, ok}."""
+    """Retired (ledger 0797) opencode headless runner; no live call site."""
     cmd = [_opencode_exe(), "run", prompt, "-m", MODEL,
            "--agent", AGENT, "--dir", str(WORKDIR), "--format", "json"]
     if session:
@@ -228,68 +198,43 @@ def _save(d: dict) -> None:
 
 
 def _classify(text: str) -> str:
-    if "[QUESTION]" in text:
-        return "awaiting"
-    if "[DONE]" in text:
-        return "done"
-    s = text.strip()
-    if len(s) < 300 and ("?" in s or "？" in s):
-        return "awaiting"
-    return "done"
+    """Kept for callers/tests; the contract lives in tools/dev_contract.py."""
+    return dc.classify(text)
 
 
 def start(task: str) -> dict:
-    if _backend() == "dsh":
-        if not _ensure_worker():
-            return {"status": "error", "session": "", "task": task,
-                    "text": "dsh worker 不可用（venv-dsh 缺失或启动失败）"}
-        try:
-            res = _post_worker("/start", {"task": task})
-        except Exception as exc:  # noqa: BLE001
-            return {"status": "error", "session": "", "task": task,
-                    "text": f"dsh worker 调用失败：{type(exc).__name__}"}
-        if not res.get("ok"):
-            return {"status": "error", "session": "", "task": task,
-                    "text": str(res.get("error") or "worker rejected")}
-        out = _load()
-        out["backend"] = "dsh"
-        return out
-    d = {"status": "running", "session": "", "task": task, "text": ""}
-    _save(d)
-    r = _run(START_PROMPT.format(task=task), None, TIMEOUT)
-    d["session"] = r["session"]
-    d["text"] = r["text"] or r["error"]
-    d["status"] = _classify(r["text"]) if r["ok"] else "error"
-    _save(d)
-    return d
+    """Start one dev task on the harness gateway (harness is the only backend)."""
+    if not _ensure_worker():
+        return {"status": "error", "session": "", "task": task,
+                "text": "harness 网关不可用（venv-dsh 缺失或启动失败）"}
+    try:
+        res = _post_worker("/start", {"task": task})
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "session": "", "task": task,
+                "text": f"harness 网关调用失败：{type(exc).__name__}"}
+    if not res.get("ok"):
+        return {"status": "error", "session": "", "task": task,
+                "text": str(res.get("error") or "worker rejected")}
+    out = _load()
+    out["backend"] = HARNESS_BACKEND
+    return out
 
 
 def answer(text: str) -> dict:
-    if _backend() == "dsh":
-        if not _ensure_worker():
-            return {"status": "error", "text": "dsh worker 不可用",
-                    "session": ""}
-        try:
-            res = _post_worker("/answer", {"text": text})
-        except Exception as exc:  # noqa: BLE001
-            return {"status": "error",
-                    "text": f"dsh worker 调用失败：{type(exc).__name__}",
-                    "session": ""}
-        if not res.get("ok"):
-            return {"status": "error", "text": str(res.get("error") or ""),
-                    "session": ""}
-        return _load()
-    d = _load()
-    if not d.get("session"):
-        return {"status": "error", "text": "没有进行中的会话，先用 #dev <任务> 开始",
+    """Answer the pending harness session (harness is the only backend)."""
+    if not _ensure_worker():
+        return {"status": "error", "text": "harness 网关不可用",
                 "session": ""}
-    d["status"] = "running"
-    _save(d)
-    r = _run(ANSWER_PROMPT.format(answer=text), d["session"], TIMEOUT)
-    d["text"] = r["text"] or r["error"]
-    d["status"] = _classify(r["text"]) if r["ok"] else "error"
-    _save(d)
-    return d
+    try:
+        res = _post_worker("/answer", {"text": text})
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error",
+                "text": f"harness 网关调用失败：{type(exc).__name__}",
+                "session": ""}
+    if not res.get("ok"):
+        return {"status": "error", "text": str(res.get("error") or ""),
+                "session": ""}
+    return _load()
 
 
 def commit(message: str) -> dict:

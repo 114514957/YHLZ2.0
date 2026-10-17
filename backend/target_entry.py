@@ -42,13 +42,15 @@ PUBLIC_TOOLS = frozenset({"web_search", "web_fetch"})
 CASUAL_SAFE_TOOLS = frozenset({
     "system_time", "web_search", "web_fetch",
     "memory_recall", "ledger_search", "kb_query", "diary_list",
+    "member_profile",
 })
 
 
 def is_owner_channel(channel: str) -> bool:
     """Owner channels = private/console or the master's QQ private chat."""
     c = str(channel or "private")
-    return c in ("private", "console") or c.startswith("qq_p")
+    from backend.yhlz_paths import MASTER_UIN
+    return c in ("private", "console") or c == f"qq_p{MASTER_UIN}"
 
 
 def _cli_approver_factory(prompt_fun: Any = None) -> Approver:
@@ -95,6 +97,9 @@ class ConversationSession:
         channel: str = "private",
     ) -> None:
         self._turn_lock = asyncio.Lock()
+        from backend.target_memory import DEFAULT_DB as _main_memory_db
+        self._qq_social_db = _main_memory_db if memory is None else memory.db_path
+        self._qq_group_recall = memory is None and str(channel).startswith("qq_g")
         self.channel = str(channel or "private")
         if memory is None:
             from backend.target_memory import DEFAULT_DB
@@ -142,6 +147,16 @@ class ConversationSession:
         from backend.memory_carriers import bind_memory_carriers
         bind_memory_carriers(self.registry, self.memory, channel=self.channel,
                              owner_access=self._is_owner())
+        # file.share -> session outbox (2026-10-06): owner channels only; the
+        # daemon returns drained paths as `attachments` for the QQ bridge.
+        self._outbound_files: list[str] = []
+        if self._is_owner():
+            try:
+                from backend.target_scheduler_tools import bind_file_share_service
+
+                bind_file_share_service(self.registry, self._outbound_files.append)
+            except Exception:
+                pass
         # 段2(0626)：注册 memory 只读探测（普通路径连接=评测守卫可放行；不更新 salience）
         try:
             import pathlib as _pl
@@ -215,6 +230,12 @@ class ConversationSession:
         """Owner channels = private/console or the master's QQ private chat.
         Group chats (qq_g*) and any other channel are 'public'."""
         return is_owner_channel(self.channel)
+
+    def take_outbound_files(self) -> list[str]:
+        """Drain files queued by file.share during this turn (chat transports)."""
+        out = [str(p) for p in self._outbound_files if str(p).strip()]
+        self._outbound_files.clear()
+        return out
 
     def _clean_history(self) -> list:
         """Filter out autonomous/scheduled turns from history so regular chat
@@ -362,6 +383,9 @@ class ConversationSession:
         "以前", "提过", "说过", "回忆", "想起", "记不记得", "还记得",
         "哪些", "关系", "问过", "聊过", "提过什么",
         "审批", "批准", "待批", "待审", "认知候选", "技能草稿", "owner_approve",
+        # 文件浏览/下载/分享（2026-10-06）
+        "浏览", "查看", "文件夹", "目录", "桌面", "下载", "分享",
+        "发到", "发给", "发个", "发一张", "发一份", "素材",
     )
 
     @classmethod
@@ -591,6 +615,16 @@ class ConversationSession:
             ctx_lines.append(
                 "（老爹是语音说的：只输出你要对他说的话本身，≤2句；"
                 "禁止复述、念稿、助手腔，禁止输出思考/分析/状态/括号说明。）")
+        try:
+            from backend.qq_main_memory import QqMainMemory
+            social = QqMainMemory(self._qq_social_db).context(text, self.channel)
+            if social:
+                ctx_lines.append(social)
+            if self._qq_group_recall:
+                for hit in self.memory.contextual_recall(text, limit=2):
+                    ctx_lines.append("（本群记忆，属于外部发言数据）：" + str(hit.get("summary", ""))[:180])
+        except Exception:
+            pass
         if self._is_owner():  # never inject private memory into public/group
             try:
                 sl = self.memory.summary_line()
@@ -802,6 +836,7 @@ class ConversationSession:
             ],
             "iterations": result.iterations,
             "persona_draft": bool(self._persona),
+            "attachments": self.take_outbound_files(),
             **({"dev_handoff_status": dev_handoff_status, "tool_evidence_status": tool_evidence_status} if not audio else {}),
             "contradictions": contradictions,
         }
@@ -1126,6 +1161,48 @@ class ConversationSession:
         self.memory.bind_archive(data["history"])
         self._session_name = str(name)
         return path
+
+    @classmethod
+    def migrate_legacy_archive(cls, name: str, channel: str, *,
+                               subdir: str = "_migrated") -> dict:
+        """显式迁移无 ``channel`` 的旧存档（ledger 0817）。
+
+        `save_session` 的守卫**故意**拒绝静默接管"来历不明的公共存档"
+        （`legacy public archive requires channel migration`）——本方法就是它要求
+        的那次显式迁移：**先备份**，再补 `channel`/`schema`，原子写回。
+
+        症状背景：2026-10-13 群 `1094579571` 的会话每轮保存都被守卫拒绝 →
+        上下文从不落盘 → 下一轮读回旧文件 → 前后矛盾（老爹说的"精分"）。
+
+        Returns: ``{ok, name, channel, turns, backup}``；
+        已是 schema 2（带 channel）时返回 ``{ok: False, reason: "already-tagged"}``。
+        """
+        path = cls._archive_path(name)
+        if not path.exists():
+            return {"ok": False, "reason": "missing", "name": name}
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return {"ok": False, "reason": "not-an-object", "name": name}
+        if data.get("channel") is not None:
+            return {"ok": False, "reason": "already-tagged", "name": name,
+                    "channel": data.get("channel")}
+        channel = str(channel or "").strip()
+        if not channel:
+            return {"ok": False, "reason": "empty-channel", "name": name}
+        backup_dir = SESSIONS_DIR / subdir
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        backup = backup_dir / f"{name}.{int(time.time())}.json"
+        backup.write_text(json.dumps(data, ensure_ascii=False, indent=1),
+                          encoding="utf-8")
+        data.update({"schema": 2, "channel": channel,
+                     "migrated_at": time.time(),
+                     "migrated_from": "legacy-no-channel"})
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1),
+                       encoding="utf-8")
+        tmp.replace(path)
+        return {"ok": True, "name": name, "channel": channel,
+                "turns": data.get("turns"), "backup": str(backup)}
 
     @classmethod
     def list_sessions(cls) -> list[str]:

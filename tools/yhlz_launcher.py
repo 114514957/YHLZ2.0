@@ -50,6 +50,27 @@ QQBOT_UIN = BOT_UIN
 QQBOT_MASTER = MASTER_UIN
 QQBOT_PORT = 3001
 QQBOT_LOCK = _ROOT / "cache" / "tmp" / "qqbot.lock"
+QQ_MANAGEMENT_FILE = _ROOT / "config" / "qq_management.json"
+
+
+def qq_management() -> str:
+    """full (default) | external.
+
+    external: another bridge build owns the QQ account (Lite chain); the Full
+    launcher/watchdog must not start/stop the QQ bridge, NapCat or
+    napcat_watch. Env YHLZ_QQ_MANAGEMENT wins, then config file.
+    """
+    env = os.getenv("YHLZ_QQ_MANAGEMENT", "").strip().lower()
+    if env in ("full", "external"):
+        return env
+    try:
+        cfg = json.loads(QQ_MANAGEMENT_FILE.read_text(encoding="utf-8-sig"))
+        mode = str(cfg.get("mode") or "").strip().lower()
+        if mode in ("full", "external"):
+            return mode
+    except Exception:
+        pass
+    return "full"
 
 
 def _up(url: str) -> bool:
@@ -97,7 +118,13 @@ def qqbot_status() -> bool:
 
 
 def _spawn_ollama():
-    subprocess.Popen([OLLAMA, "serve"], close_fds=True)
+    """0699: hidden + logged (was: visible console window, no log)."""
+    log = _ROOT / "cache" / "logs" / "ollama.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.Popen([OLLAMA, "serve"], cwd=str(_ROOT),
+                     stdout=open(log, "ab"), stderr=subprocess.STDOUT,
+                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                     close_fds=True)
 
 
 def _spawn_llama():
@@ -130,10 +157,20 @@ def _spawn_llama():
 def _spawn_daemon():
     # F1 (ledger 0436): log stdout/stderr so crash/flap causes are visible
     # (previously the daemon was spawned with no redirect at all).
+    # ledger 0815: 子进程不吃父进程的畸形 NO_PROXY（`[::1]` → httpx 全请求
+    # InvalidURL，元亨 QQ 全哑）。
     log = _ROOT / "cache" / "logs" / "daemon.log"
     log.parent.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ)
+    try:
+        from backend.env_loader import sanitize_proxy_env
+
+        for change in sanitize_proxy_env(env):
+            print(f"[launcher] env: {change}", flush=True)
+    except Exception:
+        pass
     subprocess.Popen([str(PY), "-B", "-m", "backend.target_daemon",
-                      "--port", "8321"], cwd=str(_ROOT),
+                      "--port", "8321"], cwd=str(_ROOT), env=env,
                      stdout=open(log, "ab"), stderr=subprocess.STDOUT,
                      creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                      close_fds=True)
@@ -150,16 +187,33 @@ NAPCAT_BAT = NAPCAT_LAUNCHER
 
 
 def _proc_alive(script: str) -> bool:
+    """True if the matching process is running (hardened 2026-10-12).
+
+    - exe-like marker (`llama-server`, `ollama`): image-name prefix match;
+    - script/module marker (`target_daemon`, `napcat_watch.py`): python
+      interpreter whose argv element ends with the marker.
+
+    Shells that merely *mention* the name no longer count — a PowerShell
+    running `Get-Process llama-server` once fooled the llama check, so the
+    watchdog skipped the respawn (llama stayed down after a GPU window).
+    """
     try:
         import psutil
     except Exception:
         return False
-    for p in psutil.process_iter(["cmdline"]):
+    marker = script.lower()
+    for p in psutil.process_iter(["name", "cmdline"]):
         try:
-            cl = p.info.get("cmdline") or []
+            nm = str(p.info.get("name") or "").lower()
+            cl = [str(x).replace("\\", "/").lower()
+                  for x in (p.info.get("cmdline") or [])]
         except Exception:
             continue
-        if any(script in str(x) for x in cl):
+        if nm.startswith(marker):
+            return True
+        if nm.startswith("python") and any(
+                x.endswith(marker) or x.endswith(marker + ".py")
+                for x in cl):
             return True
     return False
 
@@ -179,9 +233,9 @@ def _spawn_napcat_watch():
 
 
 def _spawn_napcat():
-    if NAPCAT_BAT.exists():
-        subprocess.Popen(["cmd", "/c", str(NAPCAT_BAT), QQBOT_UIN],
-                         cwd=str(NAPCAT_BAT.parent), close_fds=True)
+    from backend.napcat_launcher import launch_napcat
+
+    launch_napcat(QQBOT_UIN)
 
 
 SPAWN_GUARD = _ROOT / "cache" / "tmp" / "spawn_guard.json"
@@ -213,6 +267,57 @@ def _spawn_allowed(key: str, cooldown: float) -> bool:
         return True
 
 
+def _daemon_health() -> dict | None:
+    try:
+        import json as _j
+        import urllib.request
+
+        with urllib.request.urlopen("http://127.0.0.1:8321/health", timeout=3) as r:
+            return _j.loads(r.read())
+    except Exception:
+        return None
+
+
+def _maybe_recycle_daemon() -> None:
+    """0535: a long-running daemon accumulates state (a turn went 18s→4s after a
+    restart).  Opt-in via YHLZ_DAEMON_MAX_UPTIME_S (default 0 = off): when the
+    daemon has been up past the limit AND is idle, kill it so the next tick
+    respawns a fresh one.  Never interrupts a busy turn."""
+    import os
+
+    try:
+        max_s = float(os.getenv("YHLZ_DAEMON_MAX_UPTIME_S", "0") or 0)
+    except Exception:
+        max_s = 0.0
+    if max_s <= 0:
+        return
+    h = _daemon_health()
+    if not isinstance(h, dict):
+        return
+    try:
+        if float(h.get("uptime_s", 0) or 0) < max_s:
+            return
+        if int(h.get("active_turns", 0) or 0) > 0:
+            return
+    except Exception:
+        return
+    if not _spawn_allowed("daemon_recycle", 1800):
+        return
+    try:
+        import psutil
+
+        killed = 0
+        for p in psutil.process_iter(["cmdline"]):
+            cl = p.info.get("cmdline") or []
+            if any("target_daemon" in str(x) for x in cl):
+                p.kill()
+                killed += 1
+        if killed:
+            print("[launcher] daemon recycled (uptime guard)", flush=True)
+    except Exception:
+        pass
+
+
 def ensure_stack() -> dict:
     st = status()
     # F2: never respawn something that is still there (process alive or port
@@ -229,12 +334,16 @@ def ensure_stack() -> dict:
             and not _proc_alive("target_daemon")
             and _spawn_allowed("daemon", 120)):
         _spawn_daemon()
-    # keep the QQ bridge alive, but only if NapCat's OneBot WS is up
-    if _port_open("127.0.0.1", QQBOT_PORT) and not _qqbot_alive():
-        _spawn_qqbot()
-    # keep the NapCat online-watcher alive
-    if not _proc_alive("napcat_watch.py"):
-        _spawn_napcat_watch()
+    # 0535: opt-in idle uptime recycle (prevents long-running slowdown).
+    _maybe_recycle_daemon()
+    # keep the QQ bridge alive, but only if NapCat's OneBot WS is up.
+    # qq_management=external (2026-10-07): the Lite chain owns QQ; skip here.
+    if qq_management() != "external":
+        if _port_open("127.0.0.1", QQBOT_PORT) and not _qqbot_alive():
+            _spawn_qqbot()
+        # keep the NapCat online-watcher alive
+        if not _proc_alive("napcat_watch.py"):
+            _spawn_napcat_watch()
     time.sleep(1)
     return status()
 
@@ -242,7 +351,7 @@ def ensure_stack() -> dict:
 def _boot_html() -> bytes:
     return (f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
 <title>YHLZ · 元 · 亨 · 利 · 贞 · 启动中</title>
-<link rel="icon" href="/favicon.png">
+<link rel="icon" href="/favicon.png?v=20261017">
 <style>
 html,body{{margin:0;height:100%;font:14px/1.7 "Segoe UI","Microsoft YaHei",sans-serif;
   color:#fff;overflow:hidden;
@@ -331,7 +440,8 @@ def _self_test() -> None:
     except Exception as exc:  # noqa: BLE001
         print("SELFTEST FAIL workbench", type(exc).__name__, str(exc)[:100])
         ok = False
-    print("SELFTEST OK services=", status() if ok else {}, flush=True)
+    print("SELFTEST " + ("OK" if ok else "FAIL") + " services=",
+          status(), flush=True)
     if not ok:
         raise SystemExit(1)
 
@@ -347,21 +457,24 @@ def main() -> int:
         _self_test()
         return 0
     ensure_stack()
-    # wait until the whole stack is ready, then open the workbench directly
+    # The daemon serves the workbench and its service-status dashboard.
+    # Open it while model processes load; --no-browser remains a full-stack check.
     print("等待服务就绪…", flush=True)
+    st = status()
     for _ in range(150):
-        st = status()
         print("  ", st, flush=True)
-        if all(st.values()):
+        if st["daemon"] and (not a.no_browser or all(st.values())):
             break
         time.sleep(1)
-    if not all(status().values()):
-        print("部分服务未就绪:", status(), flush=True)
-        if not a.no_browser:
-            return 1
+        st = status()
+    if not all(st.values()):
+        print("部分服务未就绪:", st, flush=True)
     if a.no_browser:
-        print("services:", status(), flush=True)
-        return 0
+        print("services:", st, flush=True)
+        return 0 if all(st.values()) else 1
+    if not st["daemon"]:
+        print("工作台服务未就绪，请查看 cache/logs/daemon.log", flush=True)
+        return 1
     webbrowser.open("http://127.0.0.1:8321/")
     print("已打开工作台 http://127.0.0.1:8321", flush=True)
     return 0

@@ -1,0 +1,103 @@
+{
+  "_note": "QQ Bridge Lite profile (P0 example, no credentials). token 只保留在本机 NapCat/OneBot 配置，不写入本文件；P1 装载时用真实值替换 <bot_uin>/<existing_local_config> 或注入环境变量。",
+  "profile": "lite",
+  "uin": "<bot_uin>",
+  "master_uins": [
+    "2258374446"
+  ],
+  "onebot_config": "<existing_local_config>",
+  "conversation": "optional",
+  "manage_napcat": "owned",
+  "lazy_asr": true,
+  "enable_voice": false,
+  "dev_backend": "dsh",
+  "dev_agent": "yhlz-dev",
+  "dev_model": "",
+  "dev_workspace": "cache/qq_bridge/lite/dev_workspace",
+  "dev_timeout_seconds": 1800,
+  "daemon_url": "http://127.0.0.1:8321",
+  "daemon_required_for_normal_chat": true,
+  "restart_backoff_seconds": [
+    2,
+    5,
+    15,
+    30,
+    60
+  ],
+  "heartbeat_seconds": 10,
+  "pong_timeout_seconds": 5,
+  "status_interval_seconds": 5,
+  "bridge_start_timeout_seconds": 20,
+  "owner_command_groups": [],
+  "notify_owner": "2258374446",
+  "group_history_turns": 50,
+  "groups": [
+    "1121723665",
+    "1094579571",
+    "855372167"
+  ],
+  "wake": {
+    "enabled": true,
+    "mode": "lively",
+    "names": [
+      "元亨",
+      "利贞"
+    ],
+    "topics": true,
+    "memory": true,
+    "topic_min_chars": 4,
+    "master_always": true,
+    "silence": false,
+    "at_only_groups": [
+      "855372167"
+    ]
+  },
+  "limits": {
+    "group_user_cooldown_seconds": 30,
+    "group_chan_per_minute": 6,
+    "group_chan_gap_seconds": 20,
+    "group_daily_limit": 300,
+    "private_user_cooldown_seconds": 30
+  },
+  "profiles": {
+    "refresh_seconds": 600,
+    "min_messages": 1,
+    "inject": true
+  },
+  "recovery": {
+    "check_interval_seconds": 2,
+    "attempt_timeout_seconds": 15,
+    "attempt2_delay_seconds": 2,
+    "stall_seconds": 30,
+    "start_grace_seconds": 30,
+    "backoff_seconds": [
+      15,
+      30,
+      60
+    ],
+    "blocked_after_failures": 5,
+    "blocked_retry_seconds": 600,
+    "lost_notice_text": "【系统检测到异常，元亨丢失】",
+    "recovered_notice_text": "【元亨已接续】"
+  },
+  "supervision": {
+    "napcat_miss_grace_seconds": 120,
+    "napcat_launch_cooldown_seconds": 300,
+    "napcat_max_attempts": 1,
+    "napcat_launch_wait_seconds": 15,
+    "account_offline_grace_seconds": 150,
+    "account_max_attempts": 1,
+    "account_restart_cooldown_seconds": 300,
+    "account_recover_wait_seconds": 60,
+    "account_blocked_retry_seconds": 900,
+    "scan_notice_after_seconds": 600,
+    "auto_start_napcat": false,
+    "auto_relogin": false
+  },
+  "sticker_library": {
+    "auto_accept_confidence": 0.85,
+    "review_confidence": 0.6,
+    "default_scope": "source"
+  },
+  "auto_resume": false
+}

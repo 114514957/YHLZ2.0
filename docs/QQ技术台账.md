@@ -97,10 +97,11 @@
 
 ## 记录 0010：远程开发桥（QQ → 开发能力）
 
-- 路径：QQ 指令 → `target_dev_bridge.handle_dev_command` → `tools/dev_runner.py`（后端可切 `opencode` / `dsh`）
-- 指令：`#dev` / `#a` / `#n` / `#backend opencode|dsh`
+- 路径：QQ 指令 → `target_dev_bridge.handle_dev_command` → `tools/dev_runner.py`（后端固定 harness/`dsh`；opencode 已退役——ledger 0797）
+- Lite 侧：`tools/qq_dev_runner.py`（job 台账/工作树）→ `tools/qq_dev_worker.py` → 常驻网关 `tools/dsh_worker.py`（job 面 `/job/*`；按工作区持有 harness，注入 `yhlz` MCP）
+- 指令：`#dev` / `#a` / `#n` / `#backend`（只读：固定 harness）
 - 元亨侧：`[[dev: 任务]]`（owner 渠道，经 `extract_dev_task` + `start_dev_task`）
-- 关键词：`target_dev_bridge` `handle_dev_command` `dev_runner.py` `opencode` `dsh` `#dev` `#backend` `[[dev:]]` `extract_dev_task` `start_dev_task`
+- 关键词：`target_dev_bridge` `handle_dev_command` `dev_runner.py` `qq_dev_worker.py` `dsh_worker.py` `harness_gateway.py` `harness` `dsh` `#dev` `#backend` `[[dev:]]` `extract_dev_task` `start_dev_task`
 
 ## 记录 0011：排障要点
 

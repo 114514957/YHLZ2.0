@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>YHLZ · 元 · 亨 · 利 · 贞</title>
-<link rel="icon" href="/favicon.png?v=2">
+<link rel="icon" href="/favicon.png?v=20261017">
 <link rel="stylesheet" href="/console.css">
 </head>
 <body>
@@ -31,6 +31,16 @@
     <p class="kv" style="font-size:11px;opacity:.75">文本：打字；语音：连续对话（免点击，边说边识别）</p>
   </section>
   <section class="card">
+    <h3>启动入口</h3>
+    <div class="qrow">
+      <button id="ln-napcat" class="btn-mini" type="button" title="NapCat 管理面板（6099）；未运行会自动拉起">NapCat 面板</button>
+      <button id="ln-official" class="btn-mini" type="button" title="SoulX-Singer 官方翻唱 UI（7861）；独占唱窗，期间聊天暂停">翻唱官方UI</button>
+      <button id="ln-official-stop" class="btn-mini" type="button" style="display:none" title="关闭官方 UI 并恢复聊天">关闭官方UI</button>
+    </div>
+    <div id="ln-status" class="kv" style="font-size:12px;opacity:.8">官方UI 未开启（独占唱窗，启动后聊天暂停）</div>
+    <div id="ln-napcat-status" class="kv" style="font-size:12px;opacity:.8">点击按钮打开（未运行会自动拉起）</div>
+  </section>
+  <section class="card">
     <h3>后台情况</h3>
     <ul class="svc">
       <li><span class="dot" id="s-gemma"></span>Gemma 8081</li>
@@ -47,6 +57,9 @@
     <p class="kv"><span>桥接</span><b id="q-bridge">-</b></p>
     <div class="qrow">
       <button id="q-wake" class="btn-mini" type="button" title="唤起 NapCat 以便登录元亨号">唤起登录</button>
+      <button id="q-start" class="btn-mini" type="button" title="启动 QQ 桥 Lite（看门狗+桥；NapCat 已登录时秒开）">启动QQ桥</button>
+      <button id="q-restart" class="btn-mini" type="button" title="重启 QQ 桥（NapCat 登录保持不动）">重启桥</button>
+      <button id="q-stop" class="btn-mini" type="button" title="停止桥和看门狗，保留 QQ 登录；下次登录系统也保持停止">停止桥</button>
     </div>
     <div id="qqQrWrap" style="display:none;text-align:center;margin-top:8px">
       <img id="qqQr" alt="登录二维码" style="width:150px;height:150px;border-radius:8px;background:#fff">
@@ -119,12 +132,11 @@
       <button id="sing-go" class="btn-mini" type="button">开始翻唱</button>
     </div>
     <div class="qrow">
-      <label class="ck"><input type="checkbox" id="sing-sep" checked>
-        人声分离（整歌质量优先，约 +10 分钟；聊天不中断）</label>
-      <label>翻唱嗓<select id="sing-voice"><option value="xiaoyi">Xiaoyi（平静）</option><option value="bright">清亮俏皮</option></select></label>
+      <span style="opacity:.85;font-size:12px">规则：只翻唱干声，和声/伴奏保留原声（自动分轨混回）</span>
+      <label>翻唱嗓<select id="sing-voice"><option value="bright">清亮俏皮（默认）</option><option value="xiaoyi">Xiaoyi（平静）</option></select></label>
     </div>
     <div id="sing-status" class="qrow" style="opacity:.8;font-size:12px">
-      选一首歌 → 开始：用元亨嗓翻唱，成品保存到「音频素材/翻唱产出/」。哼唱可关掉分离更快；仅 SVC 阶段聊天暂停约 2 分钟。
+      选一首歌 → 开始：自动分轨 → 只把干声换成元亨嗓（和声/伴奏用原声）→ 成品+分层存「音频素材/翻唱产出/」并入库。预处理聊天不中断；仅 SVC 唱窗暂停约 2 分钟。
     </div>
     <audio id="sing-audio" controls style="width:100%;display:none;margin-top:6px"></audio>
     <div id="songs-list" class="qrow" style="flex-wrap:wrap;gap:6px;font-size:12px"></div>

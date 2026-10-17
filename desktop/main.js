@@ -11,6 +11,9 @@ let chatWin = null;
 const CONSOLE_URL = "http://127.0.0.1:8321/";
 const AVATAR_URL = "http://127.0.0.1:8321/avatar.html?pet=1";
 const CHAT_URL = "http://127.0.0.1:8321/chat_popup.html";
+// 2026-10-17（ledger 0828）：统一用方形多尺寸 ICO；对话窗/桌宠窗口原来没设
+// 图标，任务栏会显示 Electron 默认图标（"启动图标还是有问题"的来源之一）。
+const APP_ICON = path.join(__dirname, "..", "assets", "icons", "yhlz-app2.ico");
 
 function openChat() {
   if (!chatWin || chatWin.isDestroyed()) {
@@ -18,6 +21,7 @@ function openChat() {
       width: 560,
       height: 720,
       title: "YHLZ · 对话",
+      icon: APP_ICON,
       autoHideMenuBar: true,
       webPreferences: { contextIsolation: true, nodeIntegration: false },
     });
@@ -49,6 +53,7 @@ function makeWindow() {
     skipTaskbar: true,
     hasShadow: false,
     focusable: true,
+    icon: APP_ICON,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -108,7 +113,7 @@ function setPetDrag(on) {
 }
 
 async function makeTray() {
-  let icon = path.join(__dirname, "..", "assets", "icons", "yhlz-app2.ico");
+  const icon = APP_ICON;
   tray = new Tray(nativeImage.createFromPath(icon));
   tray.setToolTip("YHLZ · 元 · 亨 · 利 · 贞");
   const models = await modelsSubmenu();

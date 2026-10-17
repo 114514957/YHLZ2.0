@@ -153,6 +153,38 @@ def autonomy_due(*, last_tick: float, now: float, timer_seconds: float,
     return False, "wait"
 
 
+def _gpu_chat_active() -> int:
+    """Cheap GPU-interlock read used by /health (never touches SQLite/locks)."""
+    try:
+        from backend import gpu_lock
+
+        return int(gpu_lock.chat_active())
+    except Exception:
+        return 0
+
+
+def _daemon_target_voice_enabled() -> bool:
+    """Opt-in (default off): route audio turns through the shared Target graph."""
+    import os
+
+    return os.getenv("YHLZ_DAEMON_TARGET_VOICE", "0").strip() == "1"
+
+
+def _daemon_target_device_binding():
+    """Build an explicit endpoint binding from env (fail-closed)."""
+    import os
+
+    from backend.target_device_binding import TargetDeviceBinding
+
+    return TargetDeviceBinding(
+        input_name=os.getenv("YHLZ_TARGET_INPUT_NAME", ""),
+        output_name=os.getenv("YHLZ_TARGET_OUTPUT_NAME", ""),
+        route=os.getenv("YHLZ_TARGET_ROUTE", "speaker_mic"),
+        input_hostapi_name=os.getenv("YHLZ_TARGET_INPUT_HOSTAPI") or None,
+        output_hostapi_name=os.getenv("YHLZ_TARGET_OUTPUT_HOSTAPI") or None,
+    )
+
+
 class DaemonRuntime:
     def __init__(self, session_factory: Optional[Callable[[], Any]] = None,
                  llm_turn: Any = None,
@@ -163,6 +195,16 @@ class DaemonRuntime:
         self._llm_turn_override = llm_turn
         self._sessions: dict[str, Any] = {}
         self._lock = threading.Lock()
+        # 节点A (default off): route audio turns through the shared Target graph.
+        self._target_voice = None
+        self._target_voice_error = ""
+        self._target_voice_lock = threading.Lock()
+        self._started_at = time.time()
+        self._target_voice_cleanup_pending = False
+        from backend.voice_task_supervisor import VoiceTaskSupervisor
+        self._voice_supervisor = VoiceTaskSupervisor()
+        from backend.voice_jobs import VoiceJobs
+        self._voice_jobs = VoiceJobs()
         import os as _os
 
         if autonomy_seconds is None:
@@ -239,11 +281,8 @@ class DaemonRuntime:
                 except Exception:
                     pass
                 try:
-                    # P2e: proactive contact — queue a substantive autonomous
-                    # thought for the QQ bridge to relay to the master.
-                    # 0496: the decision is now explicit and logged (was a single
-                    # compound `if`, which left no trace of why nothing was sent).
-                    from backend import qq_outbox
+                    # 2026-10-01: 自主时刻不再转发 QQ，改写进元亨自己的日记。
+                    from backend.target_scheduler_tools import diary_write
 
                     ans = str(info.get("answer", "")).strip()
                     if len(ans) < 30:
@@ -252,14 +291,15 @@ class DaemonRuntime:
                         pushed, reason = False, "model_says_none"
                     else:
                         ok, reason = notify_guard.allow_ex(
-                            "autonomy", ans, cooldown=6 * 3600, max_per_day=2)
+                            "autonomy_diary", ans, cooldown=3 * 3600,
+                            max_per_day=8)
                         pushed = bool(ok)
                         if pushed:
-                            qq_outbox.push("[自主] " + ans, kind="autonomy")
+                            diary_write("【自主时刻】" + ans)
                 except Exception as exc:  # noqa: BLE001
                     pushed, reason, ans = False, "error", str(
                         info.get("answer", "")).strip()
-                    print(f"[autonomy] push 失败 {type(exc).__name__}", flush=True)
+                    print(f"[autonomy] diary 失败 {type(exc).__name__}", flush=True)
                 log_autonomy_tick({
                     "ts": time.time(),
                     "time": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -268,7 +308,7 @@ class DaemonRuntime:
                     "drives": _drive_snapshot(),
                     "tool_uses": info.get("tool_uses", []),
                     "answer_head": ans[:120],
-                    "pushed": pushed,
+                    "diary": pushed,
                     "reason": reason,
                 })
                 self._autonomy_last = time.time()
@@ -276,7 +316,7 @@ class DaemonRuntime:
                     self._autonomy_urge_last = time.time()
                 print("[autonomy] tick(" + trigger + "): "
                       + str(info.get("answer", ""))[:90]
-                      + f" | push={pushed}/{reason}", flush=True)
+                      + f" | diary={pushed}/{reason}", flush=True)
             except Exception as exc:  # noqa: BLE001
                 print(f"[autonomy] skip {type(exc).__name__}", flush=True)
 
@@ -328,6 +368,7 @@ class DaemonRuntime:
                 s = self._factory(key)
                 if self._llm_turn_override is not None:
                     s.llm_turn = self._llm_turn_override
+                s._voice_supervisor = self._voice_supervisor
                 self._sessions[key] = s
             return s
 
@@ -343,7 +384,14 @@ class DaemonRuntime:
             return {"status": "degraded", "detail": type(exc).__name__}
         return {"status": "ok", "provider": "dual-rail",
                 "sessions": len(self._sessions), "turns": counts,
-                "llm": "deepseek->ollama"}
+                "llm": "deepseek->ollama",
+                "uptime_s": round(
+                    time.time() - getattr(self, "_started_at", time.time()), 1),
+                "active_turns": _gpu_chat_active(),
+                "voice_background": self._voice_supervisor.snapshot(),
+                "target_voice": self._target_voice.health() if self._target_voice is not None else {
+                    "ready": False, "error_code": self._target_voice_error,
+                    "cleanup_pending": self._target_voice_cleanup_pending}}
 
     @staticmethod
     def _norm_ui_channel(channel: str) -> str:
@@ -358,16 +406,123 @@ class DaemonRuntime:
 
     def turn(self, text: str, channel: str = "private",
              images: list | None = None, audio: list | None = None) -> dict:
-        """GPU interlock (ledger 0459): refuse new turns during the SVC window."""
+        """GPU interlock (ledger 0459): refuse new turns during the SVC window.
+
+        节点A (opt-in, default off): audio turns are routed through the shared
+        Target graph; only a clean pre-dispatch failure may use the legacy path.
+        """
         from backend import gpu_lock
 
         if not gpu_lock.chat_enter():
             return {"answer": gpu_lock.busy_message(), "tool_uses": [],
                     "iterations": 0, "busy": True}
         try:
+            if audio and not images and self._norm_ui_channel(channel) == "console":
+                routed = self._target_voice_turn(text, channel, audio)
+                if routed is not None:
+                    return routed
             return self._turn_impl(text, channel, images=images, audio=audio)
         finally:
             gpu_lock.chat_exit()
+
+    def _ensure_target_voice(self):
+        """节点A: lazily start the shared Target graph on this daemon loop.
+
+        Strictly opt-in; fail-closed (returns None on any error so the caller
+        falls back to the legacy path).  Never opens devices unless enabled.
+        """
+        if not _daemon_target_voice_enabled():
+            return None
+        with self._target_voice_lock:
+            if self._target_voice is not None:
+                return self._target_voice
+            if self._target_voice_error:
+                return None
+            service = None
+            future = None
+            try:
+                import os
+
+                from backend.target_daemon_service import TargetDaemonService
+
+                service = TargetDaemonService(
+                    _daemon_target_device_binding(),
+                    model_dir=(os.getenv("YHLZ_TARGET_MODEL_DIR") or None),
+                    voice_profile=(os.getenv("YHLZ_TARGET_VOICE_PROFILE") or None),
+                    session_factory=lambda: self._session("console"),
+                    voice_supervisor=self._voice_supervisor,
+                )
+                future = asyncio.run_coroutine_threadsafe(service.start(), self._loop)
+                future.result(timeout=240)
+                self._target_voice = service
+                print("[target-voice] started", flush=True)
+                return service
+            except Exception as exc:  # noqa: BLE001
+                self._target_voice_error = type(exc).__name__
+                if future is not None and not future.done():
+                    future.cancel()
+                if service is not None:
+                    self._target_voice_cleanup_pending = True
+                    try:
+                        cleanup = asyncio.run_coroutine_threadsafe(service.shutdown(), self._loop)
+                        cleanup.result(timeout=15)
+                        self._target_voice_cleanup_pending = False
+                    except Exception:
+                        # Never start the old path while output ownership is unknown.
+                        pass
+                print(f"[target-voice] start failed: {self._target_voice_error}",
+                      flush=True)
+                return None
+
+    def _target_voice_turn(self, text, channel, audio):
+        """Route one audio turn through the shared Target graph.
+
+        Returns a turn dict, or None so the caller uses the legacy entry.
+        """
+        if self._norm_ui_channel(channel) != "console":
+            return None  # QQ/public audio must not activate the local speaker.
+        service = self._ensure_target_voice()
+        if service is None:
+            if getattr(self, "_target_voice_cleanup_pending", False):
+                return {"answer": "", "status": "failed", "target_voice": True,
+                        "error_code": "TARGET-CLEANUP-UNCONFIRMED", "tool_uses": [], "iterations": 0}
+            return None
+        future = None
+        try:
+            future = asyncio.run_coroutine_threadsafe(
+                service.submit_audio(audio, text=str(text or ""),
+                                     source="daemon_audio"),
+                self._loop)
+            result = future.result(timeout=240)
+            return {
+                "answer": str(getattr(result, "text", "") or ""),
+                "tool_uses": [],
+                "iterations": 1,
+                "status": str(getattr(result, "status", "") or ""),
+                "target_voice": True,
+                "turn_id": getattr(result, "turn_id", None),
+                "error_code": getattr(result, "error_code", None),
+            }
+        except Exception as exc:  # noqa: BLE001
+            if future is not None:
+                future.cancel()  # service cancels only this turn's lease, not a newer one
+            print(f"[target-voice] turn failed: {type(exc).__name__}", flush=True)
+            return {"answer": "", "tool_uses": [], "iterations": 1,
+                    "status": "failed", "target_voice": True,
+                    "error_code": "TARGET-VOICE-" + type(exc).__name__.upper(),
+                    "stop_confirmed": False}
+
+    def shutdown_voice(self, timeout_s=20.0):
+        async def close():
+            try:
+                jobs = getattr(self, "_voice_jobs", None)
+                if jobs is not None:
+                    await jobs.shutdown()
+                if self._target_voice is not None:
+                    await self._target_voice.shutdown()
+            finally:
+                await self._voice_supervisor.shutdown()
+        return asyncio.run_coroutine_threadsafe(close(), self._loop).result(timeout=timeout_s)
 
     def _turn_impl(self, text: str, channel: str = "private",
                    images: list | None = None, audio: list | None = None) -> dict:
@@ -390,30 +545,47 @@ class DaemonRuntime:
         future = asyncio.run_coroutine_threadsafe(
             s.run_turn(str(text), images=images, audio=audio), self._loop)
         info = future.result(timeout=240)
-        # [[dev: ...]] hand-off to 利贞 (ledger 0406): owner-only, strip the
-        # marker from the answer before it is stored/spoken, dispatch async.
-        try:
+        # Text markers cannot authorize a dev process. Apply defense in depth
+        # for custom/legacy session factories too; explicit #dev was handled
+        # above from trusted owner input. Frozen audio dispatch stays unchanged.
+        if not audio:
             from backend.target_entry import is_owner_channel
+            from backend.target_dev_bridge import guard_text_dev_handoff
 
-            if is_owner_channel(key):
-                from backend.target_dev_bridge import (
-                    extract_dev_task, start_dev_task,
-                )
+            guarded, status = guard_text_dev_handoff(
+                str(info.get("answer", "")), is_owner=is_owner_channel(key),
+                had_tool_attempts=bool(info.get("tool_uses")))
+            if status:
+                info["answer"] = guarded
+                info["dev_handoff_status"] = status
+        else:
+            # [[dev: ...]] hand-off to 利贞 (ledger 0406): owner-only, strip the
+            # marker from the answer before it is stored/spoken, dispatch async.
+            try:
+                from backend.target_entry import is_owner_channel
 
-                clean, task = extract_dev_task(str(info.get("answer", "")))
-                if task:
-                    info["answer"] = clean
-                    info["dev_task"] = task
-                    note = start_dev_task(task)
-                    if note:
-                        info["answer"] = (clean + "\n" + note).strip()
-        except Exception:
-            pass
+                if is_owner_channel(key):
+                    from backend.target_dev_bridge import (
+                        extract_dev_task, start_dev_task,
+                    )
+
+                    clean, task = extract_dev_task(str(info.get("answer", "")))
+                    if task:
+                        info["answer"] = clean
+                        info["dev_task"] = task
+                        note = start_dev_task(task)
+                        if note:
+                            info["answer"] = (clean + "\n" + note).strip()
+            except Exception:
+                pass
         try:
             s.save_session("console" if key == "console" else
                            "qq_" + key if key != "private" else "default")
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            # 2026-10-13（ledger 0816）：这里原来静默 pass——会话写盘失败后
+            # 表现是"上下文丢了/每轮像重新认识"，但日志里一个字都没有。
+            print(f"[session] 保存失败 key={key} {type(exc).__name__}: {exc}",
+                  flush=True)
         self._maybe_consolidate(key)
         try:
             answer = str(info.get("answer", ""))
@@ -805,6 +977,10 @@ class _Handler(ConsoleHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self.path.startswith("/voice/jobs/"):
+            from backend.target_voice_api import handle_get
+            handle_get(self)
+            return
         if self._ui_route("GET"):
             return
         if self.path.startswith(("/sing", "/songs")):
@@ -826,11 +1002,29 @@ class _Handler(ConsoleHandler):
             # upload/sing/song routes read the raw body themselves
             self.console_do_POST()
             return
-        length = int(self.headers.get("Content-Length", 0))
+        if self.path.startswith("/voice/"):
+            from backend.target_voice_api import MAX_BODY_BYTES, local_request
+            if not local_request(self):
+                self._send(403, {"error": "VOICE-LOCAL-ONLY"})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                self._send(400, {"error": "VOICE-INVALID-LENGTH"})
+                return
+            if not 0 <= length <= MAX_BODY_BYTES:
+                self._send(413, {"error": "VOICE-BODY-TOO-LARGE"})
+                return
+        else:
+            length = int(self.headers.get("Content-Length", 0))
         try:
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
             self._send(400, {"error": "bad json"})
+            return
+        if self.path.startswith("/voice/"):
+            from backend.target_voice_api import handle_post
+            handle_post(self, payload)
             return
         if self.path == "/turn":
             text = str(payload.get("text", "")).strip()
@@ -961,6 +1155,17 @@ def main() -> int:
     parser.add_argument("--autonomy-hours", type=float, default=3.0,
                         help="self-initiated autonomy cadence (hours)")
     args = parser.parse_args()
+    # 环境消毒（ledger 0815）：NO_PROXY 里带方括号的 IPv6（`[::1]`，DSH/Node 工具链
+    # 会注入）会让 daemon 的 httpx 对**每个**请求抛 InvalidURL → 元亨在 QQ 上全哑
+    # （2026-10-13 22:0x 事故）。启动即清掉并记录，避免"看起来像模型挂了"。
+    try:
+        from backend.env_loader import ensure_env_loaded, sanitize_proxy_env
+
+        ensure_env_loaded()
+        for _change in sanitize_proxy_env():
+            print(f"[env] {_change}", flush=True)
+    except Exception:
+        pass
     runtime = DaemonRuntime(autonomy_seconds=max(60.0,
                                                  args.autonomy_hours * 3600))
     try:
@@ -989,6 +1194,9 @@ def main() -> int:
         server.serve_forever()
     except KeyboardInterrupt:
         print("shutdown", flush=True)
+    finally:
+        server.server_close()
+        runtime.shutdown_voice()
     return 0
 
 

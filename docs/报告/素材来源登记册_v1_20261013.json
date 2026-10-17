@@ -1,0 +1,221 @@
+// V9 素材来源登记册 v1（机器可读）
+// 2026-10-13 建。用途：GB/T 45654—2025 要求的"训练数据来源可追溯"留痕。
+// 字段：id / name / kind / location / license / robots_or_terms / pre_collect_assessment /
+//       post_collect_verification / usable_for / rights_scope_status / notes
+// 约定：
+//   rights_scope_status ∈ { pending, cleared, nc_only, public_domain, reference_only, own }
+//   assessment_status  ∈ { not_done, partial, done }   ← 国标要求的 5% 双评估，目前绝大多数是 not_done
+//   ⚠️ 本册只记录**已核实的事实**，不把"打算核"写成"已核"。
+{
+  "version": "v1",
+  "created": "2026-10-13",
+  "standard_ref": "GB/T 45654—2025 训练数据条款（来源合法性、知识产权、个人信息）",
+  "legend": {
+    "kind": ["local_material", "qq_corpus", "open_dataset", "novel", "book", "web_reference"],
+    "assessment_status": ["not_done", "partial", "done"],
+    "rights_scope_status": ["pending", "cleared", "nc_only", "public_domain", "reference_only", "own"]
+  },
+  "sources": [
+    {
+      "id": "SRC-001",
+      "name": "自有素材集（对话样本/记忆v2/诚实边界/安全拒绝/承认不确定/真实对话/优质样本/黄金样本）",
+      "kind": "local_material",
+      "location": "docs/素材/*.md（9 个主素材文件）",
+      "license": "自有创作 + 历史合成，无第三方许可问题",
+      "robots_or_terms": "不适用（本地自有）",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "partial（门控 + 抽审；无 4000 条规模留痕）",
+      "usable_for": ["核心黄金池", "上下文池"],
+      "rights_scope_status": "own",
+      "notes": "含历史合成草稿，非真实实录；旧 rating/keep/fixed 不等于本次通过"
+    },
+    {
+      "id": "SRC-002",
+      "name": "QQ 群语料（corpus_qq.jsonl，18567 条）",
+      "kind": "qq_corpus",
+      "location": "data/finetune/corpus_qq.jsonl",
+      "license": "群内成员发言；**涉及他人个人信息**",
+      "robots_or_terms": "不适用（群内数据）",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "partial（本次 4000 抽样机器判定合格率 99.08%）",
+      "usable_for": ["上下文与多轮池（须先匿名化）"],
+      "rights_scope_status": "pending",
+      "notes": "**待老爹裁（D-1）**：①自有群+匿名化+留依据 ②只取元亨与老爹本人发言 ③停用群友发言。群号/昵称/QQ 号须哈希化后才可出集"
+    },
+    {
+      "id": "SRC-003",
+      "name": "真实对话样本（31 块，小寻虚拟主播交流群导出）",
+      "kind": "local_material",
+      "location": "docs/素材/真实对话样本.md",
+      "license": "同 SRC-002（群内发言）",
+      "robots_or_terms": "不适用",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "partial",
+      "usable_for": ["核心黄金池（实录）"],
+      "rights_scope_status": "pending",
+      "notes": "台账 0506 记录：原 4066 条导出 → 元亨 33 条（22 文字 + 11 语音 ASR）"
+    },
+    {
+      "id": "SRC-004",
+      "name": "Moemu/Muice-Dataset",
+      "kind": "open_dataset",
+      "location": "HF；本机仅预览缓存 cache/v9_materials_review/20261008/",
+      "license": "**CC BY-NC 4.0**，商业需授权",
+      "robots_or_terms": "HF 数据卡已核（固定 revision）",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["说话与一般任务池（仅非商业，隔离）"],
+      "rights_scope_status": "nc_only",
+      "notes": "主集 train.jsonl 3376 条；另有 Customized 混合集不可当主集"
+    },
+    {
+      "id": "SRC-005",
+      "name": "NaturalConv（xywang1/NaturalConv）",
+      "kind": "open_dataset",
+      "location": "HF；未下载",
+      "license": "**腾讯自定义非商业条款**",
+      "robots_or_terms": "官方条款已核",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["说话与一般任务池（非商业，隔离）"],
+      "rights_scope_status": "nc_only",
+      "notes": "19919 记录；20 messages ≠ 20 问答轮，需归并"
+    },
+    {
+      "id": "SRC-006",
+      "name": "BAAI/COIG",
+      "kind": "open_dataset",
+      "location": "HF；未下载",
+      "license": "顶层 Apache-2.0，但卡面提示第三方协议与生成模型条件 → **须逐子集核**",
+      "robots_or_terms": "数据卡已读",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["一般任务池（许可明确子集）"],
+      "rights_scope_status": "pending",
+      "notes": "不按顶层 Apache 推断全库放行"
+    },
+    {
+      "id": "SRC-007",
+      "name": "zhcompanion/companion-roleplay-sft",
+      "kind": "open_dataset",
+      "location": "HF；6 demo 已读",
+      "license": "公开；仅 6 demo",
+      "robots_or_terms": "已核",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["风格参考（method/reference）"],
+      "rights_scope_status": "reference_only",
+      "notes": "不承担千条级补量"
+    },
+    {
+      "id": "SRC-008",
+      "name": "m-a-p/COIG-CQIA",
+      "kind": "open_dataset",
+      "location": "HF；未下载",
+      "license": "当前卡未见明确顶层 license；正文写研究用途、多平台来源",
+      "robots_or_terms": "数据卡已读",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["备选（按子来源核）"],
+      "rights_scope_status": "pending",
+      "notes": "不优先靠它填数"
+    },
+    {
+      "id": "SRC-009",
+      "name": "Salesforce/xlam-function-calling-60k",
+      "kind": "open_dataset",
+      "location": "HF；**访问门控，未取得**",
+      "license": "卡面 CC BY 4.0 但正文写研究用途 → 冲突",
+      "robots_or_terms": "未获访问确认",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["暂不可用"],
+      "rights_scope_status": "pending",
+      "notes": "**不算可用训练数据**"
+    },
+    {
+      "id": "SRC-010",
+      "name": "《希灵帝国》《异常生物见闻录》《诡秘之主》（远瞳 / 爱潜水的乌贼）",
+      "kind": "novel",
+      "location": "本机无文本；仅百科级设定（不构成训练数据）",
+      "license": "在版版权作品，**逐本核权中**",
+      "robots_or_terms": "仅读取公开百科条目作设定参考",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["阅读讨论/抽象机制（不依赖原文）"],
+      "rights_scope_status": "pending",
+      "notes": "台账 0783 记录为『来源方向授权』，**不等于已获训练使用权**；引用原文须待文本＋授权"
+    },
+    {
+      "id": "SRC-011",
+      "name": "《苏菲的世界》等哲学启蒙/智慧小说候选簇（10 本）",
+      "kind": "novel",
+      "location": "本机无文本",
+      "license": "在版；《小王子》《瓦尔登湖》原文公版、译本逐版核",
+      "robots_or_terms": "仅读取中文维基条目作概览",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["阅读讨论/抽象机制"],
+      "rights_scope_status": "pending",
+      "notes": "《苏菲的世界》建议降级为『机制来源』（对话录形式）"
+    },
+    {
+      "id": "SRC-012",
+      "name": "语言学书籍候选（《语言学的邀请》《我们赖以生存的隐喻》《汉字王国》《Eats, Shoots & Leaves》等）",
+      "kind": "book",
+      "location": "本机无文本",
+      "license": "在版译本，**未核**",
+      "robots_or_terms": "未抓取",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["说话与一般任务池（先做不依赖原文的原创讨论型）"],
+      "rights_scope_status": "pending",
+      "notes": "老爹 2026-10-13 追加方向"
+    },
+    {
+      "id": "SRC-013",
+      "name": "科普书籍候选（《万物简史》《上帝掷骰子吗》《自私的基因》《魔鬼出没的世界》《冷浪漫》《what if?》等）",
+      "kind": "book",
+      "location": "本机无文本",
+      "license": "在版译本，**未核**；《昆虫记》原文公版、译本逐版核",
+      "robots_or_terms": "未抓取",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["说话与一般任务池（同上）"],
+      "rights_scope_status": "pending",
+      "notes": "老爹 2026-10-13 追加方向"
+    },
+    {
+      "id": "SRC-014",
+      "name": "公版经典文本（庄子/伊索寓言/世说新语/浮生六记/幽梦影/陶庵梦忆 等，故事种子库 A/B/C）",
+      "kind": "book",
+      "location": "docs/素材/_原素材/故事原素材_v0_20261011.md（种子索引）",
+      "license": "**原文公版**（维基文库/维基百科已核）；中文译本逐版核",
+      "robots_or_terms": "维基文库条目已核",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["故事线（种子转化·原创改编）"],
+      "rights_scope_status": "public_domain",
+      "notes": "种子库本身是索引，不进装配、不进训练"
+    },
+    {
+      "id": "SRC-015",
+      "name": "公开百科正文（QQ阅读百科 / 中文维基 / 萌娘百科镜像 moegirl.icu / Fandom API）",
+      "kind": "web_reference",
+      "location": "本轮抓取（未落盘为语料，仅用于设定研读）",
+      "license": "各自许可不同：维基 CC BY-SA、萌娘镜像 CC BY-NC-SA 3.0 CN（禁商用）、Fandom 各自条款",
+      "robots_or_terms": "**未记录 robots 证据**",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["仅设定研读参考"],
+      "rights_scope_status": "reference_only",
+      "notes": "**不得作为训练语料**；如需使用须逐站核 robots 与许可"
+    }
+  ],
+  "current_gaps": [
+    "全部 15 个来源的 pre_collect_assessment 均为 not_done（国标要求的采集前 5% 评估）",
+    "外部来源与 QQ 语料的 post_collect_verification 均未达国标要求（无 4000 条人工签字留痕；本次仅机器判定）",
+    "SRC-002/003 的个人信息同意路径未定（待老爹 D-1）",
+    "SRC-015 缺 robots 证据记录"
+  ]
+}

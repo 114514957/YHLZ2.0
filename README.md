@@ -20,7 +20,7 @@
 | 链路 | 模型 | 说明 |
 |---|---|---|
 | 元亨本体（对话 / 人格） | 本地 **Gemma-4-E4B-Aggressive**（`gemma4-e4b-aggr-q4km.gguf` + 视觉 `mmproj`） | llama.cpp 起，端口 8081，reasoning 模型 |
-| 开发派单（`[[dev:]]`） | **deepseek/deepseek-v4-flash** | opencode headless，agent `yhlz-dev`（禁 git commit/push） |
+| 开发派单（`[[dev:]]`） | **deepseek/deepseek-v4-flash** | 利贞跑在 **DeepSeek Harness（dsh）** 上，常驻网关 `tools/dsh_worker.py`（禁 git commit/push） |
 
 ## 感知链路（本地优先）
 
@@ -44,7 +44,9 @@
 
 ## 开发 / Agent
 
-- opencode 通过 `opencode.json` 的 `yhlz` MCP 工具查询台账 / 记忆（`tools/yhlz_mcp_server.py`）
+- 利贞（开发执行体）跑在 **harness** 上：常驻网关 `tools/dsh_worker.py` 把 `yhlz` MCP
+  （`tools/yhlz_mcp_server.py`）以 `--patch` 覆盖层注入她的 profile，她用
+  `mcp__yhlz__*` 工具查台账 / 记忆；Full/Lite 两条链路都走它（opencode 已退役，ledger 0497）
 - 台账（**唯一事实源**）：`docs/上下文台账.md`
 - 台账增删查改（任何 agent 通用程序）：`python tools/ledger_cli.py {search,list,get,add,update,delete,stats,index}`
   （Python 直接 `import backend.ledger_store`；MCP 工具 `ledger_search/get/list/add/update/delete` 同源）
