@@ -76,14 +76,29 @@ class TextSessionBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     def assert_advertised_matches_offered(self):
+        """The prompt must never advertise a capability that is not offered.
+
+        Since 2026-10-22 the tool schemas are passed only through the API
+        `tools` parameter (the duplicated text listing is off by default), so
+        the invariant is: any advertised line is a subset of what is offered.
+        If the text listing is explicitly re-enabled, it must still match the
+        offered set exactly.
+        """
+        from backend.target_prompts import tool_text_block_enabled
+
         messages, schemas = self.calls[0]
         system = messages[0]['content']
         offered = {s['function']['name'] for s in schemas}
+        all_names = {s['function']['name'] for s in self.session.registry.export_openai_tools()}
         advertised = {line[2:].split(':', 1)[0] for line in system.splitlines()
                       if line.startswith('- ') and ':' in line
-                      and line[2:].split(':', 1)[0] in
-                      {s['function']['name'] for s in self.session.registry.export_openai_tools()}}
-        self.assertEqual(advertised, offered)
+                      and line[2:].split(':', 1)[0] in all_names}
+        self.assertTrue(
+            advertised <= offered,
+            f"prompt advertises tools that are not offered: {advertised - offered}",
+        )
+        if tool_text_block_enabled():
+            self.assertEqual(advertised, offered)
         self.assertEqual(sum(m['role'] == 'system' for m in messages), 1)
         return offered
 
@@ -185,9 +200,25 @@ class TextSessionBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(info['tool_evidence_status'], 'not_executed')
 
     async def test_render_default_preserves_full_owner_api(self):
-        text = self.session.render_system()
-        self.assertIn('- diary_write:', text)
-        self.assertNotIn('- diary_write:', self.session.render_system(allowed_tools=frozenset()))
+        """Owner default keeps the full tool surface; a restricted allow-list
+        still hides it. Since the duplicated text listing is off by default,
+        this is observable through the opt-in switch."""
+        import os
+
+        old = os.environ.get("YH_TOOL_TEXT_BLOCK")
+        try:
+            os.environ["YH_TOOL_TEXT_BLOCK"] = "1"
+            text = self.session.render_system()
+            self.assertIn('- diary_write:', text)
+            self.assertNotIn('- diary_write:', self.session.render_system(allowed_tools=frozenset()))
+            os.environ.pop("YH_TOOL_TEXT_BLOCK", None)
+            plain = self.session.render_system()
+            self.assertNotIn('- diary_write:', plain)  # no duplicate listing by default
+        finally:
+            if old is None:
+                os.environ.pop("YH_TOOL_TEXT_BLOCK", None)
+            else:
+                os.environ["YH_TOOL_TEXT_BLOCK"] = old
 
 
 class DaemonTextDefenseTests(unittest.TestCase):

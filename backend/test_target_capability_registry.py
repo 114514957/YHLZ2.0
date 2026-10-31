@@ -5,6 +5,7 @@ import unittest
 from backend.target_capability_registry import Capability, CapabilityRegistry
 from backend.target_scheduler_tools import (
     LEDGER,
+    QQOPS_ENABLED,
     ledger_search,
     recall_memory,
     scheduler_capabilities,
@@ -176,12 +177,15 @@ class TestSchedulerCapabilities(unittest.TestCase):
              "song.list", "song.play", "song.send",
              "report.qq_weekly", "system.time",
              "diary.write", "diary.list", "diary.delete", "task.plan",
-             "kb.add", "kb.query",
+             "kb.add", "kb.query", "member.profile",
              "qq.bootstrap", "qq.digest", "qq.export", "qq.process",
              "qq.runbatch", "qq.shutdown", "qq.status", "qq.summarize",
              "schedule.plan",
              "skill.add", "skill.feedback", "skill.search",
-             "file.list", "file.read", "web.fetch", "web.search"},
+             "file.download", "file.list", "file.read", "file.share",
+             "runtime.status", "web.fetch", "web.search",
+             "bili.find", "bili.watch", "bili.status", "bili.notes",
+             "bili.read"},
         )
         for name, cap in caps.items():
             if name in ("ledger.search", "memory.recall"):
@@ -207,24 +211,39 @@ class TestSchedulerCapabilities(unittest.TestCase):
         reg = setup_scheduler_capabilities()
         tools = reg.export_openai_tools()
         names = {t["function"]["name"] for t in tools}
-        self.assertEqual(names, {"ledger_search", "ledger_get", "ledger_list", "ledger_add", "ledger_update", "ledger_delete", "memory_recall", "memory_save", "memory_audit", "memory_profile", "memory_causal", "memory_why", "song_list", "song_play", "song_send", "report_qq_weekly", "system_time",
+        expected = {"ledger_search", "ledger_get", "ledger_list", "ledger_add", "ledger_update", "ledger_delete", "memory_recall", "memory_save", "memory_audit", "memory_profile", "memory_causal", "memory_why", "song_list", "song_play", "song_send", "report_qq_weekly", "system_time",
               "diary_write", "diary_list", "diary_delete", "task_plan",
-              "kb_add", "kb_query",
+              "kb_add", "kb_query", "member_profile",
               "qq_bootstrap", "qq_digest", "qq_export", "qq_process",
               "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize",
               "schedule_plan",
               "skill_add", "skill_feedback", "skill_search",
-              "file_list", "file_read", "web_fetch", "web_search"})
+              "file_download", "file_list", "file_read", "file_share",
+              "runtime_status", "web_fetch", "web_search",
+              "bili_find", "bili_watch", "bili_status", "bili_notes",
+              "bili_read"}
+        # 0831：QQ 归 Lite 独占时，旧采集/导出工具对 LLM 隐藏（fail-closed）。
+        # 2026-10-20 老爹定「qq导出就是工具，要做」→ 以下 5 个改为**恒暴露**：
+        #   qq.export 双路（Full 链走 QCE / 否则走 Lite 群历史库只读导出）；
+        #   qq.status / qq.process / qq.digest / qq.summarize 只读本地文件与知识库，
+        #   Lite 模式下同样能跑，故也解除隐藏。
+        # 仅真正依赖 NapCat/QCE 链的 3 个仍按开关隐藏。
+        if not QQOPS_ENABLED:
+            expected -= {"qq_bootstrap", "qq_runbatch", "qq_shutdown"}
+        self.assertEqual(names, expected)
 
     def test_internal_names_stay_dotted(self):
         reg = setup_scheduler_capabilities()
-        self.assertEqual(reg.names(), ["diary.delete", "diary.list", "diary.write", "file.list", "file.read",
+        self.assertEqual(reg.names(), ["bili.find", "bili.notes", "bili.read", "bili.status", "bili.watch",
+             "diary.delete", "diary.list", "diary.write", "file.download", "file.list", "file.read", "file.share",
              "kb.add", "kb.query", "ledger.add", "ledger.delete", "ledger.get",
              "ledger.list", "ledger.search", "ledger.update",
+             "member.profile",
              "memory.audit", "memory.causal", "memory.profile", "memory.recall", "memory.save", "memory.why",
              "owner.approve",
              "qq.bootstrap", "qq.digest", "qq.export", "qq.process", "qq.runbatch", "qq.shutdown", "qq.status", "qq.summarize",
              "report.qq_weekly",
+             "runtime.status",
              "schedule.plan",
              "skill.add", "skill.feedback", "skill.search",
              "song.list", "song.play", "song.send", "system.time",

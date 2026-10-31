@@ -162,7 +162,7 @@ class QwenProviderAdapterTests(unittest.TestCase):
             events = await _collect(session)
             self.assertEqual(
                 [event.kind for event in events],
-                ["READY", "PCM_CHUNK", "PCM_CHUNK", "DONE"],
+                ["READY", "PCM_CHUNK", "PCM_CHUNK", "PCM_STREAM_END", "DONE"],
             )
             self.assertEqual(model.calls[0]["text"], "你好，这里是元亨")
             self.assertEqual(model.calls[0]["speaker"], "Vivian")
@@ -178,7 +178,7 @@ class QwenProviderAdapterTests(unittest.TestCase):
             self.assertTrue(normalizer.done)
             self.assertEqual(
                 [event.kind for event in normalized],
-                ["READY", "FIRST_CHUNK", "PCM_CHUNK", "PCM_CHUNK", "DONE"],
+                ["READY", "FIRST_CHUNK", "PCM_CHUNK", "PCM_CHUNK", "PCM_STREAM_END", "DONE"],
             )
             self.assertTrue(await session.wait_stopped(0.2))
             self.assertTrue(await provider.wait_idle_stopped(0.2))

@@ -1,0 +1,29 @@
+{
+ "file": "docs\\素材\\长对话生成提示词_v0_20261008.md",
+ "profile": "general",
+ "blocks": [
+  {
+   "name": "一、生成提示词（可复制）",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  }
+ ],
+ "summary": {
+  "PASS": 0,
+  "WARN": 0,
+  "FAIL": 1
+ }
+}

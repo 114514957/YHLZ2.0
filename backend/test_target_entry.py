@@ -254,37 +254,29 @@ class TestConversationSession(unittest.TestCase):
         self.assertTrue(owner._is_owner())
 
 
-    def test_group_promote_writes_owner_with_source(self):
+    def test_group_promote_only_creates_pending_candidate(self):
         import asyncio
         import json
-        import sqlite3
+        from unittest.mock import patch
+        from backend.memory_review import MemoryReviewQueue
 
-        import backend.target_memory as tm
-
-        tmp = self.tmp / "owner.db"
-        real = tm.TargetMemoryService
-
-        class _Fake(real):
-            def __init__(self, *a, **k):
-                super().__init__(db_path=tmp)
-
-        tm.TargetMemoryService = _Fake
-        try:
-            class _LLM:
-                async def __call__(self, messages, tools):
-                    return {"content": json.dumps(
-                        [{"summary": "群友分享的 Python 技巧", "kind": "fact"}])}
-
-            sess = ConversationSession(memory=self.mem, registry=self.reg,
-                                       llm_turn=_LLM(), channel="qq_g123")
+        queue = MemoryReviewQueue(self.tmp / "review.db")
+        class _LLM:
+            async def __call__(self, messages, tools):
+                return {"content": json.dumps(
+                    [{"summary": "群友分享的 Python 技巧", "kind": "fact"}])}
+        sess = ConversationSession(memory=self.mem, registry=self.reg,
+                                   llm_turn=_LLM(), channel="qq_g123456")
+        from types import SimpleNamespace
+        with patch('backend.memory_review.MemoryReviewQueue', return_value=queue), \
+             patch('backend.memory_resource_policy.load_memory_resource_policy',
+                   return_value=SimpleNamespace(llm_enabled=True)):
             n = asyncio.run(sess._promote_group("群里聊到 Python", "是个好技巧"))
-            self.assertGreaterEqual(n, 1)
-            con = sqlite3.connect(str(tmp))
-            row = con.execute("SELECT source FROM l2_items LIMIT 1").fetchone()
-            con.close()
-            self.assertEqual(row[0], "群聊")
-        finally:
-            tm.TargetMemoryService = real
+        self.assertEqual(n, 1)
+        rows = queue.list()
+        self.assertEqual(rows[0]['status'], 'pending')
+        self.assertEqual(rows[0]['channel'], 'qq_g123456')
+        self.assertEqual(rows[0]['item_id'], '')
 
 
 class TestToolPolicy(unittest.TestCase):
@@ -302,11 +294,40 @@ class TestToolPolicy(unittest.TestCase):
         self.assertNotIn("memory_save", allowed)
         self.assertNotIn("schedule_plan", allowed)
 
-    def test_owner_work_gets_full_registry(self):
+    def test_owner_work_gets_core_tools(self):
         use, allowed = ConversationSession._tool_policy(
             is_owner=True, work=True, images=False)
         self.assertTrue(use)
-        self.assertIsNone(allowed)
+        self.assertIsNotNone(allowed)
+        self.assertIn("diary_write", allowed)
+        self.assertIn("file_read", allowed)
+        # optional groups stay out unless the turn names the domain
+        self.assertNotIn("qq_export", allowed)
+        self.assertNotIn("bili_watch", allowed)
+        self.assertNotIn("song_play", allowed)
+
+    def test_owner_work_unlocks_hinted_group(self):
+        use, allowed = ConversationSession._tool_policy(
+            is_owner=True, work=True, images=False, text="总结一下今天群里聊了什么")
+        self.assertTrue(use)
+        self.assertIn("qq_summarize", allowed)
+        self.assertIn("report_qq_weekly", allowed)
+        self.assertNotIn("bili_watch", allowed)
+
+        _, allowed = ConversationSession._tool_policy(
+            is_owner=True, work=True, images=False, text="看看B站直播在播什么")
+        self.assertIn("bili_watch", allowed)
+        self.assertNotIn("song_play", allowed)
+
+    def test_work_tool_set_is_subset_of_registry(self):
+        from backend.target_scheduler_tools import scheduler_capabilities
+
+        shipped = {c.name.replace(".", "_") for c in scheduler_capabilities()}
+        policy = ConversationSession._work_tool_set("群 B站 歌 成员")
+        self.assertTrue(policy <= shipped, policy - shipped)
+        # every core tool must exist in the registry too
+        self.assertTrue(ConversationSession._WORK_CORE_TOOLS <= shipped,
+                        ConversationSession._WORK_CORE_TOOLS - shipped)
 
     def test_vision_turn_has_no_tools(self):
         use, allowed = ConversationSession._tool_policy(
@@ -366,6 +387,54 @@ class TestTranscriptGuard(unittest.TestCase):
         self.assertIn("（语音：v.wav）", text)
         users = [t for t in self.mem._turns if t.get("role") == "user"]
         self.assertIn("（语音：v.wav）", users[-1]["text"])
+
+
+class TestFileShareOutbox(unittest.TestCase):
+    """2026-10-06: file.share -> session outbox on owner channels only."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+
+        from backend.target_kw_index import KeywordIndex
+
+        self.tmp = Path(tempfile.mkdtemp())
+        self.mem = TargetMemoryService(db_path=self.tmp / "mem.db",
+                                       kw_index=KeywordIndex(self.tmp / "kw.db"))
+
+    def _session(self, channel):
+        return ConversationSession(memory=self.mem, channel=channel)
+
+    def test_owner_session_binds_and_drains(self):
+        import asyncio
+
+        sess = self._session("qq_p2258374446")
+        f = self.tmp / "pic.png"
+        f.write_bytes(b"img")
+
+        async def go():
+            return await sess.registry.execute_openai_async(
+                "file_share", {"path": str(f)})
+
+        r = asyncio.run(go())
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(sess.take_outbound_files(), [str(f)])
+        self.assertEqual(sess.take_outbound_files(), [])
+
+    def test_public_session_needs_no_binding(self):
+        import asyncio
+
+        sess = self._session("qq_g1094579571")
+        f = self.tmp / "pic.png"
+        f.write_bytes(b"img")
+
+        async def go():
+            return await sess.registry.execute_openai_async(
+                "file_share", {"path": str(f)})
+
+        r = asyncio.run(go())
+        self.assertIn("未就绪", r["output"])
+        self.assertEqual(sess.take_outbound_files(), [])
 
 
 if __name__ == "__main__":

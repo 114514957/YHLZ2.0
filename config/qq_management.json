@@ -1,0 +1,5 @@
+{
+  "mode": "external",
+  "updated": "2026-10-07",
+  "note": "Full 启动器/看门狗只管模型与 daemon；QQ 由 QQ Bridge Lite 独立链负责"
+}

@@ -304,6 +304,26 @@ MEMORY_L2_JUDGE_PROMPT = (
 )
 
 
+def tool_text_block_enabled() -> bool:
+    """Whether to ALSO list the tools as text inside the system prompt.
+
+    The same schemas are already passed to the model through the `tools`
+    parameter, so this block is duplicated context. Measured on this machine
+    (2026-10-22, llama-server /v1/chat/completions, usage.prompt_tokens):
+
+      45 tools: with block 8579 tok (HTTP 400, exceeds 8192) / without 6754 tok
+      12 tools: with block 4250 tok / without 3823 tok (delta 427)
+
+    Tool-choice behaviour was unchanged or better without the block (7/8 same
+    answer, the odd one out called memory_save in the no-block arm).
+    Therefore the default is OFF; set YH_TOOL_TEXT_BLOCK=1 to restore the old
+    listing. The callable surface itself is identical either way.
+    """
+    return os.getenv("YH_TOOL_TEXT_BLOCK", "0").strip().lower() in {
+        "1", "true", "on", "yes",
+    }
+
+
 def render_capabilities_tools_block(tools: Sequence[dict]) -> str:
     if not tools:
         return ""
@@ -423,7 +443,7 @@ def render_system_prompt(
     blocks.append(TOOL_PROTOCOL_CLAUSE)
     if not public:
         blocks.append(DEV_TOOL_BOUNDARY_CLAUSE)
-    if tools:
+    if tools and tool_text_block_enabled():
         blocks.append("")
         blocks.append(render_capabilities_tools_block(tools))
     return "\n".join(blocks).strip() + "\n"

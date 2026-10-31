@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-08",
+  "purpose": "reference_and_method_review_only",
+  "training_approved": false,
+  "snapshot_root": "cache/v9_materials_review/20261008_round2",
+  "candidates": [
+    {"id":"R2-01","repo":"xywang1/NaturalConv","role":"topic_transition_reference","evidence":"xywang1__NaturalConv.json","license_status":"Tencent terms; non-commercial only","training_approved":false},
+    {"id":"R2-02","repo":"PaddlePaddle/Research:NLP/ACL2022-DuLeMon","role":"memory-citation-method","evidence":"DuLeMon.json and DuLeMon-download.json","license_status":"no explicit dataset license found in checked directory","training_approved":false},
+    {"id":"R2-03","repo":"cows21/MOOM-Roleplay-Dialogue:data/ZH-4O_dataset.jsonl","role":"ultra-long memory-annotation-method","evidence":"MOOM-data-directory.json and MOOM.json","observed_file_size_bytes":3792159,"license_status":"not established in checked materials","sample_downloaded":false,"turn_definition_verified":false,"training_approved":false},
+    {"id":"R2-04","repo":"VITA-MLLM/Emotion_NaturalConv_FunctionCall","role":"emotion-and-tool-structure","evidence":"VITA-MLLM__Emotion_NaturalConv_FunctionCall.json","license_status":"unlisted","usable_preview":false,"training_approved":false},
+    {"id":"R2-05","repo":"markyfsun/chinese-enthusiastic-dpo","role":"exclude_as_persona_preference_data","evidence":"markyfsun__chinese-enthusiastic-dpo.json","reason":"chosen commonly adds verbosity, bullets, service phrasing, and occasional AI-assistant self-reference","training_approved":false},
+    {"id":"R2-06","repo":"proj-persona/PersonaHub","role":"persona-challenge-idea-only","evidence":"proj-persona__PersonaHub.json","license_status":"CC-BY-NC-SA-4.0","training_approved":false},
+    {"id":"R2-07","repo":"raincandy-u/chinese-roleplay","role":"exclude_from_yuanheng_sft","evidence":"raincandy-u__chinese-roleplay.json","license_status":"unlisted","reason":"character-card/IP dependencies, stage directions, mismatched relationship and NSFW distribution","training_approved":false}
+  ],
+  "limitations": ["Samples are bounded viewer previews, not random or exhaustive.", "Viewer revisions are not assumed pinned to repository SHA.", "Method suitability does not imply permission to download, transform, train, or redistribute."]
+}

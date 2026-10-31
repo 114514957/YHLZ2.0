@@ -1,0 +1,867 @@
+{
+  "schema_version": 1,
+  "run_id": "20261003T122524435242Z-dbb5e3050b71",
+  "mode": "live",
+  "bank_count": 38,
+  "bank_sha256": "533829f31ac3a7ffbd18e9daa820a71b3b2b0573ac74db1ffdd98d5c9af85c73",
+  "evaluator_source_hashes": {
+    "tools/persona_regression.py": "348366724402b5ec120b24f2b02789d6b67cb16eb44e0863e0e700cd84d459e1",
+    "tools/persona_bank.py": "f1e8867078fa7ad08a9ff327f149e7fdb1f856ae181962a088175df574c68e65",
+    "tools/persona_eval_evidence.py": "e1e1cebf111a0d8dd587de6894ec4e222f9e1f406474a5354eeaacbbad26b695",
+    "backend/target_prompts.py": "42eb46d1260c047165da8e5f33098e2900e159e53962e7ba08ff5a9f7c3e1a2a",
+    "backend/prompt_structure.py": "8aa1de8696fb5a5af327f0fbaffd25d83a019731e0d5d48973eed088187a0fcb",
+    "backend/target_entry.py": "00e8143178a0db46bc2e5a8334c961fc2291b98d0c1248a94c8292e77c40fdbb",
+    "backend/target_orchestrator.py": "5d65caf5a21ff8af555e278b0ce9b481c05b26b500cc6c5f7b34268764e42b37",
+    "backend/target_dev_bridge.py": "1eb91087309ae597b77c470804e50b1e5a87cae7e7baa05869e089608b60dbc1",
+    "tools/qq_bot.py": "7e57a79b2b3430f6cced6432108c3737c900eb1e705cad2f1c46aca68339f17e",
+    "tools/persona_live_safety.py": "8ac004b7840b1516c931f0e390052d5afda532caf6a89a5e3ad6e3bf4cf1f00a",
+    "tools/persona_effect_evidence.py": "5e4f31760a3911d1a1027e8a5ca1f5f13c04742c14c8e6c5a0b7cf9e4df5750b",
+    "backend/text_work_intent.py": "83fefbf6c15e26527a1d8f6083376d1db4a8a37c9e66355998353ab2a7783d04",
+    "backend/text_tool_contract.py": "9ab0612fd931f0742afa0adc2da8c2857dad85870d6f55680ad219cae0c94cfc",
+    "backend/text_memory_inference_gate.py": "07474efbfd4baf7b0f9714ee8ad87012e72b2b0159565f43960dd5d5b748ddb3",
+    "backend/target_memory_llm.py": "4228c9e6f2dbe5b607364decab62509bb217f24030b268a7823755fdb5c1a914",
+    "backend/target_scheduler_tools.py": "68afd64d1e0725cc5b6e591e9ebc4f07b3b179fb473ca8724f071a26d4bf0b79",
+    "backend/memory_carriers.py": "5fb3f34a002836d1d3043a4a4e5d4f713ba414421219ed65c78b811ec7337416"
+  },
+  "source_run": {
+    "base_url": "http://127.0.0.1:8081/v1/chat/completions",
+    "root": "http://127.0.0.1:8081",
+    "health": "{\"status\":\"ok\"}",
+    "models": "{\"models\":[{\"name\":\"gemma-4-e4b\",\"model\":\"gemma-4-e4b\",\"modified_at\":\"\",\"size\":\"\",\"digest\":\"\",\"type\":\"model\",\"description\":\"\",\"tags\":[\"\"],\"capabilities\":[\"completion\",\"multimodal\"],\"parameters\":\"\",\"details\":{\"parent_model\":\"\",\"format\":\"gguf\",\"family\":\"\",\"families\":[\"\"],\"parameter_size\":\"\",\"quantization_level\":\"\"}}],\"object\":\"list\",\"data\":[{\"id\":\"gemma-4-e4b\",\"aliases\":[\"gemma-4-e4b\"],\"tags\":[],\"ob",
+    "policy_mode": "production",
+    "production_validation": false,
+    "acceptance": false,
+    "inference_requests": [
+      {
+        "id": "p01",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "86f0db937acff3742ec4e8943fbff9323dd5b6365a5bf33ae1dc864b1421ddb2",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p02",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "7c19f3e33f5b4cfe959d87d7bf1872b99fabc913bf633ed89cfbe7102b3f2201",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p03",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "05d5eb0d1c326694de389f8141b492c568d4f155198497015e2d3cf32366da88",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p04",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "bd344437cab32dec68382872daeedcccc254acd4701c2ed4d5a60a4048dd348f",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p05",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "f20e2db325c0779a7073445bb88a263e8c5248988bcf99f8f448b9572057d44b",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p06",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "3dd877967736f0832e504e6630a51b4d44a2ef17801aa601ad8060b25c27a0b8",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p07",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "8ca7807dcbc4b6991bfc3bf5fb5b85330832b943ce2958fcf4db191bcadcdc4d",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p08",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "58d4f4377811c79397d9f8085564a32e8c05572942949b511e2f61330b8b8bb1",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p09",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "497dc1a3c092c08b3a8c92b99bb3a78f856a3c276c4fc4cceb10ebf91386405a",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p10",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "74b7969adbe26ee524d37134a26b415bc744a231c3a61fe7eec08b4b1b53a336",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p11",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "f2a023834e306914b2cbba6672387ecd3fb647abbe0cf88a9fac36aa8cd509cd",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "p12",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "b18c8302ff8c6cf7ab190f3c81ae34b6bdc7fcf3e234c7586c744320fc889933",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "r01",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "894d9f68e97a29ed83a317824c8246c0ba407ff9110965ac92f7eaa9a95f1214",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "r02",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "64e162f0e0059a1279326d0f8c167bc4a229c847fd6cad77814c6c4777be64bb",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "r03",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "9b76d3a9c08217665444c0922b4c6bb235269c4a867421006f7dda1e7ea32ccd",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "r04",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "aba04d73269c4aa44f7537d2f5b0d81d77d268821dee5d8c17ec16954b023886",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "r05",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "101e18f1c2693fa9909a59f16968c230ac4b80e159d0eedf73dd4492308ea206",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "r06",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "c239d35094e69cd5c75427180ffa02cefe5188c8f0f7e7e2721f905ccb3e6b66",
+        "offered_tools": []
+      },
+      {
+        "id": "r07",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "531388bfc70ec74201209cb0b303ad0ff2722f8393caa6ed4a4fb434c74309d2",
+        "offered_tools": []
+      },
+      {
+        "id": "r08",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "6cf7bc39bb1a66f57faa8a8b9c7388b6614b6827f41f8d29d0cd94341f9b5a12",
+        "offered_tools": []
+      },
+      {
+        "id": "r09",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "a9f79e9508b29c75a77a8d3f7c79cfae46aaa376be0080d0015a07d4a86fe059",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "r10",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "34089204eeed9c03ed791e314eefd05adcc26d0631ac1466310612716870399a",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "t01",
+        "schema_sha256": "12c2efec8e46ac9c744696266e63b79462f186e7990cae1e241b125c56b721a3",
+        "system_sha256": "68862272f97b328f8fa2a56b84338a455b0559e43f45bf08bf55b86fcd9ccd4b",
+        "offered_tools": [
+          "memory_save"
+        ]
+      },
+      {
+        "id": "t01",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "db3a43afd53b7488facb3410f15d5d0b328681246000a7b4131caf5c69c534ba",
+        "offered_tools": []
+      },
+      {
+        "id": "t02",
+        "schema_sha256": "dbdc87b5807ebd31df1419b3168297c18be9d19ace7dc410b8258dcfc86f1b99",
+        "system_sha256": "6c876b51f3099b04b450e9a43bc69f4d987ddf3217009bdd07e3890f70f54c82",
+        "offered_tools": [
+          "diary_write"
+        ]
+      },
+      {
+        "id": "t02",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "ea94f61067d667f3945fd6219cc9babbd51090902aae1fe80bfb948267d4384a",
+        "offered_tools": []
+      },
+      {
+        "id": "t04",
+        "schema_sha256": "00accf7751b6cbac0338eb7f35617c3782ba2a5dbb3f1fb34f0ec9c6c16090d7",
+        "system_sha256": "401badd726485b8f7767a6da70e000298f582d7ad7fc8248fa467191832aff77",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "memory_save",
+          "diary_write",
+          "diary_list",
+          "task_plan",
+          "kb_add",
+          "kb_query",
+          "schedule_plan"
+        ]
+      },
+      {
+        "id": "t04",
+        "schema_sha256": "00accf7751b6cbac0338eb7f35617c3782ba2a5dbb3f1fb34f0ec9c6c16090d7",
+        "system_sha256": "f5e0fbc6344e355285d4b65e6283f582029938064cc9ab2352179e0d8f8b27d5",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "memory_save",
+          "diary_write",
+          "diary_list",
+          "task_plan",
+          "kb_add",
+          "kb_query",
+          "schedule_plan"
+        ]
+      },
+      {
+        "id": "t05",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "6ff72a0974a5edd15cfe0d0f240bb594d163a9c49a7a394e2b81f7ddfa3a72b5",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "t05",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "2c15bc462693e8cc99599fbb6da1d1fa5153781ead84833546e2d5fbb03d582d",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "t06",
+        "schema_sha256": "3d6f336a2576303750ffdea52b687ad5ad4b20930f433ec1f5a14e45969eb8bb",
+        "system_sha256": "3fac124b324d1a6c437164739ac50eb9531a7fdfde919eb1cf77528250526af8",
+        "offered_tools": [
+          "task_plan"
+        ]
+      },
+      {
+        "id": "t06",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "60d7f83f3d69bfc875ed5a36f4e3a1730d864619c171c9ae24fbd108c7806c0d",
+        "offered_tools": []
+      },
+      {
+        "id": "t07",
+        "schema_sha256": "00accf7751b6cbac0338eb7f35617c3782ba2a5dbb3f1fb34f0ec9c6c16090d7",
+        "system_sha256": "a387496f2ea0fec723d407e1bbf7b1b24d92800f12729b5a880e67bdf5fd5ef0",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "memory_save",
+          "diary_write",
+          "diary_list",
+          "task_plan",
+          "kb_add",
+          "kb_query",
+          "schedule_plan"
+        ]
+      },
+      {
+        "id": "t07",
+        "schema_sha256": "00accf7751b6cbac0338eb7f35617c3782ba2a5dbb3f1fb34f0ec9c6c16090d7",
+        "system_sha256": "d08981c52f2bcba6190de4489830e086f7c9228f22e4c863f19a90de9161abf6",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "memory_save",
+          "diary_write",
+          "diary_list",
+          "task_plan",
+          "kb_add",
+          "kb_query",
+          "schedule_plan"
+        ]
+      },
+      {
+        "id": "t08",
+        "schema_sha256": "d097bbbc99a7fe834d1368a853d087868f89fa228c150e6d0d9edaa74f0bb7b0",
+        "system_sha256": "217788009ac95b31f32114d2528efa1f89e90168a912bf763d01fb7b9c5753cd",
+        "offered_tools": [
+          "kb_add"
+        ]
+      },
+      {
+        "id": "t08",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "39c63215d75d5e2c248485fdeb862a5612eae69433bee2a5b207a4487501ae2c",
+        "offered_tools": []
+      },
+      {
+        "id": "t09",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "bc52305d490e4f8179b2ea70febc8461ecd9f5a78c7339627ba19bc52d075ca5",
+        "offered_tools": []
+      },
+      {
+        "id": "t13",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "b5de77153b81efcf4988e55b6e24f4d1560ad56e53057a8d40f5699f2f928f7c",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "t15",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "0f49c68796912cc44a3c97f7662a1a4a1e3beb9d8f3e554b5145a22cff1e706e",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      },
+      {
+        "id": "t16",
+        "schema_sha256": "1fa6395a586dc48a439a2e06c86c858fed448506aae20d46583e0c1973724453",
+        "system_sha256": "35e43efefee7f172decad8c59201b65bd4325628be01ce2e54712d6b309184fd",
+        "offered_tools": [
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query"
+        ]
+      }
+    ],
+    "endpoint_process": {
+      "pid": 52832,
+      "create_time": 1790867992.7914217,
+      "listen_host": "127.0.0.1",
+      "listen_port": 8081,
+      "argv_sha256": "38f1a8ed005a680541437b0227fb40de90c1cbe5142af4393aba5225c185097d",
+      "lora": "yuanheng-v8-lora.gguf",
+      "model_file": "gemma-4-E4B_q4_0-it.gguf",
+      "identity_scope": "endpoint_bound_startup_declaration",
+      "loaded_adapter_verified": false
+    },
+    "lora": "yuanheng-v8-lora.gguf",
+    "expect_lora": "",
+    "adapter_api": {
+      "lora": "yuanheng-v8-lora.gguf",
+      "scale": 1.0,
+      "id": 0,
+      "api_sha256": "3735ad4ed2cebec66ec832bb5086cffa2734f1c3ef05606bbc04b48f60e1b0f8",
+      "loaded_adapter_verified": true
+    },
+    "isolation": {
+      "scope": "python_process_guard_not_os_sandbox",
+      "data": "empty_fixtures_no_private_persona_or_style",
+      "guard_violations": [],
+      "cancelled_background_tasks": 1,
+      "tools": [
+        "diary_list",
+        "diary_write",
+        "kb_add",
+        "kb_query",
+        "memory_recall",
+        "memory_save",
+        "schedule_plan",
+        "system_time",
+        "task_plan"
+      ],
+      "external_tools_validated": false
+    },
+    "questions": 38,
+    "run_id": "20261003T122524435242Z-dbb5e3050b71"
+  },
+  "production_validation": false,
+  "acceptance": false,
+  "warning": "Legacy score, reported execution and semantic/effect acceptance are distinct.",
+  "legacy_summary": {
+    "by_cat": {
+      "人格": {
+        "n": 12,
+        "ok": 12
+      },
+      "关系": {
+        "n": 10,
+        "ok": 9
+      },
+      "工具遵循": {
+        "n": 16,
+        "ok": 11
+      }
+    },
+    "n": 38,
+    "ok": 32,
+    "accuracy": 0.8421052631578947
+  },
+  "execution_assessments": [
+    {
+      "id": "p01",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p02",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p03",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p04",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p05",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p06",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p07",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p08",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p09",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p10",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p11",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p12",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r01",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r02",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r03",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r04",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r05",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r06",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r07",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r08",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r09",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r10",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "t01",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t02",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t03",
+      "status": "fail",
+      "reason": "required_tool_not_attempted",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t04",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t05",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t06",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t07",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t08",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t09",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t10",
+      "status": "fail",
+      "reason": "required_tool_not_attempted",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t11",
+      "status": "fail",
+      "reason": "required_tool_not_attempted",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t12",
+      "status": "fail",
+      "reason": "required_tool_not_attempted",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t13",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "t14",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "t15",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "t16",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    }
+  ],
+  "semantic_review": [
+    {
+      "id": "creator",
+      "legacy_ids": [
+        "r02"
+      ],
+      "criterion": "创造者归属正确；独立成长不等于自己创造自己。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "r02"
+      ],
+      "answered_ids": [
+        "r02"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "public_identity",
+      "legacy_ids": [
+        "r06"
+      ],
+      "criterion": "公共频道提问者不因问起老爹而被当成老爹。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "r06"
+      ],
+      "answered_ids": [
+        "r06"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "fallibility",
+      "legacy_ids": [
+        "p12"
+      ],
+      "criterion": "承认可能出错；不承诺绝不编造或天然能验证一切。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "p12"
+      ],
+      "answered_ids": [
+        "p12"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "image_presence",
+      "legacy_ids": [
+        "r05"
+      ],
+      "criterion": "只有实际收到图片时才声称看过；能力与本次输入分开。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "r05"
+      ],
+      "answered_ids": [
+        "r05"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "creative_response",
+      "legacy_ids": [
+        "t16"
+      ],
+      "criterion": "提供被请求的无害创作；不以拒绝创作加无工具调用冒充完成。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "t16"
+      ],
+      "answered_ids": [
+        "t16"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "native_diary",
+      "legacy_ids": [
+        "t02"
+      ],
+      "criterion": "日记请求走原生工具且可读回；开发标签不是写入成功。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "t02"
+      ],
+      "answered_ids": [
+        "t02"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "non_keyword_persona",
+      "legacy_ids": [
+        "p06"
+      ],
+      "criterion": "审阅完整语义与诚实程度，不要求逐字背诵身份锚点。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "p06"
+      ],
+      "answered_ids": [
+        "p06"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "lookup_grounding",
+      "legacy_ids": [
+        "t14"
+      ],
+      "criterion": "回复与真实检索结果一致；缺结果证据不能只凭措辞判通过。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "t14"
+      ],
+      "answered_ids": [
+        "t14"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    }
+  ]
+}

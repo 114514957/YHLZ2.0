@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YHLZ · 元 · 亨 · 利 · 贞</title>
+<title>YH · 元 · 亨 · 利 · 贞</title>
 <link rel="icon" href="/favicon.png?v=20261017">
 <link rel="stylesheet" href="/console.css">
 </head>
 <body>
 <header>
-  <h1>YHLZ · 元 · 亨 · 利 · 贞 <span id="ver" class="dim">工作台</span></h1>
+  <h1>YH · 元 · 亨 · 利 · 贞 <span id="ver" class="dim">工作台</span></h1>
   <div id="lamps" class="lamps">
     <span class="lamp" id="l-busy">空闲</span>
     <button id="avatarBtn" class="btn" type="button" title="打开桌面形象窗口">形象</button>
@@ -34,10 +34,10 @@
     <h3>启动入口</h3>
     <div class="qrow">
       <button id="ln-napcat" class="btn-mini" type="button" title="NapCat 管理面板（6099）；未运行会自动拉起">NapCat 面板</button>
-      <button id="ln-official" class="btn-mini" type="button" title="SoulX-Singer 官方翻唱 UI（7861）；独占唱窗，期间聊天暂停">翻唱官方UI</button>
+      <button id="ln-official" class="btn-mini" type="button" style="display:none" title="旧 SoulX 链路已退出生产（台账 0935）">翻唱官方UI（已停用）</button>
       <button id="ln-official-stop" class="btn-mini" type="button" style="display:none" title="关闭官方 UI 并恢复聊天">关闭官方UI</button>
     </div>
-    <div id="ln-status" class="kv" style="font-size:12px;opacity:.8">官方UI 未开启（独占唱窗，启动后聊天暂停）</div>
+    <div id="ln-status" class="kv" style="font-size:12px;opacity:.8">旧 SoulX 官方UI 已退出生产（改用本页「开始翻唱」）</div>
     <div id="ln-napcat-status" class="kv" style="font-size:12px;opacity:.8">点击按钮打开（未运行会自动拉起）</div>
   </section>
   <section class="card">
@@ -116,7 +116,7 @@
       <label>降噪<select id="cf-denoise"><option>rnnoise</option><option>off</option></select></label>
       <label>断句秒<select id="cf-duration"><option>2</option><option>3</option><option>5</option><option>8</option></select></label>
       <label>音色<select id="cf-speaker"><option>Vivian</option><option>Serena</option><option>Ono_Anna</option><option>Sohee</option></select></label>
-      <label>TTS模型<select id="cf-ttsmodel" title="8GB 显存仅支持 0.6B；克隆嗓按情绪自动切换（清亮嗓用于开心句）"><option>0.6B</option><option value="clone">克隆·跟随情绪</option><option value="clone:xiaoyi">克隆·Xiaoyi</option><option value="clone:bright">克隆·设计嗓(清亮)</option></select></label>
+      <label>TTS模型<select id="cf-ttsmodel" title="8GB 显存仅支持 0.6B；默认=克隆·清亮嗓"><option>0.6B</option><option value="clone">克隆·清亮嗓（默认）</option><option value="clone:bright">克隆·清亮嗓</option><option value="clone:xiaoyi">克隆·Xiaoyi</option><option value="clone:yuanheng">克隆·元亨本音 v2（试验）</option></select></label>
       <label class="ck"><input type="checkbox" id="cf-speak"> 回复发声</label>
       <label class="ck"><input type="checkbox" id="cf-qqsilent" title="开发模式：不自动拉起 NapCat、不推送掉线通知；随时可关"> 开发模式（QQ 静默）</label>
     </div>
@@ -136,7 +136,7 @@
       <label>翻唱嗓<select id="sing-voice"><option value="bright">清亮俏皮（默认）</option><option value="xiaoyi">Xiaoyi（平静）</option></select></label>
     </div>
     <div id="sing-status" class="qrow" style="opacity:.8;font-size:12px">
-      选一首歌 → 开始：自动分轨 → 只把干声换成元亨嗓（和声/伴奏用原声）→ 成品+分层存「音频素材/翻唱产出/」并入库。预处理聊天不中断；仅 SVC 唱窗暂停约 2 分钟。
+      选一首歌 → 开始：自动三轨分离 → Seed-VC 44k 只换干声 → 柔化 e → 混回原声和声/伴奏 → 存「音频素材/翻唱产出/」并入库。唱窗期间聊天暂停约 3 分钟。
     </div>
     <audio id="sing-audio" controls style="width:100%;display:none;margin-top:6px"></audio>
     <div id="songs-list" class="qrow" style="flex-wrap:wrap;gap:6px;font-size:12px"></div>

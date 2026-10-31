@@ -1,5 +1,11 @@
 # YHLZ 会话交接文档（V6.5）
 
+> ⚠️ **历史文档（2026-08-09，V6.5 世代），当前状态已远超此版本——不要照此接手。**
+> 现行事实源：`STRUCTURE.md`（结构/入口/三区划分）+ `docs/上下文台账.md`（决策历史，最新记录在文件尾部）。
+> 本机路径已变更：项目根 `C:\Users\ACE_WAN——PROJECT\YHLZ`（非 `D:\YHLZ2.0`），
+> 解释器 `.venv\Scripts\python.exe`（非 `venv\Scripts\python.exe`）；
+> `backend/embodied/` 除 `companion/{constitution,memory_stabilization}` 外已归档（台账 0291）。
+
 > 上下文压缩前请先完整阅读本文档。项目根：`D:\YHLZ2.0`。
 > 工作区：`backend/embodied/`；venv 解释器：`D:\YHLZ2.0\venv\Scripts\python.exe`。
 > 生成日期：2026-08-09

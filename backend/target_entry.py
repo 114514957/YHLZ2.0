@@ -43,6 +43,9 @@ CASUAL_SAFE_TOOLS = frozenset({
     "system_time", "web_search", "web_fetch",
     "memory_recall", "ledger_search", "kb_query", "diary_list",
     "member_profile",
+    # B站只读看片（bili.find/watch 只排队，真正浏览器在独立 worker 里；
+    # 状态/笔记/读取都是本地只读）
+    "bili_find", "bili_watch", "bili_status", "bili_notes", "bili_read",
 })
 
 
@@ -220,7 +223,12 @@ class ConversationSession:
         self._summary_tasks: list[Any] = []
         self._background_error = ""
         from backend.memory_summary_scheduler import MemorySummaryScheduler
-        self._memory_summary_scheduler = MemorySummaryScheduler(self.memory)
+        self._last_turn_ts = 0.0  # idle clock for background L1 compression
+        self._memory_summary_scheduler = MemorySummaryScheduler(
+            self.memory,
+            idle_gate=lambda: time.time() - self._last_turn_ts,
+            min_idle_s=90,
+        )
         self._voice_task: Any = None  # last audio transcript write-back task
         self._session_name = ""  # set by save/load; voice re-save only if known
         self._persona = ""
@@ -398,15 +406,62 @@ class ConversationSession:
         from backend.text_work_intent import want_text_work_mode
         return want_text_work_mode(text)
 
-    @staticmethod
-    def _tool_policy(*, is_owner: bool, work: bool, images: bool,
-                     audio: bool = False) -> tuple[bool, frozenset | None]:
+    # Owner work turns: 30 core tools, optional groups unlocked by domain hints.
+    _WORK_CORE_TOOLS = frozenset({
+        "ledger_search", "ledger_get", "ledger_list", "ledger_add",
+        "ledger_update", "ledger_delete",
+        "memory_recall", "memory_save", "memory_why", "memory_causal",
+        "memory_profile", "memory_audit",
+        "diary_write", "diary_list", "diary_delete",
+        "file_list", "file_read", "file_download", "file_share",
+        "kb_add", "kb_query",
+        "task_plan", "schedule_plan",
+        "skill_search", "skill_add", "skill_feedback",
+        "web_search", "web_fetch",
+        "system_time", "runtime_status",
+    })
+    _WORK_OPTIONAL_GROUPS = {
+        "qq": frozenset({"qq_status", "qq_digest", "qq_export", "qq_process",
+                         "qq_summarize", "report_qq_weekly"}),
+        "bili": frozenset({"bili_find", "bili_watch", "bili_status",
+                           "bili_notes", "bili_read"}),
+        "song": frozenset({"song_list", "song_play", "song_send"}),
+        "member": frozenset({"member_profile"}),
+    }
+    _WORK_OPTIONAL_HINTS = {
+        "qq": ("群", "qq", "QQ", "周报", "聊天记录", "消息记录"),
+        "bili": ("B站", "b站", "直播", "看片", "视频", "弹幕", "bili"),
+        "song": ("歌", "音乐", "点歌"),
+        "member": ("群友", "成员", "昵称", "名片"),
+    }
+
+    @classmethod
+    def _work_tool_set(cls, text: str = "") -> frozenset:
+        """Tools shipped for an owner work turn.
+
+        Measured 2026-10-22: the full registry is 45 tools ≈ 4.1k prompt
+        tokens, which left almost no room for history + early_context under
+        an 8192 window. The work set therefore ships the 30 core tools and
+        adds the optional groups only when the turn text actually mentions
+        their domain. Explicit requests still get through: an excluded tool
+        can be reached via the text tool contract or by naming the domain.
+        """
+        extra: set[str] = set()
+        t = str(text or "")
+        for group, hints in cls._WORK_OPTIONAL_HINTS.items():
+            if any(h in t for h in hints):
+                extra |= cls._WORK_OPTIONAL_GROUPS[group]
+        return frozenset(cls._WORK_CORE_TOOLS | extra)
+
+    @classmethod
+    def _tool_policy(cls, *, is_owner: bool, work: bool, images: bool,
+                     audio: bool = False, text: str = "") -> tuple[bool, frozenset | None]:
         """Tools allowed for this turn (ledger 0405/0406).
 
         - images -> vision chat, no tools
         - voice (audio) -> CASUAL_SAFE_TOOLS: low-latency read-only; heavy
           work is handed to 利贞 via [[dev:...]] instead (owner decision A)
-        - owner work -> full registry
+        - owner work -> _work_tool_set(text): 30 core tools + hinted groups
         - owner casual -> CASUAL_SAFE_TOOLS (read-only info tools)
         - public/group -> PUBLIC_TOOLS (read-only external search only)
         """
@@ -415,7 +470,9 @@ class ConversationSession:
         if is_owner:
             if audio:
                 return True, CASUAL_SAFE_TOOLS
-            return True, (None if work else CASUAL_SAFE_TOOLS)
+            if work:
+                return True, cls._work_tool_set(text)
+            return True, CASUAL_SAFE_TOOLS
         return True, PUBLIC_TOOLS
 
     async def run_turn(self, text: str,
@@ -509,7 +566,7 @@ class ConversationSession:
                 work = True
         use_tools, allowed_tools = self._tool_policy(
             is_owner=is_owner, work=work, images=bool(images),
-            audio=bool(audio))
+            audio=bool(audio), text=text)
         if text_contract is not None:
             # Intersect, never enlarge, the permission policy selected above.
             allowed_tools = (text_contract.tools if allowed_tools is None else
@@ -793,6 +850,7 @@ class ConversationSession:
                     self._promote_group(text, result.answer)))
             except Exception:
                 pass
+        self._last_turn_ts = time.time()  # compression may run once idle >= 90s
         if self.memory._summary_pending:
             _summary_task = self._memory_summary_scheduler.kick()
             if _summary_task is not None and _summary_task not in self._summary_tasks:
@@ -828,6 +886,14 @@ class ConversationSession:
                 self._summary_tasks = [t for t in self._summary_tasks if not t.done()]
             except Exception:
                 pass
+        # 2026-10-20（ledger 0873）：本轮真实工具调用留痕，替代纯生成轨迹。
+        try:
+            from backend.tool_trace_log import log_turn as _log_tools
+
+            _log_tools(self.channel, text, result.tool_uses,
+                       extra={"iterations": getattr(result, "iterations", 0), "answer": str(result.answer)[:600]})
+        except Exception:
+            pass
         return {
             "answer": result.answer,
             "tool_uses": [

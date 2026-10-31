@@ -118,6 +118,21 @@ def resolve(handle: str) -> dict | None:
     return None
 
 
+def _relocated(p: pathlib.Path) -> pathlib.Path | None:
+    """`...\\YHLZ\\<x>` -> `...\\YHLZ\\YH\\<x>`（2026-10-22 目录重排后的兜底）。
+
+    索引里的旧绝对路径在重排后全部失效（59/59）。这里只做**读时兜底**，
+    不改写索引；`tools/music_cli.py repair` 才是显式迁移。
+    """
+    s = str(p)
+    marker = "\\YHLZ\\"
+    if marker in s and "\\YHLZ\\YH\\" not in s:
+        alt = pathlib.Path(s.replace(marker, marker + "YH\\", 1))
+        if alt.is_file():
+            return alt
+    return None
+
+
 def song_path(song_id: str) -> pathlib.Path | None:
     it = resolve(song_id)
     if not it:
@@ -126,7 +141,9 @@ def song_path(song_id: str) -> pathlib.Path | None:
         p = pathlib.Path(str(it["path"]))
     else:
         p = SONGS_DIR / str(it.get("file") or "")
-    return p if p.is_file() else None
+    if p.is_file():
+        return p
+    return _relocated(p)
 
 
 def play(song_id: str) -> str:

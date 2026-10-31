@@ -1,4 +1,7 @@
-# YHLZ Agent Rules
+# YH Agent Rules
+
+> 总目录：`C:\Users\ACE_WAN——PROJECT\YHLZ`；元亨主路径：`…\YHLZ\YH`，利贞：`…\YHLZ\LZ`。
+> `yhlz` MCP serverName / `mcp__yhlz__*` 工具名 / `yhlz_*.py` 模块名保留兼容，不要改。
 
 ## 检索纪律（tool-first）
 

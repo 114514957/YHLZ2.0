@@ -499,19 +499,54 @@ def voice_dialog_once(
         registry=setup_scheduler_capabilities(),
     )
     import asyncio
+    from backend.voice_streaming import StreamingTextChunker
+
+    stream_started = time.perf_counter()
+    stream_segments: list[str] = []
+    first_segment_ms: int | None = None
+    chunker = StreamingTextChunker()
+
+    def _record_segments(parts) -> None:
+        nonlocal first_segment_ms
+        for segment in parts:
+            stream_segments.append(segment)
+            if first_segment_ms is None:
+                first_segment_ms = int((time.perf_counter() - stream_started) * 1000)
+
+    def _on_delta(delta: str) -> None:
+        _record_segments(chunker.push(delta))
+
+    async def _tick_segments():
+        while True:
+            await asyncio.sleep(.02)
+            _record_segments(chunker.tick())
 
     async def _turn() -> dict:
-        info = await session.run_turn(text, audio=([clip] if audio_mode else None))
-        task = getattr(session, "_voice_task", None)
-        if task is not None:
-            try:
-                # keep the loop alive until the async transcript lands
-                await asyncio.wait_for(asyncio.shield(task), timeout=20)
-            except Exception:
-                pass
-        return info
+        timer = asyncio.create_task(_tick_segments())
+        try:
+            info = await session.run_turn(
+                text, on_delta=_on_delta if audio_mode else None,
+                audio=([clip] if audio_mode else None),
+            )
+            _record_segments(chunker.finish())
+            return info
+        except BaseException:
+            chunker.cancel()
+            raise
+        finally:
+            timer.cancel()
+            await asyncio.gather(timer, return_exceptions=True)
 
     info = asyncio.run(_turn())
+    result["stream_segments"] = stream_segments
+    result["stream_first_segment_ms"] = first_segment_ms
+    # This one-shot diagnostic loop is not the daemon's persistent loop. Do not
+    # claim background transcript durability after asyncio.run closes it.
+    if audio_mode:
+        task = getattr(session, "_voice_task", None)
+        result["voice_writeback_status"] = (
+            "cancelled_with_probe_loop" if task is not None and task.cancelled()
+            else "completed" if task is not None and task.done() else "not_confirmed")
     result.update(
         {
             "answer": info["answer"],

@@ -1,4 +1,4 @@
-# YHLZ 元亨 · 数字生命
+# YH 元亨 · 数字生命
 
 本机（RTX 4060 Laptop 8GB）上的数字生命体：**本地 Gemma 主脑** + 五支柱（情感 / 记忆 / 成长 / 学习 / 思考）+ 工作台 / 桌面桌宠 / QQ / 语音。
 
@@ -6,12 +6,23 @@
 
 ## 快速开始
 
-双击 **`YHLZ_全家桶.bat`**（→ `tools/yhlz_launcher.py`）会拉起：
+**开机自启（唯一入口）**：Windows「启动」里只有一条 `YH 开机自启.lnk` → `YH_boot.bat`，
+按顺序拉起：
 
-- 本地 Gemma（llama.cpp，端口 **8081**）
-- Ollama 离线兜底（**11434**）
-- 常驻 daemon（工作台 UI + API，端口 **8321**）
-- QQ 桥（`tools/qq_bot.py`）、NapCat 掉线看护、桌面桌宠（Electron）
+1. 服务栈：本地 Gemma（llama.cpp，**8081**）/ Ollama 兜底（**11434**）/ daemon + 工作台（**8321**）
+2. Full 看门狗 `tools/yhlz_watchdog.py`（只管模型与 daemon，不再碰 QQ）
+3. QQ Bridge Lite（`tools/qq_bridge_control.py resume`；`auto_resume` 决定是否随登录恢复）
+
+**手动启动（唯一桌面入口）**：桌面只有一条 `YH 元亨利贞`（→ 仓库里的 `YH_workbench_normal.bat`）。
+它先 `call YH_boot.bat` 走同一套启动链，等 8321 就绪后打开工作台；不再使用桌面副本 bat。
+`YH_全家桶.bat` 仍可用，但它只转调 `YH_boot.bat`（同一套实现）再开工作台、拉桌宠——不要再各自维护一套启动逻辑。
+启动诊断：`cache/logs/boot.log`（启动脚本）、`cache/logs/launcher.log`（每一步 spawn/失败）、`cache/logs/daemon.log`。
+
+- QQ 号**只有一个消费者**：`config/qq_management.json` = `external`，QQ 归 **QQ Bridge Lite**
+  （`tools/qq_bridge_service.py` + `tools/qq_bridge_watchdog.py`，由 `tools/qq_bridge_control.py` 管理）。
+  旧 Full 链（`tools/qq_bot.py` / `napcat_watch.py`）在 external 模式下会被启动器/看门狗当场收掉；
+  旧入口 `tools/qq_bot_start.bat` 已删除，`tools/qq_bot_restart.py` 只转调 Lite control。
+- 自启项安装/回滚：`python tools/yhlz_boot_startup.py --apply|--rollback`。
 
 然后浏览器打开 <http://127.0.0.1:8321>。
 
@@ -36,6 +47,26 @@
 - 语音：`POST /voice`
 - 面板：`/state /logs /growth /ledger /mem /sessions /drives /monitor`
 
+## QQ 派单（利贞）
+
+- **派单只走显式指令**：`#dev <任务>` / `#任务派发 <任务>`（同义）。普通聊天永不自动派单。
+- `#退出任务`（含 `#退出任务模式` / `#退出`）＝退出任务模式并**清掉工作状态**；
+  旧逻辑只在 `#解除` 清状态，于是退出后每条闲聊都被 `#dev + 原文` 二次派单。
+- 未识别的 `#...` 只回「未知指令」，**不再兜底派单**（旧兜底会把 `#cancle`、
+  `#退出任务，这不是任务指令` 整句都当任务发出去）。
+- `#cancel [job]`（兼容拼写 `#cancle` / `#取消`）停止执行；`#y` 提交 / `#n` 不提交 / `#push` 推送；
+  `#answer <job> <答复>` 跨会话答复；`#devstatus` 看状态；`#` 出菜单。
+
+## B站看片（只读）
+
+元亨可以自己搜片、看字幕、写笔记，账号登录态只留在专用 Edge profile 里。
+
+- 工具：`bili.find` / `bili.watch` **只排队**（毫秒返回）；`bili.status` / `bili.notes` / `bili.read` 看结果。
+- 后台 `tools/bili_worker.py` 顺序处理（同一时间只占一个 Edge profile），用 `tools/bili_browse.py` 抓 AI 字幕 → 本地 Gemma 写「事实/观点」笔记。
+- 产物：`cache/bilibili/notes/<bvid>.md`（原始字幕 JSON 同目录）；登录态：`cache/bilibili/edge-profile`（不进仓库/日志）。
+- 只读：不点赞/投币/收藏/评论/关注。多 P 视频目前只抓 P1；无字幕视频暂无 ASR 兜底。
+- 新机器：`pip install -r requirements-bili.txt`，再 `python tools/bili_browse.py login` 扫码一次。
+
 ## 记忆
 
 - L1 / L2 / L3；主库 `cache/memstore/memstore.db`，向量侧表 `cache/embvec.db`
@@ -55,5 +86,5 @@
 ## 说明
 
 - Python 3.12 + `.venv`；目录结构见 `STRUCTURE.md`。
-- 依赖：按用途看 `requirements-target-*.txt` / `requirements-tts-primary.txt` / `requirements-target-runtime.txt`；根 `requirements.txt` 为**旧版聚合，已过时**。
+- 依赖：按用途看 `requirements-target-*.txt` / `requirements-tts-primary.txt` / `requirements-target-runtime.txt` / `requirements-bili.txt`；根 `requirements.txt` 为**旧版聚合，已过时**。
 - 旧世代代码（embodied / vision / personality / action / voice_identity / main.py 等）已归档到 `archive/2026-09-12-prune/`。

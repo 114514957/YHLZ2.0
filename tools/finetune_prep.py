@@ -13,7 +13,7 @@ import re
 import sys
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-ROOT = pathlib.Path(r"C:\Users\ACE_WAN——PROJECT\YHLZ")
+ROOT = pathlib.Path(r"C:\Users\ACE_WAN——PROJECT\YHLZ\YH")
 
 SEED_FILES = [
     ROOT / "docs" / "元亨的日记.md",

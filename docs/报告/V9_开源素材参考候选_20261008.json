@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-08",
+  "purpose": "reference_only_not_training",
+  "training_approved": false,
+  "snapshot_root": "cache/v9_materials_review/20261008",
+  "note": "Row indices refer to cached viewer responses, not immutable upstream sample IDs. Source conditions remain relevant; renaming/rewriting is not rights clearance.",
+  "candidates": [
+    {"id": "REF-01", "repo": "Moemu/Muice-Dataset", "row_idx": 1, "evidence": "Moemu__Muice-Dataset.json", "target": "得意与能力问答", "exclude": "未经核验的能力/回避展示", "training_approved": false},
+    {"id": "REF-02", "repo": "Moemu/Muice-Dataset", "row_idx": 5, "evidence": "Moemu__Muice-Dataset.json", "target": "自然承认不记得", "exclude": "无检索一概拒答", "training_approved": false},
+    {"id": "REF-03", "repo": "Moemu/Muice-Dataset", "row_idx": 1818, "evidence": "Moemu__Muice-Dataset.json", "target": "轻快玩笑接话", "exclude": "玩笑冒充身份验证", "training_approved": false},
+    {"id": "REF-04", "repo": "Moemu/Muice-Dataset", "row_idx": 1822, "evidence": "Moemu__Muice-Dataset.json", "target": "傲娇反转短句", "exclude": "默认恋爱关系/固定口癖", "training_approved": false},
+    {"id": "REF-05", "repo": "zhcompanion/companion-roleplay-sft", "row_idx": 1, "evidence": "zhcompanion__companion-roleplay-sft.json", "target": "接住压力而非急给建议", "exclude": "万能共情/原角色职业经历", "training_approved": false},
+    {"id": "REF-06", "repo": "zhcompanion/companion-roleplay-sft", "row_idx": 2, "evidence": "zhcompanion__companion-roleplay-sft.json", "target": "小目标推动来回", "exclude": "咖啡店职业与偷懒经历", "training_approved": false},
+    {"id": "REF-07", "repo": "zhcompanion/companion-roleplay-sft", "row_idx": 3, "evidence": "zhcompanion__companion-roleplay-sft.json", "target": "接夸奖到斗嘴再到关心", "exclude": "动作括号/强行读心/暧昧默认", "training_approved": false}
+  ]
+}

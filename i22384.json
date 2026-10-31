@@ -1,0 +1,102 @@
+{
+  "url": "https://api.github.com/repos/ggml-org/llama.cpp/issues/22384",
+  "repository_url": "https://api.github.com/repos/ggml-org/llama.cpp",
+  "labels_url": "https://api.github.com/repos/ggml-org/llama.cpp/issues/22384/labels{/name}",
+  "comments_url": "https://api.github.com/repos/ggml-org/llama.cpp/issues/22384/comments",
+  "events_url": "https://api.github.com/repos/ggml-org/llama.cpp/issues/22384/events",
+  "html_url": "https://github.com/ggml-org/llama.cpp/issues/22384",
+  "id": 4330225658,
+  "node_id": "I_kwDOJH_K4M8AAAABAhn_-g",
+  "number": 22384,
+  "title": "server: fix context checkpoint restore for hybrid/recurrent models (DeltaNet/Mamba)",
+  "user": {
+    "login": "Tongas",
+    "id": 13090246,
+    "node_id": "MDQ6VXNlcjEzMDkwMjQ2",
+    "avatar_url": "https://avatars.githubusercontent.com/u/13090246?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/Tongas",
+    "html_url": "https://github.com/Tongas",
+    "followers_url": "https://api.github.com/users/Tongas/followers",
+    "following_url": "https://api.github.com/users/Tongas/following{/other_user}",
+    "gists_url": "https://api.github.com/users/Tongas/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/Tongas/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/Tongas/subscriptions",
+    "organizations_url": "https://api.github.com/users/Tongas/orgs",
+    "repos_url": "https://api.github.com/users/Tongas/repos",
+    "events_url": "https://api.github.com/users/Tongas/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/Tongas/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "labels": [
+
+  ],
+  "state": "closed",
+  "locked": false,
+  "assignees": [
+
+  ],
+  "milestone": null,
+  "comments": 3,
+  "created_at": "2026-04-26T06:40:43Z",
+  "updated_at": "2026-04-26T07:34:17Z",
+  "closed_at": "2026-04-26T06:59:32Z",
+  "assignee": null,
+  "author_association": "NONE",
+  "issue_field_values": [
+
+  ],
+  "type": null,
+  "active_lock_reason": null,
+  "sub_issues_summary": {
+    "total": 0,
+    "completed": 0,
+    "percent_completed": 0
+  },
+  "issue_dependencies_summary": {
+    "blocked_by": 0,
+    "total_blocked_by": 0,
+    "blocking": 0,
+    "total_blocking": 0
+  },
+  "body": "## Problem\n\nHybrid/recurrent models like Qwen3.5-27B and Qwen3.6-27B (Gated DeltaNet architecture) force full prompt re-processing on every conversation turn. A 15K-token conversation takes ~15 seconds per turn instead of milliseconds, making multi-turn agentic workflows (OpenCode, Claude Code) practically unusable.\n\nThis has been reported in #20225, #19394, #19690 with no fix yet.\n\n## Root cause\n\nTwo bugs in `tools/server/server-context.cpp`:\n\n**Bug 1** — checkpoint search uses `cur.pos_min < pos_min_thold`, but for recurrent models `pos_min` always equals the full sequence length, so this check always fails and no checkpoint is ever restored.\n\n**Bug 2** — checkpoint creation requires `n_tokens >= 64`, so short prompts never get a checkpoint created — even if Bug 1 were fixed, there would be nothing to restore.\n\n## Fix\n\n**Fix 1:** For hybrid/recurrent models, use `cur.pos_max <= pos_next` instead of the SWA-based `pos_min` check when searching for a valid checkpoint.\n\n**Fix 2:** Lower the checkpoint creation minimum from 64 to 4 tokens for hybrid/recurrent models so short prompts also get checkpointed.\n\n## Performance impact\n\nTested with Qwen3.6-27B Q4_K_M on RTX 3090, multi-turn via OpenCode:\n\n| | Before | After |\n|---|---|---|\n| Turn 2 prefill (12K context) | 12,146 tokens re-processed (~11s) | 31 new tokens only (115ms) |\n| Turn 3+ | Full re-process every turn | Incremental only |\n\nMulti-turn agentic workflows go from minutes of wait per turn to near-instant.\n\n## Implementation\n\nAlready implemented and tested in: spiritbuun/buun-llama-cpp#26\n\nThe patch is two small changes to `tools/server/server-context.cpp`:\n\n```diff\n--- a/tools/server/server-context.cpp\n+++ b/tools/server/server-context.cpp\n@@ -2598,6 +2598,12 @@\n+                                            // for hybrid/recurrent models (DeltaNet, Mamba), pos_min always equals\n+                                            // the full sequence length, so the SWA-based pos_min check always fails.\n+                                            // use pos_max <= pos_next instead to find the most recent valid checkpoint.\n+                                            if (llama_model_is_recurrent(model) || llama_model_is_hybrid(model)) {\n+                                                return cur.pos_max <= pos_next;\n+                                            }\n                                             return cur.pos_min < pos_min_thold;\n\n@@ -2842,1 +2845,3 @@\n-                    do_checkpoint = do_checkpoint && (pos_min >= 0 && slot.prompt.n_tokens() >= 64);\n+                    const int checkpoint_min_tokens = (llama_model_is_recurrent(model) || llama_model_is_hybrid(model)) ? 4 : 64;\n+                    do_checkpoint = do_checkpoint && (pos_min >= 0 && slot.prompt.n_tokens() >= checkpoint_min_tokens);\n```\n\n— Gastón Parravicini",
+  "closed_by": {
+    "login": "ggerganov",
+    "id": 1991296,
+    "node_id": "MDQ6VXNlcjE5OTEyOTY=",
+    "avatar_url": "https://avatars.githubusercontent.com/u/1991296?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/ggerganov",
+    "html_url": "https://github.com/ggerganov",
+    "followers_url": "https://api.github.com/users/ggerganov/followers",
+    "following_url": "https://api.github.com/users/ggerganov/following{/other_user}",
+    "gists_url": "https://api.github.com/users/ggerganov/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/ggerganov/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/ggerganov/subscriptions",
+    "organizations_url": "https://api.github.com/users/ggerganov/orgs",
+    "repos_url": "https://api.github.com/users/ggerganov/repos",
+    "events_url": "https://api.github.com/users/ggerganov/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/ggerganov/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "reactions": {
+    "url": "https://api.github.com/repos/ggml-org/llama.cpp/issues/22384/reactions",
+    "total_count": 0,
+    "+1": 0,
+    "-1": 0,
+    "laugh": 0,
+    "hooray": 0,
+    "confused": 0,
+    "heart": 0,
+    "rocket": 0,
+    "eyes": 0
+  },
+  "timeline_url": "https://api.github.com/repos/ggml-org/llama.cpp/issues/22384/timeline",
+  "performed_via_github_app": null,
+  "state_reason": "completed",
+  "pinned_comment": null
+}

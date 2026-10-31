@@ -1,0 +1,59 @@
+{
+ "file": "docs\\素材\\_草稿\\测试样本_新线两集_v0_20261011.md",
+ "profile": "story",
+ "blocks": [
+  {
+   "name": "故事-101｜晚饭后·\"你是谁\"不许答",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 21,
+    "turns": 48,
+    "max_turn": 405,
+    "avg_turn": 24,
+    "short_turns": 22,
+    "interjections": 2,
+    "endings": {
+     "陈述": 16,
+     "叹": 1,
+     "问": 2
+    },
+    "self_refs": [
+     "我",
+     "咱",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "故事-102｜别挡住我的阳光",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 21,
+    "turns": 47,
+    "max_turn": 422,
+    "avg_turn": 27,
+    "short_turns": 18,
+    "interjections": 6,
+    "endings": {
+     "陈述": 18,
+     "问": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "我",
+     "咱",
+     "本小姐"
+    ]
+   }
+  }
+ ],
+ "summary": {
+  "PASS": 2,
+  "WARN": 0,
+  "FAIL": 0
+ }
+}

@@ -21,7 +21,7 @@ import sys
 import time
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-ROOT = pathlib.Path(r"C:\Users\ACE_WAN——PROJECT\YHLZ")
+ROOT = pathlib.Path(r"C:\Users\ACE_WAN——PROJECT\YHLZ\YH")
 sys.path.insert(0, str(ROOT))
 
 from backend.target_memory import TargetMemoryService  # noqa: E402

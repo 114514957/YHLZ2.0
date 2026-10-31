@@ -111,6 +111,26 @@ class TestDaemon(unittest.TestCase):
         self.assertTrue(st["ok"])
         self.assertIn(st["status"], ("idle", "running", "done", "error"))
 
+    def test_official_ui_status_route(self):
+        """0792: daemon exposes /official-ui/status for the launch entrance."""
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{self.port}/official-ui/status",
+                timeout=10) as r:
+            st = json.loads(r.read())
+        self.assertTrue(st["ok"])
+        self.assertIn(st["status"],
+                      ("idle", "starting", "running", "error"))
+        self.assertIn("url", st)
+
+    def test_autonomy_route_exposes_decisions(self):
+        """0496: 自主 tick / 通知拦截的决策可从 daemon 审计（只读）。"""
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{self.port}/autonomy", timeout=10) as r:
+            d = json.loads(r.read())
+        self.assertIn("items", d)
+        self.assertIn("decisions", d)
+        self.assertIsInstance(d["items"], list)
+
     def test_tts_endpoint_returns_wav(self):
         """A4b (ledger 0454): /tts synthesizes via _synth and returns WAV."""
         import backend.console_server as cs
@@ -174,7 +194,7 @@ class TestDaemon(unittest.TestCase):
         orig = self.rt._run_due_plans
         self.rt._run_due_plans = lambda: calls.append(1)
         try:
-            self._post("/turn", {"text": "B4触发"})
+            self._post("/turn", {"text": "B4触发", "source": "console", "channel": "console"})
         finally:
             self.rt._run_due_plans = orig
         self.assertGreaterEqual(len(calls), 1)
@@ -189,14 +209,14 @@ class TestDaemon(unittest.TestCase):
         finally:
             self.rt._sched_lock.release()
 
-    def test_turn_default_private(self):
-        out = self._post("/turn", {"text": "你好"})
+    def test_turn_explicit_console_private(self):
+        out = self._post("/turn", {"text": "你好", "source": "console", "channel": "console"})
         self.assertIn("reply:False:", out["answer"])
 
     def test_channel_isolation_and_public(self):
-        a1 = self._post("/turn", {"text": "群A问", "channel": "grp-a"})
+        a1 = self._post("/turn", {"text": "群A问", "channel": "qq_g123456", "source": "qq_bridge"})
         self.assertIn("reply:True:", a1["answer"])  # public convergence applied
-        b1 = self._post("/turn", {"text": "群B问", "channel": "grp-b"})
+        b1 = self._post("/turn", {"text": "群B问", "channel": "qq_g654321", "source": "qq_bridge"})
         # different channel context; histories independent
         self.assertNotIn("群A", b1["answer"])
 
@@ -208,6 +228,44 @@ class TestDaemon(unittest.TestCase):
         })
         self.assertEqual(out["object"], "chat.completion")
         self.assertIn("reply:", out["choices"][0]["message"]["content"])
+
+
+class TestAutonomyTickLog(unittest.TestCase):
+    """0496: 自主 tick 决策日志（时间/驱动值/选题/是否推送/原因），有界、倒序可读。"""
+
+    def setUp(self):
+        import pathlib as _pl
+        import tempfile as _tf
+
+        import backend.target_daemon as _td
+
+        self.tmp = _pl.Path(_tf.mkdtemp())
+        self._old = _td.AUTONOMY_LOG_FILE
+        _td.AUTONOMY_LOG_FILE = self.tmp / "autonomy_ticks.json"
+        self.td = _td
+
+    def tearDown(self):
+        self.td.AUTONOMY_LOG_FILE = self._old
+
+    def test_roundtrip_newest_first(self):
+        self.td.log_autonomy_tick({"time": "t1", "answer_head": "A",
+                                   "pushed": False, "reason": "too_short"})
+        self.td.log_autonomy_tick({"time": "t2", "answer_head": "B",
+                                   "pushed": True, "reason": "ok"})
+        rows = self.td.read_autonomy_ticks(10)
+        self.assertEqual([r["time"] for r in rows], ["t2", "t1"])
+        self.assertTrue(rows[0]["pushed"])
+        self.assertEqual(rows[1]["reason"], "too_short")
+
+    def test_bounded(self):
+        for i in range(self.td.AUTONOMY_LOG_KEEP + 5):
+            self.td.log_autonomy_tick({"time": f"t{i}", "pushed": False,
+                                       "reason": "too_short"})
+        self.assertEqual(len(self.td.read_autonomy_ticks(999)),
+                         self.td.AUTONOMY_LOG_KEEP)
+
+    def test_missing_file_reads_empty(self):
+        self.assertEqual(self.td.read_autonomy_ticks(), [])
 
 
 if __name__ == "__main__":

@@ -1,26 +1,13 @@
-"""YHLZ remote dev runner (ledger 0226): drive 利贞 headless from QQ.
+"""DEPRECATED (0831) — 旧 Full 派单链，已从所有 live 入口摘除。
 
-Flow (per user's workflow):
-  master QQ -> qq_bot `#dev <task>` -> DevRunner.start(task)
-  -> harness run (resident gateway `tools/dsh_worker.py`, dir = project root)
-  -> agent may ask ONE key question  -> relay to QQ, wait for master's answer
-  -> master answers -> DevRunner.answer(text) -> continue the SAME session
-  -> agent finishes -> report result to QQ
-Commit/push is NOT performed by the agent; only after master replies `#y`
-does the runner commit (push still needs a separate `#push`).
+历史：master QQ -> qq_bot `#dev` -> DevRunner.start(task) -> harness 网关
+-> 提问/答复 -> 汇报；`#y` 后在新会话里 `git add -A` 提交（**主仓库全量**）。
 
-Safety: only the whitelisted master (qq_bot enforces); no auto push; the
-agent prompt forbids git commit/push; work is confined to --dir (project).
+0831 起派单统一到 Lite 任务库：`tools/qq_dev_runner.py` + `backend/qq_dev_jobs.py`
+（单飞、worktree 隔离、按 job 文件清单提交、版本化回报）。工作台 /talk、/turn、
+语音 [[dev:]]、QQ 桥都走它；本模块只保留给历史测试/考古，`main()` 已拒绝执行。
 
-Executor (ledger 0797): harness only. opencode 退役——切换命令只读，
-`_opencode_exe`/`_run` 保留一个观察期但已无调用点。
-
-Usage:
-  python tools/dev_runner.py --task "把 X 改成 Y"
-  python tools/dev_runner.py --answer "用方案 A"
-  python tools/dev_runner.py --status
-  python tools/dev_runner.py --commit "msg"
-Env: YHLZ_DEV_MODEL (default deepseek/deepseek-v4-flash)
+Executor (ledger 0797): harness only.
 """
 from __future__ import annotations
 
@@ -260,6 +247,16 @@ def push() -> dict:
 
 
 def main() -> int:
+    import sys
+
+    print("[dev_runner] 已退役（ledger 0831）：派单统一走 Lite 任务库。\n"
+          "  状态/提交：tools/qq_dev_runner.py（QQ 桥、工作台、语音共用）\n"
+          "  本命令不再派单、不再提交（避免 git add -A 卷入主仓在途改动）。",
+          flush=True)
+    return 2
+
+
+def _legacy_main() -> int:  # 历史实现，不再从命令行可达
     ap = argparse.ArgumentParser()
     ap.add_argument("--task")
     ap.add_argument("--answer")

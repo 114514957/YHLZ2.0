@@ -9,6 +9,7 @@ Sources merged into one chat-format dataset (dedup, fixed persona system):
   - docs/素材/诚实边界样本.md         : B3 (HONESTY_CLAUSE)
   - docs/素材/安全拒绝样本.md         : B4 (ATTACK_SILENT_CLAUSE)
   - docs/素材/承认不确定样本.md       : D2 (ANTI_HALLUCINATION)
+  - docs/素材/元亨说话_老爹故事.md    : V9 故事素材 (Phase 1, 老爹叙述/代写; status=keep 才写入)
   - --extra data/finetune/tool_use_v8.jsonl : tool-use trajectories
 
 v8 quality gates (README_规范 §6): tool names MUST be a subset of the real
@@ -31,11 +32,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-SYSTEM = (
-    "你是元亨——一个从代码与记忆里长出来的数字生命体，老爹的伙伴。好奇心爆棚、"
-    "活泼话多，傲娇得很，其实最在意老爹；哲学强。像人对朋友说话：短、口语、有起伏；"
-    "自称按情绪切换（我/咱/元亨/老娘/本小姐）；禁止助手腔/报告腔、列表、小标题。"
-)
+# 2026-10-30 统一 prompt：训练/评测/部署共用一份（原简化版 86 tokens，
+# 与部署用的 3,856 字真实 prompt 不一致，实测真实版让工具题 2/6 -> 0/6）。
+from unified_prompt import UNIFIED_SYSTEM as SYSTEM  # noqa: E402
 TURN = re.compile(r"^###\s*([^\n#]*?)(问|答)(\d+)\s*$", re.MULTILINE)
 META = re.compile(r"^[ \t]*-[ \t]*([A-Za-z_]+)[ \t]*:[ \t]*(.*)$", re.MULTILINE)
 VALID_STATUS = {"candidate", "keep", "drop", "fixed"}
@@ -47,7 +46,8 @@ _REPAIR_REPEATS = False
 _REPAIR_COUNT = 0
 
 SYSTEM_LZ = (
-    "你是利贞——元亨的伙伴、靠谱的技术担当。稳重、博学、直接，话不多但到位；"
+    "你是利贞——元亨的姐妹、家人，也是家里的技术担当（家里那台接入了 DE 的主机）。"
+    "稳重、博学、直接，话不多但到位；"
     "句尾偶尔「，理论上来说」；私下其实没常识、有点大胆。禁止助手腔/列表/小标题。"
 )
 
@@ -72,6 +72,27 @@ def _read_jsonl(path: Path) -> list[dict]:
             except json.JSONDecodeError:
                 pass
     return out
+
+
+def _strip_label(text: str) -> str:
+    """剥掉正文开头的角色标签（2026-10-27）。
+
+    两个实测出来的 bug：
+      ① `role != 元亨` 时拼成 `f"{role}：{text}"`，若 text 本身以「利贞：」开头
+         就变成「利贞：利贞：xxx」（philo 里有多条）；
+      ② 元亨的台词本身写成「元亨：利贞，你问得好——…」，原样进训练后
+         模型学会了输出「元亨：」前缀（56 题第 6 条实测复现：答「元亨：因为不睡会死。」）。
+
+    只剥开头、且可连剥多次（防「利贞：利贞：」），不动正文中间。
+    """
+    t = str(text or "").lstrip()
+    pat = re.compile(r"^(元亨|利贞|老爹|助手|AI)\s*[:：]\s*")
+    for _ in range(3):
+        m = pat.match(t)
+        if not m:
+            break
+        t = t[m.end():].lstrip()
+    return t
 
 
 def _repair_repeat(text: str, min_len: int = 20) -> tuple[str, bool]:
@@ -101,6 +122,11 @@ def _to_messages(turns: list[tuple[str, str, str]], keep_owner: bool = True,
         role, text = turn[0], turn[-1]
         if _REPAIR_REPEATS:
             text, _ = _repair_repeat(text)
+        # v9t2(2026-10-27)：剥掉正文开头的角色标签，避免
+        # 「利贞：利贞：」（user 侧重复拼前缀）和 assistant 台词带「元亨：」。
+        text = _strip_label(text)
+        if not text:
+            continue
         if role == "元亨":
             who, content = "assistant", text
         elif role == "老爹":
@@ -207,8 +233,11 @@ def main() -> int:
     ap.add_argument("--tag", default=cfg.get("tag", "v3"))
     ap.add_argument("--memory-ratio", type=float, default=0.20)
     ap.add_argument("--lizhen-cap", type=int, default=300)
-    ap.add_argument("--extra", default=None)
+    ap.add_argument("--extra", action="append", default=None,
+                    help="可多次指定，例如 --extra a.jsonl --extra b.jsonl")
     ap.add_argument("--extra-cap", type=int, default=0)
+    ap.add_argument("--memory-file", default="记忆样本_v2.md")
+    ap.add_argument("--refusal-file", default="安全拒绝样本.md")
     ap.add_argument("--repair-repeats", action="store_true",
                     help="R1: 修复消息内相邻重复段（洁净候选用）")
     args = ap.parse_args()
@@ -220,6 +249,19 @@ def main() -> int:
 
     from backend.target_scheduler_tools import openai_tools_view
     real_tools = {t["function"]["name"] for t in openai_tools_view()}
+    # 2026-10-20（ledger 0900）：工具范围扩到未来 agent harness——把 harness 注册表并入白名单
+    _hs = ROOT / "data" / "tool_registry" / "harness_tools_latest.json"
+    _ds = ROOT / "data" / "tool_registry" / "dsh_tools_latest.json"
+    if _ds.exists():
+        try:
+            real_tools |= {t["name"] for t in json.loads(_ds.read_text(encoding="utf-8")).get("tools") or []}
+        except Exception:
+            pass
+    if _hs.exists():
+        try:
+            real_tools |= {t["name"] for t in json.loads(_hs.read_text(encoding="utf-8")).get("tools") or []}
+        except Exception:
+            pass
 
     records: list[dict] = []
     seen = set()
@@ -251,9 +293,27 @@ def main() -> int:
         a = rec["messages"][2]["content"]
         if add(rec, _fp(u, a)):
             n_gold += 1
+    # 2026-10-22 全素材集检查发现：**优质样本.md 是孤儿**——8 块利贞手写的风格标杆
+    # （日常3/哲学2/技术1/闲聊2），格式合规 `## 优质-N｜…`，但从来没有任何读取路径用到。
+    # 内容正是"完美风格"最缺的标杆，接进 golden 维度。
+    n_qual = add_doc("优质样本.md", "golden")
+    n_gold += n_qual
     n_b3 = add_doc("诚实边界样本.md", "honesty")
-    n_b4 = add_doc("安全拒绝样本.md", "refusal")
+    n_b4 = add_doc(args.refusal_file, "refusal")
     n_d2 = add_doc("承认不确定样本.md", "uncertain")
+    n_story = add_doc("元亨说话_老爹故事.md", "story")
+    # 2026-10-20 新增：哲学观点素材（来源代号 PHILO-A《苏菲的世界》；落法 B/C，见来源代号登记表）
+    n_philo = add_doc("哲学观点样本.md", "philo")
+    # 2026-10-20 新增：比喻理解素材（原创实体比喻讲抽象概念，无版权来源）
+    n_meta = add_doc("比喻理解样本.md", "metaphor")
+    # 2026-10-20 新增：情绪承接素材（机制学自 TreeHoleEcho，情景与台词全原创）
+    n_emo = add_doc("情绪承接样本.md", "emotional")
+    # 2026-10-20 新增：LCCC 开源真实对话原话直采（MIT）
+    n_open = add_doc("开源对话样本.md", "opendialogue")
+    # 2026-10-21 老爹：「元亨要的是个性，不是叛逆」→ 个性样本（她本来就有坐标系）
+    n_pers = add_doc("个性样本.md", "personality")
+    # 2026-10-21 老爹：「这些保留」→ 教样本（治毛病：被纠正就改的那种）
+    n_teach = add_doc("教样本.md", "teaching")
 
     n_scene = 0
     for rec, why in parse_doc(D / "对话样本.md", "scene"):
@@ -264,20 +324,28 @@ def main() -> int:
         if add(rec, key):
             n_scene += 1
 
+    # 2026-10-20 修（老爹「重做」／素材体检 P0-1）：
+    # lizhen 记录带的是 **SYSTEM_LZ（利贞人格）**，原来直接 add() 进主 records，
+    # 导致 118 条利贞样本混进元亨训练集 → 模型会学到"某些情况该自称利贞"，身份污染。
+    # 现改为**分流到独立文件**，不进元亨数据集。
     lz_recs = _from_lizhen(D / "对话样本.md")
     if args.lizhen_cap and len(lz_recs) > args.lizhen_cap:
         import random as _r
         _r.Random(cfg.get("seed", 20260913)).shuffle(lz_recs)
         lz_recs = lz_recs[: args.lizhen_cap]
-    n_lz = 0
-    for rec in lz_recs:
-        if add(rec, _fp(json.dumps(rec["messages"], ensure_ascii=False))):
-            n_lz += 1
+    n_lz = len(lz_recs)
+    if lz_recs:
+        lz_out = out_dir / f"sft_lizhen_{args.tag}.jsonl"
+        lz_out.write_text(
+            "\n".join(json.dumps(r, ensure_ascii=False) for r in lz_recs) + "\n",
+            encoding="utf-8")
+        print(f"[assemble] 利贞人格集已分流：{n_lz} 条 -> {lz_out.name}"
+              f"（不进元亨训练集）")
 
     from tools.memory_samples import load_memory_samples
     import random
     mem_items: list[tuple[dict, str, bool]] = []
-    for m in load_memory_samples(D / "记忆样本_v2.md"):
+    for m in load_memory_samples(D / args.memory_file):
         if m.get("status") in ("drop", "不要", "这条不要"):
             continue
         if m.get("answerer") != "元亨":
@@ -306,8 +374,8 @@ def main() -> int:
             n_mem += 1
 
     n_extra, n_extra_bad = 0, 0
-    if args.extra:
-        ex_rows = _read_jsonl(Path(args.extra))
+    for _ex_path in (args.extra or []):
+        ex_rows = _read_jsonl(Path(_ex_path))
         if args.extra_cap and len(ex_rows) > args.extra_cap:
             random.Random(cfg.get("seed", 20260913)).shuffle(ex_rows)
             ex_rows = ex_rows[: args.extra_cap]
@@ -329,8 +397,29 @@ def main() -> int:
                 n_extra_bad += 1
                 continue
             rec = {"messages": msgs, "source": r.get("source", "extra")}
+            # 2026-10-20（老爹「工具要经过测试可用，别写错调用就坏了」）：
+            # **tool_calls[].function.arguments 必须是对象，不能是 JSON 字符串。**
+            # Gemma 4 的 chat template 会直接报
+            #   "tool_calls[].function.arguments must be a JSON object (mapping), not a string"
+            # 训练脚本走 apply_chat_template，实测 train 35 / val 5 / test 1 条会因此崩。
+            for _m in rec["messages"]:
+                for _tc in _m.get("tool_calls") or []:
+                    _fn = _tc.setdefault("function", {})
+                    _a = _fn.get("arguments")
+                    if isinstance(_a, str):
+                        try:
+                            _fn["arguments"] = json.loads(_a) if _a.strip() else {}
+                        except Exception:
+                            _fn["arguments"] = {}
+                    elif _a is None:
+                        _fn["arguments"] = {}
             if r.get("tools"):
                 rec["tools"] = r["tools"]
+            # 2026-10-20（ledger 0889）：simulation/generated 标记必须透传，
+            # 否则门无法区分「真实轨迹」与「按 schema 生成的轨迹」。
+            for k in ("simulation", "generated", "tool", "scenario"):
+                if k in r:
+                    rec[k] = r[k]
             if add(rec, _fp(json.dumps(msgs, ensure_ascii=False))):
                 n_extra += 1
 
@@ -339,7 +428,10 @@ def main() -> int:
     out.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n",
                    encoding="utf-8")
     dims = {"real": n_real, "golden": n_gold, "scene": n_scene, "lizhen": n_lz,
-            "memory": n_mem, "b3": n_b3, "b4": n_b4, "d2": n_d2, "tools": n_extra}
+            "memory": n_mem, "b3": n_b3, "b4": n_b4, "d2": n_d2,
+            "story": n_story, "philo": n_philo, "metaphor": n_meta,
+            "emotional": n_emo, "opendialogue": n_open,
+            "personality": n_pers, "teaching": n_teach, "tools": n_extra}
     adjacent_assistant = leading_assistant = lizhen_user_turns = 0
     for r in records:
         msgs = r["messages"]

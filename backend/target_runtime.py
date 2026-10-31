@@ -12,6 +12,7 @@ import time
 from typing import Any, Dict, Mapping, Optional, Tuple
 
 from backend.asr_bridge import ASRBridge
+from backend.barge_in import BargeInDecision, BargeInDetector
 from backend.media_adapter import DeviceDescriptor, MediaAdapter, MediaError, MediaState
 from backend.runtime_events import RuntimeEventRelay
 from backend.session_kernel import (
@@ -216,15 +217,27 @@ class TargetVoiceRuntime:
         fault_policy: Optional[RuntimeFaultPolicy] = None,
         environment_report: Optional[EnvironmentProbeReport] = None,
         acceptance_thresholds: Optional[AcceptanceThresholds] = None,
+        barge_in_detector: Optional[BargeInDetector] = None,
     ) -> None:
         if asr.chain is not chain:
             raise ValueError("ASR bridge and runtime must share the same TargetVoiceChain")
         if stop_timeout_s <= 0:
             raise ValueError("stop_timeout_s must be positive")
+        if barge_in_detector is not None and not isinstance(barge_in_detector, BargeInDetector):
+            raise TypeError("barge_in_detector must be a BargeInDetector or None")
         self.media = media
         self.asr = asr
         self.chain = chain
         self.stop_timeout_s = float(stop_timeout_s)
+        # Opt-in (阶段3): when supplied, sustained speech while the assistant is
+        # speaking triggers ``chain.interrupt`` — playback stops without waiting
+        # for an ASR final.  Default None keeps the previous behaviour.
+        self.barge_in_detector = barge_in_detector
+        self._barge_in_lock = threading.RLock()
+        self._playback_active = False
+        self._barge_in_poll_handle: Optional[asyncio.TimerHandle] = None
+        self._barge_in_last: Optional[BargeInDecision] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
         if acceptance_thresholds is not None and not isinstance(
             acceptance_thresholds, AcceptanceThresholds
         ):
@@ -297,6 +310,12 @@ class TargetVoiceRuntime:
                 raise MediaError("media adapter did not expose effective capabilities")
             self.chain.start(effective)
             self._started = True
+            with self._barge_in_lock:
+                self._playback_active = False
+                self._barge_in_last = None
+            if self.barge_in_detector is not None:
+                self.barge_in_detector.reset(
+                    self.chain.kernel.snapshot().get("generation"))
             with self._acceptance_lock:
                 self._acceptance = FullDuplexAcceptance.not_run(
                     self.media.generation,
@@ -332,6 +351,7 @@ class TargetVoiceRuntime:
         if self._run_task is not None and not self._run_task.done() and self._run_task is not current:
             raise MediaError("target voice runtime already has a media consumer")
         self._run_task = current
+        self._loop = asyncio.get_running_loop()
         try:
             await self.media.run()
         except asyncio.CancelledError:
@@ -1110,12 +1130,95 @@ class TargetVoiceRuntime:
 
     def _handle_media_event(self, event: Any) -> None:
         """Make runtime media failures visible to the Kernel capability view."""
-        if str(getattr(event, "kind", "")) != "MEDIA_ERROR":
+        kind = str(getattr(event, "kind", ""))
+        if kind in ("SPEECH_STARTED", "SPEECH_ENDED"):
+            self._on_barge_in_speech(kind == "SPEECH_STARTED", event)
+            return
+        if kind != "MEDIA_ERROR":
             return
         code = getattr(event, "code", None)
         if not code:
             return
         self._record_runtime_fault(str(code), "media")
+
+    # ── 阶段3: barge-in onset detection ──────────────────────────────
+    def _on_barge_in_speech(self, active: bool, event: Any) -> None:
+        """Feed one VAD speech edge to the detector (only while speaking)."""
+        detector = self.barge_in_detector
+        if detector is None:
+            return
+        snapshot = self.chain.kernel.snapshot()
+        playing = (
+            str(snapshot.get("active_turn_state") or "").lower() == "speaking"
+            or self._playback_active
+        )
+        if not playing:
+            return
+        generation = snapshot.get("generation")
+        # Use the detector's own monotonic clock (MediaEvent.timestamp is
+        # wall-clock, which would make held_ms nonsensical).
+        if active:
+            detector.arm(None, generation)
+            self._schedule_barge_in_poll()
+        else:
+            detector.speech_end(None)
+
+    def _schedule_barge_in_poll(self) -> None:
+        loop = self._loop
+        detector = self.barge_in_detector
+        if loop is None or detector is None:
+            return
+        with self._barge_in_lock:
+            if self._barge_in_poll_handle is not None:
+                return
+            handle = loop.call_later(
+                max(detector.config.min_speech_ms, 1.0) / 1000.0,
+                self._poll_barge_in)
+            self._barge_in_poll_handle = handle
+
+    def _poll_barge_in(self) -> None:
+        with self._barge_in_lock:
+            self._barge_in_poll_handle = None
+        detector = self.barge_in_detector
+        if detector is None:
+            return
+        decision = detector.poll()
+        if decision is not None:
+            self._fire_barge_in(decision)
+            return
+        # The timer can fire a hair before enough time has elapsed; keep
+        # polling while the burst is still armed (terminates on confirmation or
+        # when silence disarms it via speech_end).
+        if detector.armed and not detector.confirmed:
+            self._schedule_barge_in_poll()
+
+    def _fire_barge_in(self, decision: BargeInDecision) -> None:
+        """Confirmed onset: stop playback / cancel the turn, then record it."""
+        loop = self._loop
+        if loop is None:
+            return
+        with self._barge_in_lock:
+            self._barge_in_last = decision
+
+        async def _stop() -> None:
+            try:
+                await self.chain.interrupt("barge_in_onset", timeout_s=self.stop_timeout_s)
+            except Exception:
+                logger.exception("barge-in interrupt failed")
+
+        try:
+            asyncio.ensure_future(_stop(), loop=loop)
+        except Exception:
+            logger.exception("failed to schedule barge-in interrupt")
+
+    def barge_in_snapshot(self) -> dict:
+        with self._barge_in_lock:
+            last = self._barge_in_last
+            return {
+                "enabled": self.barge_in_detector is not None,
+                "playback_active": self._playback_active,
+                "last": last.to_dict() if last is not None else None,
+            }
 
     def _handle_asr_event(self, event: Any) -> None:
         """Downgrade evidence when a serial ASR cancellation cannot be proven."""
@@ -1130,6 +1233,18 @@ class TargetVoiceRuntime:
     def _handle_playback_event(self, event: Any) -> None:
         """Treat output-port faults as core target-chain health evidence."""
         kind = str(getattr(event, "kind", ""))
+        if kind == "PLAYBACK_STARTED":
+            with self._barge_in_lock:
+                self._playback_active = True
+        elif kind in ("PLAYBACK_DONE", "PLAYBACK_STOPPED"):
+            with self._barge_in_lock:
+                self._playback_active = False
+                handle, self._barge_in_poll_handle = self._barge_in_poll_handle, None
+            if handle is not None:
+                handle.cancel()
+            if self.barge_in_detector is not None:
+                self.barge_in_detector.reset(
+                    self.chain.kernel.snapshot().get("generation"))
         code = getattr(event, "code", None)
         if not code:
             payload = getattr(event, "payload", {}) or {}

@@ -63,6 +63,12 @@ _busy = False
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 _job_threads: dict[str, threading.Thread] = {}
+# 利贞 QQ 桥：一个常驻会话，跨消息保留上下文（同一个 harness 进程内）。
+_chat_lock = threading.Lock()
+_chat_harness = None
+CHAT_SESSION = "lizhen-qq"
+CHAT_WORKSPACE = _ROOT / "cache" / "lizhen_qq" / "workspace"
+PERSONA_FILE = pathlib.Path(r"C:\Users\ACE_WAN——PROJECT\.dsh\AGENT.md")
 _worker_cfg = {"workdir": str(_ROOT), "dsh_home": str(_ROOT / "cache" / "dsh-home"),
                "model": os.getenv("YHLZ_DSH_MODEL", "deepseek-v4-flash"),
                "mcp": os.getenv("YHLZ_DSH_MCP", "1").strip() != "0"}
@@ -213,6 +219,43 @@ def _harness_get():
 # --------------------------------------------------------------------------
 # Full path (dev_runner): one active session, state.json contract
 # --------------------------------------------------------------------------
+
+def _chat_persona() -> str:
+    try:
+        text = PERSONA_FILE.read_text(encoding="utf-8").strip()
+    except Exception:
+        text = ""
+    return text[:2600]
+
+
+def chat(text: str) -> dict:
+    """One persistent 利贞 chat session for the QQ bridge."""
+    global _chat_harness
+    text = str(text or "").strip()
+    if not text:
+        return {"ok": False, "error": "empty text"}
+    if not _chat_lock.acquire(blocking=False):
+        return {"ok": False, "error": "busy: 利贞正在回复上一条"}
+    try:
+        CHAT_WORKSPACE.mkdir(parents=True, exist_ok=True)
+        h = _chat_harness
+        if h is None:
+            h = _make_harness(str(CHAT_WORKSPACE))
+            _chat_harness = h
+        persona = _chat_persona()
+        prompt = ((persona + "\n\n" if persona else "")
+                  + "【QQ 对话】\n" + text
+                  + "\n\n直接以利贞的身份回复，不要输出工具/系统说明。")
+        r = h.run(prompt, session_id=CHAT_SESSION)
+        answer = str(getattr(r, "final_response", "") or "").strip()
+        return {"ok": True, "answer": answer or "(无输出)",
+                "session": CHAT_SESSION}
+    except Exception as exc:  # noqa: BLE001
+        _log(f"chat error {type(exc).__name__}: {exc}")
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    finally:
+        _chat_lock.release()
+
 
 def _run_async(prompt: str, session: str, task: str) -> None:
     global _busy
@@ -492,6 +535,7 @@ class _Handler(BaseHTTPRequestHandler):
                              "task_status": d.get("status", ""),
                              "session": d.get("session", ""),
                              "backend": "dsh", "jobs_active": len(active),
+                             "chat_busy": _chat_lock.locked(),
                              "harnesses": len(_harness_pool)})
         elif path == "/job/state":
             job_id = ""
@@ -519,6 +563,8 @@ class _Handler(BaseHTTPRequestHandler):
             res = start(str(payload.get("task", "")).strip())
         elif p == "/answer":
             res = answer(str(payload.get("text", "")).strip())
+        elif p in ("/turn", "/chat"):
+            res = chat(str(payload.get("text") or payload.get("task") or "").strip())
         elif p == "/job/start":
             res = job_start(payload)
         elif p == "/job/answer":

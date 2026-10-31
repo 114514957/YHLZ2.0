@@ -80,17 +80,23 @@ def _save_state(state: dict) -> None:
 
 
 def _daemon_pids() -> list[int]:
+    """Daemon PIDs (hardened 2026-10-12: python interpreter whose argv
+    element ends with `target_daemon`; shells that merely mention the name
+    are ignored — F2 must never kill innocent processes)."""
     try:
         import psutil
     except Exception:
         return []
     out: list[int] = []
-    for p in psutil.process_iter(["pid", "cmdline"]):
+    for p in psutil.process_iter(["pid", "name", "cmdline"]):
         try:
-            cl = p.info.get("cmdline") or []
+            nm = str(p.info.get("name") or "").lower()
+            cl = [str(x).replace("\\", "/").lower()
+                  for x in (p.info.get("cmdline") or [])]
         except Exception:
             continue
-        if any("target_daemon" in str(x) for x in cl):
+        if nm.startswith("python") and any(
+                x.endswith("target_daemon") for x in cl):
             out.append(int(p.info["pid"]))
     return out
 
@@ -145,8 +151,9 @@ def _log(msg: str) -> None:
 
 
 def tick() -> dict:
-    from yhlz_launcher import (ensure_stack, napcat_status, qqbot_status,
-                               status, _port_open, _proc_alive, _spawn_napcat)
+    from yhlz_launcher import (ensure_stack, napcat_status, qq_management,
+                               qqbot_status, status, _port_open, _proc_alive,
+                               _reap_legacy_qq, _spawn_napcat)
 
     before = status()
     down = [k for k, v in before.items() if not v]
@@ -178,6 +185,22 @@ def tick() -> dict:
     after = status()
 
     # --- NapCat / 元亨 online watchdog ---
+    # 2026-10-07: qq_management=external — QQ 由独立 Lite 链负责，
+    # Full 看门狗不再启动/重启 NapCat、QQ 桥或发送 QQ 通知。
+    if qq_management() == "external":
+        if not getattr(tick, "_qq_external_logged", False):
+            _log("QQ 管理=external：跳过 NapCat/QQ桥/napcat_watch（Lite 链负责）")
+            tick._qq_external_logged = True
+        # 0830：旧链不一定会等到某个服务掉线才出现（老快捷方式/老脚本随时
+        # 拉起 qq_bot.py / napcat_watch.py）。每个 tick 都收一遍，保证同一个
+        # QQ 号只有 Lite 一个消费者。
+        try:
+            reaped = _reap_legacy_qq()
+            if reaped:
+                _log(f"external：收掉旧 QQ 链残留 {reaped}")
+        except Exception as exc:  # noqa: BLE001
+            _log(f"旧链清理异常 {type(exc).__name__}: {exc}")
+        return after
     # 0469: dev-mode silence — never auto-start NapCat / auto-login / notify.
     silent = _qq_silent()
     ns = napcat_status()

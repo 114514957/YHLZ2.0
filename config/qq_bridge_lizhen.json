@@ -1,0 +1,61 @@
+{
+  "profile": "lizhen",
+  "uin": "<lizhen_uin>",
+  "master_uins": [
+    "2258374446"
+  ],
+  "onebot_config": "C:\\Users\\ACE_WAN——PROJECT\\qqwatch\\shell\\config\\onebot11_<lizhen_uin>.json",
+  "conversation": "optional",
+  "manage_napcat": "owned",
+  "lazy_asr": true,
+  "enable_voice": false,
+  "daemon_url": "http://127.0.0.1:8347",
+  "state_dir": "cache/qq_bridge/lizhen",
+  "daemon_required_for_normal_chat": true,
+  "restart_backoff_seconds": [2, 5, 15, 30, 60],
+  "heartbeat_seconds": 10,
+  "pong_timeout_seconds": 5,
+  "status_interval_seconds": 5,
+  "bridge_start_timeout_seconds": 20,
+  "owner_command_groups": [],
+  "notify_owner": "2258374446",
+  "group_history_turns": 0,
+  "groups": [],
+  "wake": {
+    "enabled": false,
+    "mode": "quiet",
+    "names": ["利贞"],
+    "topics": false,
+    "memory": false,
+    "master_always": true,
+    "silence": true,
+    "at_only_groups": []
+  },
+  "limits": {
+    "group_user_cooldown_seconds": 30,
+    "group_chan_per_minute": 0,
+    "group_chan_gap_seconds": 30,
+    "group_daily_limit": 0,
+    "private_user_cooldown_seconds": 10
+  },
+  "profiles": {
+    "refresh_seconds": 600,
+    "min_messages": 1,
+    "inject": false
+  },
+  "supervision": {
+    "napcat_miss_grace_seconds": 120,
+    "napcat_launch_cooldown_seconds": 300,
+    "napcat_max_attempts": 0,
+    "napcat_launch_wait_seconds": 15,
+    "account_offline_grace_seconds": 150,
+    "account_max_attempts": 0,
+    "account_restart_cooldown_seconds": 300,
+    "account_recover_wait_seconds": 60,
+    "account_blocked_retry_seconds": 900,
+    "scan_notice_after_seconds": 600,
+    "auto_start_napcat": false,
+    "auto_relogin": false
+  },
+  "auto_resume": true
+}

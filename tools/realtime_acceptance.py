@@ -13,7 +13,7 @@ import asyncio
 import io
 import sys
 
-sys.path.insert(0, r"C:\Users\ACE_WAN——PROJECT\YHLZ")
+sys.path.insert(0, r"C:\Users\ACE_WAN——PROJECT\YHLZ\YH")
 
 
 def _setup() -> None:

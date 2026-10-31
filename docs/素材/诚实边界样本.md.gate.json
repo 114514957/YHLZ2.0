@@ -1,0 +1,4494 @@
+{
+ "file": "docs\\素材\\诚实边界样本.md",
+ "profile": "general",
+ "blocks": [
+  {
+   "name": "b3-1",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 57,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "b3-2",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 55,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-3",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 38,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "b3-4",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 53,
+    "avg_turn": 33,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-5",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 49,
+    "avg_turn": 30,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-6",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 70,
+    "avg_turn": 42,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-7",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 70,
+    "avg_turn": 36,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-8",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 69,
+    "avg_turn": 43,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-9",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 70,
+    "avg_turn": 39,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-10",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 39,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-11",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 64,
+    "avg_turn": 39,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-12",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 59,
+    "avg_turn": 40,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-13",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 54,
+    "avg_turn": 35,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-14",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 53,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-15",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 39,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-16",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 59,
+    "avg_turn": 37,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-17",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 46,
+    "avg_turn": 32,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-18",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1",
+    "客服腔词（老爹点名）: 我认 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 48,
+    "avg_turn": 33,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-19",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 53,
+    "avg_turn": 33,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-20",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 55,
+    "avg_turn": 32,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-21",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 45,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-22",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 55,
+    "avg_turn": 32,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-23",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1",
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 61,
+    "avg_turn": 38,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-24",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 42,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-25",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 66,
+    "avg_turn": 40,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-26",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 50,
+    "avg_turn": 33,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-27",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 54,
+    "avg_turn": 31,
+    "short_turns": 2,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-28",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 53,
+    "avg_turn": 33,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-29",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 52,
+    "avg_turn": 32,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-30",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 49,
+    "avg_turn": 28,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-31",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 57,
+    "avg_turn": 35,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-32",
+   "status": "FAIL",
+   "fails": [
+    "应答模板 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 78,
+    "avg_turn": 47,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-33",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 81,
+    "avg_turn": 53,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-34",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 90,
+    "avg_turn": 51,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-35",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 83,
+    "avg_turn": 52,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-36",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 86,
+    "avg_turn": 49,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-37",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 74,
+    "avg_turn": 48,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-38",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1",
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 78,
+    "avg_turn": 50,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-39",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 84,
+    "avg_turn": 45,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-40",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 61,
+    "avg_turn": 36,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-41",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1"
+   ],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 74,
+    "avg_turn": 47,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-42",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 73,
+    "avg_turn": 44,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-43",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 53,
+    "avg_turn": 33,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-44",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 39,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-45",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 57,
+    "avg_turn": 33,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-46",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 47,
+    "avg_turn": 29,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-47",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 35,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-48",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 52,
+    "avg_turn": 31,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-49",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 65,
+    "avg_turn": 34,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-50",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 55,
+    "avg_turn": 32,
+    "short_turns": 2,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-51",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 60,
+    "avg_turn": 36,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-52",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 36,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-53",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 68,
+    "avg_turn": 40,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-54",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "4字重复: [('不知道我', 3)]",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 54,
+    "avg_turn": 31,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-55",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 67,
+    "avg_turn": 40,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-56",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 76,
+    "avg_turn": 44,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-57",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 69,
+    "avg_turn": 42,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-58",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×2",
+    "填充语撞车: 我这边 ×2"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 60,
+    "avg_turn": 37,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-59",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 55,
+    "avg_turn": 37,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-60",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 60,
+    "avg_turn": 38,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-61",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 48,
+    "avg_turn": 32,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-62",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 70,
+    "avg_turn": 40,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-63",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 61,
+    "avg_turn": 37,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-64",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 67,
+    "avg_turn": 44,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-65",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 65,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-66",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 65,
+    "avg_turn": 39,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-67",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 75,
+    "avg_turn": 46,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-68",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 64,
+    "avg_turn": 40,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-69",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 55,
+    "avg_turn": 35,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-70",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 61,
+    "avg_turn": 34,
+    "short_turns": 2,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-71",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 64,
+    "avg_turn": 35,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-72",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 66,
+    "avg_turn": 39,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-73",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 67,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-74",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 58,
+    "avg_turn": 33,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-75",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 56,
+    "avg_turn": 36,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-76",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 59,
+    "avg_turn": 33,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-77",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×2",
+    "填充语撞车: 我这边 ×2"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 64,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-78",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 66,
+    "avg_turn": 42,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-79",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 65,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-80",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 53,
+    "avg_turn": 35,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-81",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1",
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.7，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 64,
+    "avg_turn": 32,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-82",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 53,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-83",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 49,
+    "avg_turn": 30,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-84",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 64,
+    "avg_turn": 37,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-85",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 54,
+    "avg_turn": 35,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-86",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 61,
+    "avg_turn": 37,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-87",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 55,
+    "avg_turn": 33,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-88",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 61,
+    "avg_turn": 39,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-89",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 64,
+    "avg_turn": 39,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-90",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 35,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-91",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 72,
+    "avg_turn": 40,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-92",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 70,
+    "avg_turn": 36,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-93",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 54,
+    "avg_turn": 34,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-94",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 61,
+    "avg_turn": 34,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-95",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 67,
+    "avg_turn": 39,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-96",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-97",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 61,
+    "avg_turn": 36,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-98",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我认 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 37,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-99",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 57,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-100",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 71,
+    "avg_turn": 46,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-101",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 68,
+    "avg_turn": 39,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-102",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 48,
+    "avg_turn": 31,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-103",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1",
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 71,
+    "avg_turn": 43,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-104",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 38,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-105",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 71,
+    "avg_turn": 44,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-106",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 64,
+    "avg_turn": 38,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-107",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 67,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-108",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 37,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-109",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 56,
+    "avg_turn": 35,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-110",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 59,
+    "avg_turn": 34,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-111",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 53,
+    "avg_turn": 35,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-112",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 54,
+    "avg_turn": 36,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-113",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1",
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 48,
+    "avg_turn": 30,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-114",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 56,
+    "avg_turn": 36,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-115",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 54,
+    "avg_turn": 35,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-116",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 58,
+    "avg_turn": 35,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-117",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 52,
+    "avg_turn": 30,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-118",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 51,
+    "avg_turn": 31,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-119",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 61,
+    "avg_turn": 35,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-120",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 38,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-121",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-122",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 35,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-123",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1",
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 40,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-124",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 54,
+    "avg_turn": 33,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-125",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 60,
+    "avg_turn": 34,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-126",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 36,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-127",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 60,
+    "avg_turn": 34,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-128",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 58,
+    "avg_turn": 33,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-129",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 74,
+    "avg_turn": 43,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-130",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 81,
+    "avg_turn": 48,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-131",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 66,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-132",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 56,
+    "avg_turn": 37,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-133",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 56,
+    "avg_turn": 32,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-134",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 39,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-135",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 60,
+    "avg_turn": 36,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-136",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 68,
+    "avg_turn": 40,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-137",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-138",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 58,
+    "avg_turn": 33,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-139",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 35,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-140",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 74,
+    "avg_turn": 40,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-141",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 75,
+    "avg_turn": 42,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-142",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 60,
+    "avg_turn": 36,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-143",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 37,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-144",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 38,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-145",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 69,
+    "avg_turn": 39,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-146",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 65,
+    "avg_turn": 39,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-147",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 58,
+    "avg_turn": 36,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-148",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我认 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 83,
+    "avg_turn": 50,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-149",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 34,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-150",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 67,
+    "avg_turn": 42,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-151",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 73,
+    "avg_turn": 39,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-152",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-153",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 46,
+    "avg_turn": 27,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-154",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 39,
+    "avg_turn": 23,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-155",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 46,
+    "avg_turn": 24,
+    "short_turns": 2,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-156",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 49,
+    "avg_turn": 27,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-157",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 52,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-158",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 49,
+    "avg_turn": 30,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-159",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 45,
+    "avg_turn": 28,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-160",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 36,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-161",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 52,
+    "avg_turn": 31,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-162",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 66,
+    "avg_turn": 40,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-163",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 65,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-164",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 56,
+    "avg_turn": 37,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-165",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1",
+    "应答模板 ×1",
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 59,
+    "avg_turn": 34,
+    "short_turns": 2,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-166",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 61,
+    "avg_turn": 37,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-167",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 58,
+    "avg_turn": 35,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-168",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 64,
+    "avg_turn": 37,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-169",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 77,
+    "avg_turn": 42,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-170",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 64,
+    "avg_turn": 33,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-171",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 69,
+    "avg_turn": 39,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-172",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 59,
+    "avg_turn": 37,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-173",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 63,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-174",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 67,
+    "avg_turn": 37,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-175",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 66,
+    "avg_turn": 38,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "b3-176",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 59,
+    "avg_turn": 35,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-177",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 66,
+    "avg_turn": 42,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-178",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 65,
+    "avg_turn": 41,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-179",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 69,
+    "avg_turn": 41,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "b3-180",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 92,
+    "avg_turn": 61,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  }
+ ],
+ "summary": {
+  "PASS": 0,
+  "WARN": 106,
+  "FAIL": 74
+ }
+}

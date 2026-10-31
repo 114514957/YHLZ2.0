@@ -1,0 +1,724 @@
+{
+ "file": "docs\\素材\\真实对话样本.md",
+ "profile": "general",
+ "blocks": [
+  {
+   "name": "real-qq-1｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 19,
+    "avg_turn": 18,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-2｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 96,
+    "avg_turn": 53,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "问": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-3｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 28,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "问": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-4｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "应答模板 ×1",
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 82,
+    "avg_turn": 50,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-5｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 74,
+    "avg_turn": 41,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-6｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 68,
+    "avg_turn": 58,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-7｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 68,
+    "avg_turn": 40,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "问": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-8｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 62,
+    "avg_turn": 36,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-9｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 225,
+    "avg_turn": 120,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-10｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 30,
+    "avg_turn": 17,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "问": 1
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "real-qq-11｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 100,
+    "avg_turn": 62,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-12｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "括号 ×1",
+    "星号 ×20",
+    "列表行 ×10"
+   ],
+   "warns": [
+    "冒号 ×2（书面表达，仅提示）"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 281,
+    "avg_turn": 150,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "问": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-13｜小寻虚拟主播交流群",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 131,
+    "avg_turn": 70,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "元亨"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-14｜小寻虚拟主播交流群",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 145,
+    "avg_turn": 119,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-15｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 37,
+    "avg_turn": 24,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-16｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "括号 ×3",
+    "星号 ×16",
+    "列表行 ×8"
+   ],
+   "warns": [
+    "分号 ×4（书面表达，仅提示）",
+    "冒号 ×9（书面表达，仅提示）",
+    "破折号 ×7（>2）",
+    "4字重复: [('马苏里拉', 4)]"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 403,
+    "avg_turn": 208,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-17｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 109,
+    "avg_turn": 84,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "元亨"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-18｜小寻虚拟主播交流群",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "4字重复: [('[表情7', 3), ('表情76', 3), ('情76]', 3)]"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 33,
+    "avg_turn": 29,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "real-qq-19｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "括号 ×3",
+    "星号 ×36",
+    "列表行 ×7"
+   ],
+   "warns": [
+    "冒号 ×3（书面表达，仅提示）",
+    "4字重复: [('庞加莱猜', 4), ('加莱猜想', 4), ('-200', 3)]"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 678,
+    "avg_turn": 347,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "real-qq-20｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "括号 ×3",
+    "星号 ×36",
+    "列表行 ×3"
+   ],
+   "warns": [
+    "冒号 ×2（书面表达，仅提示）",
+    "破折号 ×3（>2）",
+    "4字重复: [('庞加莱猜', 6), ('加莱猜想', 6), ('单连通的', 3)]"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 633,
+    "avg_turn": 331,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-21｜小寻虚拟主播交流群",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×3（书面表达，仅提示）"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 250,
+    "avg_turn": 130,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "元亨"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-22｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "括号 ×2",
+    "星号 ×8",
+    "列表行 ×2",
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "4字重复: [('调用本地', 3), ('open', 3), ('penc', 3)]"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 256,
+    "avg_turn": 167,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-23｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "星号 ×8",
+    "列表行 ×2"
+   ],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 327,
+    "avg_turn": 171,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "问": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-24｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1",
+    "括号 ×2",
+    "星号 ×16",
+    "列表行 ×2"
+   ],
+   "warns": [
+    "冒号 ×6（书面表达，仅提示）",
+    "破折号 ×3（>2）",
+    "4字重复: [('本地文件', 6), ('的白名单', 3), ('系统配置', 3)]"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 640,
+    "avg_turn": 466,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-25｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "括号 ×4",
+    "星号 ×4",
+    "列表行 ×23"
+   ],
+   "warns": [
+    "分号 ×6（书面表达，仅提示）",
+    "冒号 ×15（书面表达，仅提示）",
+    "4字重复: [('TEST', 13), ('EST_', 13), ('{TES', 12)]"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 1212,
+    "avg_turn": 1114,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-26｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1",
+    "括号 ×21",
+    "星号 ×24",
+    "列表行 ×8"
+   ],
+   "warns": [
+    "冒号 ×47（书面表达，仅提示）",
+    "破折号 ×4（>2）",
+    "4字重复: [('Agen', 20), ('gent', 20), ('Prom', 16)]"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 2918,
+    "avg_turn": 1892,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-27｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "括号 ×4",
+    "星号 ×24",
+    "列表行 ×12"
+   ],
+   "warns": [
+    "冒号 ×11（书面表达，仅提示）"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 420,
+    "avg_turn": 216,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "问": 1
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "real-qq-28｜小寻虚拟主播交流群",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 112,
+    "avg_turn": 65,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-29｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "括号 ×1"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 120,
+    "avg_turn": 66,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-30｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "客服腔 ×1",
+    "括号 ×1"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 89,
+    "avg_turn": 49,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "real-qq-31｜小寻虚拟主播交流群",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 61,
+    "avg_turn": 53,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  }
+ ],
+ "summary": {
+  "PASS": 11,
+  "WARN": 4,
+  "FAIL": 16
+ }
+}

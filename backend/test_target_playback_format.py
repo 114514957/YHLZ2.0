@@ -74,8 +74,8 @@ class TestStreamResampler(unittest.TestCase):
         chunk2 = np.ones(100, dtype=np.float32)
         out1 = r.process(chunk1)
         out2 = r.process(chunk2)
-        self.assertGreater(len(out1), 150)  # includes carry expansion
-        self.assertGreater(len(out2), 150)
+        self.assertEqual(len(out1), 200)  # filter history is not replayed
+        self.assertEqual(len(out2), 200)
 
     def test_flush(self):
         r = _StreamResampler(24000, 48000)

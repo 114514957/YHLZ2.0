@@ -51,6 +51,7 @@ def validate_channel(source: str, channel: str) -> str:
 
 
 def is_owner_channel(channel: str) -> bool:
-    """Owner = console or qq_p* (private QQ chat)."""
+    """Owner = console or the configured master's exact QQ private channel."""
+    from backend.yhlz_paths import MASTER_UIN
     c = str(channel or "").strip()
-    return c == "console" or bool(_QQ_P.match(c))
+    return c == "console" or c == f"qq_p{MASTER_UIN}"

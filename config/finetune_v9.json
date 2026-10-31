@@ -1,0 +1,33 @@
+{
+  "_comment": "V9 人格微调配置（2026-10-20）。与 finetune.json 的差别：数据换成 v9 清洗后的 sft_persona_v9t_*，max_seq_len 按实测降到 768（实测 p99=679、max=765，768 已零截断），显存需求从 ~4.5GB 降到 ~3.6GB，以便和常驻 llama-server 共存。注意：**这里不写 tag**——finetune_train.py 一旦读到 tag 就会把 train_file/val_file 覆盖成 sft_persona_<tag>_{train,val}.jsonl（那是旧数据，实测只有 835 条），会绕过本配置指定的 v9t 文件。",
+  "base_model": "models/gemma4-hf/gemma-4-e4b-it",
+  "data_in": "data/finetune/sft_persona_v9.jsonl",
+  "train_file": "data/finetune/sft_persona_v9t_train.jsonl",
+  "val_file": "data/finetune/sft_persona_v9t_val.jsonl",
+  "output_dir": "models/lora/yuanheng-v9",
+  "val_ratio": 0.15,
+  "seed": 20261020,
+  "max_seq_len": 768,
+  "epochs": 3,
+  "batch_size": 1,
+  "grad_accum": 4,
+  "lr": 0.0002,
+  "weight_decay": 0.0,
+  "warmup_ratio": 0.03,
+  "lora_r": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "target_modules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ],
+  "load_in_4bit": true,
+  "gradient_checkpointing": true,
+  "save_steps": 200,
+  "logging_steps": 20
+}

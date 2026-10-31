@@ -14,6 +14,10 @@ import time
 
 import websockets
 
+from backend.qq_connection import (
+    ConnectionSnapshot, heartbeat_loop, websocket_options,
+)
+
 BASE = pathlib.Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE / "config" / "qqwatch.json"
 CAND_DIR = BASE / "cache" / "qqwatch"
@@ -119,13 +123,19 @@ class QqWatcher:
         self.seen: set[str] = set()
         self._next_id = 0
         self._pending: dict[str, asyncio.Future] = {}
+        self.connection = ConnectionSnapshot()
 
     async def connect(self) -> websockets.WebSocketClientProtocol:
         headers = {}
         if self.cfg.get("token"):
             headers["Authorization"] = "Bearer " + self.cfg["token"]
         _log("connecting", self.cfg["ws_url"])
-        ws = await websockets.connect(self.cfg["ws_url"], additional_headers=headers)
+        ws = await websockets.connect(
+            self.cfg["ws_url"], additional_headers=headers,
+            **websocket_options(open_timeout=float(
+                self.cfg.get("connect_timeout", 10))))
+        self.connection.connected_at = time.time()
+        self.connection.state = "connected"
         _log("connected")
         return ws
 
@@ -184,17 +194,49 @@ class QqWatcher:
             try:
                 async with await self.connect() as ws:
                     deadline = time.time() + once_seconds if once_seconds else 0
-                    while True:
-                        if once_seconds and time.time() > deadline:
-                            return count
-                        raw = await asyncio.wait_for(ws.recv(), timeout=300)
-                        ev = json.loads(raw)
-                        try:
-                            if await self.handle(ev):
-                                count += 1
-                        except Exception as e:
-                            _log("handler err", e)
+                    heartbeat = asyncio.create_task(heartbeat_loop(
+                        ws, self.connection,
+                        interval=float(self.cfg.get("ping_interval", 25)),
+                        timeout=float(self.cfg.get("pong_timeout", 10))))
+                    recv_task = None
+                    try:
+                        while True:
+                            if once_seconds and time.time() > deadline:
+                                return count
+                            recv_task = asyncio.create_task(ws.recv())
+                            waiters = {recv_task, heartbeat}
+                            timeout = 300.0
+                            if once_seconds:
+                                timeout = max(0.05, deadline - time.time())
+                            done, _ = await asyncio.wait(
+                                waiters, timeout=timeout,
+                                return_when=asyncio.FIRST_COMPLETED)
+                            if not done:
+                                raise TimeoutError("QQ watcher receive idle timeout")
+                            if heartbeat in done:
+                                exc = heartbeat.exception()
+                                if exc:
+                                    raise exc
+                                raise ConnectionError("QQ watcher heartbeat stopped")
+                            raw = recv_task.result()
+                            self.connection.last_rx_at = time.time()
+                            ev = json.loads(raw)
+                            try:
+                                if await self.handle(ev):
+                                    count += 1
+                            except Exception as e:
+                                _log("handler err", e)
+                    finally:
+                        if recv_task is not None and not recv_task.done():
+                            recv_task.cancel()
+                            await asyncio.gather(recv_task, return_exceptions=True)
+                        if not heartbeat.done():
+                            heartbeat.cancel()
+                        await asyncio.gather(heartbeat, return_exceptions=True)
             except Exception as e:
+                self.connection.reconnect_count += 1
+                self.connection.last_error = type(e).__name__
+                self.connection.state = "reconnecting"
                 _log("conn err", e, "retry in 5s")
                 if once_seconds:
                     return count

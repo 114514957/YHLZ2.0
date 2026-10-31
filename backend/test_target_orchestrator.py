@@ -1,4 +1,4 @@
-﻿"""Turn Orchestrator tests (ADR-007 core loop, fake LLM driven)."""
+"""Turn Orchestrator tests (ADR-007 core loop, fake LLM driven)."""
 
 import unittest
 
@@ -162,17 +162,41 @@ class TestTurnOrchestrator(unittest.TestCase):
         orch = TurnOrchestrator(reg)
         tools = orch._export_tools()
         names = {t["function"]["name"] for t in tools}
+        # 2026-10-20 更新到现状：
+        #  · 今日删掉 3 个真依赖 NapCat/QCE 的 qq_* 工具（bootstrap/runbatch/shutdown）；
+        #  · qq_export / qq_status / qq_process / qq_digest / qq_summarize 五个改为恒暴露
+        #    （export 双路走 Lite 历史库；其余只读本地文件与知识库）；
+        #  · member_profile 早已注册导出，旧名单漏了它。
         self.assertEqual(
             names,
             {             "ledger_search", "ledger_get", "ledger_list", "ledger_add", "ledger_update", "ledger_delete",
              "memory_recall", "memory_save", "system_time", "runtime_status",
              "diary_write", "diary_list", "diary_delete",
-             "file_list", "file_read", "task_plan", "web_fetch", "web_search",
-             "kb_add", "kb_query", "memory_audit", "memory_profile", "memory_causal", "memory_why", "report_qq_weekly",
-             "qq_bootstrap", "qq_digest", "qq_export", "qq_process", "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize",
+             "file_list", "file_read", "file_download", "file_share",
+             "task_plan", "web_fetch", "web_search",
+             "kb_add", "kb_query", "memory_audit", "memory_profile", "memory_causal", "memory_why",
+             "member_profile", "report_qq_weekly",
+             "qq_export", "qq_status", "qq_process", "qq_digest", "qq_summarize",
              "schedule_plan", "skill_add", "skill_feedback", "skill_search",
-             "song_list", "song_play", "song_send"},
+             "song_list", "song_play", "song_send",
+             "bili_find", "bili_watch", "bili_status", "bili_notes",
+             "bili_read"},
         )
+
+
+class TestLocalFallback(unittest.TestCase):
+    def test_compact_fits_local_context(self):
+        from backend.target_orchestrator import (
+            _FALLBACK_TOOL_NAMES, _compact_for_local,
+        )
+        msgs = [{"role": "system", "content": "人设" * 3000}]
+        msgs += [{"role": "user" if i % 2 == 0 else "assistant",
+                  "content": "历史" * 500} for i in range(12)]
+        out = _compact_for_local(msgs)
+        self.assertEqual(len(out), 7)  # system + last 6
+        self.assertLessEqual(len(out[0]["content"]), 3000)
+        self.assertIn("bili_status", _FALLBACK_TOOL_NAMES)
+        self.assertIn("bili_find", _FALLBACK_TOOL_NAMES)
 
 
 if __name__ == "__main__":

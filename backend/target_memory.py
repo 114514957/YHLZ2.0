@@ -41,6 +41,20 @@ L2_MID_IMPORTANCE = 4
 _WORD = re.compile(r"\w+")
 
 
+def _rerank_in_recall_enabled() -> bool:
+    """Cross-encoder rerank is OFF by default inside recall.
+
+    Measured 2026-10-22 on this machine: bge-reranker-base costs ~1435 ms for
+    10 docs and returns 0.000-0.013, i.e. it flattens every channel score.
+    Experiment only: YH_RERANK_IN_RECALL=1.
+    """
+    import os
+
+    return str(os.getenv("YH_RERANK_IN_RECALL", "0")).strip().lower() in {
+        "1", "true", "on", "yes",
+    }
+
+
 def _fingerprint(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
@@ -119,6 +133,53 @@ def extract_causal(text: str) -> list[dict]:
     return out
 
 
+def memory_wake_hit(text: str, *, min_chars: int = 6, min_grams: int = 2,
+                    db_path=None) -> dict | None:
+    """群唤醒探针（2026-10-08）：群聊里聊到“她记得/经历过的事”？
+
+    只读、无副作用；口径对齐 contextual_recall 的字面 2-gram 部分：
+    type ∈ (preference/event/decision)、importance≥5、status='active'、
+    ≥2 个共享 2-gram（单 gram 视为噪声，ledger 0306）。命中返回
+    {id,type,importance,summary}，否则 None。绝不抛异常。
+    """
+    q = str(text or "").strip()
+    if len(q) < max(4, int(min_chars)):
+        return None
+    grams = {q[i:i + 2] for i in range(len(q) - 1)}
+    if not grams:
+        return None
+    db = Path(db_path) if db_path else DEFAULT_DB
+    try:
+        con = sqlite3.connect(str(db), timeout=0.2)
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        rows = con.execute(
+            "SELECT id, type, importance, keywords, summary FROM l2_items "
+            "WHERE status='active' AND type IN ('preference','event','decision') "
+            "AND importance >= 5").fetchall()
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        con.close()
+    best = None
+    for iid, itype, imp, keywords, summary in rows:
+        s = str(summary or "").strip()
+        if len(s) < 4:
+            continue
+        store = (str(keywords or "") + " " + s)
+        shared = sum(1 for g in grams if g in store)
+        if shared < int(min_grams):
+            continue
+        if best is None or shared > best["_shared"]:
+            best = {"id": iid, "type": itype, "importance": imp,
+                    "summary": s, "_shared": shared}
+    if best is None:
+        return None
+    best.pop("_shared", None)
+    return best
+
+
 @dataclass(slots=True)
 class L2Item:
     id: str
@@ -179,18 +240,31 @@ class TargetMemoryService:
         kw_index: Any = None,
         l1_scope: str = "",
         summary_batch_size: int = 40,
+        recall_budget_ms: float = 100.0,
+        max_recall_results: int = 10,
     ) -> None:
         self.db_path = Path(db_path)
         self.window_turns = int(window_turns)
         self.l1_scope = str(l1_scope or "")
         self.summary_batch_size = int(summary_batch_size)
+        self.recall_budget_ms = float(recall_budget_ms)
+        self.max_recall_results = int(max_recall_results)
+        if (not math.isfinite(self.recall_budget_ms) or self.recall_budget_ms <= 0
+                or not 1 <= self.max_recall_results <= 50):
+            raise ValueError("invalid recall budget")
         if self.window_turns < 1 or self.summary_batch_size < 1:
             raise ValueError("memory window and summary batch must be positive")
         self._summary_running = False
         self._summary_failures = 0
         self._summary_error = ""
         self._l1_save_error = ""
+        self._l1_load_error = ""
+        self._l1_read_blocked = False
         self._kw = kw_index
+        # Non-owner databases must never write test/group IDs into the owner index.
+        if self._kw is None and self.db_path.resolve() != DEFAULT_DB.resolve():
+            from backend.target_kw_index import KeywordIndex
+            self._kw = KeywordIndex(self.db_path.with_name(self.db_path.name + ".kw.db"))
         self._lock = threading.RLock()
         self._turns: list[dict[str, str]] = []
         self._summary: str = ""
@@ -201,10 +275,25 @@ class TargetMemoryService:
         self._pending_dropped: list[dict[str, str]] = []
         self._extractor: Any = None  # cloud candidate generator (Hybrid, local-first)
         self._judge: Any = None  # local judge (importance/adjudication)
+        self.last_candidate_status = "not_run"
+        self.last_adjudication_status = "not_run"
         self._boost_ts: dict[str, float] = {}  # recall-use boost dedup window (ledger 0189)
-        self._last_recall_timing: dict[str, float] = {}
+        self._last_recall_timing: dict[str, Any] = {}
         self._recall_count: int = 0
         self._summary_provider_status: str = "unknown"
+        self._resource_mode: str = "unknown"
+        from backend.memory_resource_policy import semantic_model_allowed, semantic_mode
+        self._semantic_enabled = semantic_model_allowed()
+        self._rerank_failures: int = 0
+        try:
+            if semantic_mode() != "off":
+                from backend.vector_memory import warm_semantic
+
+                warm_semantic()  # background; a cold load must never block a turn
+        except Exception:
+            pass
+        self._summary_backlog_peak: int = 0
+        self._l1_write_failures: int = 0
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
         self._load_l1()
@@ -310,9 +399,25 @@ class TargetMemoryService:
             con.close()
 
     def set_llm_hooks(self, extractor: Any = None, judge: Any = None) -> None:
-        """extractor=cloud-candidate generator; judge=local adjudicator."""
+        """Attach memory hooks explicitly; never constructs a model implicitly."""
         self._extractor = extractor
         self._judge = judge
+        mode = getattr(extractor, "mode", None) or getattr(judge, "mode", None)
+        if mode:
+            self._resource_mode = str(mode)
+
+    def set_resource_policy(self, policy: Any, *, semantic_enabled: Optional[bool] = None) -> None:
+        """Expose the process resource decision in health without owning it.
+
+        The dialogue entry chooses the policy.  This service only records it
+        and optionally disables the CPU vector sidecar for maintenance runs.
+        """
+        self._resource_mode = str(getattr(policy, "mode", policy or "unknown"))
+        if semantic_enabled is not None:
+            self._semantic_enabled = bool(semantic_enabled)
+        else:
+            from backend.memory_resource_policy import semantic_model_allowed
+            self._semantic_enabled = semantic_model_allowed()
 
     # ---------- L1 transient ----------
     def _l1_path(self) -> Path:
@@ -325,7 +430,10 @@ class TargetMemoryService:
     def _valid_turns(value: Any) -> list[dict[str, str]]:
         if not isinstance(value, list):
             return []
-        return [{"role": t["role"], "text": t["text"]}
+        return [{"role": t["role"], "text": t["text"],
+                 **({"voice_id": t["voice_id"]} if isinstance(t.get("voice_id"), str)
+                    and len(t["voice_id"]) == 32
+                    and all(c in "0123456789abcdef" for c in t["voice_id"]) else {})}
                 for t in value if isinstance(t, dict)
                 and t.get("role") in ("user", "assistant")
                 and isinstance(t.get("text"), str)]
@@ -335,9 +443,17 @@ class TargetMemoryService:
         try:
             d = json.loads(self._l1_path().read_text(encoding="utf-8"))
             if not isinstance(d, dict) or d.get("scope", "") != self.l1_scope:
-                return
+                raise ValueError("L1 scope/schema mismatch")
+            for key in ("turns", "pending"):
+                values = d.get(key, [])
+                if not isinstance(values, list) or len(self._valid_turns(values)) != len(values):
+                    raise ValueError("L1 invalid turn queue")
             version = max(0, int(d.get("version", 0) or 0))
-        except (OSError, ValueError, TypeError):
+        except FileNotFoundError:
+            return
+        except (OSError, ValueError, TypeError) as exc:
+            self._l1_load_error = type(exc).__name__
+            self._l1_read_blocked = True
             return
         with self._lock:
             self._summary = str(d.get("summary", "") or "")
@@ -348,9 +464,13 @@ class TargetMemoryService:
             self._pending_dropped = self._valid_turns(d.get("pending"))
             self._summary_pending = bool(self._pending_dropped)
 
-    def _save_l1(self) -> None:
+    def _save_l1(self) -> bool:
         # A unique temporary name avoids different instances clobbering the
         # same .tmp file. A failed save is observable; do not clear memory.
+        if self._l1_read_blocked:
+            self._l1_save_error = "blocked_by_l1_load_error"
+            self._l1_write_failures += 1
+            return False
         tmp = None
         try:
             with self._lock:
@@ -365,8 +485,11 @@ class TargetMemoryService:
                     ensure_ascii=False), encoding="utf-8")
                 tmp.replace(p)
                 self._l1_save_error = ""
+                return True
         except Exception as exc:
             self._l1_save_error = type(exc).__name__
+            self._l1_write_failures += 1
+            return False
         finally:
             if tmp is not None and tmp.exists():
                 try:
@@ -431,9 +554,36 @@ class TargetMemoryService:
                 dropped = self._turns[: len(self._turns) - self.window_turns]
                 self._turns = self._turns[-self.window_turns:]
                 if dropped:
+                    # Never cap/drop this queue: it is the durable source for
+                    # L1 compression.  A high-water mark makes an unhealthy
+                    # backlog visible instead of silently losing early turns.
                     self._pending_dropped.extend(dropped)
                     self._summary_pending = True
+                    self._summary_backlog_peak = max(
+                        self._summary_backlog_peak, len(self._pending_dropped))
             self._save_l1()
+
+    def append_voice_turn(self, *, text: str) -> str:
+        """Stable writeback identity, independent of placeholder text/order."""
+        import uuid
+        voice_id = uuid.uuid4().hex
+        with self._lock:
+            self.append_turn(role="user", text=text)
+            self._turns[-1]["voice_id"] = voice_id
+            self._save_l1()
+        return voice_id
+
+    def restamp_voice_turn(self, voice_id: str, text: str) -> bool:
+        if not str(text).strip():
+            return False
+        with self._lock:
+            for turn in self._turns:
+                if turn.get("voice_id") == voice_id and turn.get("role") == "user":
+                    turn["text"] = str(text)
+                    self._archive_digest = ""
+                    self._save_l1()
+                    return True
+        return False
 
     def restamp_last_user(self, text: str, *, placeholder: str = "（语音）") -> bool:
         """Replace the newest placeholder user turn with its transcript.
@@ -486,12 +636,23 @@ class TargetMemoryService:
                 raise ValueError("empty memory summary")
             version = int(version or 0)
             with self._lock:
+                old_summary = self._summary
+                old_version = self._summary_version
                 self._summary = summary_text.strip()
                 self._summary_version = max(self._summary_version + 1, version)
                 del self._pending_dropped[:len(dropped)]
                 self._summary_pending = bool(self._pending_dropped)
-                self._summary_error = ""
-                self._save_l1()
+                if not self._save_l1():
+                    # A provider result is not an acknowledgement until the
+                    # L1 transaction is on disk.  Restore the captured prefix;
+                    # turns appended while the provider was running remain.
+                    self._summary = old_summary
+                    self._summary_version = old_version
+                    self._pending_dropped[:0] = dropped
+                    self._summary_pending = True
+                    self._summary_error = "l1_persist_failed"
+                else:
+                    self._summary_error = ""
         except Exception as exc:
             with self._lock:
                 self._summary_failures += 1
@@ -554,7 +715,7 @@ class TargetMemoryService:
         _INJECT_TYPES = ("preference", "event", "decision")
         try:
             with self._lock:
-                con = sqlite3.connect(str(self.db_path))
+                con = sqlite3.connect(str(self.db_path), timeout=0.05)
                 try:
                     rows = con.execute(
                         "SELECT id, type, importance, status, keywords, summary, "
@@ -568,6 +729,8 @@ class TargetMemoryService:
         seen: set[str] = set()
         # 1) semantic candidates (换说法, higher confidence)
         try:
+            if not self._semantic_enabled:
+                raise RuntimeError("semantic disabled")
             from backend.vector_memory import semantic_l2
 
             for it in semantic_l2(q, top=limit * 3, min_score=0.42,
@@ -611,6 +774,8 @@ class TargetMemoryService:
                 seen.add(r[0])
         # 3) diary semantic (own words can also be recalled in chat)
         try:
+            if not self._semantic_enabled:
+                raise RuntimeError("semantic disabled")
             from backend.vector_memory import semantic_any
 
             for d in semantic_any(q, ["diary"], top=limit, min_score=0.48):
@@ -645,7 +810,7 @@ class TargetMemoryService:
         current_ids = {it["id"] for it in self._filter_current(
             [it for it in good if it.get("tier") == "L2"])}
         good = [it for it in good if it.get("tier") != "L2" or it["id"] in current_ids]
-        if len(good) > 1:
+        if len(good) > 1 and self._semantic_enabled and _rerank_in_recall_enabled():
             try:
                 from backend.vector_memory import rerank
 
@@ -653,7 +818,8 @@ class TargetMemoryService:
                 for g, s in zip(good, scores):
                     g["_score"] = float(s)
             except Exception:
-                pass
+                # fail closed: keep the channel scores instead of zeroing them
+                self._rerank_failures += 1
         good.sort(key=lambda x: x.get("_score", 0.0), reverse=True)
         # de-dup by text (diary/l2 may hold the same sentence)
         uniq: list[dict] = []
@@ -692,7 +858,9 @@ class TargetMemoryService:
         """
         extractor = self._extractor
         items: list[L2Item] = []
+        self.last_candidate_status = "running"
         if extractor is None or not callable(getattr(extractor, "candidates", None)):
+            self.last_candidate_status = "extractor_unavailable"
             return items
         context = {"text": str(text), "transcript": str(transcript)[:4000], "source": source}
         try:
@@ -700,8 +868,14 @@ class TargetMemoryService:
             if inspect.isawaitable(raw):
                 raw = await raw
         except Exception:
+            self.last_candidate_status = "provider_error"
+            return items
+        hook_status = getattr(extractor, "last_candidate_status", None)
+        if isinstance(hook_status, str) and hook_status not in {"validated", "validated_empty"}:
+            self.last_candidate_status = hook_status
             return items
         if not isinstance(raw, list):
+            self.last_candidate_status = "invalid_output"
             return items
         for cand in raw:
             if not isinstance(cand, dict):
@@ -736,6 +910,7 @@ class TargetMemoryService:
                     access_count=0,
                 )
             )
+        self.last_candidate_status = ("validated" if items else "validated_empty" if not raw else "invalid_output")
         return items
 
     def adjudicate(self, items: list[L2Item], *, local_only: bool = True) -> list[L2Item]:
@@ -745,50 +920,72 @@ class TargetMemoryService:
     async def adjudicate_async(self, items: list[L2Item], *, local_only: bool = True) -> list[L2Item]:
         """Local adjudication: confirm importance/status/status transitions."""
         judge = self._judge
+        self.last_adjudication_status = "running"
+        # Resolve the whole batch before opening a write transaction. A slow or
+        # cancelled model must never hold SQLite's writer lock across await.
+        verdicts = []
+        if items and (judge is None or not callable(getattr(judge, "adjudicate", None))):
+            self.last_adjudication_status = "judge_unavailable"
+            raise RuntimeError("memory judge unavailable; batch not committed")
+        try:
+            for item in items:
+                verdict = judge.adjudicate(item.to_dict())
+                if inspect.isawaitable(verdict):
+                    verdict = await verdict
+                status = getattr(judge, "last_judge_status", None)
+                if isinstance(status, str) and status != "validated":
+                    raise ValueError("fallback judgment is not validated evidence")
+                if (not isinstance(verdict, dict) or type(verdict.get("importance")) is not int
+                        or not 1 <= verdict["importance"] <= 10
+                        or verdict.get("status") not in {"active", "downgraded", "cold", "archive"}):
+                    raise ValueError("invalid memory judgment")
+                verdicts.append(verdict)
+        except BaseException:
+            self.last_adjudication_status = "unconfirmed"
+            raise
         with self._lock:
             con = sqlite3.connect(str(self.db_path))
-            for item in items:
-                if judge is not None and callable(getattr(judge, "adjudicate", None)):
-                    try:
-                        verdict = judge.adjudicate(item.to_dict())
-                        if inspect.isawaitable(verdict):
-                            verdict = await verdict
-                        item.importance = int(verdict.get("importance", item.importance))
-                        item.status = str(verdict.get("status", item.status) or item.status)
-                    except Exception:
-                        pass
-                if item.importance <= L2_MID_IMPORTANCE and item.status == "active":
-                    item.status = "downgraded"
-                con.execute(
-                    """
-                    INSERT INTO l2_items
-                    (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source,kind,valid_at,confidence)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                    ON CONFLICT(id) DO UPDATE SET
-                      tier=excluded.tier, type=excluded.type,
-                      importance=excluded.importance, summary=excluded.summary,
-                      content_hash=excluded.content_hash, keywords=excluded.keywords,
-                      status=excluded.status, evidence_ref=excluded.evidence_ref,
-                      version=excluded.version, obsolete_of=excluded.obsolete_of,
-                      salience=excluded.salience, source=excluded.source,
-                      confidence=MAX(l2_items.confidence, excluded.confidence)
-                    """,
-                    (
-                        item.id, item.tier, item.type, item.importance, item.summary,
-                        item.content_hash, item.keywords, item.status, item.evidence_ref,
-                        item.created_at, item.version, item.obsolete_of, 0, 0.0,
-                        0.5, 0, time.time(), float(getattr(item, "salience", 0.5)),
-                        str(getattr(item, "source", "") or ""),
-                        str(getattr(item, "kind", "episodic") or "episodic"),
-                        float(getattr(item, "valid_at", 0) or 0) or float(item.created_at or time.time()),
-                        float(getattr(item, "confidence", 0.5) or 0.5),
-                    ),
-                )
-                con.execute("DELETE FROM l2_fts WHERE sid=?", (item.id,))
-                con.execute("INSERT INTO l2_fts(sid, keywords, summary) VALUES (?,?,?)",
-                            (item.id, item.keywords, item.summary))
-            con.commit()
-            con.close()
+            try:
+                with con:
+                    for item, verdict in zip(items, verdicts):
+                        item.importance = verdict["importance"]
+                        item.status = verdict["status"]
+                        if item.importance <= L2_MID_IMPORTANCE and item.status == "active":
+                            item.status = "downgraded"
+                        con.execute(
+                            """
+                            INSERT INTO l2_items
+                            (id,tier,type,importance,summary,content_hash,keywords,status,evidence_ref,created_at,version,obsolete_of,access_count,last_accessed,belief,evidence_count,belief_updated,salience,source,kind,valid_at,confidence)
+                            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(id) DO UPDATE SET
+                              tier=excluded.tier, type=excluded.type,
+                              importance=excluded.importance, summary=excluded.summary,
+                              content_hash=excluded.content_hash, keywords=excluded.keywords,
+                              status=excluded.status, evidence_ref=excluded.evidence_ref,
+                              version=excluded.version, obsolete_of=excluded.obsolete_of,
+                              salience=excluded.salience, source=excluded.source,
+                              confidence=MAX(l2_items.confidence, excluded.confidence)
+                            """,
+                            (
+                                item.id, item.tier, item.type, item.importance, item.summary,
+                                item.content_hash, item.keywords, item.status, item.evidence_ref,
+                                item.created_at, item.version, item.obsolete_of, 0, 0.0,
+                                0.5, 0, time.time(), float(getattr(item, "salience", 0.5)),
+                                str(getattr(item, "source", "") or ""),
+                                str(getattr(item, "kind", "episodic") or "episodic"),
+                                float(getattr(item, "valid_at", 0) or 0) or float(item.created_at or time.time()),
+                                float(getattr(item, "confidence", 0.5) or 0.5),
+                            ),
+                        )
+                        con.execute("DELETE FROM l2_fts WHERE sid=?", (item.id,))
+                        con.execute("INSERT INTO l2_fts(sid, keywords, summary) VALUES (?,?,?)",
+                                    (item.id, item.keywords, item.summary))
+            except BaseException:
+                self.last_adjudication_status = "storage_failed"
+                raise
+            finally:
+                con.close()
+        self.last_adjudication_status = "validated_committed"
         try:
             # vector side-table for semantic recall (ledger 0226)
             self._vec_upsert(items)
@@ -914,25 +1111,26 @@ class TargetMemoryService:
         con.close()
 
     def _belief_apply(self, item_id: str, evidence: float) -> Optional[float]:
-        con = sqlite3.connect(str(self.db_path))
-        row = con.execute(
-            "SELECT belief, belief_updated FROM l2_items WHERE id=?", (item_id,)
-        ).fetchone()
-        if row is None:
+        con = sqlite3.connect(str(self.db_path), timeout=0.05)
+        try:
+            row = con.execute(
+                "SELECT belief, belief_updated FROM l2_items WHERE id=?", (item_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            now = time.time()
+            b, updated = float(row[0]), float(row[1] or now)
+            days = max(0.0, (now - updated) / 86400.0)
+            nb = self.belief_step(b, evidence, decay_days=days)
+            con.execute(
+                "UPDATE l2_items SET belief=?, evidence_count=evidence_count+1, "
+                "belief_updated=?, last_accessed=? WHERE id=?",
+                (nb, now, now, item_id),
+            )
+            con.commit()
+            return nb
+        finally:
             con.close()
-            return None
-        now = time.time()
-        b, updated = float(row[0]), float(row[1] or now)
-        days = max(0.0, (now - updated) / 86400.0)
-        nb = self.belief_step(b, evidence, decay_days=days)
-        con.execute(
-            "UPDATE l2_items SET belief=?, evidence_count=evidence_count+1, "
-            "belief_updated=?, last_accessed=? WHERE id=?",
-            (nb, now, now, item_id),
-        )
-        con.commit()
-        con.close()
-        return nb
 
 
     def review_reinforce(self, min_importance: int = 7, stale_days: float = 3.0,
@@ -1440,20 +1638,29 @@ class TargetMemoryService:
         q = str(query or "").strip()
         if not q:
             return []
+        limit = max(1, min(int(limit), self.max_recall_results))
         self._recall_count += 1
-        self._last_recall_timing = {}
+        self._last_recall_timing = {"budget_ms": self.recall_budget_ms, "budget_kind": "optional-stage-admission"}
         _t0 = time.perf_counter()
-        ranked = self._recall_via_kw(q, int(limit))
+        try:
+            ranked = self._recall_via_kw(q, int(limit))
+        except sqlite3.Error as exc:
+            ranked = []
+            self._last_recall_timing["keyword_error"] = type(exc).__name__
         _t1 = time.perf_counter()
         self._last_recall_timing["keyword_ms"] = round((_t1 - _t0) * 1000, 2)
         self._last_recall_timing["keyword_hits"] = len(ranked) if ranked else 0
         filter_rows = (lambda rows: self._filter_as_of(rows, float(as_of))) if as_of else self._filter_current
-        out = filter_rows(ranked or [])
+        out = filter_rows(ranked or [])[:limit]
         # A rebuildable keyword mirror may lag an approved transaction. Fill
         # thin results from authoritative L2/FTS before invoking any model.
         if len(out) < int(limit):
             _t2 = time.perf_counter()
-            sql = self._recall_via_sqlite(q, max(int(limit) * 4, 20))
+            try:
+                sql = self._recall_via_sqlite(q, min(max(int(limit) * 4, 20), 200))
+            except sqlite3.Error as exc:
+                sql = []
+                self._last_recall_timing["sql_error"] = type(exc).__name__
             self._last_recall_timing["sql_ms"] = round((time.perf_counter() - _t2) * 1000, 2)
             self._last_recall_timing["sql_hits"] = len(sql)
             seen = {it["id"] for it in out}
@@ -1465,13 +1672,14 @@ class TargetMemoryService:
         if as_of:
             self._last_recall_timing["total_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
             return out
-        if spread and len(out) < int(limit):
+        _within_budget = lambda: (time.perf_counter() - _t0) * 1000 < self.recall_budget_ms
+        if spread and len(out) < int(limit) and _within_budget():
             _ts = time.perf_counter()
             out = out + self._spread_hits(
                 q, int(limit) - len(out),
                 exclude={str(it.get("id", "")) for it in out})
             self._last_recall_timing["spread_ms"] = round((time.perf_counter() - _ts) * 1000, 2)
-        if len(out) < int(limit):
+        if len(out) < int(limit) and self._semantic_enabled and _within_budget():
             # 0499 向量召回进主路径：字面（关键词/FTS）命中不足时补语义命中，
             # 换说法也能召回；高阈值 + via='semantic' 标记，绝不替代字面命中。
             _ts = time.perf_counter()
@@ -1479,10 +1687,14 @@ class TargetMemoryService:
                 q, int(limit) - len(out),
                 exclude={str(it.get("id", "")) for it in out})
             self._last_recall_timing["semantic_ms"] = round((time.perf_counter() - _ts) * 1000, 2)
-        if len(out) >= 2:
+        out = out[:limit]
+        if len(out) >= 2 and _within_budget():
             self._shadow_record(q, out)
         self._last_recall_timing["total_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
         self._last_recall_timing["total_hits"] = len(out)
+        self._last_recall_timing["budget_exceeded"] = not _within_budget()
+        self._last_recall_timing["semantic_skipped"] = ("disabled" if not self._semantic_enabled
+                                                       else "budget" if not _within_budget() else "")
         return out
 
     def _semantic_hits(self, query: str, need: int, exclude: set) -> list[dict]:
@@ -1492,7 +1704,7 @@ class TargetMemoryService:
         "睡眠不好想早点睡"）得分 **0.496**，取 0.5 会把这种真命中漏掉；工具结果
         会直接进模型上下文，所以也不放到自动注入那么低。绝不抛异常。
         """
-        if need <= 0:
+        if need <= 0 or not self._semantic_enabled:
             return []
         try:
             from backend.vector_memory import semantic_l2
@@ -1540,7 +1752,7 @@ class TargetMemoryService:
             if len(out) >= need:
                 break
             try:
-                con = sqlite3.connect(str(self.db_path))
+                con = sqlite3.connect(str(self.db_path), timeout=0.05)
                 try:
                     rows = con.execute(
                         "SELECT id,tier,type,importance,status,evidence_ref,"
@@ -1572,7 +1784,7 @@ class TargetMemoryService:
         relevance x connectivity x reactivation next to the live ordering.
         Writes cache/../memory_shadow.jsonl; never changes the output."""
         try:
-            con = sqlite3.connect(str(self.db_path))
+            con = sqlite3.connect(str(self.db_path), timeout=0.05)
             try:
                 deg: dict = {}
                 last: dict = {}
@@ -1614,7 +1826,7 @@ class TargetMemoryService:
         are not recalled unless an explicit as_of time is given."""
         out: list[dict] = []
         try:
-            con = sqlite3.connect(str(self.db_path))
+            con = sqlite3.connect(str(self.db_path), timeout=0.05)
             try:
                 for it in items or []:
                     row = con.execute(
@@ -1665,7 +1877,7 @@ class TargetMemoryService:
             return None
         if not hits:
             return []
-        con = sqlite3.connect(str(self.db_path))
+        con = sqlite3.connect(str(self.db_path), timeout=0.05)
         try:
             out: list[dict] = []
             for h in hits:
@@ -1699,45 +1911,48 @@ class TargetMemoryService:
             con.close()
 
     def _recall_via_sqlite(self, q: str, limit: int) -> list[dict]:
-        con = sqlite3.connect(str(self.db_path))
-        rows = []
+        con = sqlite3.connect(str(self.db_path), timeout=0.05)
         try:
-            rows = con.execute(
-                """
-                SELECT i.id, i.tier, i.type, i.importance, i.status, i.evidence_ref, i.summary, i.stance,
-                       COALESCE(NULLIF(i.valid_at,0), i.created_at)
-                FROM l2_fts f JOIN l2_items i ON i.id = f.sid
-                WHERE l2_fts MATCH ?
-                ORDER BY i.importance DESC, i.last_accessed DESC
-                LIMIT ?
-                """,
-                (q, limit),
-            ).fetchall()
-        except sqlite3.OperationalError:
             rows = []
-        if not rows:
-            pattern = f"%{q}%"
-            rows = con.execute(
-                """
-                SELECT id, tier, type, importance, status, evidence_ref, summary, stance,
-                       COALESCE(NULLIF(valid_at,0), created_at)
-                FROM l2_items
-                WHERE (summary LIKE ? ESCAPE '\\' OR keywords LIKE ? ESCAPE '\\')
-                  AND status IN ('active','downgraded')
-                ORDER BY importance DESC, last_accessed DESC
-                LIMIT ?
-                """,
-                (pattern, pattern, limit),
-            ).fetchall()
-        con.close()
-        return [
-            {
-                "id": r[0], "tier": r[1], "type": r[2], "importance": r[3],
-                "status": r[4], "evidence_ref": r[5], "summary": r[6],
-                "stance": r[7], "date": _date_str(r[8]),
-            }
-            for r in rows
-        ]
+            try:
+                rows = con.execute(
+                    """
+                    SELECT i.id, i.tier, i.type, i.importance, i.status, i.evidence_ref, i.summary, i.stance,
+                           COALESCE(NULLIF(i.valid_at,0), i.created_at)
+                    FROM l2_fts f JOIN l2_items i ON i.id = f.sid
+                    WHERE l2_fts MATCH ?
+                    ORDER BY i.importance DESC, i.last_accessed DESC
+                    LIMIT ?
+                    """,
+                    (q, limit),
+                ).fetchall()
+            except sqlite3.OperationalError:
+                rows = []
+            if not rows:
+                pattern = f"%{q}%"
+                rows = con.execute(
+                    """
+                    SELECT id, tier, type, importance, status, evidence_ref, summary, stance,
+                           COALESCE(NULLIF(valid_at,0), created_at)
+                    FROM l2_items
+                    WHERE (summary LIKE ? ESCAPE '\\' OR keywords LIKE ? ESCAPE '\\')
+                      AND status IN ('active','downgraded')
+                    ORDER BY importance DESC, last_accessed DESC
+                    LIMIT ?
+                    """,
+                    (pattern, pattern, limit),
+                ).fetchall()
+            return [
+                {
+                    "id": r[0], "tier": r[1], "type": r[2], "importance": r[3],
+                    "status": r[4], "evidence_ref": r[5], "summary": r[6],
+                    "stance": r[7], "date": _date_str(r[8]),
+                }
+                for r in rows
+            ]
+        finally:
+            con.close()
+
 
     def rebuild_fts(self) -> None:
         with self._lock:
@@ -2032,7 +2247,7 @@ class TargetMemoryService:
         """Time-travel filter: keep items valid at `ts` (valid_at<=ts<invalid)."""
         out: list[dict] = []
         try:
-            con = sqlite3.connect(str(self.db_path))
+            con = sqlite3.connect(str(self.db_path), timeout=0.05)
             try:
                 for it in items or []:
                     row = con.execute(
@@ -2079,9 +2294,19 @@ class TargetMemoryService:
             "summary_error": self._summary_error,
             "l1_scope": self.l1_scope,
             "l1_save_error": self._l1_save_error,
+            "l1_load_error": self._l1_load_error,
+            "l1_read_blocked": self._l1_read_blocked,
             "recall_count": self._recall_count,
             "last_recall_timing": dict(self._last_recall_timing),
             "summary_provider_status": self._summary_provider_status,
+            "candidate_status": self.last_candidate_status,
+            "adjudication_status": self.last_adjudication_status,
+            "resource_mode": self._resource_mode,
+            "semantic_enabled": self._semantic_enabled,
+            "recall_budget_ms": self.recall_budget_ms,
+            "max_recall_results": self.max_recall_results,
+            "summary_backlog_peak": int(self._summary_backlog_peak),
+            "l1_write_failures": int(self._l1_write_failures),
             "episodes": int(episodes),
             "causal_active": int(causal_active),
             "causal_pending": int(causal_pending),

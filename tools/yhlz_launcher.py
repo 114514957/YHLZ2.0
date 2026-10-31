@@ -15,24 +15,20 @@ import json
 import os
 import subprocess
 import sys
-import threading
 import time
 import urllib.request
 import webbrowser
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from backend.yhlz_paths import (  # noqa: E402
-    BOT_UIN, DESKTOP_DIR, GEMMA_GGUF, LLAMA_EXE, MASTER_UIN, MMPROJ_GGUF,
+    BOT_UIN, GEMMA_GGUF, LLAMA_EXE, MASTER_UIN, MMPROJ_GGUF,
     NAPCAT_LAUNCHER, OLLAMA_EXE, YH_BASE_GGUF, YH_LLAMA_EXE, YH_LORA_GGUF,
     YH_MMPROJ_GGUF,
 )
 
-SRC_DIR = DESKTOP_DIR
-BOOT_PORT = 8577
 OLLAMA = OLLAMA_EXE
 LLAMA = LLAMA_EXE
 GEMMA = GEMMA_GGUF
@@ -45,21 +41,97 @@ URLS = {
     "daemon": ("http://127.0.0.1:8321/health", "GET"),
 }
 
+# 2026-10-21 P0：Ollama 在本机长期 500，却仍被当必选服务每 60 秒等待/刷日志。
+# 只把 gemma/daemon 当关键服务；Ollama 要显式 YHLZ_START_OLLAMA=1 才尝试。
+CRITICAL_SERVICES = ("gemma", "daemon")
+GPU_WINDOW_FLAG = _ROOT / "cache" / "gpu_window.lock"
+GPU_WINDOW_MAX_AGE = 1200.0
+
+
+def ready(st: dict) -> bool:
+    return all(bool(st.get(k)) for k in CRITICAL_SERVICES)
+
+
+def gpu_window_active() -> bool:
+    """True while a singing/Seed-VC window owns the GPU.
+
+    The watchdog must keep running (it is the independent supervisor), but it
+    must not respawn llama during the window.  A stale flag expires so a
+    crashed job cannot leave the stack down forever.
+    """
+    try:
+        if not GPU_WINDOW_FLAG.exists():
+            return False
+        if time.time() - GPU_WINDOW_FLAG.stat().st_mtime > GPU_WINDOW_MAX_AGE:
+            GPU_WINDOW_FLAG.unlink(missing_ok=True)
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def _open_log(path: pathlib.Path, max_bytes: int = 8 * 1024 * 1024):
+    """Rotate before spawn (never while a process holds the file open)."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size > max_bytes:
+            backup = path.with_name(path.name + ".1")
+            backup.unlink(missing_ok=True)
+            path.replace(backup)
+    except Exception:
+        pass
+    return open(path, "ab")
+
+# 0832: 启动器从 pythonw 跑（开机自启/桌面入口）时没有控制台，出问题只能靠
+# 这份日志定位。每次 spawn / 失败都落一行，别让"只起来一半"再静默发生。
+LAUNCHER_LOG = _ROOT / "cache" / "logs" / "launcher.log"
+
+
+def _log(msg: str) -> None:
+    line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}"
+    print(line, flush=True)
+    try:
+        LAUNCHER_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with LAUNCHER_LOG.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+
+
+def _try_spawn(name: str, fn) -> bool:
+    """One broken spawn must not abort the rest of the stack (0832)."""
+    try:
+        fn()
+        _log(f"spawn {name}: requested")
+        return True
+    except Exception as exc:  # noqa: BLE001
+        _log(f"spawn {name} FAILED: {type(exc).__name__}: {exc}")
+        return False
+
 # QQ bridge (optional): kept alive only when NapCat's OneBot WS is up.
 QQBOT_UIN = BOT_UIN
 QQBOT_MASTER = MASTER_UIN
 QQBOT_PORT = 3001
 QQBOT_LOCK = _ROOT / "cache" / "tmp" / "qqbot.lock"
+NAPCAT_WATCH_LOCK = _ROOT / "cache" / "tmp" / "napcat_watch.lock"
 QQ_MANAGEMENT_FILE = _ROOT / "config" / "qq_management.json"
 
 
+_QQ_MGMT_WARNED = False
+
+
 def qq_management() -> str:
-    """full (default) | external.
+    """full | external (default **external**, fail-closed since 0831).
 
     external: another bridge build owns the QQ account (Lite chain); the Full
     launcher/watchdog must not start/stop the QQ bridge, NapCat or
     napcat_watch. Env YHLZ_QQ_MANAGEMENT wins, then config file.
+
+    缺文件/坏 JSON 时不再回落 full——那会自动拉起旧 qq_bot/napcat_watch，
+    和 Lite 抢同一个 QQ 号。要回滚旧链：设 YHLZ_QQ_MANAGEMENT=full 或把
+    config/qq_management.json 改成 full。
     """
+    global _QQ_MGMT_WARNED
     env = os.getenv("YHLZ_QQ_MANAGEMENT", "").strip().lower()
     if env in ("full", "external"):
         return env
@@ -70,7 +142,12 @@ def qq_management() -> str:
             return mode
     except Exception:
         pass
-    return "full"
+    if not _QQ_MGMT_WARNED:
+        _QQ_MGMT_WARNED = True
+        print("[launcher] qq_management 配置缺失/损坏 → fail-closed 按 external"
+              "（回滚旧链：config/qq_management.json 或 YHLZ_QQ_MANAGEMENT=full）",
+              flush=True)
+    return "external"
 
 
 def _up(url: str) -> bool:
@@ -122,18 +199,29 @@ def _spawn_ollama():
     log = _ROOT / "cache" / "logs" / "ollama.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     subprocess.Popen([OLLAMA, "serve"], cwd=str(_ROOT),
-                     stdout=open(log, "ab"), stderr=subprocess.STDOUT,
+                     stdout=_open_log(log), stderr=subprocess.STDOUT,
                      creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                      close_fds=True)
 
 
+def _allow_no_lora() -> bool:
+    return str(os.getenv("YHLZ_ALLOW_BASE_NO_LORA", "")).strip().lower() in (
+        "1", "true", "yes", "on")
+
+
 def _spawn_llama():
-    """v6 生产链（记录 0398/0426）：QAT-Q4 + mmproj(CPU) + v6 LoRA。
+    """v6 生产链（记录 0398/0426）：QAT-Q4 + mmproj(CPU) + v7b LoRA。
 
     旧 gemma-aggr 配置只在 v6 资产缺失时兜底——此前 watchdog 会用它抢占
     8081，导致项目调用到的不是元亨。
+    0831：v6 资产在、但 LoRA 缺失时不再静默起基座（人格消失但 /health 正常，
+    排查成本极高）；默认拒绝启动，YHLZ_ALLOW_BASE_NO_LORA=1 才放行。
     """
     if YH_LLAMA_EXE.exists() and YH_BASE_GGUF.exists():
+        if not YH_LORA_GGUF.exists() and not _allow_no_lora():
+            _log(f"生产 LoRA 缺失：{YH_LORA_GGUF}；拒绝用无 LoRA 基座冒充元亨"
+                 "（YHLZ_ALLOW_BASE_NO_LORA=1 可强制）")
+            return
         argv = [str(YH_LLAMA_EXE), "-m", str(YH_BASE_GGUF),
                 "--mmproj", str(YH_MMPROJ_GGUF), "--no-mmproj-offload"]
         if YH_LORA_GGUF.exists():
@@ -148,9 +236,12 @@ def _spawn_llama():
                 "--temp", "1.0", "--top-p", "0.95", "--top-k", "64"]
     log = _ROOT / "cache" / "logs" / "llama-server.log"
     log.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.Popen(argv, cwd=str(_ROOT), stdout=open(log, "ab"),
-                     stderr=subprocess.STDOUT,
-                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    # 2026-10-20（ledger 0893）：服务子进程必须**脱离父进程**——否则父命令结束
+    # （例如我在一次 exec 里起 llama）就会把 llama 一起带走，表现为"模型刚 ready 就掉"。
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | \
+        getattr(subprocess, "DETACHED_PROCESS", 0)
+    subprocess.Popen(argv, cwd=str(_ROOT), stdout=_open_log(log, 12 * 1024 * 1024),
+                     stderr=subprocess.STDOUT, creationflags=flags,
                      close_fds=True)
 
 
@@ -171,7 +262,7 @@ def _spawn_daemon():
         pass
     subprocess.Popen([str(PY), "-B", "-m", "backend.target_daemon",
                       "--port", "8321"], cwd=str(_ROOT), env=env,
-                     stdout=open(log, "ab"), stderr=subprocess.STDOUT,
+                     stdout=_open_log(log), stderr=subprocess.STDOUT,
                      creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                      close_fds=True)
 
@@ -184,6 +275,77 @@ def _spawn_qqbot():
 
 
 NAPCAT_BAT = NAPCAT_LAUNCHER
+
+# 旧 QQ 链脚本（0830）：qq_management=external 时这些进程和 Lite 链抢同一个
+# 账号/同一条 OneBot WS，必须收掉。只按「python 解释器的 argv 以脚本名结尾」
+# 精确匹配，不碰别的 python，也不碰 Lite 的 qq_bridge_service.py。
+LEGACY_QQ_MARKERS = ("tools/qq_bot.py", "tools/napcat_watch.py",
+                     "tools/qq_bot_restart.py")
+
+
+def _reap_legacy_qq() -> list[str]:
+    """Kill leftover legacy Full-chain QQ consumers (external mode only).
+
+    旧方式没删干净：``tools/qq_bot_start.bat``、手搓 ``pythonw qq_bot.py``、
+    ``napcat_watch.py`` 仍可能被老快捷方式/老脚本拉起来，和 Lite 链一起连
+    OneBot WS、写旧状态文件，工作台就同时看到"新旧都启动了"。每个 tick
+    把它们收掉，保证同一个 QQ 号只有一个消费者。qq_management=full 时不调用
+    （想回滚旧链改回 full 即可）。
+    """
+    try:
+        import psutil
+    except Exception:
+        return []
+    me = os.getpid()
+    killed: list[str] = []
+    for p in psutil.process_iter(["pid", "name", "cmdline"]):
+        try:
+            pid = int(p.info["pid"])
+            nm = str(p.info.get("name") or "").lower()
+            cl = [str(x).replace("\\", "/").lower()
+                  for x in (p.info.get("cmdline") or [])]
+        except Exception:
+            continue
+        if pid == me or not nm.startswith("python"):
+            continue
+        hit = ""
+        for arg in cl:
+            for marker in LEGACY_QQ_MARKERS:
+                if arg.endswith(marker):
+                    hit = marker
+                    break
+            if hit:
+                break
+        if not hit:
+            continue
+        try:
+            proc = psutil.Process(pid)
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except Exception:
+                proc.kill()
+            killed.append(f"{pid}:{hit.rsplit('/', 1)[-1]}")
+        except Exception:
+            continue
+    # 旧链的 pid 锁：进程已经没了就是僵尸锁（旧桥/旧看护自己会在下次启动时
+    # 误判"已有实例"），清掉；Lite 用 state_dir/bridge.lock，互不影响。
+    try:
+        from backend.qq_bridge_lock import pid_alive
+
+        for lock_path in (QQBOT_LOCK, NAPCAT_WATCH_LOCK):
+            if not lock_path.exists():
+                continue
+            try:
+                old = int(lock_path.read_text(encoding="utf-8").strip() or "0")
+            except Exception:
+                old = 0
+            if not old or not pid_alive(old):
+                lock_path.unlink(missing_ok=True)
+                killed.append(f"stale:{lock_path.name}")
+    except Exception:
+        pass
+    return killed
 
 
 def _proc_alive(script: str) -> bool:
@@ -320,20 +482,26 @@ def _maybe_recycle_daemon() -> None:
 
 def ensure_stack() -> dict:
     st = status()
-    # F2: never respawn something that is still there (process alive or port
-    # bound) — a slow /health is not a dead service.
-    if (not st["ollama"] and not _proc_alive("ollama")
-            and not _port_open("127.0.0.1", 11434)
-            and _spawn_allowed("ollama", 180)):
-        _spawn_ollama()
-    if (not st["gemma"] and not _port_open("127.0.0.1", 8081)
+    window = gpu_window_active()
+    _log(f"ensure_stack: {st} critical={ready(st)} "
+         f"gpu_window={'exclusive' if window else 'off'} qq_management={qq_management()}")
+    # P0: Ollama is optional.  Do not spawn/wait/log it every tick; it has been
+    # returning 500 on this machine and was blocking boot for ~3 minutes.
+    if os.getenv("YHLZ_START_OLLAMA", "").strip().lower() in ("1", "true", "yes", "on"):
+        if (not st["ollama"] and not _proc_alive("ollama")
+                and not _port_open("127.0.0.1", 11434)
+                and _spawn_allowed("ollama", 180)):
+            _try_spawn("ollama", _spawn_ollama)
+    # During a singing/Seed-VC window the watchdog stays alive but must not
+    # bring llama back until the window closes.
+    if (not window and not st["gemma"] and not _port_open("127.0.0.1", 8081)
             and not _proc_alive("llama-server")
             and _spawn_allowed("llama", 180)):
-        _spawn_llama()
+        _try_spawn("llama", _spawn_llama)
     if (not st["daemon"] and not _port_open("127.0.0.1", 8321)
             and not _proc_alive("target_daemon")
             and _spawn_allowed("daemon", 120)):
-        _spawn_daemon()
+        _try_spawn("daemon", _spawn_daemon)
     # 0535: opt-in idle uptime recycle (prevents long-running slowdown).
     _maybe_recycle_daemon()
     # keep the QQ bridge alive, but only if NapCat's OneBot WS is up.
@@ -344,81 +512,14 @@ def ensure_stack() -> dict:
         # keep the NapCat online-watcher alive
         if not _proc_alive("napcat_watch.py"):
             _spawn_napcat_watch()
+    else:
+        # 0830: QQ 归 Lite 链，旧链残留（老快捷方式/老脚本拉起的 qq_bot.py、
+        # napcat_watch.py）当场收掉，否则新旧两条链同时吃同一个 QQ 号。
+        reaped = _reap_legacy_qq()
+        if reaped:
+            print(f"[launcher] external: 收掉旧 QQ 链残留 {reaped}", flush=True)
     time.sleep(1)
     return status()
-
-
-def _boot_html() -> bytes:
-    return (f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
-<title>YHLZ · 元 · 亨 · 利 · 贞 · 启动中</title>
-<link rel="icon" href="/favicon.png?v=20261017">
-<style>
-html,body{{margin:0;height:100%;font:14px/1.7 "Segoe UI","Microsoft YaHei",sans-serif;
-  color:#fff;overflow:hidden;
-  background:#131318 url(/bg.png) center/cover no-repeat;}}
-.wrap{{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
-  background:rgba(10,8,20,.25);backdrop-filter:blur(2px);}}
-video{{width:min(64vh,420px);height:auto;border-radius:14px;
-  box-shadow:0 18px 44px rgba(0,0,0,.45);}}
-h1{{margin:0;font-size:22px;letter-spacing:2px;text-shadow:0 2px 8px #000}}
-.rows{{display:flex;gap:22px;font-weight:600}}
-.s{{padding:4px 14px;border-radius:14px;background:rgba(255,255,255,.14);}}
-.s b{{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:#888;}}
-.s.ok b{{background:#4fd1a5;box-shadow:0 0 8px #4fd1a5}}
-#st{{font-size:12px;opacity:.75;min-height:18px}}
-</style></head><body>
-<div class="wrap">
- <video src="/boot.mp4" autoplay muted loop playsinline></video>
- <h1>YHLZ · 元 · 亨 · 利 · 贞</h1>
- <div class="rows" id="rows"></div>
- <div id="st">正在唤醒服务…</div>
-</div>
-<script>
-const names={{gemma:"Gemma",daemon:"daemon",ollama:"ollama"}};
-const rows=document.getElementById('rows');
-for(const k in names){{const s=document.createElement('div');s.className='s';s.id='s_'+k;
-  s.innerHTML='<b></b>'+names[k];rows.appendChild(s);}}
-setInterval(async()=>{{
- try{{const r=await fetch('/api/status');const d=await r.json();let all=true;
-  for(const k in names){{const e=document.getElementById('s_'+k);if(d[k]){{e.classList.add('ok')}}
-    else{{all=false;e.classList.remove('ok')}}}}
-  if(all){{document.getElementById('st').textContent='全部就绪，即将进入工作台…';
-    setTimeout(()=>location.href='http://127.0.0.1:8321/',2600);}}}}
- catch(e){{}}
-}},700);
-</script></body></html>""").encode("utf-8")
-
-
-class BootHandler(BaseHTTPRequestHandler):
-    def log_message(self, *a):
-        pass
-
-    def _send(self, code, body, ctype):
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def do_GET(self):
-        p = self.path.split("?", 1)[0]
-        if p == "/":
-            self._send(200, _boot_html(), "text/html; charset=utf-8")
-        elif p == "/bg.png":
-            blob = (SRC_DIR / "背景.png").read_bytes()
-            self._send(200, blob, "image/png")
-        elif p == "/boot.mp4":
-            blob = (SRC_DIR / "加载动画.mp4").read_bytes()
-            self._send(200, blob, "video/mp4")
-        elif p == "/favicon.png":
-            blob = (_ROOT / "assets" / "webui" / "favicon.png").read_bytes()
-            self._send(200, blob, "image/png")
-        elif p == "/api/status":
-            self._send(200, json.dumps(status()).encode(),
-                       "application/json")
-        else:
-            self._send(404, b"n/a", "text/plain")
 
 
 def _self_test() -> None:
@@ -429,10 +530,10 @@ def _self_test() -> None:
     ensure_stack()
     for _ in range(60):
         st = status()
-        if all(st.values()):
+        if ready(st):
             break
         time.sleep(1)
-    ok = all(status().values())
+    ok = ready(status())
     try:
         html = _u.urlopen("http://127.0.0.1:8321/", timeout=5).read()
         h = html.decode("utf-8", "replace")
@@ -453,6 +554,8 @@ def main() -> int:
     ap.add_argument("--self-test", action="store_true",
                     help="ensure services then exit (startup test)")
     a = ap.parse_args()
+    _log(f"launcher start pid={os.getpid()} args={sys.argv[1:]} "
+         f"qq_management={qq_management()}")
     if a.self_test:
         _self_test()
         return 0
@@ -463,15 +566,16 @@ def main() -> int:
     st = status()
     for _ in range(150):
         print("  ", st, flush=True)
-        if st["daemon"] and (not a.no_browser or all(st.values())):
+        if st["daemon"] and (not a.no_browser or ready(st)):
             break
         time.sleep(1)
         st = status()
-    if not all(st.values()):
-        print("部分服务未就绪:", st, flush=True)
+    if not ready(st):
+        print("关键服务未就绪（gemma/daemon）:", st, flush=True)
+    _log(f"launcher final services={st} critical={ready(st)}")
     if a.no_browser:
-        print("services:", st, flush=True)
-        return 0 if all(st.values()) else 1
+        print("services:", st, "critical:", ready(st), flush=True)
+        return 0 if ready(st) else 1
     if not st["daemon"]:
         print("工作台服务未就绪，请查看 cache/logs/daemon.log", flush=True)
         return 1

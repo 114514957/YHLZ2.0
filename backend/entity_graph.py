@@ -76,10 +76,17 @@ def _local_llm():
 
 
 async def extract_triples(text: str, llm_turn=None) -> list[dict]:
+    from backend.memory_resource_policy import load_memory_resource_policy
+    if not load_memory_resource_policy().llm_enabled:
+        return []
     llm = llm_turn or _local_llm()
     prompt = EXTRACT_PROMPT.replace("<TEXT>", str(text or "")[:800])
     try:
-        msg = await llm([{"role": "user", "content": prompt}], [])
+        from backend.text_memory_inference_gate import inference_gate
+        async with inference_gate().slot(background=True):
+            if not load_memory_resource_policy().llm_enabled:
+                return []
+            msg = await llm([{"role": "user", "content": prompt}], [])
         raw = str(msg.get("content") or "")
     except Exception:
         return []

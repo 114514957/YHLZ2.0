@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>元亨直播音频出口 · L1</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif;
+         background: #101318; color: #d7dde6; }
+  header { padding: 10px 14px; background: #171c24; border-bottom: 1px solid #232a35;
+           display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .chip { padding: 3px 10px; border-radius: 999px; background: #222a36; font-size: 12px; }
+  .chip.ok { background: #17351f; color: #7fe0a0; }
+  .chip.warn { background: #3a2f14; color: #f0c869; }
+  .chip.bad { background: #3d1b1b; color: #ff9a9a; }
+  #banner { display: none; padding: 8px 14px; font-weight: 600; }
+  #banner.show { display: block; }
+  #banner.bad { background: #4a1515; color: #ffb3b3; }
+  #banner.warn { background: #4a3a10; color: #ffe08a; }
+  main { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; padding: 12px 14px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em;
+       color: #8fa0b8; margin: 0 0 8px; }
+  .card { background: #161b23; border: 1px solid #232a35; border-radius: 10px; padding: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #202733; }
+  th { color: #8fa0b8; font-weight: 600; }
+  td.state-started { color: #7fe0a0; }
+  td.state-queued { color: #ffe08a; }
+  td.state-ended { color: #8fa0b8; }
+  td.state-failed, td.state-cancelled, td.state-expired { color: #ff9a9a; }
+  #events { list-style: none; margin: 0; padding: 0; font-size: 12px; max-height: 320px; overflow: auto; }
+  #events li { padding: 3px 0; border-bottom: 1px dashed #202733; color: #b6c1d1; }
+  footer { padding: 8px 14px; color: #6b7a90; font-size: 12px; }
+  .muted { color: #6b7a90; }
+</style>
+</head>
+<body>
+<header>
+  <strong>元亨 · 直播音频出口</strong>
+  <span class="chip" id="chip-conn">连接中…</span>
+  <span class="chip" id="chip-armed">未武装</span>
+  <span class="chip" id="chip-route">路由：-</span>
+  <span class="chip" id="chip-gen">代际 -</span>
+  <span class="chip" id="chip-lease">租约：-</span>
+</header>
+<div id="banner" class="bad"></div>
+<main>
+  <section class="card">
+    <h2>待播队列（由服务端裁决）</h2>
+    <table>
+      <thead><tr><th>片段</th><th>状态</th><th>时长</th><th>文本</th></tr></thead>
+      <tbody id="queue-body"><tr><td colspan="4" class="muted">空</td></tr></tbody>
+    </table>
+  </section>
+  <section class="card">
+    <h2>事件</h2>
+    <ul id="events"></ul>
+  </section>
+</main>
+<footer>
+  <span id="foot"></span>
+  <span class="muted"> · 仅限 OBS 浏览器源（“通过 OBS 控制音频 + 监听关闭”）；页面自身不打开物理音频设备。</span>
+</footer>
+<script>
+(function () {
+  "use strict";
+  var params = new URLSearchParams(location.search);
+  var TOKEN = params.get("token") || "";
+  var CLIENT_ID = params.get("client_id") || "";
+  if (!CLIENT_ID) {
+    try {
+      CLIENT_ID = sessionStorage.getItem("yhlz_live_cid") || "";
+      if (!CLIENT_ID) {
+        CLIENT_ID = "obs-" + Math.random().toString(36).slice(2, 10);
+        sessionStorage.setItem("yhlz_live_cid", CLIENT_ID);
+      }
+    } catch (e) { CLIENT_ID = "obs-fallback"; }
+  }
+  var el = function (id) { return document.getElementById(id); };
+  var state = {
+    since: 0, generation: -1, armed: false, route: null, connected: false,
+    known: {}, chain: Promise.resolve(), ctx: null, gain: null,
+    sources: [], epoch: 0, nextTime: 0, events: []
+  };
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function setBanner(text, cls) {
+    var b = el("banner");
+    if (!text) { b.className = ""; b.textContent = ""; return; }
+    b.className = "show " + (cls || "warn");
+    b.textContent = text;
+  }
+  function chip(id, text, cls) {
+    var c = el(id);
+    c.textContent = text;
+    c.className = "chip" + (cls ? " " + cls : "");
+  }
+  function updateChips() {
+    chip("chip-conn", state.connected ? "已连接" : "连接中…", state.connected ? "ok" : "warn");
+    chip("chip-armed", state.armed ? "已武装" : "未武装", state.armed ? "ok" : "warn");
+    chip("chip-route", state.armed && state.route
+        ? "路由：" + state.route.route + " / 监听 " + state.route.monitor
+        : "路由：-");
+    chip("chip-gen", "代际 " + state.generation);
+    chip("chip-lease", "租约：" + CLIENT_ID);
+    el("foot").textContent = "client=" + CLIENT_ID + " · token " + (TOKEN ? "已配置" : "缺失");
+  }
+  function renderQueue(queue) {
+    var body = el("queue-body");
+    if (!queue || !queue.length) {
+      body.innerHTML = '<tr><td colspan="4" class="muted">空</td></tr>';
+      return;
+    }
+    body.innerHTML = queue.map(function (s) {
+      return "<tr><td>" + s.segment_id.slice(-14) + "</td>"
+        + '<td class="state-' + s.state + '">' + s.state + "</td>"
+        + "<td>" + s.duration_s + "s</td><td>" + escapeHtml(s.text) + "</td></tr>";
+    }).join("");
+  }
+  function escapeHtml(t) {
+    return String(t).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function renderEvent(ev) {
+    state.events.push(ev);
+    if (state.events.length > 40) state.events.shift();
+    el("events").innerHTML = state.events.slice().reverse().map(function (e) {
+      return "<li>#" + e.seq + " " + e.type
+        + (e.segment_id ? " · " + String(e.segment_id).slice(-14) : "")
+        + (e.cancelled != null ? " · 取消 " + e.cancelled : "")
+        + (e.generation != null ? " · gen " + e.generation : "")
+        + (e.reason ? " · " + escapeHtml(e.reason) : "") + "</li>";
+    }).join("");
+  }
+
+  function ensureCtx() {
+    if (state.ctx) return;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    state.ctx = new AC();
+    state.gain = state.ctx.createGain();
+    state.gain.gain.value = 1.0;
+    state.gain.connect(state.ctx.destination);
+    state.nextTime = state.ctx.currentTime;
+  }
+  function stopAll() {
+    state.epoch += 1;
+    state.sources.forEach(function (src) {
+      try { src.onended = null; src.stop(); } catch (e) {}
+    });
+    state.sources = [];
+    if (state.ctx) state.nextTime = state.ctx.currentTime;
+    state.chain = Promise.resolve();
+  }
+  function ack(seg, kind, detail) {
+    fetch("/ack", {
+      method: "POST", cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: TOKEN, client_id: CLIENT_ID, segment_id: seg.segment_id,
+        generation: seg.generation, kind: kind,
+        at_client_ms: Math.round(performance.now()),
+        detail: detail || null
+      })
+    }).catch(function () {});
+  }
+  function playSeg(seg) {
+    if (!window.obsstudio) {
+      ack(seg, "failed", { reason: "no-obsstudio" });
+      setBanner("未检测到 window.obsstudio：本页面必须作为 OBS 浏览器源运行。", "bad");
+      return Promise.resolve();
+    }
+    ensureCtx();
+    var resume = state.ctx.state === "suspended"
+      ? state.ctx.resume().catch(function () {}) : Promise.resolve();
+    return resume.then(function () {
+      if (!state.armed || seg.generation !== state.generation) return null;
+      return fetch(seg.audio_path + "?token=" + encodeURIComponent(TOKEN),
+                   { cache: "no-store" }).then(function (resp) {
+        if (!resp.ok) throw new Error("audio-http-" + resp.status);
+        return resp.arrayBuffer();
+      }).then(function (buf) {
+        if (!state.armed || seg.generation !== state.generation) return null;
+        return state.ctx.decodeAudioData(buf).then(function (audio) {
+          if (!state.armed || seg.generation !== state.generation) return null;
+          var src = state.ctx.createBufferSource();
+          src.buffer = audio;
+          src.connect(state.gain);
+          var at = Math.max(state.ctx.currentTime + 0.05, state.nextTime);
+          state.nextTime = at + audio.duration;
+          var epochAt = state.epoch;
+          state.sources.push(src);
+          src.onended = function () {
+            var idx = state.sources.indexOf(src);
+            if (idx >= 0) state.sources.splice(idx, 1);
+            ack(seg, "ended");
+          };
+          src.start(at);
+          ack(seg, "scheduled", { scheduled_at: at });
+          var startDelayMs = Math.max(0, (at - state.ctx.currentTime) * 1000);
+          window.setTimeout(function () {
+            if (state.armed && seg.generation === state.generation
+                && state.epoch === epochAt) {
+              ack(seg, "started", { started_at: at, duration_s: audio.duration });
+            }
+          }, startDelayMs);
+          return null;
+        });
+      });
+    }).catch(function (err) {
+      ack(seg, "failed", { reason: String(err && err.message || err) });
+    });
+  }
+  function schedule(seg) {
+    state.chain = state.chain.then(function () { return playSeg(seg); })
+      .catch(function () {});
+  }
+
+  function apply(data) {
+    state.connected = true;
+    if (typeof data.since === "number") state.since = data.since;
+    if (data.generation !== state.generation) {
+      stopAll();
+      state.known = {};
+      state.generation = data.generation;
+    }
+    state.armed = !!data.armed;
+    state.route = data.route || null;
+    updateChips();
+    (data.events || []).forEach(renderEvent);
+    renderQueue(data.queue || []);
+    if (!state.armed) {
+      stopAll();
+      return;
+    }
+    (data.queue || []).forEach(function (seg) {
+      if (seg.state === "queued" && seg.generation === state.generation
+          && !state.known[seg.segment_id]) {
+        state.known[seg.segment_id] = true;
+        schedule(seg);
+      }
+    });
+  }
+
+  function loop() {
+    var url = "/channel?token=" + encodeURIComponent(TOKEN)
+      + "&client_id=" + encodeURIComponent(CLIENT_ID)
+      + "&since=" + state.since;
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, 20000);
+    fetch(url, { cache: "no-store", signal: controller.signal })
+      .then(function (resp) {
+        clearTimeout(timer);
+        if (resp.status === 409) {
+          state.connected = false; updateChips();
+          return resp.json().catch(function () { return {}; }).then(function (body) {
+            setBanner("租约被其他客户端持有（" + (body.holder || "unknown") + "），稍后重试。", "warn");
+            return sleep(3000);
+          });
+        }
+        if (!resp.ok) {
+          state.connected = false; updateChips();
+          setBanner("通道错误 HTTP " + resp.status, "bad");
+          return sleep(2000);
+        }
+        return resp.json().then(function (data) {
+          setBanner(null);
+          apply(data);
+        });
+      })
+      .catch(function () {
+        clearTimeout(timer);
+        state.connected = false; updateChips();
+        setBanner("与音频服务断开，重试中…", "warn");
+        return sleep(1500);
+      })
+      .then(loop);
+  }
+
+  if (!TOKEN) {
+    setBanner("URL 缺少 token：请使用 CLI `live_service.py url` 生成的 OBS 地址。", "bad");
+    updateChips();
+    return;
+  }
+  if (!window.obsstudio) {
+    setBanner("当前不在 OBS 浏览器源中：仅显示状态，不会创建 AudioContext、不会播放声音。", "warn");
+  }
+  updateChips();
+  loop();
+})();
+</script>
+</body>
+</html>

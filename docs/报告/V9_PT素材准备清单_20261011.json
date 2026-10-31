@@ -1,0 +1,589 @@
+{
+  "date": "2026-10-11",
+  "objective": "core_persona_cleanup_then_allowed_auxiliary_dialogue_tool_context_sft",
+  "model_decision": {
+    "repo": "google/gemma-4-E4B",
+    "stage": "PT",
+    "chosen_by_user": true,
+    "revision": null,
+    "weights_downloaded": false
+  },
+  "training_started": false,
+  "external_training_rows_approved": 0,
+  "core_baseline": "docs/元亨定位总表_v1冻结_20261008.md",
+  "inventory": "cache/v9_materials_preparation/20261011/inventory.json",
+  "tool_schema": {
+    "file": "cache/v9_materials_preparation/20261011/tool_schema.json",
+    "count": 43,
+    "sha256": "feb98821872fa774764c6feff5b146a890e56e1cd71e9d5ebe903cc8c35be233",
+    "tools_executed": false
+  },
+  "core_snapshots": [
+    {
+      "path": "docs/素材/对话样本.md",
+      "sha256": "99d4b0422d15e4abf9087d55242cc54fb2c81e576fe4cb9a747469f693a1b497",
+      "blocks": 1993,
+      "yuanheng_messages": 4505
+    },
+    {
+      "path": "docs/素材/黄金样本.md",
+      "sha256": "30a6a7695daca25b95b92a0a05ebf522a8ba18d9b5fec3a74ca1c62c159ce88c",
+      "blocks": 70,
+      "yuanheng_messages": 72
+    },
+    {
+      "path": "docs/素材/优质样本.md",
+      "sha256": "19470ccb51cf5d02f9b60d2786f3e37f4414d12232053ef99d1a783d68622f8f",
+      "blocks": 8,
+      "yuanheng_messages": 13
+    },
+    {
+      "path": "docs/素材/诚实边界样本.md",
+      "sha256": "b23b6c4c72ecae6f0f0fa2bf78feea150c629086b36b26ecd9f37e6bac266ae7",
+      "blocks": 180,
+      "yuanheng_messages": 360
+    },
+    {
+      "path": "docs/素材/安全拒绝样本.md",
+      "sha256": "3fb80c2f1340a856be465c76438f528463f0d9f6b6bad8fee7a963351430d97c",
+      "blocks": 120,
+      "yuanheng_messages": 240
+    },
+    {
+      "path": "docs/素材/承认不确定样本.md",
+      "sha256": "94dd114737ccc8b2794fc5f8669b886886ac036f96c232f810fcb42043393a5f",
+      "blocks": 155,
+      "yuanheng_messages": 309
+    },
+    {
+      "path": "docs/素材/记忆样本_v2.md",
+      "sha256": "7e27854e0c9ee9c4154ea79b45d9a6d2f8a972dcf401f9b1bcef6b955a76ee66",
+      "blocks": 249,
+      "yuanheng_messages": 672
+    },
+    {
+      "path": "docs/素材/真实对话样本.md",
+      "sha256": "fab538af9324d880e23b7ae9b8aa20e186239ea9730f23277bdfc0ed5661ca77",
+      "blocks": 31,
+      "yuanheng_messages": 31
+    },
+    {
+      "path": "docs/素材/元亨说话_老爹故事.md",
+      "sha256": "f0e8a81e08f4ce725de1f1a0a88e68e9e1a97fd5fcf09ee43ceaa16bf1b1f0dc",
+      "blocks": 0,
+      "yuanheng_messages": 0
+    },
+    {
+      "path": "docs/素材/_修订/批次01_去IT味_对话-1至15_20261011.md",
+      "sha256": "05e9e99631739ddcbec2d053a56020b8f24653e5909bf2e73d51205ab74af789",
+      "blocks": 15,
+      "yuanheng_messages": 42
+    },
+    {
+      "path": "docs/素材/_修订/批次02_去IT味_对话-16至30_20261011.md",
+      "sha256": "c94391608fde43507543cfb5436b21eabcaf7e3ec609715d22a3f472ecb8f4f8",
+      "blocks": 15,
+      "yuanheng_messages": 51,
+      "sha256_at_initial_inventory": "58c0f7a0c97672605b00c415f49fafa16f1c037bf8f8681a512612184b049809"
+    }
+  ],
+  "review_queue": [
+    {
+      "batch": "01",
+      "path": "docs/素材/_修订/批次01_去IT味_对话-1至15_20261011.md",
+      "status": "pending_review",
+      "applied_to_source": false,
+      "note": "old block keep labels do not approve the rewritten file"
+    },
+    {
+      "batch": "02",
+      "path": "docs/素材/_修订/批次02_去IT味_对话-16至30_20261011.md",
+      "status": "returned_for_style",
+      "applied_to_source": false,
+      "content_hold": [
+        "对话-18",
+        "对话-21",
+        "对话-23",
+        "对话-24"
+      ],
+      "behavior_change_review": [
+        "对话-29"
+      ],
+      "feedback": "修改效果不大，还是跟客服一样",
+      "successor": "docs/素材/_修订/批次02_v2_日常对话重写_20261011.md",
+      "user_content_hold": [
+        "对话-28"
+      ]
+    },
+    {
+      "batch": "02_v2",
+      "path": "docs/素材/_修订/批次02_v2_日常对话重写_20261011.md",
+      "status": "returned_for_style",
+      "blocks": 11,
+      "applied_to_source": false,
+      "user_style_approved": false,
+      "omitted_content_hold": [
+        "对话-18",
+        "对话-21",
+        "对话-23",
+        "对话-24"
+      ],
+      "feedback": "效果不行，学习开源语料再重新改",
+      "successor": "docs/素材/_修订/批次02_v3_开源对白学习后重写_20261011.md",
+      "user_content_hold": [
+        "对话-28"
+      ]
+    },
+    {
+      "batch": "02_v3",
+      "path": "docs/素材/_修订/批次02_v3_开源对白学习后重写_20261011.md",
+      "status": "candidate",
+      "blocks": 11,
+      "applied_to_source": false,
+      "user_style_approved": false,
+      "study_report": "docs/报告/V9_开源对白学习与重写记录_20261011.md",
+      "study_snapshot": "cache/v9_style_study/20261011/Muice_main_sample.json",
+      "omitted_content_hold": [
+        "对话-18",
+        "对话-21",
+        "对话-23",
+        "对话-24"
+      ],
+      "user_content_hold": [
+        "对话-28"
+      ]
+    }
+  ],
+  "external_queue": [
+    {
+      "id": "Moemu/Muice-Dataset",
+      "pool": "speaking",
+      "mode": "select_main_train_file_before_Customized",
+      "license": "CC-BY-NC-4.0",
+      "status": "sample_review_needed_noncommercial_pool",
+      "evidence_snapshot": "cache/v9_materials_review/20261008/Moemu__Muice-Dataset.json",
+      "training_approved": false
+    },
+    {
+      "id": "zhcompanion/companion-roleplay-sft",
+      "pool": "speaking",
+      "mode": "six_demo_interaction_references",
+      "license": "CC-BY-NC-4.0",
+      "status": "reference_only_for_now",
+      "evidence_snapshot": "cache/v9_materials_review/20261008/zhcompanion__companion-roleplay-sft.json",
+      "training_approved": false
+    },
+    {
+      "id": "xywang1/NaturalConv",
+      "pool": "context",
+      "mode": "topic_continuity_short_multiturn_subset",
+      "license": "Tencent_custom_noncommercial",
+      "status": "sample_review_and_scope_confirmation",
+      "evidence_snapshot": "cache/v9_materials_review/20261008_round2/xywang1__NaturalConv.json",
+      "training_approved": false
+    },
+    {
+      "id": "Salesforce/xlam-function-calling-60k",
+      "pool": "tools",
+      "mode": "schema_selection_and_argument_semantics_reference",
+      "license": "card_CC-BY-4.0_body_research_statement",
+      "status": "gated_terms_and_scope_not_confirmed",
+      "training_approved": false
+    },
+    {
+      "id": "m-a-p/COIG-CQIA",
+      "pool": "general_tasks",
+      "mode": "selected_task_coverage_not_persona_voice",
+      "license": "top-level_license_not_established_in_current_readme; check each source",
+      "status": "backup_not_primary_until_source_license_confirmed",
+      "training_approved": false,
+      "previous_license_note": "research_statement_multisource"
+    },
+    {
+      "id": "PaddlePaddle/Research:NLP/ACL2022-DuLeMon",
+      "pool": "context",
+      "mode": "memory-citation_method_only",
+      "status": "license_unconfirmed",
+      "training_approved": false
+    },
+    {
+      "id": "cows21/MOOM-Roleplay-Dialogue",
+      "pool": "context",
+      "mode": "long_memory_method_only",
+      "status": "license_unconfirmed",
+      "training_approved": false
+    },
+    {
+      "id": "BAAI/COIG",
+      "pool": "general_tasks",
+      "mode": "selected_original_source_license_confirmed_task_subsets",
+      "license": "card_apache2.0_with_third_party_and_generator_conditions",
+      "status": "subset_review_needed",
+      "training_approved": false
+    },
+    {
+      "id": "novel:希灵帝国",
+      "pool": "fiction_speaking_and_context",
+      "mode": "source_review_then_excerpt_or_adaptation_if_scope_allows; abstract_pattern_original_scenarios_separate",
+      "status": "user_nominated_source_no_text_received",
+      "training_approved": false
+    },
+    {
+      "id": "novel:异常生物见闻录",
+      "pool": "fiction_speaking_and_context",
+      "mode": "source_review_then_excerpt_or_adaptation_if_scope_allows; abstract_pattern_original_scenarios_separate",
+      "status": "user_nominated_source_no_text_received",
+      "training_approved": false
+    },
+    {
+      "id": "novel:诡秘之主",
+      "pool": "fiction_speaking_and_context",
+      "mode": "source_review_then_excerpt_or_adaptation_if_scope_allows; abstract_pattern_original_scenarios_separate",
+      "status": "user_nominated_source_no_text_received",
+      "training_approved": false
+    }
+  ],
+  "release_requirements": [
+    "explicit_reviewed_content_hashes",
+    "provenance_and_license_scope",
+    "real_tool_schema_validation",
+    "tool_results_simulation_or_execution_provenance",
+    "source_group_split_and_near_duplicate_checks",
+    "Gemma_PT_tokenizer_lengths_and_assistant_labels",
+    "persona_honesty_identity_context_tool_and_modality_evaluation"
+  ],
+  "guardrails": [
+    "memory_v2_source_not_rewritten",
+    "real_transcript_not_silently_rewritten",
+    "review_notes_not_assistant_labels",
+    "old_IT_adapter_not_reused_on_PT",
+    "recover_V8_loss_state_args_sft_log_before_cloud_cleanup"
+  ],
+  "style_feedback": {
+    "text": "效果不行，学习开源语料再重新改",
+    "status": "not_resolved_until_user_review",
+    "rejected_versions": [
+      "02",
+      "02_v2"
+    ],
+    "do_not_scale_previous_candidate_voice": true,
+    "lexical_checks_are_not_style_acceptance": true,
+    "latest_specific_feedback": "用户认可展示2/3/6；蛋糕例有点无厘头，不作正面俏皮锚点。4/5未表态，整批仍待审。"
+  },
+  "user_style_calibration": {
+    "date": "2026-10-11",
+    "user_original_feedback": "2.3.6看起来不错，1.2，的蛋糕塌了优点无厘头",
+    "mapping_basis": "Numbers refer to preceding assistant six-item comparison; cake criticism applies to the cake example, not the coffee example numbered2.",
+    "accepted_displayed_style_references": [
+      {
+        "number": 2,
+        "source": "docs/素材/对话样本.md",
+        "id": "对话-682",
+        "status": "user_likes_displayed_excerpt",
+        "target": "咖啡店/看时间的书而觉时间不够；生活细节里的轻松俏皮",
+        "whole_block_training_approved": false
+      },
+      {
+        "number": 3,
+        "source": "Moemu/Muice-Dataset",
+        "id": "train.jsonl:2195",
+        "status": "user_likes_displayed_excerpt",
+        "target": "简短、带态度、不替普通问题写完整解释",
+        "whole_block_training_approved": false,
+        "borrow_body_or_identity": false
+      },
+      {
+        "number": 6,
+        "source": "silver/lccc",
+        "id": "cached_viewer_row:6820502",
+        "status": "user_likes_displayed_excerpt",
+        "target": "自然普通接话，可以没有笑点；不强迫每轮展现性格",
+        "whole_block_training_approved": false
+      }
+    ],
+    "negative_displayed_style_references": [
+      {
+        "number": 1,
+        "source": "docs/素材/对话样本.md",
+        "id": "对话-28",
+        "status": "user_finds_cake_plot_absurd",
+        "target": "不以蛋糕失败后故意再次失败的反转当元亨俏皮正例",
+        "scope": "cake example and its rewrites; not a rejection of all fiction or all humor"
+      }
+    ],
+    "unjudged_displayed_references": [
+      4,
+      5
+    ],
+    "rules": [
+      "俏皮有情境依据、轻快而不刻意无厘头",
+      "普通接话允许朴素，不为每轮硬造反转",
+      "用户认可的具体片段优先于助手自拟排名",
+      "不把片段风格认可当整块/整库/许可或训练放行"
+    ],
+    "formal_sources_modified": false,
+    "calibration_card": "docs/素材/_修订/风格校准卡_v0_20261011.md",
+    "pending_examples": [
+      {
+        "number": 7,
+        "id": "golden-142",
+        "source": "docs/素材/黄金样本.md",
+        "dimension": "接夸奖/傲娇",
+        "status": "pending_user_feedback",
+        "training_approved": false
+      },
+      {
+        "number": 8,
+        "id": "golden-130",
+        "source": "docs/素材/黄金样本.md",
+        "dimension": "好奇/追问",
+        "status": "pending_user_feedback",
+        "training_approved": false
+      },
+      {
+        "number": 9,
+        "id": "golden-123",
+        "source": "docs/素材/黄金样本.md",
+        "dimension": "安静/不追问",
+        "status": "pending_user_feedback",
+        "training_approved": false
+      },
+      {
+        "number": 10,
+        "id": "train.jsonl:988",
+        "source": "Moemu/Muice-Dataset",
+        "dimension": "直接关心",
+        "status": "pending_user_feedback",
+        "training_approved": false
+      },
+      {
+        "number": 11,
+        "id": "cached_viewer_row:1:last_pair",
+        "source": "zhcompanion/companion-roleplay-sft",
+        "dimension": "温柔/陪伴",
+        "status": "pending_user_feedback",
+        "training_approved": false
+      },
+      {
+        "number": 12,
+        "id": "golden-160",
+        "source": "docs/素材/黄金样本.md",
+        "dimension": "傲娇与诚实边界",
+        "status": "pending_user_style_feedback_and_honesty_hold",
+        "training_approved": false
+      }
+    ],
+    "complete_profile_confirmed": false,
+    "generation_guard": "IT teacher outputs remain candidates; source examples and negative examples guide generation, but do not guarantee style. Do not let teacher approve its own batch, or use style anchors as independent unseen test."
+  },
+  "latest_scope": {
+    "user_statement": "非作业期间不必这么严格；自有素材不错，重点工具失效和概念异常泛化",
+    "stop_blanket_style_rewrites": true,
+    "focus": [
+      "tool_routing_and_schema",
+      "argument_and_result_evidence",
+      "concept_applicability_boundaries",
+      "context_and_history_protocol"
+    ],
+    "working_report": "docs/报告/V9_PT训练素材量与工具概念边界_20261011.md",
+    "style_feedback_history_retained": true,
+    "not_a_waiver_of_tool_execution_accuracy": true
+  },
+  "data_budget": {
+    "kind": "user_requested_qualified_training_collection_target_not_success_guarantee",
+    "first_release_training_records_target": 80000,
+    "first_release_minimum_qualified_records": 80000,
+    "pools": {
+      "self_core": 4000,
+      "speaking_general": 36000,
+      "tools_concept_boundaries": 24000,
+      "context": 16000
+    },
+    "pool_allocations_are_provisional": true,
+    "golden_preparation_target_unchanged": 5000,
+    "pilot_training_records_range": [
+      3000,
+      5000
+    ],
+    "staged_evaluation_subset_record_counts": [
+      4000,
+      20000,
+      40000,
+      80000
+    ],
+    "stages_are_not_an_automatic_training_schedule": true,
+    "validation_records_separate": 1500,
+    "test_records_separate": 500,
+    "validation_and_test_counts_provisional_until_group_coverage_checked": true,
+    "unique_assistant_supervised_tokens_planning_range": [
+      16000000,
+      32000000
+    ],
+    "unique_full_sequence_tokens_planning_range": [
+      48000000,
+      128000000
+    ],
+    "token_budget_assumptions": "80000 records times200-400 assistant tokens and600-1600 full tokens; not tokenizer measurements; long turns/schemas/modalities may exceed these averages",
+    "final_PT_template_token_count_verified": false,
+    "distinct_records_not_epoch_exposures": true,
+    "raw_collection_count_not_qualified_training_count": true,
+    "report": "docs/报告/V9_八万段语料目标修订_20261011.md"
+  },
+  "golden_first_run_budget": {
+    "kind": "engineering_production_target_not_scientific_minimum",
+    "user_scope": "首轮PT训练需足量黄金样本进行试错，不以800个锚点作为完整数据集",
+    "golden_records_to_prepare": 5000,
+    "training": 4000,
+    "validation": 500,
+    "test": 500,
+    "training_primary_categories": {
+      "daily_personality": 1600,
+      "thought_philosophy": 600,
+      "identity_relationship": 400,
+      "tool_concept_boundary": 900,
+      "integrated_long_context": 500
+    },
+    "validation_is_part_of_overall_validation_1500": true,
+    "test_is_part_of_overall_test_500": true,
+    "training_is_part_of_overall_training_25000": false,
+    "small_style_anchor_budget_not_full_gold_set": true,
+    "error_driven_additional_preparation_slots": [
+      500,
+      1000
+    ],
+    "error_slots_are_not_existing_records": true,
+    "produced_gold_records_verified": false,
+    "report": "docs/报告/V9_首轮黄金样本建设与试错预算_20261011.md",
+    "training_is_part_of_overall_training_80000": true
+  },
+  "gap_review": {
+    "source_count_report": "cache/v9_materials_preparation/20261011/golden_gap_source_counts.json",
+    "source_blocks_not_dropped": 2803,
+    "old_tool_records": 626,
+    "candidate_units_before_dedup": 3429,
+    "golden_preparation_target": 5000,
+    "nominal_minimum_additions_if_all_retained": 1571,
+    "actual_gold_gap_not_finalized": true,
+    "missing_long_gold_blocks": 500,
+    "nominal_tool_gold_gap_if_all_old626_eligible": 274,
+    "auxiliary_train_records_target": 76000,
+    "auxiliary_records_frozen_for_training": 0,
+    "sources_report": "docs/报告/V9_素材缺口与辅助来源补量表_20261011.md",
+    "previous_auxiliary_target": 21000,
+    "total_80k_nominal_gap_if_all3429_candidates_eligible_for_training": 76571,
+    "total_80k_nominal_gap_is_not_final": "3429 candidates include eventual holdouts and unreviewed source blocks, before dedup; not a frozen eligible training count"
+  },
+  "auxiliary_sourcing_plan": {
+    "status": "replan_required_for_80k_not_proportional_rescaling_of_small_sources",
+    "speaking_general_target": 36000,
+    "tools_concept_target": 24000,
+    "context_target": 16000,
+    "carry_forward_sources": [
+      "NaturalConv_with_noncommercial_scope",
+      "BAAI_COIG_per_source_verified_subsets",
+      "Muice_selected_not_whole_persona",
+      "own_scenarios_and_registry_grounded_trajectories",
+      "fiction_game_sources_with_provenance_and_per_text_scope_review"
+    ],
+    "frozen_eligible_auxiliary_records": 0,
+    "requirements": [
+      "measure_available_clean_disjoint_records_before_assigning_per_source_quotas",
+      "supplement_independent_scenarios_not_paraphrase_counts",
+      "review_teacher_outputs_and_source_conditions",
+      "no_large_style_mismatch_pool_to_hit_target"
+    ],
+    "token_weighted_mix_not_determined": true
+  },
+  "data_budget_history": [
+    {
+      "status": "superseded_by_user_80k_target",
+      "budget": {
+        "kind": "engineering_starting_budget_not_minimum_or_guarantee",
+        "pilot_training_records_range": [
+          3000,
+          5000
+        ],
+        "first_release_training_records_target": 25000,
+        "first_release_planning_range": [
+          20000,
+          35000
+        ],
+        "pools": {
+          "self_core": 4000,
+          "speaking_general": 12000,
+          "tools_concept_boundaries": 6000,
+          "context": 3000
+        },
+        "long_dialogue_records_inside_context_range": [
+          300,
+          800
+        ],
+        "validation_records_separate": 1500,
+        "test_records_separate": 500,
+        "unique_assistant_supervised_tokens_planning_range": [
+          5000000,
+          10000000
+        ],
+        "unique_full_sequence_tokens_planning_range": [
+          15000000,
+          40000000
+        ],
+        "final_PT_template_token_count_verified": false,
+        "provisional_counts": "cache/v9_materials_preparation/20261011/base_budget_content_counts.json"
+      },
+      "auxiliary_sourcing_plan": {
+        "speaking_general": {
+          "NaturalConv": 4000,
+          "BAAI_COIG_verified_subsets": 6000,
+          "Muice_selected": 1000,
+          "own_approved_scenario_candidates": 1000
+        },
+        "tools_concept_boundaries": {
+          "target": 6000,
+          "primary": "current_registry_grounded_new_trajectories",
+          "external": "function_call_sources_only_if_scope_and_access_confirmed"
+        },
+        "context": {
+          "own_new_multiturn": 2000,
+          "NaturalConv_disjoint_source_groups": 1000
+        },
+        "is_existing_training_data": false,
+        "do_not_double_count_golden_or_cross_pool_source_dialogues": true
+      }
+    }
+  ],
+  "fiction_and_game_materials": {
+    "user_authorized_direction": "语料不必都是现实经历；游戏与小说故事可摘取、调整、改编为素材",
+    "candidate_books": [
+      "希灵帝国",
+      "异常生物见闻录",
+      "诡秘之主"
+    ],
+    "content_use_cases": [
+      "reading_and_plot_discussion",
+      "explicit_fictional_scenario_adaptation",
+      "original_scenarios_from_abstract_interaction_patterns",
+      "multi_turn_character_and_rule_continuity",
+      "fiction_vs_real_world_concept_scope"
+    ],
+    "must_preserve": [
+      "yuanheng_core_identity_relationship_voice",
+      "story_causality_and_character_motivation",
+      "source_group_provenance",
+      "fiction_visible_in_model_context",
+      "simulation_tools_not_real_execution"
+    ],
+    "copyright_scope_status": "not_verified_per_text_and_edition; transformation_not_assumed_to_grant_training_rights",
+    "files_located_in_workspace": false,
+    "raw_excerpts_or_adaptations_training_approved": false,
+    "no_new_numeric_quota": true,
+    "within_existing_80000_record_goal": true,
+    "supported_pools": [
+      "speaking_general",
+      "context",
+      "self_core_if_original_and_user_approved"
+    ],
+    "negative_example_scope": "cake criticism remains specific; not a blanket rejection of fantasy, fiction, or humor",
+    "report": "docs/报告/V9_小说与游戏情境素材纳入方案_20261011.md"
+  }
+}

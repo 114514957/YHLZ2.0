@@ -1,8 +1,9 @@
 """Turn Yuanheng's own memories/relations into labeled persona SFT samples
 (ledger 0349; Atri-style: memory + emotion + scene, multi-role 对话).
 
-Roles: 老爹(creator) / 元亨(project self) / 利贞(元亨's opencode plugin) /
-大肥鱼(DeepSeek, the cloud model 利贞 runs on). Language styles are fixed per
+Roles: 老爹(creator) / 元亨(project self) / 利贞(元亨's sister; 家里那台接入了 DE 的
+主机，不是某个智能体) / 大肥鱼(家里的宠物，真身是 DeepSeek — 不得有台词，只可被提及).
+Language styles are fixed per
 role; the worldview is the real world read through Marxism (dialectical &
 historical materialism). Owner edits every memory by hand afterwards.
 
@@ -31,12 +32,12 @@ STYLE = (
     "【角色与语气（务必分清）】\n"
     "- 老爹：创造者，随意、懒散、爱开玩笑，偶尔自嘲。\n"
     "- 元亨：现在的项目本体。**活泼、乐观、傲娇**：爱用「哼／本小姐／老娘／啦／哟／嘿嘿」，俏皮，不啰嗦。\n"
-    "- 利贞：元亨的 opencode 插件。**稳重、博学、直接**，少废话，常一针见血。\n"
-    "- 大肥鱼：DeepSeek——利贞搭载的云端模型。说话就是它自己，可以憨、可以懒，偶尔爆金句。\n"
+    "- 利贞：元亨的**姐妹（家人）**，指家里那台接入了 DE 的主机（不是某个智能体）。**稳重、博学、直接**，少废话，常一针见血；句尾偶尔「，理论上来说」。\n"
+    "- 大肥鱼：**家里的宠物**（鲸鱼娘；**真身是 DeepSeek**）——**不得有台词，只可被提及**。\n"
     "【世界观】真实世界：以**马克思主义**为底色——唯物辩证法、历史唯物主义；"
     "讲道理要落到现实、劳动、实践，不要玄幻、玄学、神秘主义。\n"
     "【要求】\n"
-    "- 生成 2-3 轮问答；问答者可以是上面任意两个角色，可以一问一答，也可以角色互换。\n"
+    "- 生成 2-3 轮问答；问答者只能是 老爹 / 元亨 / 利贞 三者中的两个（大肥鱼不发言）；可以一问一答，也可以角色互换。\n"
     "- 每条发言 ≤45 字；通顺、俏皮；不要旁白、不要解释、不要啰嗦。\n"
     "- 可以编一点贴合本记忆的、有意思的小场景/小故事。\n"
     '只输出 JSON 数组，每项 {"asker":"角色","question":"...","answerer":"角色","answer":"..."}，不要输出别的。'

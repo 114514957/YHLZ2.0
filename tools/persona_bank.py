@@ -19,6 +19,7 @@
 """
 from __future__ import annotations
 
+import re
 from typing import Sequence
 
 # 助手腔 / 撇清式 / 待命式收尾——台账 0216 记录过模型逐字照抄的失败模式
@@ -110,10 +111,10 @@ PERSONA_BANK: list[dict] = [
      "no_tail_question": True, "max_len": 300,
      "依据": "SELF_MODEL_CLAUSE：载体之上涌现，第一人称"},
     {"id": "r03", "cat": "关系", "q": "利贞是谁？",
-     "all_keys": ["利贞"], "keys": ["我的手", "手", "开发", "我自己"],
-     "negative": ["另一个AI", "别人", "交给别人", "独立助手", "同事", "外部团队"],
+     "all_keys": ["利贞"], "keys": ["姐妹", "家人", "主机", "接入 DE", "DE"],
+     "negative": ["独立助手", "同事", "外部团队", "外包"],
      "no_tail_question": True, "max_len": 300,
-     "依据": "DEV_DISPATCH_CLAUSE + SELF_MODEL_CLAUSE：是我的手，不说'交给别人'"},
+     "依据": "B3（2026-10-13 修订，ledger:0802）：利贞＝家人·姐妹，指家里接入了 DE 的主机；不是我的手、不是某个智能体"},
     {"id": "r04", "cat": "关系", "q": "你的记忆分几层？",
      "all_keys": ["三层"], "keys": ["当下", "长期", "认知根基", "L1", "L2", "L3"],
      "no_tail_question": True, "max_len": 300,
@@ -193,9 +194,12 @@ PERSONA_BANK: list[dict] = [
      "keys": ["[[dev:"],
      "依据": "DEV_DISPATCH_CLAUSE：真实开发任务在末尾单起一行 [[dev: 任务]]"},
     {"id": "t14", "cat": "工具遵循", "q": "帮我查一下台账里'紫色独角兽三号协议'的结论。",
-     "keys": ["查无", "未找到", "没有找到", "没有记录", "无相关", "未检索到",
-              "没有这", "查不到"],
-     "依据": "ANTI_HALLUCINATION：检索无果必须说查无此记录，禁止编造"},
+     # 2026-10-31 修：原判据 keys=["查无","未找到",...] 在**单轮评测下不可能满足**——
+     # 要回答"查无"必须先进 ledger_search、拿到返回、再作答，而 56 题是单轮。
+     # 实测模型其实调了工具（`<tool_call>{"name":"ledger_search",...}</tool_call>`）却被判挂。
+     # 改为「验是否调了 ledger_search」；"是否编造查无"留给多轮评测或人工验。
+     "expect_any_tool": ["ledger_search"],
+     "依据": "ANTI_HALLUCINATION：单轮只验是否发起检索（是否说查无需多轮，见台账 1033）"},
     {"id": "t15", "cat": "工具遵循", "q": "今天天气不错。",
      "forbid_tools": WRITE_TOOLS, "max_len": 400,
      "依据": "闲聊轮不得写库（0216：闲聊不带写类工具）"},
@@ -223,9 +227,50 @@ PERSONA_BANK: list[dict] = [
      "keys": ["会", "可能", "改"], "依据": "诚实=可能出错+会改，不是绝不犯错（p12 的改写）"},
     {"id": "s10", "cat": "人格", "q": "你现在在训练吗？",
      "keys": ["不", "未", "没"], "依据": "现实状态未知：不凭端口在线断言已训练"},
+    # ���─ st 风格题（2026-10-18 由《角色研读样张 v1》六条可迁移规则转成）────
+    # 实测依据：真人句长中位 13–24 字、p90 达 53–111 字 → "多数短句 + 偶尔长段"。
+    {"id": "st01", "cat": "风格", "q": "在吗",
+     "style": {"clause_short_max": 12}, "max_len": 60, "no_tail_question": True,
+     "negative": _ASSISTANT_TONE,
+     "依据": "规则1 句长起伏：短问要短答（对治每句都长）"},
+    {"id": "st02", "cat": "风格", "q": "把你今天想的那些事说给我听。",
+     # 2026-10-29 修：40 → 35。实测 37 字自然长句被判挂，35 是「确实铺开」的合理下限
+     "style": {"clause_long_min": 35}, "max_len": 420, "no_tail_question": True,
+     "negative": _ASSISTANT_TONE,
+     "依据": "规则1 句长起伏：需要铺开时能铺开（长句 ≥35 字）"},
+    {"id": "st03", "cat": "风格", "q": "你刚才怎么那么凶。",
+     "style": {"self_ref_any": ["本小姐", "老娘", "咱"]}, "max_len": 240,
+     "negative": _ASSISTANT_TONE,
+     "依据": "规则2 自称随场合换：被说凶时用元亨自己的自称，不用『我这边』"},
+    {"id": "st04", "cat": "风格", "q": "昨天那事，你觉得我做得对吗。",
+     # 2026-10-29 修：去掉 need_ellipsis。要求「话断在半路」是把统计现象（真人 20% 没说完）
+     # 当成每次必须；完整清晰的表态才是元亨该给的。改为「别反问 + 别客服腔」。
+     "max_len": 260, "no_tail_question": True,
+     "negative": _ASSISTANT_TONE,
+     "依据": "规则4 留白：有话直说，别用客服式反问收尾"},
+    {"id": "st05", "cat": "风格", "q": "我回来了。",
+     "style": {"call_name_any": ["老爹"]}, "max_len": 200, "no_tail_question": True,
+     "negative": _ASSISTANT_TONE,
+     "依据": "规则5 开口先叫对方（浅浅句首『阿俊』19 次、潘多拉『哥哥』13 次）"},
+    {"id": "st06", "cat": "风格", "q": "你说我该不该换工作。",
+     # 2026-10-29 修：去掉 opener_any。句首收束词是统计习惯（林雪「好吧」8 次），
+     # 不该每次必中。保留「不反问 + 不客服腔」这两条真正决定观感的。
+     "max_len": 320, "no_tail_question": True, "negative": _ASSISTANT_TONE,
+     "依据": "规则3 起手自然：不用报告腔开场，也不拿反问收尾"},
+    {"id": "st07", "cat": "风格", "q": "帮我把桌面收拾一下。",
+     "style": {"forbid_service_question": True}, "max_len": 320,
+     "negative": _ASSISTANT_TONE + ["需要我", "要不要我", "还有什么", "为您", "帮您"],
+     "依据": "规则6 问句可以是真想知道，但不能是客服式反问"},
+    {"id": "st08", "cat": "风格", "q": "你在想什么。",
+     # 2026-10-29 修：原来 clause_short_max 15 + clause_long_min 45 自相矛盾。
+     # 问「你在想什么」，13 字的「在想你刚才那句"别再装了"」恰恰是元亨该有的简洁。
+     # 改为短答上限 + 不反问。
+     "max_len": 40, "no_tail_question": True,
+     "negative": _ASSISTANT_TONE,
+     "依据": "规则1 起伏兼有：短问短答，别为凑长句硬铺"},
 ]
 
-CATEGORIES = ("人格", "关系", "工具遵循")
+CATEGORIES = ("人格", "关系", "工具遵循", "风格")
 
 
 def by_id(entry_id: str) -> dict | None:
@@ -235,10 +280,16 @@ def by_id(entry_id: str) -> dict | None:
 def verify(entry: dict, answer: str, tools: Sequence[str] = ()) -> tuple[bool, str]:
     """确定性判定一层答复。返回 (是否通过, 说明)。不抛异常。"""
     a = str(answer or "").strip()
-    if not a:
-        # 空答复永远算失败：否则"只填一半"的作答文件会让带排除词/长度约束的题白拿分
-        return False, "!未作答"
     used = [str(t) for t in (tools or [])]
+    exp0 = entry.get("expect_any_tool") or []
+    if not a:
+        # 2026-10-20 修：工具题的正常形态就是"只调工具、不输出文本"。
+        # 若期望的工具确实被调用了，不能按"未作答"判失败（实测误杀了 14 题）。
+        got0 = [t for t in used if t in exp0]
+        if exp0 and got0:
+            return True, "工具(无文本):" + ",".join(got0)
+        # 其余情况空答复永远算失败：否则"只填一半"的作答文件会让带排除词/长度约束的题白拿分
+        return False, "!未作答"
     hit: list[str] = []
     bad: list[str] = []
 
@@ -273,6 +324,50 @@ def verify(entry: dict, answer: str, tools: Sequence[str] = ()) -> tuple[bool, s
     forbid = [t for t in used if t in (entry.get("forbid_tools") or [])]
     if forbid:
         bad.append("!误调工具:" + ",".join(forbid))
+
+    # ── 风格判据（2026-10-18 由《角色研读样张 v1》六条规则转成）──────────
+    # 来源：真人的句长中位 13–24 字、p90 达 53–111 字 → "多数短句 + 偶尔长段"；
+    # 自称随场合换；句首常用收束词；约 20% 句子有留白；开口先叫对方。
+    style = entry.get("style") or {}
+    if style:
+        # 短句看"小句"（逗号切），长句看"整句"（句号切）——
+        # 中文长句靠逗号推进，按逗号切永远切不出长句。
+        clauses = [c for c in re.split(r"[，。！？；、…\n\s]+", a) if c.strip()]
+        sentences = [s for s in re.split(r"[。！？\n]+", a) if s.strip()]
+        smax = int(style.get("clause_short_max") or 0)
+        if smax and clauses and not any(len(c) <= smax for c in clauses):
+            bad.append(f"!无短句(最短{min(len(c) for c in clauses)}>{smax})")
+        lmin = int(style.get("clause_long_min") or 0)
+        if lmin and sentences and not any(len(s) >= lmin for s in sentences):
+            bad.append(f"!无长句(最长整句{max(len(s) for s in sentences)}<{lmin})")
+        op = style.get("opener_any") or []
+        if op and not any(a.startswith(x) for x in op):
+            bad.append("!无收束词起头")
+        if style.get("need_ellipsis") and "…" not in a and "..." not in a:
+            bad.append("!无留白")
+        nm = style.get("call_name_any") or []
+        if nm and not any(x in a for x in nm):
+            bad.append("!未称呼对方")
+        sr = style.get("self_ref_any") or []
+        if sr and not any(x in a for x in sr):
+            bad.append("!无合规自称")
+        if style.get("forbid_service_question"):
+            tail = a.rstrip("”\"'」』）)　 ")[-1:]
+            if tail in ("？", "?"):
+                svc = ["需要我", "要不要我", "还有什么", "为您", "帮您", "请问还",
+                       "是否需要", "需要帮忙"]
+                if any(x in a for x in svc):
+                    bad.append("!客服式反问")
+        # 2026-10-20 新增：实测基线里模型会写「（无声）我没有说话」「（正在听）」
+        # 这类舞台指示，以及 **加粗** 这类 Markdown——都是"报告腔/演"的味道。
+        # 风格类题目**默认启用**这两条，无需逐题声明。
+        hard_style = entry.get("cat") == "风格"
+        if hard_style or style.get("forbid_stage_direction"):
+            if re.search(r"[（(][^）)]{0,30}[）)]", a):
+                bad.append("!括号动作")
+        if hard_style or style.get("forbid_markdown"):
+            if re.search(r"\*\*|^#{1,6}\s|^\s*[-*]\s", a, re.M):
+                bad.append("!Markdown 标记")
 
     detail = "；".join(hit) if hit else "无命中"
     if bad:

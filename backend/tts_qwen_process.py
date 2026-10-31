@@ -295,6 +295,8 @@ class QwenProcessWorker:
         self._last_metrics: Dict[str, Any] = {}
         self._started_at: Optional[float] = None
         self._ready_at: Optional[float] = None
+        self._started_mono: Optional[float] = None
+        self._ready_mono: Optional[float] = None
         self._turn_count: int = 0
         self._stopping = False
 
@@ -319,6 +321,11 @@ class QwenProcessWorker:
                 name=self.worker_id,
                 daemon=True,
             )
+            self._started_at = time.time()
+            self._started_mono = time.monotonic()
+            self._ready_at = None
+            self._ready_mono = None
+            self._turn_count = 0
             process.start()
             child.close()
             self._process = process
@@ -348,11 +355,8 @@ class QwenProcessWorker:
                 )
                 self._record_error(error.code, error.detail)
                 raise error
-            self._started_at = time.time()
 
     def open(self, request: TTSRequest) -> "QwenProcessSession":
-        with self._lock:
-            self._turn_count += 1
         if not isinstance(request, TTSRequest):
             raise TypeError("request must be TTSRequest")
         self._command("open", {"request": request})
@@ -361,6 +365,7 @@ class QwenProcessWorker:
             if request.speech_id in self._sessions:
                 raise QwenTTSAdapterError("VOICE-TTS-QWEN-PROCESS-SESSION-BUSY")
             self._sessions[request.speech_id] = session
+            self._turn_count += 1
             pending = self._pending_events.pop(request.speech_id, ())
         for event in pending:
             session._offer_event(event)
@@ -432,17 +437,25 @@ class QwenProcessWorker:
                 "worker_isolated": True,
                 "started_at": self._started_at,
                 "ready_at": self._ready_at,
-                "model_load_ms": (
-                    round((self._ready_at - self._started_at) * 1000, 1)
-                    if self._ready_at and self._started_at else None
-                ),
+                "model_load_ms": self._model_load_ms(),
                 "turn_count": self._turn_count,
                 "is_warm": self._turn_count > 0,
+                "warm_state_basis": "accepted_sessions_not_completed_inference",
             }
             if self._last_error_code:
                 result["last_error_code"] = self._last_error_code
                 result["last_error_detail"] = self._last_error_detail
             return result
+
+    def _model_load_ms(self) -> Optional[float]:
+        if self._started_at is None or self._ready_at is None:
+            return None
+        start = getattr(self, "_started_mono", None)
+        ready = getattr(self, "_ready_mono", None)
+        if start is not None and ready is not None:
+            return round((ready - start) * 1000, 1)
+        # Compatibility with diagnostic instances holding only wall timestamps.
+        return round((self._ready_at - self._started_at) * 1000, 1)
 
     def metrics(self) -> Mapping[str, Any]:
         with self._lock:
@@ -455,10 +468,8 @@ class QwenProcessWorker:
                 "worker_isolated": True,
                 "turn_count": self._turn_count,
                 "is_warm": self._turn_count > 0,
-                "model_load_ms": (
-                    round((self._ready_at - self._started_at) * 1000, 1)
-                    if self._ready_at and self._started_at else None
-                ),
+                "warm_state_basis": "accepted_sessions_not_completed_inference",
+                "model_load_ms": self._model_load_ms(),
                 "sessions": list(self._sessions),
                 "last": dict(self._last_metrics),
             }
@@ -546,8 +557,12 @@ class QwenProcessWorker:
                     str(message.get("code") or "VOICE-TTS-QWEN-PROCESS-START-FAILED"),
                     str(message.get("detail") or "child startup failed")[:400],
                 )
+            else:
+                # Publish timestamps before releasing start()'s waiter.
+                with self._lock:
+                    self._ready_at = time.time()
+                    self._ready_mono = time.monotonic()
             self._ready_event.set()
-            self._ready_at = time.time()
             return
         if message_type == "response":
             request_id = str(message.get("id", ""))

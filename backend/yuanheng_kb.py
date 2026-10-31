@@ -94,6 +94,21 @@ def _norm(text: str) -> str:
     return re.sub(r"[\s\u3000,，。.!！?？:：;；、\-\[\]\(\)]+", "", str(text or ""))
 
 
+# 公共/群聊安全子集（2026-10-08 唤醒闸门与 kb_inject 共用同一口径）：
+# 类别必须安全，来源不得带私人标记（自主/对话类）。
+_PUBLIC_SAFE_CATEGORIES = frozenset(
+    {"tech", "method", "resource", "skill", "word"})
+_PUBLIC_PRIVATE_SOURCES = ("自主", "用户对话", "self", "对话反馈", "对话")
+
+
+def _public_safe(item: dict) -> bool:
+    """Public/group-safe subset（与 kb_inject(public=True) 同规则）。"""
+    if str(item.get("category", "")) not in _PUBLIC_SAFE_CATEGORIES:
+        return False
+    source = str(item.get("source", ""))
+    return not any(x in source for x in _PUBLIC_PRIVATE_SOURCES)
+
+
 def kb_add(summary: str, category: str = "tech", source: str = "",
            detail: str = "", created_at: float = 0.0) -> str:
     """Add one knowledge item (dedup on normalized summary)."""
@@ -209,6 +224,25 @@ def kb_query(query: str, limit: int = 6, category: str = "") -> list[dict]:
     return out
 
 
+def kb_wake_hit(text: str, *, min_chars: int = 4, k: int = 3) -> dict | None:
+    """唤醒探针（2026-10-08）：这条消息是不是在聊元亨知道的信息？
+
+    只用公共安全子集；**无副作用**（绝不累加 uses、不发反馈）。命中返回
+    第一条条目，未命中返回 None。
+    """
+    body = str(text or "").strip()
+    if len(_norm(body)) < max(1, int(min_chars)):
+        return None
+    try:
+        rows = kb_query(body, limit=max(3, int(k)))
+    except Exception:  # noqa: BLE001
+        return None
+    for item in rows:
+        if _public_safe(item):
+            return item
+    return None
+
+
 def kb_inject(text: str, k: int = 3, public: bool = False,
               max_chars: int = 480) -> str:
     """Build a compact, relevance-gated "related knowledge" block for the
@@ -220,16 +254,11 @@ def kb_inject(text: str, k: int = 3, public: bool = False,
     rows = kb_query(q, limit=max(2, int(k) * 2))
     if not rows:
         return ""
-    safe_cats = {"tech", "method", "resource", "skill", "word"}
-    private_src = ("自主", "用户对话", "self", "对话反馈", "对话")
     out: list[str] = []
     used = 0
     for it in rows:
-        if public:
-            if it.get("category") not in safe_cats:
-                continue
-            if any(x in str(it.get("source", "")) for x in private_src):
-                continue
+        if public and not _public_safe(it):
+            continue
         line = "· " + str(it.get("summary", ""))[:120]
         if used + len(line) > int(max_chars):
             break

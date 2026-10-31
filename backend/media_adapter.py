@@ -14,9 +14,12 @@ import logging
 import queue
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Callable, Dict, Mapping, Optional, Protocol
+
+from backend.duplex_clock import CallbackClock, clock_value
 
 from backend.session_kernel import (
     AudioRoute,
@@ -102,6 +105,12 @@ class AudioFrame:
     captured_at: float = field(default_factory=time.monotonic)
     duration_ms: int = 0
     reference_samples: Any = None
+    adc_at: Optional[float] = None
+    adc_time: Optional[float] = None
+    callback_time: Optional[float] = None
+    clock_epoch: int = 0
+    clock_valid: bool = False
+    capture_status: str = ""
 
     def __post_init__(self) -> None:
         if self.samples is None:
@@ -198,6 +207,7 @@ class MediaAdapter:
         max_queue_duration_ms: int = 5_000,
         voice_gate: Optional[Any] = None,
         denoiser: Optional[Any] = None,
+        duplex_pipeline: Optional[Any] = None,
     ) -> None:
         if queue_capacity <= 0:
             raise ValueError("queue_capacity must be positive")
@@ -212,6 +222,11 @@ class MediaAdapter:
         self.target_sample_rate = int(target_sample_rate) if target_sample_rate is not None else None
         self.voice_gate = voice_gate
         self.denoiser = denoiser
+        self.duplex_pipeline = duplex_pipeline
+        self._capture_clock = CallbackClock()
+        self._duplex_gated = 0
+        self._queue_wait_ms = deque(maxlen=256)
+        self._last_speaker_activity = float("-inf")
         self.on_frame = on_frame
         self.on_event = on_event
         self._queue: "queue.Queue[AudioFrame]" = queue.Queue(maxsize=queue_capacity)
@@ -272,6 +287,9 @@ class MediaAdapter:
         for passing this result to Session Kernel and for publishing it to the
         backend health endpoint.
         """
+        if self.duplex_pipeline is not None:
+            device = replace(device, reference_available=True)
+            capabilities = replace(capabilities, aec_reference_available=True)
         with self._lock:
             if self._state in {
                 MediaState.STARTING,
@@ -298,6 +316,12 @@ class MediaAdapter:
             )
 
         try:
+            self._capture_clock.reset()
+            self._duplex_gated = 0
+            self._queue_wait_ms.clear()
+            self._last_speaker_activity = float("-inf")
+            if self.duplex_pipeline is not None:
+                self.duplex_pipeline.reset()
             reset_resampler = getattr(self.resampler, "reset", None)
             if callable(reset_resampler):
                 reset_resampler()
@@ -342,6 +366,8 @@ class MediaAdapter:
                 payload={"detail": type(exc).__name__},
             )
         finally:
+            if self.duplex_pipeline is not None:
+                self.duplex_pipeline.close()
             with self._lock:
                 self._state = MediaState.STOPPED
             self._emit(MediaEventKind.STOPPED)
@@ -359,6 +385,12 @@ class MediaAdapter:
         captured_at: Optional[float] = None,
         duration_ms: Optional[int] = None,
         reference_samples: Any = None,
+        adc_at: Optional[float] = None,
+        adc_time: Optional[float] = None,
+        callback_time: Optional[float] = None,
+        clock_epoch: int = 0,
+        clock_valid: bool = False,
+        capture_status: str = "",
     ) -> bool:
         """Queue one frame from a source callback or a synthetic test."""
         with self._lock:
@@ -394,6 +426,8 @@ class MediaAdapter:
                     captured_at=time.monotonic() if captured_at is None else float(captured_at),
                     duration_ms=effective_duration,
                     reference_samples=reference_samples,
+                    adc_at=adc_at, adc_time=adc_time, callback_time=callback_time,
+                    clock_epoch=clock_epoch, clock_valid=clock_valid, capture_status=capture_status,
                 )
             except (TypeError, ValueError) as exc:
                 self._emit(
@@ -542,6 +576,11 @@ class MediaAdapter:
             "capture_sample_rate": device.get("sample_rate") if isinstance(device, Mapping) else None,
             "processing_sample_rate": self.target_sample_rate or (device.get("sample_rate") if isinstance(device, Mapping) else None),
             "resampler": resampler_health if resampler is not None else None,
+            "capture_clock": self._capture_clock.snapshot(),
+            "queue_wait_ms_last": self._queue_wait_ms[-1] if self._queue_wait_ms else None,
+            "queue_wait_ms_max_recent": max(self._queue_wait_ms) if self._queue_wait_ms else None,
+            "duplex": self.duplex_pipeline.health() if self.duplex_pipeline is not None else None,
+            "duplex_safety_gated_frames": self._duplex_gated,
         }
 
     def _effective_capabilities(
@@ -564,7 +603,7 @@ class MediaAdapter:
             effective = replace(effective, continuous_capture=False)
         if self.vad is None:
             effective = replace(effective, vad_verified=False)
-        if self.target_sample_rate is not None and self.target_sample_rate != device.sample_rate and self.resampler is None:
+        if self.target_sample_rate is not None and self.target_sample_rate != device.sample_rate and self.resampler is None and self.duplex_pipeline is None:
             effective = replace(effective, vad_verified=False)
         if device.output_channels <= 0:
             effective = replace(effective, playback_verified=False)
@@ -583,6 +622,11 @@ class MediaAdapter:
             self._emit(MediaEventKind.ERROR, "MEDIA-SOURCE-CALLBACK")
             return
         samples = args[0] if args else kwargs.get("samples")
+        observed_at = time.monotonic()
+        info = args[2] if len(args) >= 3 else kwargs.get("time_info")
+        adc = clock_value(info, "inputBufferAdcTime")
+        current = clock_value(info, "currentTime")
+        adc_at = self._capture_clock.map(adc, current, observed_at)
         status = args[3] if len(args) >= 4 else kwargs.get("status")
         if status:
             self._runtime_degrade("MEDIA-SOURCE-STATUS", detail=str(status)[:160])
@@ -602,6 +646,10 @@ class MediaAdapter:
                 sample_rate=device_sample_rate,
                 channels=device_channels,
                 duration_ms=callback_duration,
+                captured_at=observed_at, adc_at=adc_at, adc_time=adc, callback_time=current,
+                clock_epoch=self._capture_clock.epoch,
+                clock_valid=adc_at is not None and not bool(status),
+                capture_status=str(status)[:160] if status else "",
             )
 
     async def _process(self, frame: AudioFrame) -> Optional[ProcessedAudioFrame]:
@@ -627,58 +675,96 @@ class MediaAdapter:
                 return None
             self._last_processed_sequence = frame.sequence
 
+        self._queue_wait_ms.append(max(0., (time.monotonic()-frame.captured_at)*1000))
         samples = frame.samples
         processed_frame = frame
         aec_applied = False
         echo_return_loss: Optional[float] = None
-        if device.route == AudioRoute.SPEAKER_MIC.value:
-            if aec is None or frame.reference_samples is None:
-                self._runtime_degrade(
-                    "MEDIA-AEC-REFERENCE-MISSING"
-                    if frame.reference_samples is None
-                    else "MEDIA-AEC-UNAVAILABLE"
-                )
-            else:
-                try:
-                    result = self._call_aec(aec, samples, frame.reference_samples, frame.sample_rate)
-                    if isinstance(result, tuple) and len(result) >= 2:
-                        samples, echo_return_loss = result[0], float(result[1])
-                    else:
-                        samples = result
-                    aec_applied = True
-                except Exception as exc:
-                    self._runtime_degrade("MEDIA-AEC-FAILED", detail=type(exc).__name__)
-
-        if self.denoiser is not None and frame.sample_rate >= 44_100:
+        if self.duplex_pipeline is not None:
             try:
-                processed, _prob = self.denoiser.process_mono(samples, frame.sample_rate)
-                if processed is not None and processed.size:
-                    samples = processed
-                    processed_frame = replace(
-                        frame, samples=samples, sample_rate=16_000, channels=1
+                samples, adc_at, aec_applied, echo_return_loss, reason = await asyncio.to_thread(
+                    self.duplex_pipeline.process, frame,
+                    use_aec=device.route == AudioRoute.SPEAKER_MIC.value)
+                # Stop/restart can happen while CPU work is off the event loop.
+                if frame.generation != self.generation:
+                    return None
+                processed_frame = replace(frame, samples=samples, sample_rate=16_000,
+                                          channels=1, adc_at=adc_at)
+                if device.route == AudioRoute.SPEAKER_MIC.value and not aec_applied:
+                    self._runtime_degrade("MEDIA-DUPLEX-REFERENCE-UNAVAILABLE", detail=reason)
+            except Exception as exc:
+                self._runtime_degrade("MEDIA-DUPLEX-PROCESSING-FAILED", detail=type(exc).__name__)
+                return None
+        else:
+            if device.route == AudioRoute.SPEAKER_MIC.value:
+                if aec is None or frame.reference_samples is None:
+                    self._runtime_degrade(
+                        "MEDIA-AEC-REFERENCE-MISSING"
+                        if frame.reference_samples is None
+                        else "MEDIA-AEC-UNAVAILABLE"
                     )
-            except Exception as exc:
-                self._runtime_degrade("MEDIA-DENOISER-FAILED", detail=type(exc).__name__)
-                return None
-        elif self.target_sample_rate is not None and self.target_sample_rate != frame.sample_rate:
-            if self.resampler is None:
-                self._runtime_degrade("MEDIA-RESAMPLER-UNAVAILABLE")
-                return None
-            try:
-                samples = self.resampler.process(samples, frame.sample_rate, self.target_sample_rate)
-                processed_frame = replace(
-                    frame,
-                    samples=samples,
-                    sample_rate=self.target_sample_rate,
-                    channels=1,
-                )
-            except Exception as exc:
-                self._runtime_degrade("MEDIA-RESAMPLER-FAILED", detail=type(exc).__name__)
-                return None
+                else:
+                    try:
+                        result = self._call_aec(aec, samples, frame.reference_samples, frame.sample_rate)
+                        if isinstance(result, tuple) and len(result) >= 2:
+                            samples, echo_return_loss = result[0], float(result[1])
+                        else:
+                            samples = result
+                        aec_applied = True
+                    except Exception as exc:
+                        self._runtime_degrade("MEDIA-AEC-FAILED", detail=type(exc).__name__)
 
+            if self.denoiser is not None and frame.sample_rate >= 44_100:
+                try:
+                    processed, _prob = self.denoiser.process_mono(samples, frame.sample_rate)
+                    if processed is not None and processed.size:
+                        samples = processed
+                        processed_frame = replace(
+                            frame, samples=samples, sample_rate=16_000, channels=1
+                        )
+                except Exception as exc:
+                    self._runtime_degrade("MEDIA-DENOISER-FAILED", detail=type(exc).__name__)
+                    return None
+            elif self.target_sample_rate is not None and self.target_sample_rate != frame.sample_rate:
+                if self.resampler is None:
+                    self._runtime_degrade("MEDIA-RESAMPLER-UNAVAILABLE")
+                    return None
+                try:
+                    samples = self.resampler.process(samples, frame.sample_rate, self.target_sample_rate)
+                    processed_frame = replace(
+                        frame,
+                        samples=samples,
+                        sample_rate=self.target_sample_rate,
+                        channels=1,
+                    )
+                except Exception as exc:
+                    self._runtime_degrade("MEDIA-RESAMPLER-FAILED", detail=type(exc).__name__)
+                    return None
+
+        # Software wiring does not authorize speaker barge-in. Until an
+        # explicit acoustic validation is supplied, use visible half-duplex
+        # admission, including an echo-tail guard. Keep processing reference/AEC
+        # for diagnostics, but do not feed possible self-echo to ASR.
+        verified = bool(self._caps and self._caps.aec_verified and self._caps.audio_route_verified)
+        if self.duplex_pipeline is not None and device.route == AudioRoute.SPEAKER_MIC.value:
+            gate_active = False
+            if self.voice_gate is not None:
+                try:
+                    gate_active = not self.voice_gate.allow(0.)
+                except Exception as exc:
+                    self._runtime_degrade("MEDIA-VOICE-GATE-FAILED", detail=type(exc).__name__)
+                    return None
+            if gate_active:
+                self._last_speaker_activity = time.monotonic()
+            recent = self.duplex_pipeline.timeline.recent_playback(frame.adc_at)
+            guarded = gate_active or recent or time.monotonic()-self._last_speaker_activity < .3
+            if guarded and not (aec_applied and verified):
+                self._duplex_gated += 1
+                self._update_speech_edge(processed_frame, False)
+                return None
         speech: Optional[bool] = None
         if vad is not None:
-            if self.voice_gate is not None:
+            if self.voice_gate is not None and self.duplex_pipeline is None:
                 gate = getattr(self.voice_gate, "allow", None)
                 if callable(gate):
                     try:
@@ -691,7 +777,7 @@ class MediaAdapter:
                             # likely echo must not open a new speech window.
                             self._update_speech_edge(processed_frame, False)
                             return None
-                    except Exception:
+                    except Exception as exc:
                         self._runtime_degrade("MEDIA-VOICE-GATE-FAILED", detail=type(exc).__name__)
                         return None
             try:

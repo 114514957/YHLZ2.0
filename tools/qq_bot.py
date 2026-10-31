@@ -759,12 +759,20 @@ class QQBridge:
             return self._dev_state_cache
         self._dev_state_ts = now
         try:
-            if dev_runner is not None:
+            if _bridge_profile() == "full" and dev_runner is not None:
                 d = dev_runner._load()
                 self._dev_state_cache = {"status": str(d.get("status", "")),
                                          "task": str(d.get("task", ""))[:60]}
             else:
-                self._dev_state_cache = {"status": "unavailable", "task": ""}
+                # 0831：Lite 的任务在 dev_jobs.db，旧 _dev_state 读的是
+                # cache/dev/state.json（另一条已退役的链），面板会显示错任务。
+                from backend.target_dev_bridge import dev_status
+
+                d = dev_status()
+                self._dev_state_cache = {
+                    "status": str(d.get("status") or "idle"),
+                    "task": str(d.get("task") or "")[:60],
+                }
         except Exception:
             self._dev_state_cache = {"status": "unknown", "task": ""}
         return self._dev_state_cache
@@ -1323,6 +1331,8 @@ class QQBridge:
 
     async def _dev_cmd_lite(self, ws, params, low: str, user_id: str) -> None:
         """Lite dev commands: persistent job store, scope commits (P3)."""
+        from backend.qq_behavior import dev_exit_command
+
         mod = _dev_mod()
         if mod is None:
             await self._say(ws, params, "[利贞] 运行器不可用")
@@ -1357,8 +1367,7 @@ class QQBridge:
                 await self._say(ws, params, "用法：#任务派发 <任务>")
                 return
             await _result(mod.start, task, owner=user_id, channel=channel)
-        elif low in ("#退出任务", "#退出任务模式") or low.startswith(
-                ("#退出任务 ", "#退出任务模式 ")):
+        elif dev_exit_command(low):
             arg = low.split(None, 1)[1].strip() if " " in low else ""
             await _result(mod.detach, arg or None)
         elif low == "#dev" or low.startswith("#dev "):
@@ -1374,8 +1383,10 @@ class QQBridge:
             await self._say(ws, params, "[利贞] 好的，不提交；工作树改动保留。")
         elif low == "#push" or low.startswith("#push "):
             await _result(mod.push, low[5:].strip() or None)
-        elif low == "#cancel" or low.startswith("#cancel "):
-            await _result(mod.cancel, low[7:].strip() or None)
+        elif low in ("#cancel", "#cancle", "#取消", "#取消任务") or low.startswith(
+                ("#cancel ", "#cancle ", "#取消 ", "#取消任务 ")):
+            arg = low.split(None, 1)[1].strip() if " " in low else ""
+            await _result(mod.cancel, arg or None)
         elif low == "#answer" or low.startswith("#answer "):
             rest = low[7:].strip()
             job_id, _, ans = rest.partition(" ")
@@ -1417,11 +1428,12 @@ class QQBridge:
             else:
                 await self._say(ws, params, mod.backend_status())
         else:
-            task = low.lstrip("#＃").strip()
-            if task:
-                await _result(mod.start, task, owner=user_id, channel=channel)
-            else:
-                await self._say(ws, params, "发送 #dev <任务> 派发工作，#解除 恢复聊天。")
+            # 0830：未知 # 指令只提示，绝不再兜底派单。
+            # 旧兜底把「#cancle」「#backed」这类拼错、以及
+            # 「#退出任务，这不是任务指令」整句都当成任务派出去。
+            await self._say(ws, params,
+                            f"未知指令：{low[:24]}\n"
+                            "发 # 看菜单；要派单请用 #dev <任务>")
 
     async def _profile_updater(self) -> None:
         """Periodically rebuild member profiles from group history (Lite)."""
@@ -1756,7 +1768,9 @@ class QQBridge:
             channel = f"qq_g{ev.get('group_id', user_id)}"
         else:
             return
-        from backend.qq_behavior import command_not_for_bot, RELEASE, work_released
+        from backend.qq_behavior import (command_not_for_bot, dev_exit_command,
+                                         dev_lane_command, RELEASE,
+                                         work_released)
         if not self._claim_message(ev, channel):
             return
         # P4: 群消息入库在回复/频控/LLM 之前（即使不接话也能形成上下文）。
@@ -1792,10 +1806,20 @@ class QQBridge:
                 await self._say(ws, self._params(msg_type, user_id, ev),
                                 "[元亨] 已解除工作状态，恢复正常对话。")
                 return
-            self._set_work(user_id, True, channel)
-            self.log(f"开发指令 {user_id}: {cmd[:50]}")
+            # 0830：退出任务 = 离开任务模式，必须同时清掉工作状态。旧逻辑
+            # 只让 #解除 清状态，于是 #退出任务 之后每条普通聊天都被
+            # `#dev + text` 二次派单。
+            exit_task = dev_exit_command(cmd)
+            if not exit_task and dev_lane_command(cmd):
+                self._set_work(user_id, True, channel)
+            self.log(f"指令 {user_id}: {cmd[:50]}")
             await self._dev_cmd(ws, cmd, msg_type, user_id, ev)
+            if exit_task:
+                self._set_work(user_id, False, channel)
             return
+        # 0830：答复路由仍尊重「已明确解除/退出任务」的标记（work_released），
+        # 但该标记现在会由 #退出任务 / #解除 真正清掉——旧逻辑只在 #解除 清，
+        # 退出任务后仍把聊天当任务通道。
         if (user_id in self.masters and _bridge_profile() != "full"
                 and not work_released(_load_state(), user_id)):
             mod = _dev_mod()
@@ -1833,11 +1857,10 @@ class QQBridge:
                     return
             except Exception as e:  # noqa: BLE001
                 self.log(f"dev 答复路由异常 {type(e).__name__}: {e}")
-        if user_id in self.masters and self._work_enabled(user_id):
-            # Awaiting-owner answers were handled above. Follow-ups stay on
-            # the dev lane until the owner explicitly sends #解除.
-            await self._dev_cmd(ws, "#dev " + text, msg_type, user_id, ev)
-            return
+        # 0830：普通聊天绝不再自动派单。旧逻辑在 owner_work=True 时把每条
+        # 普通消息拼成 `#dev <原文>` 发出去，于是「哦好了」「差点」
+        # 「你现在怎么样」全变成开发任务；退出任务后还在继续派。
+        # 派单只走显式指令：#dev / #任务派发。
         if msg_type == "group" and any(self._work_enabled(owner) for owner in self.masters):
             return  # incoming history is preserved while the owner is working
         if msg_type != "group" and _wake_mode() == "silent":

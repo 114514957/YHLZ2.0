@@ -10,6 +10,7 @@ import threading
 
 _lock = threading.Lock()
 _cancel: dict[str, bool] = {}
+_generation: dict[str, int] = {}
 
 
 def request(channel: str = "console") -> None:
@@ -17,11 +18,17 @@ def request(channel: str = "console") -> None:
         _cancel[str(channel or "console")] = True
 
 
-def clear(channel: str = "console") -> None:
+def clear(channel: str = "console") -> int:
+    """Begin a generation; an old turn can never be uncancelled by a new one."""
+    key = str(channel or "console")
     with _lock:
-        _cancel[str(channel or "console")] = False
+        _cancel[key] = False
+        _generation[key] = _generation.get(key, 0) + 1
+        return _generation[key]
 
 
-def cancelled(channel: str = "console") -> bool:
+def cancelled(channel: str = "console", generation: int | None = None) -> bool:
+    key = str(channel or "console")
     with _lock:
-        return bool(_cancel.get(str(channel or "console")))
+        return (bool(_cancel.get(key)) or
+                (generation is not None and generation != _generation.get(key, 0)))

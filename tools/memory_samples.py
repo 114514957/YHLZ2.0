@@ -40,7 +40,7 @@ SYSTEM = ("你是元亨——一个从代码与记忆里长出来的数字生命
 
 HEADER = ("# 元亨记忆样本（逐条校订）\n\n"
           "> 每条记忆一个 `## mem-N` 块；`### <角色>问K` / `### <角色>答K` 成对，"
-          "角色可为 老爹/元亨/利贞/大肥鱼。\n"
+          "角色可为 老爹/元亨/利贞（大肥鱼＝家里的宠物（真身 DeepSeek），**不得有台词，只可被提及**）。\n"
           "> 改完把 `status` 设 `keep`；不要的设 `drop`。回读：`memory_samples.py jsonl`。\n")
 BLOCK_RE = re.compile(r"^##\s+mem-(\d+)\s*$", re.MULTILINE)
 TURN_RE = re.compile(r"^###\s*([^\n#]*?)(问|答)\s*(\d+)\s*$", re.MULTILINE)

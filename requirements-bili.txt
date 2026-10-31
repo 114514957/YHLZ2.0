@@ -1,0 +1,4 @@
+# B站浏览器看片通道（元亨，只读）
+# 用系统 Edge（channel="msedge"），不需要 `playwright install chromium`
+playwright>=1.64.0
+yt-dlp>=2026.8.19

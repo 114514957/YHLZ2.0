@@ -1,7 +1,7 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain, screen } = require("electron");
 const path = require("path");
 
-// Transparent frameless pet window (YHLZ avatar). Page must be transparent
+// Transparent frameless pet window (YH avatar). Page must be transparent
 // (avatar.html pet mode makes both html+body transparent).
 
 let win = null;
@@ -13,14 +13,14 @@ const AVATAR_URL = "http://127.0.0.1:8321/avatar.html?pet=1";
 const CHAT_URL = "http://127.0.0.1:8321/chat_popup.html";
 // 2026-10-17（ledger 0828）：统一用方形多尺寸 ICO；对话窗/桌宠窗口原来没设
 // 图标，任务栏会显示 Electron 默认图标（"启动图标还是有问题"的来源之一）。
-const APP_ICON = path.join(__dirname, "..", "assets", "icons", "yhlz-app2.ico");
+const APP_ICON = path.join(__dirname, "..", "assets", "icons", "yh-app2.ico");
 
 function openChat() {
   if (!chatWin || chatWin.isDestroyed()) {
     chatWin = new BrowserWindow({
       width: 560,
       height: 720,
-      title: "YHLZ · 对话",
+      title: "YH · 对话",
       icon: APP_ICON,
       autoHideMenuBar: true,
       webPreferences: { contextIsolation: true, nodeIntegration: false },
@@ -115,7 +115,7 @@ function setPetDrag(on) {
 async function makeTray() {
   const icon = APP_ICON;
   tray = new Tray(nativeImage.createFromPath(icon));
-  tray.setToolTip("YHLZ · 元 · 亨 · 利 · 贞");
+  tray.setToolTip("YH · 元 · 亨 · 利 · 贞");
   const models = await modelsSubmenu();
   const menu = Menu.buildFromTemplate([
     { label: "显示/隐藏桌宠", click: () => { if (win) win.isVisible() ? win.hide() : win.show(); } },

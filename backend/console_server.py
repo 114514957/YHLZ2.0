@@ -11,6 +11,7 @@ Serves assets/webui/* on port 8321 and streams Yuanheng turns back as SSE:
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -20,7 +21,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from backend.yhlz_paths import BOT_UIN, NAPCAT_QR, QQWATCH_SHELL
+from backend.yhlz_paths import BOT_UIN, NAPCAT_QR, NAPCAT_WEBUI, QQWATCH_SHELL
 from backend import turn_control as _tc
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -56,7 +57,16 @@ CLONE_CFG = {
 }
 # ledger 0463: accepted voices live side by side and are picked by emotion —
 # xiaoyi (calm default) vs bright (designed 清亮俏皮, for upbeat lines).
+# ledger 0852 (2026-10-18): 老爹定「用清亮嗓」——对话默认嗓改为 bright，
+# 不再按情绪切 xiaoyi；yuanheng（02）仍只作手动可选项。
+YUANHENG_CFG = dict(CLONE_CFG)
+YUANHENG_CFG.update(
+    ref_dir=_PROJECT_ROOT / "models" / "tts" / "refs" / "yuanheng",
+    ref="ref01",
+    label="元亨本音 v2（02 清亮胸腔）",
+)
 CLONE_VOICES: dict = {
+    "yuanheng": YUANHENG_CFG,
     "xiaoyi": dict(CLONE_CFG),
     "bright": {
         "model": CLONE_CFG["model"],
@@ -67,6 +77,9 @@ CLONE_VOICES: dict = {
 }
 VOICE_BY_EMOTION = {"happy": "bright", "surprised": "bright",
                     "excited": "bright", "angry": "bright"}
+# ledger 0853 (2026-10-18): 稳定性实验 — 0.7/20 比默认 0.9/50 明显更稳
+# （同句三次 pair cos 0.789→0.898；对参考 0.838→0.894），故设为克隆默认采样。
+CLONE_GEN_PARAMS = {"temperature": 0.7, "top_k": 20}
 _TTS = {"model": None, "key": None}
 
 
@@ -83,7 +96,7 @@ def _pick_clone_voice(which: str, text: str) -> str:
         emo = str((classify_emotion(str(text)) or {}).get("emotion") or "")
     except Exception:
         emo = ""
-    return VOICE_BY_EMOTION.get(emo, "xiaoyi")
+    return VOICE_BY_EMOTION.get(emo, "bright")
 
 
 def _get_engine(which: str):
@@ -140,7 +153,8 @@ def _synth(which: str, text: str, speaker: str = "Vivian"):
     if str(which or "").strip().lower().startswith("clone"):
         try:
             voice = _pick_clone_voice(which, text)
-            cfg = CLONE_VOICES.get(voice) or CLONE_VOICES["xiaoyi"]
+            cfg = (CLONE_VOICES.get(voice) or CLONE_VOICES.get("bright")
+                   or next(iter(CLONE_VOICES.values())))
             m = _get_engine("clone")
             ref_dir = Path(cfg["ref_dir"])
             ref_wav = ref_dir / f"{cfg['ref']}.wav"
@@ -152,7 +166,8 @@ def _synth(which: str, text: str, speaker: str = "Vivian"):
                 pass
             wavs, sr = m.generate_voice_clone(
                 text=str(text)[:120], language="Chinese",
-                ref_audio=str(ref_wav), ref_text=ref_txt)
+                ref_audio=str(ref_wav), ref_text=ref_txt,
+                **CLONE_GEN_PARAMS)
             audio = wavs[0] if isinstance(wavs, (list, tuple)) else wavs
             return audio, sr
         except Exception as exc:  # noqa: BLE001
@@ -175,6 +190,8 @@ _sing_lock = threading.Lock()
 SING_STATE: dict = {"status": "idle", "step": "", "error": "", "result": "",
                     "output": "", "voice": "xiaoyi", "log": "",
                     "started": 0.0, "finished": 0.0, "song_id": ""}
+# 2026-10-21 验收：Seed-VC 44k + 柔化 e 成为生产链路；SoulX 退居回滚位。
+_COVER_ENGINE = "seedvc"
 
 
 def _wsl_path(p) -> str:
@@ -236,20 +253,133 @@ def sing_status() -> dict:
     return {"ok": True, **dict(SING_STATE)}
 
 
-def sing_start(target: str, prompt: str = "", vocal_sep: bool = True,
-               voice: str = "xiaoyi") -> dict:
+def _job_seedvc(tgt: Path, voice: str) -> None:
+    """Production cover path (2026-10-21, ledger 0935): Seed-VC 44k + 柔化 e.
+
+    旧 SoulX 链路已退出生产；回滚只需把 _COVER_ENGINE 切回 "soulx"。
+    """
+    from backend import gpu_lock, gpu_window
+
+    _dsp_py = _PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+    try:
+        SING_STATE["step"] = "卸载本地 TTS，腾显存"
+        _unload_tts()
+        SING_STATE["step"] = "等待聊天结束（GPU 互锁）"
+        if not gpu_lock.enter_window():
+            raise RuntimeError("互锁状态异常（无法进入唱窗）")
+        gpu_lock.wait_chat_idle(timeout=120)
+        _unload_tts()
+        time.sleep(2)
+        SING_STATE["step"] = "唱窗：暂停 LLM 与看护"
+        win = gpu_window.open_window()
+        if not win.get("ok"):
+            _unload_tts()
+            time.sleep(5)
+            win = gpu_window.open_window()
+        if not win.get("ok"):
+            raise RuntimeError(f"显存不足（free={win.get('free_mb')}MB）")
+
+        SING_STATE["step"] = "翻唱中（Seed-VC 44k + 柔化 e）"
+        job_dir = SING_DIR / "seedvc_job"
+        job_dir.mkdir(parents=True, exist_ok=True)
+        env = dict(os.environ)
+        env.update({
+            "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8",
+            "HF_ENDPOINT": "https://hf-mirror.com",
+            "NO_PROXY": "localhost,127.0.0.1,::1,.maas.aliyuncs.com",
+            "PATH": str(_PROJECT_ROOT / "cache" / "tools"
+                        / "ffmpeg-9.0.1-essentials_build" / "bin")
+                    + os.pathsep + env.get("PATH", ""),
+        })
+        # 每首歌独立分轨目录：绝不复用上一首的 stem（2026-10-21 实测踩坑）。
+        stems_dir = SING_DIR / f"stem3_{time.strftime('%Y%m%d_%H%M%S')}"
+        r = subprocess.run(
+            [str(_dsp_py if _dsp_py.exists() else sys.executable),
+             str(_PROJECT_ROOT / "tools" / "cover_seedvc.py"),
+             str(tgt), "--voice", voice, "--presets", "e",
+             "--stems-dir", str(stems_dir),
+             "--out-dir", str(job_dir)],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=3600, env=env,
+            creationflags=0x08000000)  # CREATE_NO_WINDOW：防控制台关闭杀子进程
+        tail = (r.stdout or "")[-1500:] + (r.stderr or "")[-600:]
+        SING_STATE["log"] = tail[-900:]
+        info = None
+        for line in reversed((r.stdout or "").splitlines()):
+            line = line.strip()
+            if line.startswith("{") and '"ok"' in line:
+                try:
+                    info = json.loads(line)
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
+        if r.returncode != 0 or not info or not info.get("ok"):
+            raise RuntimeError(f"新链路失败 exit={r.returncode}: {tail[-280:]}")
+        outputs = info.get("outputs") or []
+        if not outputs:
+            raise RuntimeError("新链路没有产出")
+        final_src = Path(outputs[0])
+        out_dir = Path(info.get("out_dir") or final_src.parent)
+
+        SING_OUT_DIR.mkdir(parents=True, exist_ok=True)
+        stem = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", tgt.stem)[:40] or "cover"
+        vtag = "清亮嗓" if voice == "bright" else "Xiaoyi嗓"
+        run_dir = SING_OUT_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}_{stem}"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        final = run_dir / f"成品_{stem}_{vtag}.wav"
+        shutil.copy2(final_src, final)
+        # 2026-10-21 老爹定：产出只要成品，不再保留干声/和声/伴奏/说明分层。
+        sid = ""
+        try:
+            from backend import song_library
+
+            item = song_library.save_ref(
+                title=f"{stem}（元亨翻唱·{vtag}·SeedVC）", wav_path=final,
+                source="workbench-cover", target=str(tgt),
+                tags=["翻唱", "SeedVC"])
+            sid = str(item.get("id") or "")
+        except Exception:  # noqa: BLE001
+            sid = ""
+        SING_STATE.update(status="done", step="完成", result=str(final),
+                          output=str(final), song_id=sid)
+    except Exception as exc:  # noqa: BLE001
+        SING_STATE.update(status="error", step="失败",
+                          error=f"{type(exc).__name__}: {exc}"[:280])
+    finally:
+        SING_STATE["step"] = "恢复 LLM 与看护"
+        try:
+            gpu_window.close_window()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            gpu_lock.release_sing()
+        except Exception:  # noqa: BLE001
+            pass
+        SING_STATE["finished"] = time.time()
+        try:
+            _sing_lock.release()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def sing_start(target: str, prompt: str = "", voice: str = "bright") -> dict:
     """Kick off a cover job in a background thread; returns immediately.
 
-    Two-stage (ledger 0458): preprocessing (optional vocal separation + F0)
-    runs OUTSIDE the GPU window so the chat stays online; only the SVC stage
-    stops the LLM. Ledger 0464: voice picks the SVC prompt; the finished wav
-    lands in 音频素材/翻唱产出/ and the song library references it."""
+    Rule (2026-10-09): only the dry lead (干声) is converted; harmony (和声)
+    and background (伴奏) keep the original audio — split lead/backing/bgm,
+    SVC the lead only, then mix back. Two-stage (ledger 0458): stem split +
+    F0 run OUTSIDE the GPU window so the chat stays online; only the SVC
+    stage stops the LLM. Ledger 0464: voice picks the SVC prompt; the
+    finished wav lands in 音频素材/翻唱产出/ and the song library references
+    it. Ledger 0476: one folder per production with layers + 说明.txt."""
     tgt = Path(str(target or "")).resolve()
     if not tgt.is_file():
         return {"ok": False, "error": f"目标文件不存在：{target}"}
-    voice = str(voice or "xiaoyi").strip().lower()
-    if voice not in CLONE_VOICES:
-        voice = "xiaoyi"
+    voice = str(voice or "bright").strip().lower()
+    # 2026-10-18: SoulX 需要 WSL 侧 prompt_<voice>/；yuanheng 的 prompt 还没准备，
+    # 暂只允许既有两嗓；等 RVC/新 prompt 上线再切 yuanheng。
+    if voice not in ("xiaoyi", "bright"):
+        voice = "bright"
     from backend import gpu_lock
 
     if not gpu_lock.acquire_sing():
@@ -259,42 +389,83 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True,
         return {"ok": False, "error": "已有翻唱任务在跑"}
     SING_STATE.update(status="running", step="排队启动", error="", result="",
                       output="", log="", started=time.time(), finished=0.0,
-                      vocal_sep=bool(vocal_sep), song_id="", voice=voice)
+                      song_id="", voice=voice)
     if prompt:
         prm = Path(str(prompt)).resolve()
     else:
-        cfg = CLONE_VOICES.get(voice) or CLONE_VOICES["xiaoyi"]
+        cfg = CLONE_VOICES.get(voice) or CLONE_VOICES["bright"]
         prm = Path(cfg["ref_dir"]) / f"{cfg['ref']}.wav"
 
     def _job() -> None:
         from backend import gpu_window
 
+        if _COVER_ENGINE == "seedvc":
+            _job_seedvc(tgt, voice)
+            return
+
         try:
             SING_STATE["step"] = "卸载本地 TTS，腾显存"
             _unload_tts()
-            sep = "1" if SING_STATE.get("vocal_sep", True) else "0"
-            SING_STATE["step"] = ("预处理：人声分离+F0（较慢，聊天不中断）"
-                                  if sep == "1" else "预处理：F0（聊天不中断）")
+            # Rule (2026-10-09): split first — only the dry lead is converted.
+            stem_dir = SING_DIR / "stem3"
+            stem_dir.mkdir(parents=True, exist_ok=True)
+            SING_STATE["step"] = "预处理：分轨（干声/和声/伴奏，聊天不中断）"
             r0 = subprocess.run(
                 ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
-                 _wsl_path(_PROJECT_ROOT / "tools" / "wsl_soulx_prep.sh"),
-                 _wsl_path(prm), _wsl_path(tgt), sep, voice],
+                 _wsl_path(_PROJECT_ROOT / "tools" / "wsl_stem3_split.sh"),
+                 _wsl_path(tgt), _wsl_path(stem_dir)],
                 capture_output=True, text=True, encoding="utf-8",
                 errors="replace", timeout=3600)
             if r0.returncode != 0:
                 raise RuntimeError(
-                    f"预处理失败 exit={r0.returncode}: "
+                    f"分轨失败 exit={r0.returncode}: "
                     f"{(r0.stderr or '')[-200:]}")
+            # v3 定版 (2026-10-11, ledger 0746): 干声先过 MSST 去混响
+            # （anvuew SDR19.17）；F0/SVC/清晰增强都用去混响后的干声。
+            SING_STATE["step"] = "预处理：干声去混响（MSST anvuew，聊天不中断）"
+            lead_in = stem_dir / "lead.wav"
+            lead_dry = stem_dir / "lead_dry.wav"
+            r0c = subprocess.run(
+                ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
+                 _wsl_path(_PROJECT_ROOT / "tools" / "wsl_dereverb.sh"),
+                 _wsl_path(lead_in), _wsl_path(lead_dry)],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=3600)
+            if r0c.returncode != 0 or not lead_dry.is_file():
+                raise RuntimeError(
+                    f"去混响失败 exit={r0c.returncode}: "
+                    f"{(r0c.stderr or '')[-200:]}")
+            SING_STATE["step"] = "预处理：干声 F0（聊天不中断）"
+            r0b = subprocess.run(
+                ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
+                 _wsl_path(_PROJECT_ROOT / "tools" / "wsl_soulx_prep.sh"),
+                 _wsl_path(prm), _wsl_path(lead_dry),
+                 "0", voice],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=1800)
+            if r0b.returncode != 0:
+                raise RuntimeError(
+                    f"干声 F0 失败 exit={r0b.returncode}: "
+                    f"{(r0b.stderr or '')[-200:]}")
             # interlock: block new chat/TTS, then let in-flight turns drain
             SING_STATE["step"] = "等待聊天结束（GPU 互锁）"
             if not gpu_lock.enter_window():
                 raise RuntimeError("互锁状态异常（无法进入唱窗）")
             gpu_lock.wait_chat_idle(timeout=120)
+            # v3.1 (2026-10-11 千本樱实测): 预处理期间聊天不中断，TTS 克隆引擎
+            # 可能被聊天重新装载（~2.4GB），而卸载只在任务开始时做过一次 →
+            # 开窗前再卸一次 + 短等，避免窗口因显存缺口失败（曾 free=5676）。
+            _unload_tts()
+            time.sleep(2)
             SING_STATE["step"] = "唱窗：暂停 LLM 与看护"
             win = gpu_window.open_window()
             if not win.get("ok"):
+                _unload_tts()
+                time.sleep(5)
+                win = gpu_window.open_window()
+            if not win.get("ok"):
                 raise RuntimeError(f"显存不足（free={win.get('free_mb')}MB）")
-            SING_STATE["step"] = "翻唱中（SVC，约 2 分钟）"
+            SING_STATE["step"] = "翻唱中（SVC 只换干声，约 2 分钟）"
             out = SING_DIR / "out"
             out.mkdir(parents=True, exist_ok=True)
             r = subprocess.run(
@@ -308,14 +479,83 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True,
             gen = out / "generated.wav"
             if r.returncode != 0 or not gen.is_file():
                 raise RuntimeError(f"SVC 失败 exit={r.returncode}")
-            # ledger 0464: final cover -> 音频素材/翻唱产出/<歌名>_<嗓>_<时间>.wav
+            # v2 定版 (2026-10-10, ledger 0740): 清晰增强 — 把（去混响）干声
+            # >6kHz 的齿音/气息叠回 AI 干声（老爹选定 V2b：步数64 + ×0.65）
+            SING_STATE["step"] = "清晰增强（叠回原声齿音）"
+            enh = out / "enhanced.wav"
+            r2b = subprocess.run(
+                ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
+                 _wsl_path(_PROJECT_ROOT / "tools" / "wsl_clarity_enhance.sh"),
+                 _wsl_path(gen), _wsl_path(lead_dry),
+                 _wsl_path(enh), "--gain", "0.65"],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=600)
+            if r2b.returncode != 0 or not enh.is_file():
+                raise RuntimeError(f"清晰增强失败 exit={r2b.returncode}")
+            # v3 定版 (2026-10-11, ledger 0746): 柔化 DSP（轻压缩+动态去齿+
+            # 轻饱和 = 群听评/老爹验收的 V3-e 配方），等响对齐。
+            SING_STATE["step"] = "柔化 DSP（v3 定版：轻压缩+动态去齿+轻饱和）"
+            dsp_out = out / "dsp_soft.wav"
+            # daemon 实际服务进程可能不是 .venv python（曾见系统 python 子进程
+            # 服务、无 numpy）——固定用 .venv python 跑 DSP（2026-10-11 修复）。
+            _dsp_py = _PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+            r2c = subprocess.run(
+                [str(_dsp_py if _dsp_py.exists() else sys.executable),
+                 str(_PROJECT_ROOT / "tools" / "cover_v3_dsp.py"),
+                 str(enh), str(dsp_out), "--preset", "e"],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=1200)
+            if r2c.returncode != 0 or not dsp_out.is_file():
+                raise RuntimeError(
+                    f"柔化 DSP 失败 exit={r2c.returncode}: "
+                    f"{(r2c.stderr or '')[-200:]}")
+            # rule 2026-10-09: mix the AI lead back with ORIGINAL harmony/bgm
+            # (v3 定版：伴奏 +3dB → 1.13，群听评验收的 BGM 修正)
+            SING_STATE["step"] = "三轨混回（AI干声 + 原声和声/伴奏）"
+            mixed = out / "mixed.wav"
+            r3 = subprocess.run(
+                ["wsl.exe", "-d", "Ubuntu-22.04", "--", "bash",
+                 _wsl_path(_PROJECT_ROOT / "tools" / "wsl_mix3.sh"),
+                 _wsl_path(dsp_out), _wsl_path(stem_dir / "backing.wav"),
+                 _wsl_path(stem_dir / "bgm.wav"), _wsl_path(mixed),
+                 "--lead-gain", "1.4", "--backing-gain", "0.8",
+                 "--bgm-gain", "1.13"],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=600)
+            if r3.returncode != 0 or not mixed.is_file():
+                raise RuntimeError(f"三轨混回失败 exit={r3.returncode}")
+            # ledger 0464/0476: one folder per production inside
+            # 音频素材/翻唱产出/ (type-first names, layers kept for
+            # error-hunting); the library references the final mixed wav.
             SING_OUT_DIR.mkdir(parents=True, exist_ok=True)
             stem = re.sub(r"[^\w\u4e00-\u9fff-]+", "_",
                           Path(tgt).stem)[:40] or "cover"
             vtag = "清亮嗓" if voice == "bright" else "Xiaoyi嗓"
-            final = SING_OUT_DIR / (
-                f"{stem}_{vtag}_{time.strftime('%Y%m%d-%H%M%S')}.wav")
-            shutil.copy2(gen, final)
+            run_dir = SING_OUT_DIR / (
+                f"{time.strftime('%Y%m%d-%H%M%S')}_{stem}")
+            run_dir.mkdir(parents=True, exist_ok=True)
+            for type_name, src, tag in (
+                    ("干声", stem_dir / "lead.wav", ""),
+                    ("干声_去混响", lead_dry, ""),
+                    ("和声", stem_dir / "backing.wav", ""),
+                    ("伴奏", stem_dir / "bgm.wav", ""),
+                    ("AI主唱", gen, f"_{vtag}"),
+                    ("AI主唱_增强", enh, f"_{vtag}"),
+                    ("AI主唱_柔化", dsp_out, f"_{vtag}")):
+                try:
+                    shutil.copy2(src, run_dir / f"{type_name}_{stem}{tag}.wav")
+                except Exception:
+                    pass  # layers are diagnostics; do not fail the job
+            final = run_dir / f"成品_{stem}_{vtag}_三轨.wav"
+            shutil.copy2(mixed, final)
+            (run_dir / "说明.txt").write_text(
+                f"元亨翻唱 · 生产档案（工作台·v3 定版）\n源曲：{tgt}\n"
+                f"流程：demucs 分轨 → MDX 卡拉OK（干声/和声）→ MSST 去混响"
+                f"（anvuew）→ F0 → SoulX-SVC 只换干声（原调+fp16+步数64）→ "
+                f"清晰增强（去混响干声>6kHz×0.65）→ 柔化 DSP（轻压缩+动态去齿"
+                f"+轻饱和）→ 三轨混回（主唱1.4/和声0.8/伴奏1.13）\n"
+                f"嗓：{vtag}（{voice}）；和声与伴奏保留原声\n",
+                encoding="utf-8")
             # finished songs are saved locally; QQ/main chain may only use
             # library items — here the library references the materials file
             sid = ""
@@ -323,13 +563,13 @@ def sing_start(target: str, prompt: str = "", vocal_sep: bool = True,
                 from backend import song_library
 
                 item = song_library.save_ref(
-                    title=f"{stem}（元亨翻唱·{vtag}）", wav_path=final,
+                    title=f"{stem}（元亨翻唱·{vtag}·三轨）", wav_path=final,
                     source="workbench-cover", target=str(tgt),
-                    tags=["翻唱"])
+                    tags=["翻唱", "三轨"])
                 sid = str(item.get("id") or "")
             except Exception:
                 sid = ""
-            SING_STATE.update(status="done", step="完成", result=str(gen),
+            SING_STATE.update(status="done", step="完成", result=str(mixed),
                               output=str(final), song_id=sid)
         except Exception as exc:  # noqa: BLE001
             SING_STATE.update(status="error", step="失败",
@@ -600,10 +840,94 @@ def _get_sherpa():
     return _SHERPA["m"]
 
 
+def _tcp_open(host: str, port: int, timeout: float = 0.8) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+# ---- 启动入口（台账 0792）：NapCat 面板 / 翻唱链路官方 UI ----
+NAPCAT_WEBUI_DEFAULT_PORT = 6099
+
+
+def _napcat_webui() -> tuple[int, str]:
+    """NapCat 管理面板地址；端口读 webui.json，兜底 6099（QQ技术台账）。"""
+    port = NAPCAT_WEBUI_DEFAULT_PORT
+    try:
+        d = json.loads(NAPCAT_WEBUI.read_text(encoding="utf-8"))
+        port = int(d.get("port") or port)
+    except Exception:
+        pass
+    return port, f"http://127.0.0.1:{port}/webui"
+
+
+def _napcat_procs_alive() -> bool:
+    """NapCat 活着 == OneBot 端口在听。
+
+    2026-10-29：原来按进程名（NapCatWinBootMain.exe / QQ.exe）判断，但
+    NapCatWinBootMain 注入完就退出、卡住时又一直挂着——两种情况都会误判，
+    工作台因此要么说"已运行"挡住重启，要么把卡死的窗口当成健康。
+    """
+    try:
+        from backend.napcat_launcher import onebot_online
+
+        return onebot_online()
+    except Exception:
+        pass
+    return False
+
+
+def _qq_management_external() -> bool:
+    """True when QQ is owned by the Lite chain (fail-closed on bad config)."""
+    try:
+        cfg = json.loads((_PROJECT_ROOT / "config" / "qq_management.json")
+                         .read_text(encoding="utf-8-sig"))
+        return str(cfg.get("mode") or "").strip().lower() == "external"
+    except Exception:
+        return True
+
+
 def _qq_status() -> dict:
-    """元亨 QQ / NapCat / bridge status for the workbench."""
+    """元亨 QQ / NapCat / bridge status for the workbench.
+
+    优先读 QQ 桥 Lite 的权威状态（cache/qq_bridge/lite/：bridge_status.json +
+    bridge.pid 归属校验）；没有 Lite 记录时退回旧 napcat_status.json（Full）。
+    """
     out = {"uin": BOT_UIN, "name": "元亨", "online": False,
-           "ws": False, "bridge": False, "since": 0.0}
+           "ws": False, "bridge": False, "since": 0.0, "source": ""}
+    state_dir = _PROJECT_ROOT / "cache" / "qq_bridge" / "lite"
+    status_file = state_dir / "bridge_status.json"
+    if status_file.exists():
+        out["source"] = "lite"
+        try:
+            st = json.loads(status_file.read_text(encoding="utf-8"))
+            alive = False
+            info: dict = {}
+            try:
+                from backend.qq_bridge_lock import owner_matches, read_info
+
+                info = read_info(state_dir / "bridge.pid")
+                if info:
+                    alive = owner_matches(info)[0]
+            except Exception:  # noqa: BLE001
+                pass
+            out["bridge"] = bool(alive)
+            out["ws"] = bool(alive) and str(st.get("state")) == "connected"
+            out["online"] = bool(alive) and bool(st.get("account_online"))
+            out["since"] = float(st.get("started_at") or 0.0)
+            out["bridge_pid"] = info.get("pid")
+        except Exception:  # noqa: BLE001
+            pass
+        return out
+    # 0831：external 下 QQ 归 Lite 独占，旧 napcat_status.json 是停更的僵尸
+    # 状态；不再回退（否则 Lite 未起时面板会显示旧链的"在线"）。
+    if _qq_management_external():
+        out["source"] = "lite-missing"
+        return out
     try:
         p = _PROJECT_ROOT / "cache" / "tmp" / "napcat_status.json"
         d = json.loads(p.read_text(encoding="utf-8"))
@@ -631,7 +955,8 @@ GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
           "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html",
-          "/emotion", "/qq-qrcode", "/growth", "/devmode"}
+          "/emotion", "/qq-qrcode", "/growth", "/devmode",
+          "/official-ui/status"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session",
@@ -851,7 +1176,10 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(data)
         elif p == "/sing/result":
-            gen = SING_DIR / "out" / "generated.wav"
+            # final product is the 3-stem mix (fallback: raw SVC output)
+            gen = SING_DIR / "out" / "mixed.wav"
+            if not gen.is_file():
+                gen = SING_DIR / "out" / "generated.wav"
             if not gen.is_file():
                 self._send_json(404, {"error": "还没有翻唱结果"})
             else:
@@ -862,6 +1190,15 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(data)
+        elif p == "/official-ui/status":
+            # 启动入口（0792）：翻唱链路官方 UI 状态（含外部实例的自动收尾）
+            from backend import official_ui
+
+            try:
+                self._send_json(200, official_ui.status())
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(200, {"ok": False,
+                                      "error": type(exc).__name__})
         else:
             self._send_json(404, {"error": "未找到"})
 
@@ -967,8 +1304,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(200, sing_start(str(body.get("target", "")),
                                             str(body.get("prompt", "")),
-                                            bool(body.get("vocal_sep", True)),
-                                            str(body.get("voice", "xiaoyi"))))
+                                            str(body.get("voice", "bright"))))
             return
         if p == "/sing/upload":
             from urllib.parse import parse_qs, urlparse
@@ -1485,40 +1821,56 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         if action in ("napcat_login", "qq_switch"):
             try:
-                import subprocess
+                from backend.napcat_launcher import launch_napcat
 
                 uin = str(body.get("uin", "") or BOT_UIN)
-                shell = QQWATCH_SHELL
-                kill = shell / "KillQQ.bat"
-                launch = shell / "launcher-user.bat"
-                if not launch.exists():
-                    return {"ok": False, "error": "找不到 launcher-user.bat"}
-                if kill.exists():
-                    subprocess.run(["cmd", "/c", str(kill)], cwd=str(shell),
-                                   capture_output=True)
-                try:  # persist the chosen account for next quick-login
-                    import json as _json
+                if action == "napcat_login" and _napcat_procs_alive():
+                    return {"ok": True, "note": "QQ/NapCat 已运行，请在现有登录窗口或 NapCat 面板继续登录"}
+                if action == "qq_switch":
+                    from tools.qq_bridge_control import stop_napcat
 
-                    wf = shell / "config" / "webui.json"
-                    d = _json.loads(wf.read_text(encoding="utf-8"))
-                    d["autoLoginAccount"] = str(uin)
-                    _t = wf.with_suffix(".tmp")
-                    _t.write_text(_json.dumps(d, ensure_ascii=False, indent=2),
-                                  encoding="utf-8")
-                    _t.replace(wf)
-                except Exception:
-                    pass
-                subprocess.Popen(
-                    ["cmd", "/c", str(launch), uin],
-                    cwd=str(shell), close_fds=True,
-                    creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
-                _bring_qq_front(delay=12)
+                    stopped = stop_napcat(_PROJECT_ROOT / "cache" / "qq_bridge" / "lite")
+                    if not stopped.get("stopped"):
+                        return {"ok": False, "error": "旧 NapCat 尚未退出，未启动第二个实例"}
+                res = launch_napcat(uin)
                 _log("control", f"napcat_login {uin}")
                 _tag = "（元亨号）" if uin == BOT_UIN else "（老爹主号，导出用）"
-                return {"ok": True,
-                        "note": f"已唤起 NapCat，请在弹出的窗口登录 {uin} {_tag}"}
+                note = str(res.get("note") or "已唤起 NapCat")
+                return {"ok": True, "note": f"{note}{_tag}"}
             except Exception as exc:  # noqa: BLE001
-                return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
+                return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+        if action in ("qq_bridge_start", "qq_bridge_restart", "qq_bridge_stop"):
+            # 工作台一键控制 QQ 桥 Lite（2026-10-09）：走官方 control 脚本。
+            try:
+                import subprocess as _sp
+
+                py = _PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+                control = _PROJECT_ROOT / "tools" / "qq_bridge_control.py"
+                cfg = _PROJECT_ROOT / "config" / "qq_bridge_lite.json"
+                if not control.exists():
+                    return {"ok": False, "error": "找不到 qq_bridge_control.py"}
+                sub = {"qq_bridge_start": "start",
+                       "qq_bridge_restart": "restart",
+                       "qq_bridge_stop": "stop"}[action]
+                cmd = [str(py if py.exists() else sys.executable), "-B",
+                       str(control), sub, "--profile", "lite",
+                       "--config", str(cfg)]
+                if sub in ("stop", "restart"):
+                    cmd.append("--no-napcat")   # 停桥不动 QQ 登录
+                flags = getattr(_sp, "CREATE_NO_WINDOW", 0)
+                _sp.Popen(cmd, cwd=str(_PROJECT_ROOT), close_fds=True,
+                          creationflags=flags,
+                          stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+                _log("control", action)
+                note = {
+                    "start": "QQ 桥启动中（约 10~30 秒），稍后看“桥接/状态”刷新",
+                    "restart": "QQ 桥重启中（约 10~30 秒），NapCat 登录保持不动",
+                    "stop": "QQ 桥停止请求已下发（NapCat 保持登录）",
+                }[sub]
+                return {"ok": True, "note": note}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False,
+                        "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         if action == "launch_pet":
             try:
                 import subprocess
@@ -1546,6 +1898,47 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": True, "note": "已启动全家桶"}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
+        if action in ("official_ui_start", "official_ui_stop"):
+            # 2026-10-21（台账 0935）：旧 SoulX 官方 UI 退出生产，仅保留 stop。
+            if action == "official_ui_start":
+                return {"ok": False,
+                        "error": "旧 SoulX 链路已退出生产；请用工作台「开始翻唱」"
+                                 "（Seed-VC 44k + 柔化 e）"}
+            try:
+                from backend import official_ui
+
+                out = official_ui.stop(reason="workbench")
+                _log("control", action)
+                return out
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False,
+                        "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
+        if action == "napcat_ui":
+            # 启动入口（0792）：NapCat 管理面板（6099）。
+            # 已在跑 → 直接给地址；没在跑 → 拉起（自动登录）并提示稍后打开。
+            try:
+                import subprocess as _sp
+
+                port, url = _napcat_webui()
+                if _tcp_open("127.0.0.1", port):
+                    _log("control", "napcat_ui open")
+                    return {"ok": True, "up": True, "url": url,
+                            "note": "NapCat 面板在线（若提示登录，token 见 "
+                                    "qqwatch\\shell\\config\\webui.json）"}
+                if _napcat_procs_alive():
+                    return {"ok": True, "up": False, "url": url,
+                            "note": "NapCat 进程在，但面板未就绪：稍候再点；"
+                                    "仍不行可用「唤起登录」重启"}
+                from backend.napcat_launcher import launch_napcat
+
+                launch_napcat(BOT_UIN)
+                _log("control", "napcat_ui start")
+                return {"ok": True, "up": False, "url": url,
+                        "note": "NapCat 未运行 → 已拉起（自动登录中）；"
+                                "约 1 分钟后点此按钮打开面板"}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False,
+                        "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         if action == "cancel_turn":
             try:
                 from backend import turn_control
@@ -1821,6 +2214,13 @@ class ConsoleHandler(BaseHTTPRequestHandler):
     def _state(self) -> dict:
         out = {"ok": True, "now": time.time()}
         try:
+            # 启动入口（0792）：官方 UI 若被外部停掉，这里顺手收尾（释放互锁）
+            try:
+                from backend import official_ui
+
+                official_ui.reap()
+            except Exception:
+                pass
             import urllib.request
 
             try:
@@ -1838,10 +2238,11 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 out["ollama"] = "down"
             out["qq"] = _qq_status()
             try:
-                dp = _PROJECT_ROOT / "cache" / "dev" / "state.json"
-                dd = json.loads(dp.read_text(encoding="utf-8"))
-                out["dev"] = {"status": str(dd.get("status", "idle")),
-                              "task": str(dd.get("task", ""))[:60]}
+                # 0831：工作台显示的也是唯一任务库（Lite job store），
+                # 不再读旧的 cache/dev/state.json。
+                from backend.target_dev_bridge import dev_status
+
+                out["dev"] = dev_status()
             except Exception:
                 out["dev"] = {"status": "idle", "task": ""}
             out["drives"] = _drives_list()

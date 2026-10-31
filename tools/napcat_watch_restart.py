@@ -1,53 +1,27 @@
-"""Reliably (re)start the NapCat online watcher: kill all napcat_watch
-processes, clear the stale lock, spawn ONE, verify. 
-Usage: python tools/napcat_watch_restart.py
+"""DEPRECATED (2026-10-20, ledger 0831): 旧 Full 链的 NapCat 在线看护重启。
+
+旧 ``tools/napcat_watch.py`` 与 Lite 链抢同一个 QQ 号（第二个 WS 消费者、
+旧 ``cache/tmp/napcat_status.json``），external 模式下启动器/看门狗会把它收掉；
+再手工拉起只会形成"起了又被收"的抖动。
+
+QQ 的掉线与恢复现在由 ``tools/qq_bridge_watchdog.py`` 负责。要看状态：
+    .venv\\Scripts\\python.exe -B tools\\qq_bridge_control.py status --profile lite
+
+Usage: python tools/napcat_watch_restart.py   (仅打印退役说明)
 """
 from __future__ import annotations
 
-import pathlib
-import subprocess
 import sys
-import time
 
-import psutil
-
-_ROOT = pathlib.Path(__file__).resolve().parent.parent
-PY = _ROOT / ".venv" / "Scripts" / "python.exe"
-
-
-def _pids() -> list[int]:
-    out = []
-    for p in psutil.process_iter(["pid", "cmdline"]):
-        try:
-            cl = p.info.get("cmdline") or []
-        except Exception:
-            continue
-        if any("napcat_watch.py" in str(x) for x in cl):
-            out.append(p.info["pid"])
-    return out
+MESSAGE = """[napcat_watch_restart] 已退役（0831）。
+旧 napcat_watch 不再维护 QQ 在线状态；Lite 看门狗负责掉线恢复。
+查看状态：.venv\\Scripts\\python.exe -B tools\\qq_bridge_control.py status --profile lite
+"""
 
 
 def main() -> int:
-    killed = 0
-    for pid in _pids():
-        try:
-            psutil.Process(pid).kill()
-            killed += 1
-        except Exception:
-            pass
-    time.sleep(2)
-    for f in ("napcat_watch.lock", "napcat_status.json"):
-        try:
-            (_ROOT / "cache" / "tmp" / f).unlink()
-        except Exception:
-            pass
-    subprocess.Popen([str(PY), "-B", str(_ROOT / "tools" / "napcat_watch.py")],
-                     cwd=str(_ROOT), close_fds=True,
-                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    time.sleep(7)
-    now = _pids()
-    print(f"killed={killed} now={len(now)} pids={now}")
-    return 0 if now else 1
+    print(MESSAGE)
+    return 2
 
 
 if __name__ == "__main__":

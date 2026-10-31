@@ -66,5 +66,91 @@ class DrivesTest(unittest.TestCase):
         self.assertIn("以老爹的期待为先", drv.inject_block())
 
 
+class DrivesUrgeTest(unittest.TestCase):
+    """0501：内在因要能影响**行为何时发生**，不只是注入文本。"""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self._f = drv.DRIVES_FILE
+        drv.DRIVES_FILE = self.tmp / "drives.json"
+
+    def tearDown(self):
+        drv.DRIVES_FILE = self._f
+
+    def test_urge_excludes_expectation(self):
+        """期待是恒定 1.0 的持续授权，若参与比较阈值就永远形同虚设。"""
+        drv.seed_defaults()          # 老爹的期待 1.0 + 好奇 0.6
+        u = drv.urge()
+        self.assertNotEqual(u["name"], "老爹的期待")
+        self.assertEqual(u["name"], "对未知的好奇")
+        self.assertAlmostEqual(u["strength"], 0.6, places=3)
+
+    def test_urge_picks_strongest_non_expectation(self):
+        drv.seed_defaults()
+        drv.add("想读更多书", "渴望", strength=0.9)
+        self.assertEqual(drv.urge()["name"], "想读更多书")
+        self.assertEqual(drv.urge()["category"], "渴望")
+
+    def test_urge_zero_when_only_expectation_left(self):
+        drv.add("老爹的期待", "期待", strength=1.0)
+        u = drv.urge()
+        self.assertEqual(u["strength"], 0.0)
+        self.assertEqual(u["name"], "")
+
+    def test_urge_ignores_faded(self):
+        d = drv.add("临时渴望", "渴望", strength=0.06)
+        drv.decay(now=time.time() + 90 * 86400)   # 淡出
+        self.assertEqual(drv.urge()["name"], "")
+        self.assertIsNotNone(d["id"])
+
+    def test_urge_never_raises_on_broken_file(self):
+        drv.DRIVES_FILE.write_text("{ not json", encoding="utf-8")
+        self.assertEqual(drv.urge()["strength"], 0.0)
+
+
+class AutonomyDueTest(unittest.TestCase):
+    """触发判定（纯函数）：到点 OR 内因顶高且过冷却。"""
+
+    def setUp(self):
+        from backend.target_daemon import autonomy_due
+
+        self.due = autonomy_due
+
+    def test_timer_fires(self):
+        ok, why = self.due(last_tick=0.0, now=3 * 3600.0, timer_seconds=3 * 3600,
+                           urge_strength=0.0)
+        self.assertTrue(ok)
+        self.assertEqual(why, "timer")
+
+    def test_below_threshold_waits(self):
+        ok, why = self.due(last_tick=3 * 3600.0, now=3 * 3600.0 + 60,
+                           timer_seconds=3 * 3600, urge_strength=0.74)
+        self.assertFalse(ok)
+        self.assertEqual(why, "wait")
+
+    def test_urge_fires_before_timer(self):
+        T = 1_700_000_000.0   # 真实时间戳：冷却按秒算，别用 0 当"已过冷却"
+        ok, why = self.due(last_tick=T, now=T + 600, timer_seconds=3 * 3600,
+                           urge_strength=0.8, last_urge=T - 4000,
+                           urge_cooldown=3600)
+        self.assertTrue(ok)
+        self.assertEqual(why, "urge")
+
+    def test_urge_respects_cooldown(self):
+        T = 1_700_000_000.0
+        ok, why = self.due(last_tick=T, now=T + 1000, timer_seconds=3 * 3600,
+                           urge_strength=0.99, last_urge=T - 900,
+                           urge_cooldown=3600)
+        self.assertFalse(ok)
+        self.assertEqual(why, "wait")
+
+    def test_timer_wins_over_urge_label(self):
+        """同时满足时按到点记账，避免内因通道的冷却被例行 tick 反复刷新。"""
+        ok, why = self.due(last_tick=0.0, now=3 * 3600.0, timer_seconds=3 * 3600,
+                           urge_strength=1.0, last_urge=0.0)
+        self.assertTrue(ok)
+        self.assertEqual(why, "timer")
+
+
 if __name__ == "__main__":
     unittest.main()

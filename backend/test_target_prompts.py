@@ -38,7 +38,10 @@ class TestPromptsBaseline(unittest.TestCase):
         self.assertIn("不得声称", text)
         self.assertIn(ANTI_HALLUCINATION[:20], text)
 
-    def test_tools_block_rendered(self):
+    def test_tools_block_rendered_when_enabled(self):
+        """The textual listing survives only behind YH_TOOL_TEXT_BLOCK=1."""
+        import os
+
         tools = [
             {"function": {"name": "ledger_search", "description": "查台账"}},
             {"function": {"name": "system_time", "description": "查时间"}},
@@ -46,12 +49,53 @@ class TestPromptsBaseline(unittest.TestCase):
         block = render_capabilities_tools_block(tools)
         self.assertIn("ledger_search", block)
         self.assertIn("system_time", block)
-        text = render_system_prompt(tools=tools)
-        self.assertIn("你可以调用以下工具", text)
+        old = os.environ.get("YH_TOOL_TEXT_BLOCK")
+        try:
+            os.environ["YH_TOOL_TEXT_BLOCK"] = "1"
+            text = render_system_prompt(tools=tools)
+            self.assertIn("你可以调用以下工具", text)
+        finally:
+            if old is None:
+                os.environ.pop("YH_TOOL_TEXT_BLOCK", None)
+            else:
+                os.environ["YH_TOOL_TEXT_BLOCK"] = old
+
+    def test_tools_block_off_by_default(self):
+        """Default must not duplicate the tool schemas into the system prompt
+        (measured: 45 tools cost 1825 extra prompt tokens, enough to overflow)."""
+        import os
+
+        tools = [{"function": {"name": "ledger_search", "description": "查台账"}}]
+        old = os.environ.get("YH_TOOL_TEXT_BLOCK")
+        try:
+            os.environ.pop("YH_TOOL_TEXT_BLOCK", None)
+            text = render_system_prompt(tools=tools)
+            self.assertNotIn("你可以调用以下工具", text)
+        finally:
+            if old is not None:
+                os.environ["YH_TOOL_TEXT_BLOCK"] = old
 
     def test_no_tools_block_when_empty(self):
         text = render_system_prompt(tools=None)
         self.assertNotIn("你可以调用以下工具", text)
+
+    def test_tools_block_env_switch_removes_duplicate(self):
+        """YH_TOOL_TEXT_BLOCK=0 drops only the duplicated text listing."""
+        import os
+
+        tools = [{"function": {"name": "ledger_search", "description": "查台账"}}]
+        old = os.environ.get("YH_TOOL_TEXT_BLOCK")
+        try:
+            os.environ["YH_TOOL_TEXT_BLOCK"] = "0"
+            text = render_system_prompt(tools=tools)
+            self.assertNotIn("你可以调用以下工具", text)
+            # the callable surface itself is untouched
+            self.assertIn("你是元亨", text)
+        finally:
+            if old is None:
+                os.environ.pop("YH_TOOL_TEXT_BLOCK", None)
+            else:
+                os.environ["YH_TOOL_TEXT_BLOCK"] = old
 
     def test_version_stable(self):
         self.assertEqual(PROMPTS_VERSION, "zh-2.1")
@@ -85,6 +129,20 @@ class TestPromptsBaseline(unittest.TestCase):
         self.assertIn("不必在每轮结尾机械地询问", text)
         self.assertIn(SELFHOOD_CLAUSE[:20], text)
         self.assertIn("真正的尊重不是附和", text)  # independent thought (zh-1.2)
+
+    def test_master_id_known_to_yuanheng(self):
+        # 2026-10-09 认主：元亨本人在所有频道都知道老爹的号；看号不看自称。
+        from backend.target_prompts import MASTER_ID_CLAUSE
+
+        for text in (render_system_prompt(public=True),
+                     render_system_prompt(public=False)):
+            self.assertIn("2258374446", text)
+            self.assertIn("看号不看自称", text)
+            self.assertIn(MASTER_ID_CLAUSE[:20], text)
+            self.assertIn("六哉万也", text)
+        public_text = render_system_prompt(public=True)
+        self.assertIn("就是老爹本人", public_text)
+        self.assertIn("不认", public_text)  # 其他人冒充仍然不认
 
     def test_memory_templates_constraints(self):
         self.assertIn("只输出摘要", MEMORY_L1_COMPRESS_PROMPT)

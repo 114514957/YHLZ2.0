@@ -28,8 +28,27 @@ _PROJECT = __import__("pathlib").Path(__file__).resolve().parent.parent
 if str(_PROJECT) not in sys.path:
     sys.path.insert(0, str(_PROJECT))
 
-LOCAL_BASE = "http://127.0.0.1:11434/v1/chat/completions"
-LOCAL_MODEL = "qwen2.5:3b"
+# Dual-rail fallback: the local production brain is Gemma on 8081
+# (llama.cpp, alias gemma-4-e4b).  The old fallback pointed at Ollama
+# qwen2.5:3b on 11434, but this machine's Ollama cannot create its model
+# manifest dir (HTTP 500 on every chat), so when DeepSeek was briefly
+# unavailable every autonomous turn died with RuntimeError.
+LOCAL_BASE = "http://127.0.0.1:8081/v1/chat/completions"
+LOCAL_MODEL = "gemma-4-e4b"
+# 2026-10-21 老爹要求「元亨自主的任务全部停掉」：一个持久开关，
+# 同时挡住定时/内因自主和到点计划；删除 flag 即恢复。
+AUTONOMY_FLAG = _PROJECT / "cache" / "autonomy_disabled.flag"
+
+
+def autonomy_disabled() -> bool:
+    import os
+    env = os.getenv("YHLZ_AUTONOMY_DISABLED", "").strip().lower()
+    if env in ("1", "true", "yes", "on"):
+        return True
+    try:
+        return AUTONOMY_FLAG.exists()
+    except Exception:
+        return False
 
 from backend.console_server import ConsoleHandler  # noqa: E402 (workbench UI base)
 from backend import notify_guard  # noqa: E402 (F5 dedupe/rate-limit)
@@ -241,6 +260,8 @@ class DaemonRuntime:
         is the pure function `autonomy_due`."""
         while True:
             time.sleep(min(AUTONOMY_POLL_SECONDS, max(30.0, self.autonomy_seconds / 10)))
+            if autonomy_disabled():
+                continue
             try:
                 u = _drive_urge()
                 now = time.time()
@@ -384,7 +405,7 @@ class DaemonRuntime:
             return {"status": "degraded", "detail": type(exc).__name__}
         return {"status": "ok", "provider": "dual-rail",
                 "sessions": len(self._sessions), "turns": counts,
-                "llm": "deepseek->ollama",
+                "llm": "deepseek->gemma",
                 "uptime_s": round(
                     time.time() - getattr(self, "_started_at", time.time()), 1),
                 "active_turns": _gpu_chat_active(),
@@ -405,7 +426,8 @@ class DaemonRuntime:
         return c
 
     def turn(self, text: str, channel: str = "private",
-             images: list | None = None, audio: list | None = None) -> dict:
+             images: list | None = None, audio: list | None = None,
+             mode: str | None = None) -> dict:
         """GPU interlock (ledger 0459): refuse new turns during the SVC window.
 
         节点A (opt-in, default off): audio turns are routed through the shared
@@ -421,7 +443,8 @@ class DaemonRuntime:
                 routed = self._target_voice_turn(text, channel, audio)
                 if routed is not None:
                     return routed
-            return self._turn_impl(text, channel, images=images, audio=audio)
+            return self._turn_impl(text, channel, images=images, audio=audio,
+                                   mode=mode)
         finally:
             gpu_lock.chat_exit()
 
@@ -525,7 +548,8 @@ class DaemonRuntime:
         return asyncio.run_coroutine_threadsafe(close(), self._loop).result(timeout=timeout_s)
 
     def _turn_impl(self, text: str, channel: str = "private",
-                   images: list | None = None, audio: list | None = None) -> dict:
+                   images: list | None = None, audio: list | None = None,
+                   mode: str | None = None) -> dict:
         key = self._norm_ui_channel(channel)
         # owner dev console (#dev/#a/#ds/#y/#n/#push) — not a conversation turn
         # (ledger 0407): mirrors the QQ bridge without hijacking chat.
@@ -543,7 +567,8 @@ class DaemonRuntime:
             pass
         s = self._session(key)
         future = asyncio.run_coroutine_threadsafe(
-            s.run_turn(str(text), images=images, audio=audio), self._loop)
+            s.run_turn(str(text), images=images, audio=audio,
+                       mode=mode or "auto"), self._loop)
         info = future.result(timeout=240)
         # Text markers cannot authorize a dev process. Apply defense in depth
         # for custom/legacy session factories too; explicit #dev was handled
@@ -573,7 +598,7 @@ class DaemonRuntime:
                     if task:
                         info["answer"] = clean
                         info["dev_task"] = task
-                        note = start_dev_task(task)
+                        note = start_dev_task(task, channel="voice")
                         if note:
                             info["answer"] = (clean + "\n" + note).strip()
             except Exception:
@@ -686,6 +711,8 @@ class DaemonRuntime:
 
         Non-reentrant: a plan nudge is itself a turn(), whose trailing B4 call
         re-enters here — the nested call must return immediately."""
+        if autonomy_disabled():
+            return
         if not self._sched_lock.acquire(blocking=False):
             return
         try:
@@ -712,17 +739,25 @@ class DaemonRuntime:
                     if sched_mod.in_backoff(plan, time.time()):
                         continue
                     steps = plan.get("steps") or []
-                    body = (f"（计划表到点）你的例行计划：{plan.get('name')}。"
-                            f"{'步骤：' + '；'.join(steps[:3]) if steps else ''}"
-                            " 想做才做——需要我配合跑工具（如 summarize/consolidate/清理任务表）就说一声。")
-                    self.turn(body, "private")
+                    body = (f"（计划表到点，现在执行）你的例行计划：{plan.get('name')}。"
+                            f"{'步骤：' + '；'.join(steps[:3]) if steps else ''} "
+                            "现在就按步骤调用工具执行；第一步先调用工具，"
+                            "不要只回复“收到/正在执行”。做完用一两句说结果。")
+                    info = self.turn(body, "private", mode="work")
+                    used = [u.get("name", "") for u in (info.get("tool_uses") or [])]
                     sched_mod.mark_run(plan.get("id", ""), now)
-                    print(f"[schedule] ran {plan.get('name')}", flush=True)
+                    print(f"[schedule] ran {plan.get('name')} tools={used}",
+                          flush=True)
                 except Exception as exc:
                     err = type(exc).__name__
                     fc = sched_mod.mark_fail(plan.get("id", ""), err)
-                    print(f"[schedule] run err {err} (fail #{fc})",
+                    print(f"[schedule] run err {err} (fail #{fc}): {exc}",
                           flush=True)
+                    try:
+                        import traceback
+                        traceback.print_exc()
+                    except Exception:
+                        pass
                     if fc == 3:
                         msg = (f"计划「{plan.get('name')}」连续失败 3 次，"
                                f"已自动暂停 24 小时：{err}")
@@ -743,6 +778,10 @@ class DaemonRuntime:
         stamp_file = pathlib.Path(_PROJECT) / "cache" / "memory_upkeep_last.json"
         while True:
             time.sleep(60)
+            # 2026-10-24：memory upkeep is an automatic maintenance task too.
+            # The autonomy flag must stop it together with autonomy/plans.
+            if autonomy_disabled():
+                continue
             try:
                 now = time.localtime()
                 today = time.strftime("%Y-%m-%d")
@@ -813,7 +852,27 @@ class DaemonRuntime:
 
     def console_turn_stream(self, text: str, on_delta,
                             pre_recall: list | None = None) -> dict:
-        """Console (workbench) turn with token streaming via on_delta."""
+        """Console (workbench) turn with token streaming via on_delta.
+
+        0831：工作台 /talk 原先把 ``#dev`` 直接当聊天（绕过 _turn_impl 的
+        handle_dev_command），派单是断的。这里先走同一个任务入口：显式指令
+        直接回执；当前渠道有等待答复的任务时，普通一句话按答复处理。
+        """
+        try:
+            from backend.target_dev_bridge import (handle_dev_command,
+                                                   maybe_answer_pending)
+
+            reply = handle_dev_command(str(text or ""), channel="console")
+            if reply is not None:
+                return {"answer": reply, "tool_uses": [], "iterations": 0,
+                        "dev_command": True}
+            answered = maybe_answer_pending(str(text or ""), channel="console")
+            if answered is not None:
+                return {"answer": answered, "tool_uses": [], "iterations": 0,
+                        "dev_answer": True}
+        except Exception as exc:  # noqa: BLE001
+            print(f"[console] dev 路由异常 {type(exc).__name__}: {exc}",
+                  flush=True)
         s = self._session("console")
         async def _run():
             return await s.run_turn(str(text), on_delta=on_delta,

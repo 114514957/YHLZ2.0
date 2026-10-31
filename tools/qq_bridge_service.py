@@ -259,6 +259,11 @@ def run_service(resolved: dict) -> int:
         os.environ["YHLZ_QQ_PROFILE"] = resolved["profile"]
         os.environ["YHLZ_QQ_STATE_DIR"] = str(state_dir)
         os.environ["YHLZ_QQ_ENABLE_VOICE"] = "1" if resolved["voice"] else "0"
+        daemon_url = str((resolved.get("config") or {}).get("daemon_url") or "").strip()
+        if daemon_url:
+            # 利贞桥指向 harness worker，而不是元亨的 8321 daemon。
+            os.environ["DAEMON"] = daemon_url
+            print(f"[service] DAEMON={daemon_url}", flush=True)
         _apply_timing_env(resolved.get("config") or {})
         _apply_wake_env(resolved.get("config") or {})
         _apply_dev_env(resolved.get("config") or {}, state_dir)

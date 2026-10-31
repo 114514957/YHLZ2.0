@@ -25,7 +25,7 @@ except Exception:
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--arm", required=True,
-                choices=("current", "style", "anchor", "both", "final"))
+                choices=("current", "style", "anchor", "both", "final", "final2"))
 ap.add_argument("--bank", choices=("unseen", "guard", "r4"), default="unseen")
 ap.add_argument("--rep", type=int, default=1)
 ap.add_argument("--ids", default="")

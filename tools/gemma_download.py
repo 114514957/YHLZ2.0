@@ -8,7 +8,7 @@ os.environ.setdefault("HF_HOME", r"C:\Users\ACE_WAN——PROJECT\.cache\huggingf
 # ~/.cache/huggingface/token (already saved there). Never commit secrets.
 os.environ["HF_HUB_ENABLE_XET"] = "0"   # xet CDN unstable here; plain https
 os.environ["HF_HUB_DISABLE_XET"] = "1"
-sys.path.insert(0, r"C:\Users\ACE_WAN——PROJECT\YHLZ")
+sys.path.insert(0, r"C:\Users\ACE_WAN——PROJECT\YHLZ\YH")
 sys.stdout = open(sys.stdout.fileno(), mode="w", encoding="utf-8", buffering=1)
 
 from huggingface_hub import snapshot_download  # noqa: E402

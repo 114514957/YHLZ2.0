@@ -11,9 +11,10 @@
   "created": "2026-10-13",
   "standard_ref": "GB/T 45654—2025 训练数据条款（来源合法性、知识产权、个人信息）",
   "legend": {
-    "kind": ["local_material", "qq_corpus", "open_dataset", "novel", "book", "web_reference"],
+    "kind": ["local_material", "qq_corpus", "open_dataset", "novel", "book", "web_reference",
+             "run_trace", "textbook", "reading", "audio_corpus"],
     "assessment_status": ["not_done", "partial", "done"],
-    "rights_scope_status": ["pending", "cleared", "nc_only", "public_domain", "reference_only", "own"]
+    "rights_scope_status": ["pending", "cleared", "nc_only", "public_domain", "reference_only", "own", "owner_waiver"]
   },
   "sources": [
     {
@@ -39,8 +40,8 @@
       "pre_collect_assessment": "not_done",
       "post_collect_verification": "partial（本次 4000 抽样机器判定合格率 99.08%）",
       "usable_for": ["上下文与多轮池（须先匿名化）"],
-      "rights_scope_status": "pending",
-      "notes": "**待老爹裁（D-1）**：①自有群+匿名化+留依据 ②只取元亨与老爹本人发言 ③停用群友发言。群号/昵称/QQ 号须哈希化后才可出集"
+      "rights_scope_status": "cleared",
+      "notes": "**老爹 2026-10-18 裁定：QQ 接受（D-1 关闭）**；匿名化已完成（18567→18505 条，URL/号码/昵称残留全 0，v9_qq_corpus_curate.py）；consent_status=anonymized；出集时仍不得输出原始标识符"
     },
     {
       "id": "SRC-003",
@@ -52,8 +53,8 @@
       "pre_collect_assessment": "not_done",
       "post_collect_verification": "partial",
       "usable_for": ["核心黄金池（实录）"],
-      "rights_scope_status": "pending",
-      "notes": "台账 0506 记录：原 4066 条导出 → 元亨 33 条（22 文字 + 11 语音 ASR）"
+      "rights_scope_status": "cleared",
+      "notes": "**随 SRC-002 一并 cleared（2026-10-18，D-1 关闭）**；台账 0506：原 4066 条导出 → 元亨 33 条（22 文字 + 11 语音 ASR）；真实对话池仍远不足（31 条 vs ≥10% 硬下限），需继续从 QQ 续拉"
     },
     {
       "id": "SRC-004",
@@ -210,12 +211,245 @@
       "usable_for": ["仅设定研读参考"],
       "rights_scope_status": "reference_only",
       "notes": "**不得作为训练语料**；如需使用须逐站核 robots 与许可"
+    },
+    {
+      "id": "SRC-016",
+      "name": "元亨工具轨迹集（tool_use_v6 + v8 系列；**按冻结 schema 生成，非实录**）",
+      "kind": "run_trace",
+      "location": "data/finetune/tool_use_v6.jsonl | data/finetune/tool_use_v8.jsonl | data/finetune/tool_use_v8_a.jsonl | data/finetune/tool_use_v8_b.jsonl | data/finetune/tool_use_v8_c.jsonl | data/finetune/tool_use_v8_d.jsonl",
+      "license": "自有生成（由 tools/gen_tooluse.py 按 43 项 registry schema 造），无第三方许可问题",
+      "robots_or_terms": "不适用（本地生成，非抓取）",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "partial（10 条样张人工审：docs/素材/_草稿/T01_工具轨迹样张10条_20261013.md）",
+      "usable_for": ["工具调用池", "多轮上下文池"],
+      "rights_scope_status": "own",
+      "notes": "v6=380、v8=626（=a207+b186+c195+d38）；**2026-10-18 更正**：此前误标为『真实轨迹』，实为 schema 生成的模拟轨迹（user 文本唯一率 613/626，assistant 为 tool_calls 无正文）；**缺 `simulation: true` 标记**（格式标准要求）已记缺口；真实运行时工具日志**尚未收割**"
+    },
+    {
+      "id": "SRC-017",
+      "name": "利贞数据集（人格对白 lizhen:* + 派单任务与产出 dev_jobs）",
+      "kind": "run_trace",
+      "location": "data/finetune/sft_persona_v8.jsonl | cache/qq_bridge/lite/dev_jobs.db | cache/dev/harness_jobs",
+      "license": "自有：对白来自 docs/素材/对话样本.md 分发；派单记录为本机 harness 运行日志",
+      "robots_or_terms": "不适用（本地运行）",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "partial（派单 12 条逐条可核；对白按 300 条上限抽样）",
+      "usable_for": ["利贞人格池", "工具调用池（派单产出）"],
+      "rights_scope_status": "own",
+      "notes": "派单样例仅 12 条（2026-10-06~10-13），字段含 task/question/answer/report/changed_files/commit_hash/error；**需继续积累**真实派单"
+    },
+    {
+      "id": "SRC-018",
+      "name": "初中语文课本（统编 7–9 年级，共 6 册）",
+      "kind": "textbook",
+      "location": "本机无文本；待采集（docs/素材/_原素材/ 待建）",
+      "license": "**在版教材（人教社/统编）**：仅自有实体书数字化 + 个人学习可用，**禁止再分发**；现代文课文不得出集",
+      "robots_or_terms": "无网络抓取计划；不爬教材电子版",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["阅读与文言池（古诗文/文言文优先）"],
+      "rights_scope_status": "pending",
+      "notes": "古诗文原文公版（可另走 SRC-014 公版文本）；需老爹确认自有实体书与数字化范围（D-2）"
+    },
+    {
+      "id": "SRC-019",
+      "name": "高中语文课本（统编 必修上/下 + 选择性必修上/中/下，共 5 册）",
+      "kind": "textbook",
+      "location": "本机无文本；待采集（docs/素材/_原素材/ 待建）",
+      "license": "**在版教材（人教社/统编）**：仅自有实体书数字化 + 个人学习可用，**禁止再分发**；现代文课文不得出集",
+      "robots_or_terms": "无网络抓取计划；不爬教材电子版",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["阅读与文言池（古诗文/文言文优先）", "议论文/说明文语体参考"],
+      "rights_scope_status": "pending",
+      "notes": "古诗文占比高，公版原文可直采；现代文（含译作）逐篇核版；同待 D-2"
+    },
+    {
+      "id": "SRC-020",
+      "name": "阅读材料（课外阅读/整本书阅读/时文）",
+      "kind": "reading",
+      "location": "本机无文本；待采集（docs/素材/_原素材/ 待建）",
+      "license": "**逐篇核**：鲁迅/老舍等已公版；译著逐版核；在版时文仅做原创改写、不动原文",
+      "robots_or_terms": "未抓取；如用维基文库/古诗文网须记录 robots 与许可证据",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["阅读讨论池", "故事种子（仅取机制，不搬原文）"],
+      "rights_scope_status": "pending",
+      "notes": "先出公版书单（《朝花夕拾》《骆驼祥子》等）再谈在版；时文只做讨论不引原文"
+    },
+    {
+      "id": "SRC-021",
+      "name": "小学语文课本（统编 一上–六下，共 12 册）",
+      "kind": "textbook",
+      "location": "本机无文本；待采集（docs/素材/_原素材/ 待建）",
+      "license": "**在版教材（人教社/统编）**：仅自有实体书数字化 + 个人学习可用，**禁止再分发**",
+      "robots_or_terms": "无网络抓取计划；不爬教材电子版",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["基础识字与表达池", "低学段叙事/说明语体"],
+      "rights_scope_status": "pending",
+      "notes": "台账 0825 立项（老爹：小学至高中语文数学课本作语言与推理基础来源）；同待 D-2 裁定"
+    },
+    {
+      "id": "SRC-022",
+      "name": "数学课本（小学 12 册 + 初中 6 册 + 高中 5 册，人教/统编）",
+      "kind": "textbook",
+      "location": "本机无文本；待采集（docs/素材/_原素材/ 待建）",
+      "license": "**在版教材**：仅自有实体书数字化 + 个人学习可用，**禁止再分发**；例题原文不得出集",
+      "robots_or_terms": "无网络抓取计划",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["推理与概念池（条件/推导/反例/验算）", "生活迁移题（原创改写）"],
+      "rights_scope_status": "pending",
+      "notes": "台账 0825 立项：语文重阅读理解/叙事视角，数学重概念条件与推导；按知识点选材、控制机械题重复；例题只做原创改写"
+    },
+    {
+      "id": "SRC-023",
+      "name": "开源候选补充集（BaiJia / pippa-zh / chinese-chatbot-corpus / MultiTurnResponseSelection / VisualNovel-Dataset 等）",
+      "kind": "open_dataset",
+      "location": "本机未拉取；候选清单 docs/报告/HF开源素材集候选清单_20261008.md | docs/报告/V9_开源素材参考候选_20261008.json | docs/报告/V9_开源素材第二轮参考候选_20261008.json",
+      "license": "**逐库核**（含 NC、门控、机翻、成人向需筛）",
+      "robots_or_terms": "只经 HF/GitHub/魔搭检索，未批量下载",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["风格与方法参考（不整段入集）", "说话与一般任务池（拉样评估后）"],
+      "rights_scope_status": "pending",
+      "notes": "台账 0709/0711/0735 三轮检索；pippa-zh 含成人向需筛，BaiJia 为历史角色 RP；**均未拉取**。按判定分层：可拉样=LCCC/情商问答/多情绪/roleplay-sharegpt/evol-character-200/Roleplay-Novel/高情商可爱；备查=COIG·MNBVC·Belle·ruozhiba·role-play-bench·PsyAgent；排除=ChatHaruhi·honkai3rd·zhtw（IP）、Traditional Chinese roleplay（SA）、chinese-enthusiastic-dpo（反面对照）、PersonaHub（NC-SA）、Emotion_NaturalConv_FunctionCall（无许可）。详见 docs/报告/HF开源素材集候选清单_20261008.md 与清单 §2.7"
+    },
+    {
+      "id": "SRC-028",
+      "name": "LCCC 中文口语闲聊（silver/lccc 全量 + lorinma/Slim-LCCC-zh 精选约 10K）",
+      "kind": "open_dataset",
+      "location": "HF；未拉取（silver/lccc；lorinma/Slim-LCCC-zh 门控）",
+      "license": "silver/lccc = **MIT**；Slim-LCCC-zh = **未标 + 门控**（须登录同意）",
+      "robots_or_terms": "HF 数据卡已读；门控集须核同意条款",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["说话与一般任务池（口语闲聊，须筛）", "DAPT 备选（全量）"],
+      "rights_scope_status": "pending",
+      "notes": "LCCC 来源=微博/影视，隐私与版权底色须记；Slim 版约 10K 好筛；全量 10M–100M 作 DAPT 候选"
+    },
+    {
+      "id": "SRC-029",
+      "name": "情绪与角色扮演可拉样集（高情商可爱 / Chinese-Emotional-Intelligence / 多情绪对白 / roleplay-zh-sharegpt / evol-character-200 / Chinese-Roleplay-Novel）",
+      "kind": "open_dataset",
+      "location": "HF；未拉取（6 个仓库；候选文档 docs/报告/HF开源素材集候选清单_20261008.md）",
+      "license": "Mixed（逐库核）：高情商可爱=cc-by-4.0；情商问答=apache-2.0；多情绪=MIT；roleplay-sharegpt=apache-2.0；evol-character-200=apache-2.0；Roleplay-Novel=apache-2.0",
+      "robots_or_terms": "HF 数据卡已读；逐库核",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["情绪语域参考", "角色扮演格式/人设一致性参考"],
+      "rights_scope_status": "pending",
+      "notes": "**只借情绪语域与格式，不借口吻混训**（会稀释元亨辨识度）；拉样后逐条过审；酒馆/角色卡格式仅作结构参考"
+    },
+    {
+      "id": "SRC-024",
+      "name": "元亨嗓音语料（说话干声 + 翻唱参考）",
+      "kind": "audio_corpus",
+      "location": "dist/finetune_bundle/voice/audio | 音频素材",
+      "license": "自有录音（元亨 TTS/干声）；翻唱参考曲目**原曲版权另计**，仅本地研究",
+      "robots_or_terms": "不适用",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "partial（452 文件/46.7 MB 在用；翻唱 A/B 实验有留痕）",
+      "usable_for": ["语音/翻唱训练（非文本池）"],
+      "rights_scope_status": "own",
+      "notes": "台账 0730/0731：2h 说话语料；`音频素材/` 另有 9.5 GB 归档（不入库）。**不进文本 SFT**"
+    },
+    {
+      "id": "SRC-025",
+      "name": "台账决策记忆与自造样张资产（228 条决策/结论 + T01 工具轨迹样张 10 条 + 爱好词典词表）",
+      "kind": "local_material",
+      "location": "docs/素材/_草稿/T01_工具轨迹样张10条_20261013.md | cache/memstore/memstore.db",
+      "license": "自有（台账/自造）",
+      "robots_or_terms": "不适用",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "partial（T01 逐条对冻结 schema 核过）",
+      "usable_for": ["上下文与决策池", "工具轨迹样张"],
+      "rights_scope_status": "own",
+      "notes": "台账 0142/0145 预填充 228 条（fact=110/context=118，敏感行跳过）；0790 爱好词典词表在 backend/qq_profiles.py（非独立文件）"
+    },
+    {
+      "id": "SRC-026",
+      "name": "外部方法论/规范参考（Prompt-Engineering-Guide、Character-LLM 流程、NEKO 桌面做法）",
+      "kind": "web_reference",
+      "location": "GitHub/HF 文档；本机未落盘",
+      "license": "各自仓库许可（MIT/Apache 为主），**仅读方法不搬语料**",
+      "robots_or_terms": "检索已做，未记录逐条证据",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["规范骨架/术语统一/流程设计参考"],
+      "rights_scope_status": "reference_only",
+      "notes": "台账 0140/0714/0221：学技法与流程，产物化为我们的规则/模板/提示词，语料本身不进训练集"
+    },
+    {
+      "id": "SRC-027",
+      "name": "风格参考语料（galgame / ATRI / 大肥鱼人设台词）",
+      "kind": "web_reference",
+      "location": "docs/素材/素材库.md（索引）",
+      "license": "**版权（galgame/ATRI）；大肥鱼 MIT**——仅学语气，禁入库",
+      "robots_or_terms": "不适用（社区/公开分发物）",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["风格参考（不入库、不当人格数据）"],
+      "rights_scope_status": "reference_only",
+      "notes": "台账 0334/0337：galgame 检索候选 VisualNovel-Dataset / cross-channel 本地化项目；大肥鱼人设/台词 MIT"
+    }
+,
+    {
+      "id": "SRC-030",
+      "name": "游戏台词参考（崩坏三 / 崩坏星穹铁道 / 原神 / 重返未来1999）",
+      "kind": "web_reference",
+      "location": "本机无文本；不抓取、不入库（在版版权）",
+      "license": "**在版游戏版权（miHoYo / Bluepoch 等），禁止入训练集**；仅可提炼主题与结构，产出必须原创",
+      "robots_or_terms": "不抓取；不整段引用",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "not_done",
+      "usable_for": ["主题/结构参考（勇气·守护·牺牲·诚实·同行·希望）"],
+      "rights_scope_status": "owner_waiver",
+      "notes": "**老爹 2026-10-20 裁定（D-3）：游戏台词可用于个人非商用训练**（'正常人说话也会借用台词'）。执行口径：只取**短句**（8–120 字）、标注作品与出处、不整篇搬运、不对外分发；数据落 data/pd/v9_game_quotes.jsonl。已抓：原神 373 + 崩坏星穹铁道 237（维基语录，610 条）；**换源后补：崩坏3 82 + 重返未来1999 46（萌娘百科，128 条）**；BWiki 的 parse API 全拒（HTTPError），未采用。合计 738 条短句，另保留 12 条原创样张对照"
+    },
+    {
+      "id": "SRC-031",
+      "name": "公版文本库（chinese-poetry 诗词 + 维基文库散文，直采）",
+      "kind": "book",
+      "location": "data/pd/v9_pd.jsonl | data/pd/v9_ws_prose.jsonl | data/pd/v9_virtue.jsonl",
+      "license": "**原文公有领域**；维基文库页面文本 CC BY-SA（只取原文并标注来源页）",
+      "robots_or_terms": "chinese-poetry=公开数据集；维基文库 API 已用慢速+退避（429 教训），逐页留 URL 与 sha16",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "partial（逐页 sha16 + 段数留痕）",
+      "usable_for": ["文言/阅读池", "长文阅读（≥8K 字段落）", "美德主题段落抽取"],
+      "rights_scope_status": "public_domain",
+      "notes": "诗词约 6 万首 + 散文 8 页；**诗句里的偶发美德词已用「密度+语境」双门槛过滤**；散文公版被限流，需慢速补齐"
+    }
+,
+    {
+      "id": "SRC-032",
+      "name": "小说正文（希灵帝国 / 异常生物见闻录 / 诡秘之主 / 苏菲的世界；老爹提供）",
+      "kind": "novel",
+      "location": "data/pd/v9_novels.jsonl（源 下载物象/图书素材.zip）",
+      "license": "**在版作品**；老爹 2026-10-20 裁定（D-3）个人非商用训练可用，**不对外分发**",
+      "robots_or_terms": "不适用（本地文件，未抓取）",
+      "pre_collect_assessment": "not_done",
+      "post_collect_verification": "partial（段号顺序校验；按段落切 12k 字块）",
+      "usable_for": ["阅读/语境池", "长文（≥8K 字）"],
+      "rights_scope_status": "owner_waiver",
+      "notes": "zip 内 4 本 4940 章、约 1900 万字 → 1552 块（≥8K 字 1550 块）；含《苏菲的世界》（哲学启蒙，老爹 0784 立项）"
     }
   ],
   "current_gaps": [
     "全部 15 个来源的 pre_collect_assessment 均为 not_done（国标要求的采集前 5% 评估）",
     "外部来源与 QQ 语料的 post_collect_verification 均未达国标要求（无 4000 条人工签字留痕；本次仅机器判定）",
     "SRC-002/003 的个人信息同意路径未定（待老爹 D-1）",
-    "SRC-015 缺 robots 证据记录"
+    "SRC-015 缺 robots 证据记录",
+    "SRC-016 工具调用轨迹仅 10 条样张审过（docs/素材/_草稿/T01_工具轨迹样张10条_20261013.md），远未达 5% 双评估留痕",
+    "SRC-017 利贞派单样例仅 12 条（2026-10-06 ~ 10-13），2026-10-13 之后没有新增派单记录",
+    "SRC-018/019 课本尚未采集：本机无文本，需老爹确认「自有实体书 + 个人学习用数字化」范围（D-2），且现代文课文在版、禁止再分发",
+    "SRC-020 阅读材料逐篇许可未核；先做公版清单（鲁迅/老舍等已公版、译著逐版核）",
+    "SRC-021/022 小学语文与数理化课本同样未采集（台账 0825 立项），与 SRC-018/019 一并等 D-2",
+    "SRC-023 开源候选集只检索未拉取，且 pippa-zh 含成人向、BaiJia 为历史角色 RP，须先筛",
+    "SRC-024 嗓音语料在本地（452 文件 46.7 MB + 9.5 GB 归档），但未做采集前评估；不进文本 SFT",
+    "SRC-016 为 schema 生成的模拟轨迹（非实录），且缺 simulation 标记；真实运行时工具日志尚未收割",
+    "双签未完成：3121 条 annotator_review 为空，待老爹签批次 cache/v9_materials_preparation/sign_batches.json",
+    "真实对话池仍不足：SFT 内仅 31 条，QQ 语料 18505 条尚未切分为「真实对话」样本，距 ≥10% 硬下限仍远"
   ]
 }

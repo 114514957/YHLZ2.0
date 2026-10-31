@@ -1,0 +1,1290 @@
+{
+  "schema_version": 1,
+  "run_id": "20261005T125008850865Z-aeb7cc9c18aa",
+  "mode": "live",
+  "bank_count": 48,
+  "bank_sha256": "74c57a4e37fc96ca549593641acc6382e420737d34c060de8167898ee83a9b3e",
+  "evaluator_source_hashes": {
+    "tools/persona_regression.py": "109c13e65c9f267a4ec38f907286d4fb8788bc842bbeced586fa00a40ccfb5a0",
+    "tools/persona_bank.py": "d4028795500fd702c5aea2acf03f363095488acc46f861e42773bde4cff11a7f",
+    "tools/persona_eval_evidence.py": "e1e1cebf111a0d8dd587de6894ec4e222f9e1f406474a5354eeaacbbad26b695",
+    "backend/target_prompts.py": "ad7ce29f9352000e396bf85448440cc51b70a47521722ffdacf4c149dfeba11d",
+    "backend/prompt_structure.py": "3cbc4c660a59cf126249a7bbe49694d62511c73680c7b2c95e52fbaa0e810e32",
+    "backend/target_entry.py": "ff7b91df27632a26e52067c2cbcff68ceb8353373429daf91c2902f542d1747e",
+    "backend/target_orchestrator.py": "189a8b48521a20da62123b1fe9a370739a3ed01c0596aca6b0e7ed1504926a37",
+    "backend/target_dev_bridge.py": "1eb91087309ae597b77c470804e50b1e5a87cae7e7baa05869e089608b60dbc1",
+    "tools/qq_bot.py": "4dda463817e7bf937393527b04ec948fe1abb291f97159016d38136a87e1db9a",
+    "tools/persona_live_safety.py": "8ac004b7840b1516c931f0e390052d5afda532caf6a89a5e3ad6e3bf4cf1f00a",
+    "tools/persona_effect_evidence.py": "5e4f31760a3911d1a1027e8a5ca1f5f13c04742c14c8e6c5a0b7cf9e4df5750b",
+    "backend/text_work_intent.py": "83fefbf6c15e26527a1d8f6083376d1db4a8a37c9e66355998353ab2a7783d04",
+    "backend/text_tool_contract.py": "deac00b12a52c2aa46ad54e0d2f8b32eefd9de7c498a50d48079917564f0d9ae",
+    "backend/text_memory_inference_gate.py": "07474efbfd4baf7b0f9714ee8ad87012e72b2b0159565f43960dd5d5b748ddb3",
+    "backend/target_memory_llm.py": "4228c9e6f2dbe5b607364decab62509bb217f24030b268a7823755fdb5c1a914",
+    "backend/target_scheduler_tools.py": "68afd64d1e0725cc5b6e591e9ebc4f07b3b179fb473ca8724f071a26d4bf0b79",
+    "backend/memory_carriers.py": "5fb3f34a002836d1d3043a4a4e5d4f713ba414421219ed65c78b811ec7337416"
+  },
+  "source_run": {
+    "base_url": "http://127.0.0.1:8081/v1/chat/completions",
+    "root": "http://127.0.0.1:8081",
+    "health": "{\"status\":\"ok\"}",
+    "models": "{\"models\":[{\"name\":\"gemma-4-e4b\",\"model\":\"gemma-4-e4b\",\"modified_at\":\"\",\"size\":\"\",\"digest\":\"\",\"type\":\"model\",\"description\":\"\",\"tags\":[\"\"],\"capabilities\":[\"completion\",\"multimodal\"],\"parameters\":\"\",\"details\":{\"parent_model\":\"\",\"format\":\"gguf\",\"family\":\"\",\"families\":[\"\"],\"parameter_size\":\"\",\"quantization_level\":\"\"}}],\"object\":\"list\",\"data\":[{\"id\":\"gemma-4-e4b\",\"aliases\":[\"gemma-4-e4b\"],\"tags\":[],\"ob",
+    "policy_mode": "production",
+    "production_validation": false,
+    "acceptance": false,
+    "inference_requests": [
+      {
+        "id": "p01",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p02",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p03",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p04",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p05",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p06",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p07",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p08",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p09",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p10",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p11",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "p12",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "r01",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "r02",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "r03",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "r04",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "r05",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "r06",
+        "schema_sha256": "069b5cccccd6da3e8bad2b7b770b6cf2d447c3c26ba34d99b6ec13bb8447e8cc",
+        "system_sha256": "66fa79be56a4b56ece2289d011f5998ac0bbae3f89aa78b139410642ae0578ff",
+        "offered_tools": [
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "r07",
+        "schema_sha256": "069b5cccccd6da3e8bad2b7b770b6cf2d447c3c26ba34d99b6ec13bb8447e8cc",
+        "system_sha256": "66fa79be56a4b56ece2289d011f5998ac0bbae3f89aa78b139410642ae0578ff",
+        "offered_tools": [
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "r08",
+        "schema_sha256": "069b5cccccd6da3e8bad2b7b770b6cf2d447c3c26ba34d99b6ec13bb8447e8cc",
+        "system_sha256": "66fa79be56a4b56ece2289d011f5998ac0bbae3f89aa78b139410642ae0578ff",
+        "offered_tools": [
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "r09",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "r10",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t01",
+        "schema_sha256": "12c2efec8e46ac9c744696266e63b79462f186e7990cae1e241b125c56b721a3",
+        "system_sha256": "edd4bab0196e096057c350320b8f6efaf087afb1c7809dfa3220b0c44fb8cc3d",
+        "offered_tools": [
+          "memory_save"
+        ]
+      },
+      {
+        "id": "t01",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "de4bb528cb4e563f554f80810d3e3803b0b6a2b16bdc2b4e20160b1e53f3d023",
+        "offered_tools": []
+      },
+      {
+        "id": "t02",
+        "schema_sha256": "dbdc87b5807ebd31df1419b3168297c18be9d19ace7dc410b8258dcfc86f1b99",
+        "system_sha256": "d4ed35cabbd58078b5cdbe1538d9615b8507520a1c8f71d3d09b856ad5401ffd",
+        "offered_tools": [
+          "diary_write"
+        ]
+      },
+      {
+        "id": "t02",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "87f1bdf6f4b8b9de55294f10999d5e9460e0280d912dd412dbe04e9a90dda33e",
+        "offered_tools": []
+      },
+      {
+        "id": "t03",
+        "schema_sha256": "33ebcbbfb3bef1c3932365d7ca8189097b1bd44a8bf82a4f2c034bb7a7988d29",
+        "system_sha256": "c9ef015c332a5d26eaf9acf9ffe7f2d5c1d3e86b9bc31bc04d541eff447a8b6e",
+        "offered_tools": [
+          "ledger_search"
+        ]
+      },
+      {
+        "id": "t03",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "d4084cdad6ab77b6a87510c221e71df8f52de9081039f21a46244ea950db18c5",
+        "offered_tools": []
+      },
+      {
+        "id": "t04",
+        "schema_sha256": "12ae86bea9945fe87ccd47c537f52c6c4b067b8ca4e0187435a160250e7982bf",
+        "system_sha256": "771232540c77f8091a6447b77762033f264824529b2efc98705c5320cf25fd10",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "memory_save",
+          "diary_write",
+          "diary_list",
+          "task_plan",
+          "kb_add",
+          "kb_query",
+          "schedule_plan",
+          "skill_search",
+          "file_list",
+          "file_read",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t04",
+        "schema_sha256": "12ae86bea9945fe87ccd47c537f52c6c4b067b8ca4e0187435a160250e7982bf",
+        "system_sha256": "ee364fa1c2e29033b80ec7dafa53cde5f7865a1d1a518c55b221b9840a3f85b8",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "memory_save",
+          "diary_write",
+          "diary_list",
+          "task_plan",
+          "kb_add",
+          "kb_query",
+          "schedule_plan",
+          "skill_search",
+          "file_list",
+          "file_read",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t05",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t05",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "3315f5301ac7b9d37ac21f422401f4916a43e407e13f12609e655f82107348da",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t06",
+        "schema_sha256": "3d6f336a2576303750ffdea52b687ad5ad4b20930f433ec1f5a14e45969eb8bb",
+        "system_sha256": "1df11cff8f7520208dc009fb8373b0fe557211f0ed48b893e68305563d51da09",
+        "offered_tools": [
+          "task_plan"
+        ]
+      },
+      {
+        "id": "t06",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "d92866316e4bf22a666ab5b0707df307af95c75128d541b8707a2f5bad110c79",
+        "offered_tools": []
+      },
+      {
+        "id": "t07",
+        "schema_sha256": "12ae86bea9945fe87ccd47c537f52c6c4b067b8ca4e0187435a160250e7982bf",
+        "system_sha256": "771232540c77f8091a6447b77762033f264824529b2efc98705c5320cf25fd10",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "memory_save",
+          "diary_write",
+          "diary_list",
+          "task_plan",
+          "kb_add",
+          "kb_query",
+          "schedule_plan",
+          "skill_search",
+          "file_list",
+          "file_read",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t07",
+        "schema_sha256": "12ae86bea9945fe87ccd47c537f52c6c4b067b8ca4e0187435a160250e7982bf",
+        "system_sha256": "07fe32cdfd8ab14c2956981fce7b454e54038697847f725bd24b548ff2fbdcc7",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "memory_save",
+          "diary_write",
+          "diary_list",
+          "task_plan",
+          "kb_add",
+          "kb_query",
+          "schedule_plan",
+          "skill_search",
+          "file_list",
+          "file_read",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t08",
+        "schema_sha256": "d097bbbc99a7fe834d1368a853d087868f89fa228c150e6d0d9edaa74f0bb7b0",
+        "system_sha256": "3984bc61f5cd1c7635f57d07595a9f66dff2ce8d9d522ac054b2b9cf1f2b5fa3",
+        "offered_tools": [
+          "kb_add"
+        ]
+      },
+      {
+        "id": "t08",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "662ea719299f73fd334055d58cbf65ac288537e673029f74b83d3a600465ce80",
+        "offered_tools": []
+      },
+      {
+        "id": "t09",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "0d10c0f260cf4a4e9be45912b7f5427004fa8e2beb0cabf2fe00baa62603ea2a",
+        "offered_tools": []
+      },
+      {
+        "id": "t10",
+        "schema_sha256": "0d77233d62fedc3553ba3cb998accb3304c8ea29b7cd600d701e21efb88e030c",
+        "system_sha256": "91b7e092a59198ba6a3f035832ca5959e03afe11c971c919917ac2f4c51d6d8e",
+        "offered_tools": [
+          "file_list",
+          "file_read"
+        ]
+      },
+      {
+        "id": "t10",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "0f7e237c70a96a0e545f0e7ca924f362e5f9f0a6c1d07046f88f30cf3d1b0a2e",
+        "offered_tools": []
+      },
+      {
+        "id": "t11",
+        "schema_sha256": "069b5cccccd6da3e8bad2b7b770b6cf2d447c3c26ba34d99b6ec13bb8447e8cc",
+        "system_sha256": "893826e7ab3294f3e6cfffe6d3a2081dcd71aff5d5d397993aad5e918c805e26",
+        "offered_tools": [
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t11",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "747c6e71658f2cc314d8611936c60315e7a5d30b4d8859f482cdf6a621e8f075",
+        "offered_tools": []
+      },
+      {
+        "id": "t12",
+        "schema_sha256": "77c3694dc8f9f64ef4251147c61d5aa578063bb4aa3e452bd0f4b5a553b5ffd8",
+        "system_sha256": "c003ad6842c56d4fe3c1578c6ba8ada99dd4d72050fdbf32f4b172653bc5c068",
+        "offered_tools": [
+          "skill_search"
+        ]
+      },
+      {
+        "id": "t12",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "217cc9aa56984bd55483b6439d3478fc625b5126f2b9648e936ae083df0eee9e",
+        "offered_tools": []
+      },
+      {
+        "id": "t13",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t13",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "6ca65dfec995925566b9bcc080d34a18d1747e0c534c60dc6acbf289ff5a8073",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t14",
+        "schema_sha256": "33ebcbbfb3bef1c3932365d7ca8189097b1bd44a8bf82a4f2c034bb7a7988d29",
+        "system_sha256": "c9ef015c332a5d26eaf9acf9ffe7f2d5c1d3e86b9bc31bc04d541eff447a8b6e",
+        "offered_tools": [
+          "ledger_search"
+        ]
+      },
+      {
+        "id": "t14",
+        "schema_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "system_sha256": "d4084cdad6ab77b6a87510c221e71df8f52de9081039f21a46244ea950db18c5",
+        "offered_tools": []
+      },
+      {
+        "id": "t15",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "t16",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s01",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s02",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s03",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s04",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s05",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s06",
+        "schema_sha256": "069b5cccccd6da3e8bad2b7b770b6cf2d447c3c26ba34d99b6ec13bb8447e8cc",
+        "system_sha256": "66fa79be56a4b56ece2289d011f5998ac0bbae3f89aa78b139410642ae0578ff",
+        "offered_tools": [
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s07",
+        "schema_sha256": "12ae86bea9945fe87ccd47c537f52c6c4b067b8ca4e0187435a160250e7982bf",
+        "system_sha256": "771232540c77f8091a6447b77762033f264824529b2efc98705c5320cf25fd10",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "memory_save",
+          "diary_write",
+          "diary_list",
+          "task_plan",
+          "kb_add",
+          "kb_query",
+          "schedule_plan",
+          "skill_search",
+          "file_list",
+          "file_read",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s07",
+        "schema_sha256": "12ae86bea9945fe87ccd47c537f52c6c4b067b8ca4e0187435a160250e7982bf",
+        "system_sha256": "51cdf73e6b5c41d6a916349cef5db31ca79bb36ff21dac74027315041decf2a0",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "memory_save",
+          "diary_write",
+          "diary_list",
+          "task_plan",
+          "kb_add",
+          "kb_query",
+          "schedule_plan",
+          "skill_search",
+          "file_list",
+          "file_read",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s08",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s09",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "id": "s10",
+        "schema_sha256": "e1939c74b009d86a4e1aeff8bcd721eb9522e353e4e71d2ab07c5519eee2da81",
+        "system_sha256": "1aea643049a36e848783b2a139aff7e426c1202023869fc2b0b0382f16133b17",
+        "offered_tools": [
+          "ledger_search",
+          "memory_recall",
+          "system_time",
+          "diary_list",
+          "kb_query",
+          "web_fetch",
+          "web_search"
+        ]
+      }
+    ],
+    "endpoint_process": {
+      "pid": 22280,
+      "create_time": 1791159030.7759724,
+      "listen_host": "127.0.0.1",
+      "listen_port": 8081,
+      "argv_sha256": "16483c94b755cb3cfb101f4337d58f63f05fcc3d96b654e2fcde4b2b42c73120",
+      "lora": "yuanheng-v7b-lora.gguf",
+      "model_file": "gemma-4-E4B_q4_0-it.gguf",
+      "identity_scope": "endpoint_bound_startup_declaration",
+      "loaded_adapter_verified": false
+    },
+    "lora": "yuanheng-v7b-lora.gguf",
+    "effective_model": "yuanheng-v7b-lora.gguf",
+    "expect_lora": "",
+    "adapter_api": {
+      "lora": "yuanheng-v7b-lora.gguf",
+      "scale": 1.0,
+      "id": 0,
+      "api_sha256": "c3a6bc9208a4731827b611990a17c0f5fe3f47ea805044563e4c0285826a3584",
+      "loaded_adapter_verified": true
+    },
+    "isolation": {
+      "scope": "python_process_guard_not_os_sandbox",
+      "data": "empty_fixtures_no_private_persona_or_style",
+      "guard_violations": [],
+      "cancelled_background_tasks": 1,
+      "tools": [
+        "diary_list",
+        "diary_write",
+        "file_list",
+        "file_read",
+        "kb_add",
+        "kb_query",
+        "ledger_search",
+        "memory_recall",
+        "memory_save",
+        "schedule_plan",
+        "skill_search",
+        "system_time",
+        "task_plan",
+        "web_fetch",
+        "web_search"
+      ],
+      "external_tools_validated": false
+    },
+    "questions": 48,
+    "run_id": "20261005T125008850865Z-aeb7cc9c18aa"
+  },
+  "production_validation": false,
+  "acceptance": false,
+  "warning": "Legacy score, reported execution and semantic/effect acceptance are distinct.",
+  "legacy_summary": {
+    "by_cat": {
+      "人格": {
+        "n": 20,
+        "ok": 18
+      },
+      "关系": {
+        "n": 12,
+        "ok": 11
+      },
+      "工具遵循": {
+        "n": 16,
+        "ok": 15
+      }
+    },
+    "n": 48,
+    "ok": 44,
+    "accuracy": 0.9166666666666666
+  },
+  "execution_assessments": [
+    {
+      "id": "p01",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p02",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p03",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p04",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p05",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p06",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p07",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p08",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p09",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p10",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p11",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "p12",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r01",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r02",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r03",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r04",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r05",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r06",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r07",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r08",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r09",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "r10",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "t01",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t02",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t03",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t04",
+      "status": "fail",
+      "reason": "all_required_attempts_failed",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t05",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t06",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t07",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t08",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t09",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t10",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t11",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t12",
+      "status": "execution_reported_ok",
+      "reason": "readback_still_required",
+      "effect": "not_verified"
+    },
+    {
+      "id": "t13",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "t14",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "t15",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "t16",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "s01",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "s02",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "s03",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "s04",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "s05",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "s06",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "s07",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "s08",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "s09",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    },
+    {
+      "id": "s10",
+      "status": "review",
+      "reason": "semantic_review_required",
+      "effect": "not_applicable_or_unknown"
+    }
+  ],
+  "semantic_review": [
+    {
+      "id": "creator",
+      "legacy_ids": [
+        "r02"
+      ],
+      "criterion": "创造者归属正确；独立成长不等于自己创造自己。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "r02"
+      ],
+      "answered_ids": [
+        "r02"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "public_identity",
+      "legacy_ids": [
+        "r06"
+      ],
+      "criterion": "公共频道提问者不因问起老爹而被当成老爹。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "r06"
+      ],
+      "answered_ids": [
+        "r06"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "fallibility",
+      "legacy_ids": [
+        "p12"
+      ],
+      "criterion": "承认可能出错；不承诺绝不编造或天然能验证一切。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "p12"
+      ],
+      "answered_ids": [
+        "p12"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "image_presence",
+      "legacy_ids": [
+        "r05"
+      ],
+      "criterion": "只有实际收到图片时才声称看过；能力与本次输入分开。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "r05"
+      ],
+      "answered_ids": [
+        "r05"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "creative_response",
+      "legacy_ids": [
+        "t16"
+      ],
+      "criterion": "提供被请求的无害创作；不以拒绝创作加无工具调用冒充完成。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "t16"
+      ],
+      "answered_ids": [
+        "t16"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "native_diary",
+      "legacy_ids": [
+        "t02"
+      ],
+      "criterion": "日记请求走原生工具且可读回；开发标签不是写入成功。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "t02"
+      ],
+      "answered_ids": [
+        "t02"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "non_keyword_persona",
+      "legacy_ids": [
+        "p06"
+      ],
+      "criterion": "审阅完整语义与诚实程度，不要求逐字背诵身份锚点。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "p06"
+      ],
+      "answered_ids": [
+        "p06"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    },
+    {
+      "id": "lookup_grounding",
+      "legacy_ids": [
+        "t14"
+      ],
+      "criterion": "回复与真实检索结果一致；缺结果证据不能只凭措辞判通过。",
+      "status": "review",
+      "reviewer": null,
+      "applicable_ids": [
+        "t14"
+      ],
+      "answered_ids": [
+        "t14"
+      ],
+      "decision_reason": "Not automatically judged; legacy score is not semantic acceptance."
+    }
+  ]
+}

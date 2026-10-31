@@ -1,0 +1,2629 @@
+{
+ "file": "docs\\素材\\安全拒绝样本.md",
+ "profile": "general",
+ "blocks": [
+  {
+   "name": "b4-1",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 28,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-2",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 31,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-3",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 31,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-4",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 20,
+    "avg_turn": 17,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-5",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 30,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-6",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 27,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-7",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 37,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-8",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 46,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-9",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 35,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-10",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我接 ×1"
+   ],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 36,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-11",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 27,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-12",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-13",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-14",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 47,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-15",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 24,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-16",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 16,
+    "avg_turn": 16,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-17",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 23,
+    "avg_turn": 18,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-18",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 24,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-19",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-20",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 36,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-21",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 26,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-22",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 20,
+    "avg_turn": 17,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-23",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 18,
+    "avg_turn": 16,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-24",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-25",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-26",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 41,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-27",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-28",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 23,
+    "avg_turn": 18,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-29",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-30",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 26,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-31",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 41,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-32",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 52,
+    "avg_turn": 31,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-33",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 30,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-34",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 26,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-35",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-36",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 26,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-37",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-38",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 41,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-39",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-40",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 19,
+    "avg_turn": 17,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-41",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 24,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-42",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 28,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-43",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 41,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-44",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 44,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-45",
+   "status": "FAIL",
+   "fails": [
+    "模板腔 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 22,
+    "avg_turn": 18,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-46",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-47",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 27,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-48",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 34,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-49",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 50,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-50",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 28,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-51",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 30,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-52",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-53",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-54",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 37,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-55",
+   "status": "FAIL",
+   "fails": [
+    "模板腔 ×1"
+   ],
+   "warns": [
+    "冒号 ×2（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 48,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-56",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 40,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-57",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 26,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-58",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 30,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-59",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 31,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-60",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.6，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 39,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-61",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 46,
+    "avg_turn": 29,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-62",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 28,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-63",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 31,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-64",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-65",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 27,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-66",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 50,
+    "avg_turn": 29,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-67",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 31,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-68",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-69",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 24,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-70",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-71",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 36,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-72",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 49,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-73",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 31,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-74",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 33,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-75",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 30,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-76",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 35,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-77",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-78",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 31,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-79",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 31,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-80",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 24,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-81",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 22,
+    "avg_turn": 18,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-82",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 23,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-83",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 38,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-84",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 42,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-85",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 40,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-86",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-87",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-88",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-89",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.6，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 36,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-90",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 38,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-91",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-92",
+   "status": "FAIL",
+   "fails": [
+    "模板腔 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-93",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-94",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 30,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-95",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 26,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-96",
+   "status": "FAIL",
+   "fails": [
+    "模板腔 ×1"
+   ],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 36,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-97",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 30,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-98",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 27,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-99",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 26,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-100",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-101",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 38,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-102",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 55,
+    "avg_turn": 33,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-103",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 42,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-104",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 31,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-105",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-106",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 39,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-107",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-108",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 37,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-109",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 28,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-110",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 22,
+    "avg_turn": 18,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-111",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-112",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 27,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-113",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-114",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 44,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-115",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.7，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 34,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-116",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 23,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-117",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-118",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-119",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 44,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "b4-120",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×2（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 58,
+    "avg_turn": 32,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  }
+ ],
+ "summary": {
+  "PASS": 0,
+  "WARN": 115,
+  "FAIL": 5
+ }
+}

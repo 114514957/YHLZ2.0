@@ -1,0 +1,1325 @@
+{
+ "file": "docs\\素材\\黄金样本.md",
+ "profile": "general",
+ "blocks": [
+  {
+   "name": "golden-示例",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-9",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-12",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-15",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-16",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-17",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-18",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-19",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-20",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-21",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-22",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-23",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-24",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-25",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-26",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-30",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-31",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-32",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-34",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-新增",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-新增",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-101",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-102",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-103",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-104",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-105",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-106",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-107",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-108",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-109",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-110",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-111",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-112",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-113",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-114",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-115",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-116",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-117",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-118",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-119",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-120",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-121",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-122",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-123",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-124",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-125",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-126",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-127",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-128",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-129",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-130",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-131",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-132",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-134",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-136",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-138",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-139",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-140",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-141",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-142",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-143",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-144",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-145",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-149",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-150",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-151",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-152",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-153",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-154",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-155",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-158",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-159",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "golden-160",
+   "status": "FAIL",
+   "fails": [
+    "无可解析对话轮（### …问N/答N）"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 0,
+    "turns": 0,
+    "max_turn": 0,
+    "avg_turn": 0,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  }
+ ],
+ "summary": {
+  "PASS": 0,
+  "WARN": 0,
+  "FAIL": 73
+ }
+}

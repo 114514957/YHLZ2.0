@@ -1,23 +1,43 @@
 """YHLZ MCP server (ledger 0160/0163): expose ledger/memory retrieval as tools so
-coding assistants (opencode etc.) query via tool calls instead of reading
-files directly.
+coding assistants (利贞 on harness, via @deepseek-ai/dsh-mcp-client) query via
+tool calls instead of reading files directly.
 
 Routed through the SAME Capability Registry as agent sessions (single gate,
 verify, commit) — ledger 0163 unification.  memory_save is wrapped with a
-one-shot approval grant because invoking this tool from opencode IS the user
-authorization (no interactive approver inside the MCP process).
+one-shot approval grant because invoking this tool from the dev agent IS the
+user authorization (no interactive approver inside the MCP process).
 
 Run (stdio):  python -B tools/yhlz_mcp_server.py
 """
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+
+
+def _log_to_file(name: str) -> None:
+    """stdio 传输下 stdout 只承载 JSON-RPC，stderr 会被宿主当成故障输出。
+
+    FastMCP 的 configure_logging 会挂 RichHandler(console=stderr) 并调
+    logging.basicConfig；而 basicConfig 在 root 已有 handler 时是空操作，
+    所以提前给 root 装好文件 handler，日志就不会再进 stderr。
+    """
+    log_dir = _ROOT / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(log_dir / name, encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)-8s %(name)s %(message)s")
+    )
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
@@ -29,9 +49,24 @@ from backend.target_scheduler_tools import (  # noqa: E402
 
 _registry = setup_scheduler_capabilities()
 mcp = FastMCP("yhlz")
+_carriers_bound = False
+
+
+def _ensure_carriers_bound() -> None:
+    """Lazy owner-local binding; ledger reads never construct a memory service."""
+    global _carriers_bound
+    if _carriers_bound:
+        return
+    from backend.target_memory import TargetMemoryService
+    from backend.memory_carriers import bind_memory_carriers
+    service = TargetMemoryService(l1_scope="mcp")
+    bind_memory_carriers(_registry, service, channel="owner_local", owner_access=True)
+    _carriers_bound = True
 
 
 async def _call_async(name: str, params: dict) -> str:
+    if name in {"memory_save", "diary_write", "task_plan", "kb_add"}:
+        _ensure_carriers_bound()
     res = await _registry.execute_openai_async(name, params)
     if not res.get("ok"):
         raise RuntimeError(f"{name} failed: {res.get('error', 'unknown')}")
@@ -93,6 +128,17 @@ async def memory_recall(query: str, limit: int = 5) -> str:
 
 
 @mcp.tool()
+async def memory_health() -> str:
+    """Owner-local READ ONLY memory status; counts only, no model or repair."""
+    import json
+    from backend.memory_health import snapshot
+    report = snapshot(_ROOT / "cache/memstore/memstore.db",
+                      kw_db_path=_ROOT / "cache/search/kw_index.db",
+                      vec_db_path=_ROOT / "cache/embvec.db")
+    return json.dumps(report, ensure_ascii=False)
+
+
+@mcp.tool()
 async def system_time() -> str:
     """Current local date/time and day of week."""
     return await _call_async("system_time", {})
@@ -105,7 +151,7 @@ async def memory_save(content: str, kind: str = "preference", importance: int = 
     constitution gate and deduplicated against existing memory.  Calling this
     tool records into the user's memory store — make sure the user asked for
     it."""
-    _registry.grant_policy_once(SAVE_APPROVAL_POLICY)  # opencode call = user consent
+    _registry.grant_policy_once(SAVE_APPROVAL_POLICY)  # dev-agent call = user consent
     return await _call_async("memory_save", {"content": content, "kind": kind,
                                         "importance": importance})
 
@@ -147,12 +193,16 @@ async def web_search(query: str, limit: int = 5) -> str:
 
 
 if __name__ == "__main__":
+    # Preload only with explicit semantic opt-in and never during training.
     # Preload the memory embedding model BEFORE serving.  Loading it lazily
     # inside the first memory_recall call blocks the stdio transport and the
     # client hangs (2026-09-29 fix).  ~12s one-time cost, then 0.1s per call.
     try:
         from backend.vector_memory import _load_model as _preload_vm
-        _preload_vm()
+        from backend.memory_resource_policy import semantic_model_allowed
+        if semantic_model_allowed():
+            _preload_vm()
     except Exception:
         pass
+    _log_to_file("yhlz_mcp_server.log")
     mcp.run(transport="stdio")

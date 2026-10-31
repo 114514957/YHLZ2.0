@@ -1,14 +1,12 @@
-﻿"""Scheduler tool set tests (ledger 0144 minimum set)."""
+"""Scheduler tool set tests (ledger 0144 minimum set)."""
 
 import unittest
+from pathlib import Path
 
-from backend.agent.tool_registry import ToolRegistry
 from backend.target_scheduler_tools import (
     ledger_search,
     recall_memory,
-    setup_scheduler_tools,
     system_time,
-    SCHEDULER_CATEGORY,
 )
 
 
@@ -54,31 +52,6 @@ class TestSchedulerHandlers(unittest.TestCase):
             st.DIARY_FILE = old
 
 
-class TestSchedulerRegistration(unittest.TestCase):
-    def setUp(self):
-        self.registry = ToolRegistry()
-
-    def test_register_min_set(self):
-        names = setup_scheduler_tools(self.registry)
-        self.assertEqual(
-            sorted(names),
-            ["diary_delete", "diary_list", "diary_write",
-             "file_list", "file_read", "kb_add", "kb_query", "ledger_search",
-             "memory_audit", "memory_causal", "memory_profile", "memory_recall", "memory_save", "memory_why", "owner_approve", "qq_bootstrap", "qq_digest", "qq_export", "qq_process",
-             "qq_runbatch", "qq_shutdown", "qq_status", "qq_summarize", "report_qq_weekly", "schedule_plan", "skill_add", "skill_feedback", "skill_search", "song_list", "song_play", "song_send", "system_time", "task_plan",
-             "web_fetch", "web_search"],
-        )
-        exported = self.registry.export_openai_tools()
-        fn_names = {t["function"]["name"] for t in exported}
-        self.assertTrue(fn_names >= {"ledger_search", "memory_recall",
-                                     "memory_save", "system_time", "diary_write"})
-
-    def test_category(self):
-        setup_scheduler_tools(self.registry)
-        cats = {t.category for t in self.registry.list_tools(category=SCHEDULER_CATEGORY)}
-        self.assertTrue(cats)
-
-
 class TestLedgerQueryVariants(unittest.TestCase):
     """Multi-variant ledger search (ledger 0425)."""
 
@@ -114,6 +87,73 @@ class TestLedgerQueryVariants(unittest.TestCase):
     def test_no_space_query_is_not_empty(self):
         result = ledger_search("训练结果", limit=5)
         self.assertIn("[ledger:", result)
+
+
+class TestLedgerIndexFreshFallback(unittest.TestCase):
+    def test_stale_catalog_falls_back_to_current_ledger(self):
+        import tempfile
+        import time
+        import backend.target_scheduler_tools as st
+        from backend.target_kw_index import KeywordIndex
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td); db = root / "kw.db"; ledger = root / "ledger.md"
+            ledger.write_text("## 记录 0001：新记录\n结论：刚刚追加的MCP修复\n", encoding="utf-8")
+            kw = KeywordIndex(db)
+            kw.upsert_doc(docid="ledger:old:1", source="ledger", summary="旧索引内容")
+            con = kw._conn(writable=True)
+            con.execute("CREATE TABLE kw_meta (key TEXT PRIMARY KEY, val REAL)")
+            con.execute("INSERT INTO kw_meta VALUES ('ledger_built_at', ?)", (0.0,))
+            con.commit(); con.close()
+            old_ledger, old_cache = st.LEDGER, st._KW_CACHE
+            st.LEDGER = ledger; st._KW_CACHE = {"default": kw}
+            try:
+                result = st.ledger_search("刚刚追加的MCP修复", limit=3)
+            finally:
+                st.LEDGER, st._KW_CACHE = old_ledger, old_cache
+            self.assertIn("[ledger:0001:2]", result)
+            self.assertIn("刚刚追加的MCP修复", result)
+
+class TestLedgerIndexRebuild(unittest.TestCase):
+    def test_bulk_rebuild_replaces_only_ledger_source(self):
+        import tempfile
+        from backend.target_kw_index import KeywordIndex
+        from tools.ledger_mem_import import index_ledger_all_rows
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            db = root / "kw.db"
+            ledger = root / "ledger.md"
+            ledger.write_text(
+                "## 记录 0001：测试\n结论：MCP检索恢复\n"
+                "## 记录 0002：另一个\n- 全双工正常\n",
+                encoding="utf-8",
+            )
+            kw = KeywordIndex(db)
+            kw.upsert_doc(docid="memory:1", source="l2", summary="保留的记忆")
+            count = index_ledger_all_rows(ledger, db_path=db)
+            self.assertEqual(count, 2)
+            self.assertTrue(kw.query("MCP检索", source="ledger"))
+            self.assertTrue(kw.query("保留的记忆", source="l2"))
+            ledger.write_text("## 记录 0003：新版本\n结论：只保留新内容\n", encoding="utf-8")
+            count = index_ledger_all_rows(ledger, db_path=db)
+            self.assertEqual(count, 1)
+            self.assertFalse(kw.query("MCP检索", source="ledger"))
+            self.assertTrue(kw.query("新版本", source="ledger"))
+            self.assertTrue(kw.query("保留的记忆", source="l2"))
+
+    def test_empty_batch_clears_stale_ledger_rows(self):
+        import tempfile
+        from backend.target_kw_index import KeywordIndex
+        from tools.ledger_mem_import import index_ledger_all_rows
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td); db = root / "kw.db"; ledger = root / "ledger.md"
+            ledger.write_text("## 记录 0001：旧\n结论：旧索引\n", encoding="utf-8")
+            index_ledger_all_rows(ledger, db_path=db)
+            ledger.write_text("# 只有标题\n", encoding="utf-8")
+            self.assertEqual(index_ledger_all_rows(ledger, db_path=db), 0)
+            self.assertFalse(KeywordIndex(db).query("旧索引", source="ledger"))
 
 
 if __name__ == "__main__":

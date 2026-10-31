@@ -16,7 +16,7 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Iterable, Mapping, Optional
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = _PROJECT_ROOT / "cache" / "search" / "kw_index.db"
@@ -77,7 +77,7 @@ class KeywordIndex:
         self._init_schema()
 
     def _conn(self, *, writable: bool = True) -> sqlite3.Connection:
-        con = sqlite3.connect(str(self.db_path))
+        con = sqlite3.connect(str(self.db_path), timeout=5.0 if writable else 0.05)
         if writable:
             # WAL persists in the db file; only writers re-assert it (plus the
             # per-connection synchronous hint).  Read paths skip both pragmas —
@@ -164,6 +164,64 @@ class KeywordIndex:
             con.commit()
 
         self._use(_write)
+
+    def bulk_upsert_docs(
+        self,
+        docs: Iterable[Mapping[str, object]],
+        *,
+        clear_source: str | None = None,
+    ) -> int:
+        """Atomically replace/upsert a batch of documents.
+
+        Ledger rebuilds used to call ``upsert_doc`` once per line.  Each call
+        opened SQLite, enabled WAL, committed, and closed again; on a large
+        ledger this made the MCP request look hung and could leave a reader
+        waiting behind the rebuild.  Keep the full rebuild in one transaction
+        so readers see either the old index or the complete new index.
+        """
+        prepared: list[tuple[str, str, str, str, int, str, float, list[tuple[str, str, int]]]] = []
+        now = time.time()
+        for raw in docs:
+            docid = str(raw.get("docid") or "").strip()
+            source = str(raw.get("source") or "").strip()
+            if not docid or not source:
+                continue
+            summary = str(raw.get("summary") or "")
+            title = str(raw.get("record_title") or "")
+            importance = int(raw.get("importance") or 0)
+            status = str(raw.get("status") or "active")
+            terms = tokenize(summary + " " + title)
+            prepared.append((docid, source, summary, title, importance, status,
+                             now, [(term, docid, tf) for term, tf in terms.items()]))
+
+        def _write(con: sqlite3.Connection) -> int:
+            try:
+                if clear_source:
+                    con.execute(
+                        "DELETE FROM kw_index WHERE docid IN "
+                        "(SELECT docid FROM kw_docs WHERE source=?)",
+                        (clear_source,),
+                    )
+                    con.execute("DELETE FROM kw_docs WHERE source=?", (clear_source,))
+                for docid, source, summary, title, importance, status, updated, terms in prepared:
+                    con.execute("DELETE FROM kw_index WHERE docid=?", (docid,))
+                    con.execute(
+                        """INSERT OR REPLACE INTO kw_docs
+                        (docid,source,summary,record_title,importance,status,updated_at)
+                        VALUES (?,?,?,?,?,?,?)""",
+                        (docid, source, summary, title, importance, status, updated),
+                    )
+                    con.executemany(
+                        "INSERT OR REPLACE INTO kw_index(term,docid,tf) VALUES (?,?,?)",
+                        terms,
+                    )
+                con.commit()
+                return len(prepared)
+            except BaseException:
+                con.rollback()
+                raise
+
+        return int(self._use(_write))
 
     def clear_source(self, source: str) -> int:
         """Remove every doc of a source (used before authoritative rebuild)."""

@@ -53,6 +53,57 @@ _DECIDE_PROMPT = (
 
 _PERSONA_PREFIX = "persona:consolidated:"
 PENDING_FILE = _PROJECT_ROOT / "cache" / "cognition_pending.json"
+# L3 治理收口（0546）：稳定 ID + 持久拒绝账 + 失效输入过滤。
+REJECTED_FILE = _PROJECT_ROOT / "cache" / "cognition_rejected.json"
+REJECTED_KEEP = 200
+
+
+def claim_id(entry: dict) -> str:
+    """Stable id for a cognition candidate: (claim, kind, tier) — survives
+    restart / re-proposal so an approved or rejected claim is never re-litigated."""
+    import hashlib
+
+    key = "|".join((str(entry.get("claim", "")).strip(),
+                    str(entry.get("kind", "new")).strip(),
+                    _tier_of(entry)))
+    return "cog_" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
+
+
+def _valid_claim(entry: dict) -> bool:
+    """失效输入过滤：空/过短/无实义字符的候选直接丢弃。"""
+    claim = str(entry.get("claim", "")).strip()
+    if len(claim) < 4:
+        return False
+    return bool(re.search(r"[\u4e00-\u9fffA-Za-z0-9]", claim))
+
+
+def load_rejected(path: Path = REJECTED_FILE) -> set[str]:
+    """Return the set of rejected claim ids (persistent rejection ledger)."""
+    try:
+        rows = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    return {str(r.get("id")) for r in rows if isinstance(r, dict) and r.get("id")}
+
+
+def record_rejection(entry: dict, reason: str = "",
+                     path: Path = REJECTED_FILE) -> str:
+    """Persist a rejection so the same claim is never re-proposed."""
+    import time as _t
+
+    rid = claim_id(entry)
+    try:
+        rows = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        rows = []
+    if not any(str(r.get("id")) == rid for r in rows if isinstance(r, dict)):
+        rows.append({"id": rid, "claim": str(entry.get("claim", ""))[:200],
+                     "reason": str(reason)[:80], "ts": _t.time()})
+        del rows[:-REJECTED_KEEP]
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(json.dumps(rows, ensure_ascii=False, indent=1),
+                              encoding="utf-8")
+    return rid
 
 
 def _tier_of(d: dict) -> str:
@@ -125,19 +176,39 @@ def maybe_open_refute_proposal(foundation: str, dad_text: str,
         "refutes_foundation": orig,
         "refutes_line": line_no,
     }
+    entry["id"] = claim_id(entry)
+    if entry["id"] in load_rejected(pending_file.with_name("cognition_rejected.json")):
+        return f"该更正此前已被拒绝，不再提议：{orig[:30]}…"
     pending = []
     if pending_file.exists():
         try:
             pending = _json.loads(pending_file.read_text(encoding="utf-8"))
         except Exception:
             pending = []
-    if not any(e.get("refutes_foundation") == orig for e in pending):
+    if not any(str(e.get("id")) == entry["id"] for e in pending if isinstance(e, dict)):
         pending.append(entry)
         pending_file.parent.mkdir(parents=True, exist_ok=True)
         pending_file.write_text(_json.dumps(pending, ensure_ascii=False, indent=1),
                                 encoding="utf-8")
         return f"已就“{orig[:40]}…”生成证伪提案（待你确认，/review-cognition 或对话 owner.approve）"
     return f"该根基条目“{orig[:30]}…”已有待批证伪提案"
+
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Write a cognition artifact atomically and leave no partial file."""
+    import os
+    import uuid
+    tmp = path.with_name(path.name + "." + uuid.uuid4().hex + ".tmp")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp.write_text(text, encoding="utf-8")
+    try:
+        os.replace(str(tmp), str(path))
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
 
 class PersonaConsolidationLoop:
@@ -219,8 +290,15 @@ class PersonaConsolidationLoop:
         if PENDING_FILE.exists():
             try:
                 pending = json.loads(PENDING_FILE.read_text(encoding="utf-8"))
-            except Exception:
-                pending = []
+                if not isinstance(pending, list):
+                    raise ValueError("pending queue is not a list")
+            except Exception as exc:
+                # Never replace a corrupt owner-review queue with [] silently.
+                raise RuntimeError("cognition pending queue unreadable") from exc
+        existing = {str(e.get("id")) for e in pending
+                    if isinstance(e, dict) and e.get("id")}
+        rejected = load_rejected(REJECTED_FILE)
+        added = 0
         for d in keep:
             entry = {
                 "claim": str(d.get("claim", "")).strip(),
@@ -228,12 +306,16 @@ class PersonaConsolidationLoop:
                 "tier": _tier_of(d),
                 "item_ids": [str(i) for i in d.get("item_ids", [])],
             }
-            if entry["claim"] and entry not in pending:
-                pending.append(entry)
-        PENDING_FILE.parent.mkdir(parents=True, exist_ok=True)
-        PENDING_FILE.write_text(json.dumps(pending, ensure_ascii=False, indent=1),
-                                encoding="utf-8")
-        return len(keep)
+            if not _valid_claim(entry):
+                continue
+            entry["id"] = claim_id(entry)
+            if entry["id"] in existing or entry["id"] in rejected:
+                continue
+            pending.append(entry)
+            existing.add(entry["id"])
+            added += 1
+        _atomic_write_text(PENDING_FILE, json.dumps(pending, ensure_ascii=False, indent=1))
+        return added
 
     def _apply(self, decisions: list[dict], version: int, used_ids: list[str]) -> int:
         # only owner-approved core/method claims are written to the foundation
@@ -255,9 +337,11 @@ class PersonaConsolidationLoop:
                 lines.append(f"- [{tag}|{tier}] {claim}")
         if len(lines) == 2:
             return 0
-        body = self._foundation_text().rstrip() + "\n" + "\n".join(lines) + "\n"
-        self.cognition_file.write_text(body, encoding="utf-8")
-        self._stamp_items(used_ids, version)
+        before = self._foundation_text()
+        body = before.rstrip() + "\n" + "\n".join(lines) + "\n"
+        from backend.persona_versions import PersonaVersions
+        PersonaVersions(self.memory.db_path, self.cognition_file).apply(
+            version, body, used_ids, [claim_id(d) for d in keep], expected_before=before)
         return len(keep)
 
     def _stamp_items(self, item_ids: list[str], version: int) -> None:

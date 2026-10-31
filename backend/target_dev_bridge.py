@@ -1,8 +1,15 @@
-"""[[dev: ...]] hand-off to 利贞 (harness dev runner) — ledger 0406/0797.
+"""[[dev: ...]] hand-off + owner dev commands — single Lite job lane (0831).
 
-Shared by the QQ bridge (``tools/qq_bot.py``) and the daemon console/voice
-path.  Extraction is pure and unit-testable; dispatch is fire-and-forget in a
-daemon thread so a spoken reply is never blocked by the dev run.
+All live dispatch (QQ bridge, workbench /talk + /turn, voice) now goes through
+the **Lite job store** (``tools/qq_dev_runner.py`` + ``backend/qq_dev_jobs.py``):
+one active job, git-worktree isolation, scoped commit, versioned reports.
+
+The old ``tools/dev_runner.py`` state machine (``cache/dev/state.json``,
+``git add -A`` in the main repo) is retired from every live entry; it is kept
+only as a deprecated library for historical tests.
+
+Extraction is pure and unit-testable; dispatch is fire-and-forget in a daemon
+thread so a spoken reply is never blocked by the dev run.
 """
 from __future__ import annotations
 
@@ -12,8 +19,28 @@ import threading
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
+_TOOLS = _ROOT / "tools"
+for _p in (str(_ROOT), str(_TOOLS)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+from backend.yhlz_paths import MASTER_UIN  # noqa: E402
 
 _DEV_RE = re.compile(r"\[\[dev[:：]\s*(.+?)\]\]", re.S)
+
+# 唯一主人；任务库的 owner 必须与 QQ 桥一致，报告才能回到同一个私聊。
+OWNER_UIN = str(MASTER_UIN)
+DEFAULT_CHANNEL = "console"
+
+# 任务状态 → 工作台展示口径（console.js 认 idle/running/awaiting/done/error）
+_STATE_LABELS = {
+    "accepted": "running",
+    "running": "running",
+    "awaiting_owner": "awaiting",
+    "completed": "done",
+    "failed": "error",
+    "interrupted": "error",
+}
 
 
 def extract_dev_task(answer: str) -> tuple[str, str]:
@@ -47,7 +74,6 @@ TEXT_CREATIVE_CLAUSE = (
     "【创作与诚实】可以应请求讲无害笑话、写故事；明确语境中的虚构不是谎报现实事实。"
     "不要因为强调诚实而拒绝正常创作，也不要把虚构经历说成刚刚真实发生。"
 )
-
 TEXT_EVIDENCE_CLAUSE = (
     "【本轮答复依据】诚实是行为原则，不是准确率保证。我仍可能误判、记错、产生无依据的内容；"
     "被问到可靠性或编造风险时，明确承认这种可能，不声称自己没有编造事实的能力。"
@@ -84,14 +110,12 @@ def guard_text_dev_handoff(answer: str, *, is_owner: bool,
             + suffix, "requires_explicit_command")
 
 
-def _dev_runner():
-    """Import tools/dev_runner lazily (path setup included)."""
-    tools_dir = str(_ROOT / "tools")
-    if tools_dir not in sys.path:
-        sys.path.insert(0, tools_dir)
-    import dev_runner  # noqa: PLC0415
+# ---- single Lite job lane -------------------------------------------------
+def _runner():
+    """Lite job runner (single task system). Imported lazily: tools path setup."""
+    import qq_dev_runner  # noqa: PLC0415
 
-    return dev_runner
+    return qq_dev_runner
 
 
 def _notify(text: str) -> None:
@@ -103,159 +127,200 @@ def _notify(text: str) -> None:
         pass
 
 
-def _run_async(action: str, fn, note: str) -> None:
-    """Run one dev action in a daemon thread; push a notification when done."""
-
-    def _run() -> None:
-        try:
-            d = fn()
-            status = str(d.get("status", ""))
-            text = str(d.get("text", ""))[:280]
-            if action == "push":
-                _notify(f"[利贞] 推送：{text[:200]}")
-                return
-            label = {"awaiting": "有问题要问你", "done": "已完成",
-                     "error": "出错", "running": "进行中"}.get(status, status)
-            _notify(f"[利贞] {label}：{text or note}")
-        except Exception as exc:  # noqa: BLE001
-            _notify(f"[利贞] {action} 失败：{type(exc).__name__}")
-
-    threading.Thread(target=_run, daemon=True, name=f"dev-{action}").start()
-
-
-def _runner_status() -> tuple[str, str]:
-    """(status, task) from the dev runner; ("", "") when unreadable."""
+def dev_status() -> dict:
+    """Workbench-facing snapshot of the one active/latest job."""
     try:
-        data = _dev_runner()._load() or {}
-    except Exception:  # noqa: BLE001
-        return "", ""
-    return str(data.get("status") or ""), str(data.get("task") or "")
-
-
-# States that mean "利贞 already has work in flight" (2026-10-13 真机联测发现：
-# 元亨派单这条路没有 busy 守卫，会在已有任务时谎报"已开工"——QQ 桥那侧有守卫，
-# daemon 侧没有。这里补上，并把真实结果异步回报，避免乐观回话。）
-BUSY_STATES = ("running", "awaiting")
-
-
-def _start_async(task: str) -> None:
-    """Run dev_runner.start in a thread and report the *real* outcome."""
-
-    def _run() -> None:
-        try:
-            data = _dev_runner().start(task)
-        except Exception as exc:  # noqa: BLE001
-            _notify(f"[利贞] 派单失败：{type(exc).__name__}")
-            return
-        status = str((data or {}).get("status") or "")
-        if status == "error":
-            _notify(f"[利贞] 派单未开工：{str((data or {}).get('text'))[:200]}")
-            return
-        _notify(f"[利贞] 已开工：{task[:80]}（有进展我会通知你）")
-
-    threading.Thread(target=_run, daemon=True, name="dev-start").start()
-
-
-def start_dev_task(task: str) -> str:
-    """Owner/元亨 dispatch entry: refuse while busy, else accept and confirm async."""
-    task = str(task or "").strip()
-    if not task:
-        return ""
-    status, current = _runner_status()
-    if status in BUSY_STATES:
-        label = "待你答复" if status == "awaiting" else "执行中"
-        return (f"[利贞] 已有任务在跑（{label}：{current[:40]}）——先 #devstatus 看状态，"
-                "等它结束或 #cancel 再派。")
-    _start_async(task)
-    return f"[利贞] 已开工：{task[:80]}（有进展我会通知你）"
-
-
-def answer_dev_task(text: str) -> str:
-    text = str(text or "").strip()
-    if not text:
-        return "用法：#a <给利贞的答复>"
-    status, current = _runner_status()
-    if status != "awaiting":
-        return (f"[利贞] 现在没有等待答复的任务（当前状态={status or '未知'}"
-                f"{'：' + current[:40] if current else ''}）。")
-    _run_async("answer", lambda: _dev_runner().answer(text), text)
-    return "[利贞] 已收到答复，继续中…"
-
-
-def commit_dev_task() -> str:
-    def _commit() -> dict:
-        d = _dev_runner()._load()
-        msg = ("chore(remote-dev): " + str(d.get("task", ""))[:40]).strip()
-        return _dev_runner().commit(msg)
-
-    _run_async("commit", _commit, "")
-    return "[利贞] 正在提交…"
-
-
-def push_dev_task() -> str:
-    _run_async("push", lambda: _dev_runner().push(), "")
-    return "[利贞] 正在推送…"
+        job = _runner().resolve_job(None) or {}
+    except Exception:
+        return {"status": "idle", "task": "", "job_id": ""}
+    state = str(job.get("state") or "")
+    return {
+        "status": _STATE_LABELS.get(state, "idle" if not state else state),
+        "task": str(job.get("task") or "")[:60],
+        "job_id": str(job.get("job_id") or ""),
+    }
 
 
 def dev_status_text() -> str:
     try:
-        d = _dev_runner()._load()
+        return _runner().status_text()
     except Exception as exc:  # noqa: BLE001
         return f"[利贞] 状态读取失败：{type(exc).__name__}"
-    return (f"[利贞] 状态={d.get('status', '?')} | "
-            f"任务={str(d.get('task', ''))[:60]} | "
-            f"最近：{str(d.get('text', ''))[:120]}")
 
 
 def backend_status_text() -> str:
     try:
-        return _dev_runner().backend_status()
+        return _runner().backend_status()
     except Exception as exc:  # noqa: BLE001
         return f"[利贞] 后端读取失败：{type(exc).__name__}"
 
 
-def handle_dev_command(text: str) -> str | None:
-    """Owner-side dev console commands (#dev/#a/#ds/#y/#n/#push/#backend).
+def set_backend_text(arg: str) -> str:
+    try:
+        return _runner().set_backend(arg)
+    except Exception as exc:  # noqa: BLE001
+        return f"[利贞] 后端切换失败：{type(exc).__name__}"
 
-    Returns the reply text, or None when the text is not a dev command.
-    """
-    low = str(text or "").strip().lower()
-    stripped = str(text or "").strip()
-    if low in ("#backend", "#be"):
-        return backend_status_text()
+
+def start_dev_task(task: str, *, channel: str = DEFAULT_CHANNEL) -> str:
+    """Dispatch a task; never claims success before the job store accepts it."""
+    task = str(task or "").strip()
+    if not task:
+        return ""
+    try:
+        out = _runner().start(task, owner=OWNER_UIN, channel=str(channel))
+    except Exception as exc:  # noqa: BLE001
+        return f"[利贞] 派单失败：{type(exc).__name__}"
+    status = str(out.get("status") or "")
+    text = str(out.get("text") or "")
+    if status == "busy":
+        return text or "[利贞] 已有任务在跑"
+    if status == "error":
+        return text or "[利贞] 派单失败"
+    note = (f"[利贞] 已开工：{task[:80]}"
+            f"（job={out.get('job_id', '')}；有进展我会通知你）")
+    _notify(note)
+    return text or note
+
+
+def answer_dev_task(text: str, *, channel: str = DEFAULT_CHANNEL,
+                    job_id: str | None = None) -> str:
+    text = str(text or "").strip()
+    if not text:
+        return "用法：#a <给利贞的答复>"
+    try:
+        out = _runner().answer(text, owner=OWNER_UIN, channel=str(channel),
+                               job_id=job_id)
+    except Exception as exc:  # noqa: BLE001
+        return f"[利贞] 答复失败：{type(exc).__name__}"
+    return str(out.get("text") or "…")
+
+
+def maybe_answer_pending(text: str, *, channel: str = DEFAULT_CHANNEL):
+    """Plain text for this channel becomes the answer only when a job awaits."""
+    text = str(text or "").strip()
+    if not text or text.startswith(("#", "＃")):
+        return None
+    try:
+        job = _runner().awaiting_job(OWNER_UIN, str(channel))
+    except Exception:
+        return None
+    if not job:
+        return None
+    return answer_dev_task(text, channel=channel, job_id=job.get("job_id"))
+
+
+def commit_dev_task(job_id: str | None = None) -> str:
+    try:
+        out = _runner().commit(job_id)
+    except Exception as exc:  # noqa: BLE001
+        return f"[利贞] 提交失败：{type(exc).__name__}"
+    return str(out.get("text") or out.get("status") or "")
+
+
+def push_dev_task(job_id: str | None = None) -> str:
+    try:
+        out = _runner().push(job_id)
+    except Exception as exc:  # noqa: BLE001
+        return f"[利贞] 推送失败：{type(exc).__name__}"
+    return str(out.get("text") or out.get("status") or "")
+
+
+def cancel_dev_task(job_id: str | None = None) -> str:
+    try:
+        out = _runner().cancel(job_id)
+    except Exception as exc:  # noqa: BLE001
+        return f"[利贞] 取消失败：{type(exc).__name__}"
+    return str(out.get("text") or out.get("status") or "")
+
+
+def detach_dev_task(job_id: str | None = None) -> str:
+    try:
+        out = _runner().detach(job_id)
+    except Exception as exc:  # noqa: BLE001
+        return f"[利贞] 退出任务失败：{type(exc).__name__}"
+    return str(out.get("text") or out.get("status") or "")
+
+
+_DEV_HELP = (
+    "【任务栏】\n"
+    "#dev <任务> / #任务派发 <任务>  发起任务（同一时间只允许一个）\n"
+    "#devstatus  当前状态 / 直接回复=答复（仅当前渠道有待答复任务时）\n"
+    "#y [job] 提交 / #n 不提交 / #push [job] 推送\n"
+    "#cancel [job] 停止执行 / #退出任务 [job] 退出任务模式\n"
+    "#answer <job> <答复> 跨渠道答复"
+)
+
+
+def handle_dev_command(text: str, *, channel: str = DEFAULT_CHANNEL) -> str | None:
+    """Owner dev console commands; returns None when the text is normal chat."""
+    raw = str(text or "").strip()
+    if not raw.startswith(("#", "＃")):
+        return None
+    low = raw.replace("＃", "#").strip()
+    from backend.qq_behavior import dev_exit_command  # noqa: PLC0415
+
     for prefix in ("#backend", "#be"):
-        if stripped.startswith(prefix + " "):
-            try:
-                return _dev_runner().set_backend(stripped[len(prefix):])
-            except Exception as exc:  # noqa: BLE001
-                return f"[利贞] 后端切换失败：{type(exc).__name__}"
+        if low == prefix:
+            return backend_status_text()
+        if low.startswith(prefix + " "):
+            return set_backend_text(low[len(prefix):].strip())
     if low in ("#devstatus", "#ds"):
         return dev_status_text()
-    if low in ("#y", "#commit"):
-        return commit_dev_task()
+    if low in ("#任务", "#任务栏"):
+        return _DEV_HELP
+    for prefix in ("#dev", "#任务派发"):
+        if low == prefix:
+            return "用法：#dev <任务>"
+        if low.startswith(prefix + " "):
+            # 控制台入口统一用默认 channel；语音走 start_dev_task(channel="voice")
+            return start_dev_task(low[len(prefix):].strip())
+    for prefix in ("#y", "#commit"):
+        if low == prefix:
+            return commit_dev_task()
+        if low.startswith(prefix + " "):
+            return commit_dev_task(low[len(prefix):].strip())
     if low == "#n":
-        return "[利贞] 好的，不提交，改动留在工作区。"
+        return "[利贞] 好的，不提交；工作树改动保留。"
     if low == "#push":
         return push_dev_task()
+    if low.startswith("#push "):
+        return push_dev_task(low[len("#push"):].strip())
+    for prefix in ("#cancel", "#cancle", "#取消", "#取消任务"):
+        if low == prefix:
+            return cancel_dev_task()
+        if low.startswith(prefix + " "):
+            return cancel_dev_task(low[len(prefix):].strip())
+    if dev_exit_command(low):
+        rest = low.split(None, 1)[1].strip() if " " in low else ""
+        return detach_dev_task(rest or None)
     for prefix in ("#a", "#答"):
-        if stripped == prefix:
+        if low == prefix:
             return "用法：#a <给利贞的答复>"
-        if stripped.startswith(prefix + " "):
-            return answer_dev_task(stripped[len(prefix):])
-    if stripped == "#dev" or stripped.startswith("#dev "):
-        task = stripped[4:].strip()
-        if not task:
-            return "用法：#dev <任务>"
-        return start_dev_task(task)
-    return None
+        if low.startswith(prefix + " "):
+            return answer_dev_task(low[len(prefix):].strip(), channel=channel)
+    if low == "#answer":
+        return "用法：#answer <job_id> <答复>"
+    if low.startswith("#answer "):
+        job_id, _, ans = low[len("#answer"):].strip().partition(" ")
+        if not job_id or not ans.strip():
+            return "用法：#answer <job_id> <答复>"
+        return answer_dev_task(ans.strip(), channel=channel, job_id=job_id)
+    return f"未知指令：{low[:24]}\n发 # 看菜单；派单用 #dev <任务>"
 
 
 __all__ = [
     "answer_dev_task",
+    "backend_status_text",
+    "cancel_dev_task",
     "commit_dev_task",
+    "detach_dev_task",
+    "dev_status",
     "dev_status_text",
     "extract_dev_task",
     "handle_dev_command",
+    "maybe_answer_pending",
     "push_dev_task",
+    "set_backend_text",
     "start_dev_task",
 ]

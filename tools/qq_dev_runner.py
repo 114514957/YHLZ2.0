@@ -26,8 +26,6 @@ from backend import qq_dev_jobs as jobs  # noqa: E402
 from backend.qq_bridge_lock import (  # noqa: E402
     make_info, pid_alive, terminate_owned,
 )
-from backend.qq_bridge_state import path as _bridge_path  # noqa: E402
-from backend.qq_bridge_state import state_dir as _state_dir  # noqa: E402
 
 import harness_gateway as gw  # noqa: E402
 
@@ -37,12 +35,27 @@ RETIRED_BACKENDS = ("opencode",)
 DEFAULT_BACKEND = HARNESS_BACKEND
 
 
+def _profile_dir() -> pathlib.Path:
+    """任务库所在目录：env 优先，否则按 profile 落到 canonical Lite 目录。
+
+    daemon（工作台 /turn、语音）没有 QQ 桥的 YHLZ_QQ_STATE_DIR 环境；旧实现
+    走 backend.qq_bridge_state 的 legacy 分支会落到 cache/dev/dev_jobs_lite.db，
+    于是工作台和 QQ 桥看到两个不同的任务库（ledger 0831 统一）。
+    """
+    env = os.getenv("YHLZ_QQ_STATE_DIR", "").strip()
+    if env:
+        return pathlib.Path(env)
+    profile = os.getenv("YHLZ_QQ_PROFILE", "").strip() or "lite"
+    if profile == "full":
+        return _ROOT / "cache" / "tmp"
+    return _ROOT / "cache" / "qq_bridge" / profile
+
+
 def _db_path() -> pathlib.Path:
     env = os.getenv("YHLZ_QQ_DEV_DB", "").strip()
     if env:
         return pathlib.Path(env)
-    return _bridge_path("dev_jobs.db",
-                        _ROOT / "cache" / "dev" / "dev_jobs_lite.db")
+    return _profile_dir() / "dev_jobs.db"
 
 
 def _ws_root() -> str:
@@ -54,7 +67,7 @@ def _target() -> str:
 
 
 def _backend_file() -> pathlib.Path:
-    return _state_dir() / "dev_backend.txt"
+    return _profile_dir() / "dev_backend.txt"
 
 
 def _backend() -> str:
@@ -132,7 +145,7 @@ def start(task: str, *, owner: str, channel: str) -> dict:
         workspace = pathlib.Path(target)
         branch = githelp.branch_of(target)
     else:
-        root = pathlib.Path(ws_env) if ws_env else _state_dir() / "dev_workspace"
+        root = pathlib.Path(ws_env) if ws_env else _profile_dir() / "dev_workspace"
         workspace = root / job_id
         branch = f"codex/qq-dev-{job_id}"
         ok, out = githelp.worktree_add(target, workspace, branch, "HEAD")
@@ -315,6 +328,13 @@ def detach(job_id: str | None = None) -> dict:
 def cancel(job_id: str | None = None) -> dict:
     job = resolve_job(job_id)
     if not job:
+        con = _store()
+        act = jobs.active(con)
+        if job_id:
+            hint = (f"当前活动任务：{act['job_id']}（{act.get('state')}）"
+                    if act else "当前没有活动任务")
+            return {"status": "error",
+                    "text": f"没有 job={job_id}；{hint}。用 #devstatus 看状态"}
         return {"status": "error", "text": "没有开发任务"}
     pid = int(job.get("pid") or 0)
     if pid:

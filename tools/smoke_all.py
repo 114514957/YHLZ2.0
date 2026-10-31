@@ -9,7 +9,7 @@ import sys
 import time
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.path.insert(0, r"C:\Users\ACE_WAN——PROJECT\YHLZ")
+sys.path.insert(0, r"C:\Users\ACE_WAN——PROJECT\YHLZ\YH")
 
 PASS, FAIL = [], []
 

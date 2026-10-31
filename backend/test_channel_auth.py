@@ -58,6 +58,7 @@ class TestIsOwnerChannel(unittest.TestCase):
 
     def test_qq_p(self):
         self.assertTrue(is_owner_channel("qq_p2258374446"))
+        self.assertFalse(is_owner_channel("qq_p123456789"))
 
     def test_qq_g(self):
         self.assertFalse(is_owner_channel("qq_g1094579571"))

@@ -12,6 +12,7 @@ import pathlib
 import re
 import sqlite3
 import threading
+import time
 
 import numpy as np
 
@@ -22,10 +23,52 @@ MEMORY_DB = _PROJECT / "cache" / "memstore" / "memstore.db"
 _lock = threading.RLock()
 _model = None
 _tokenizer = None
+_ready = False
+_warming = False
 DIM = 512
 
 
-def _load_model():
+def semantic_ready() -> bool:
+    """True once the embedding model is loaded and usable in this process."""
+    return bool(_ready)
+
+
+def warm_semantic() -> None:
+    """Load the embedding model in the background (never blocks a turn).
+
+    Loading costs ~67 s on this machine, so it must never happen inside a
+    turn. ``auto`` mode consults :func:`semantic_ready` and stays on the
+    lexical path until this thread finishes.
+    """
+    global _warming
+    if _ready or _warming:
+        return
+    try:
+        from backend.memory_resource_policy import semantic_mode
+
+        if semantic_mode() == "off":
+            return
+    except Exception:
+        return
+    _warming = True
+
+    def _load():
+        global _ready, _warming
+        try:
+            _load_model(force=True)
+            _ready = True
+        except Exception:
+            _ready = False
+        finally:
+            _warming = False
+
+    threading.Thread(target=_load, daemon=True).start()
+
+
+def _load_model(force: bool = False):
+    from backend.memory_resource_policy import semantic_model_allowed, MemoryWorkDeferred
+    if not force and not semantic_model_allowed():
+        raise MemoryWorkDeferred("semantic model disabled; lexical memory remains available")
     global _model, _tokenizer
     if _model is None:
         import torch
@@ -39,11 +82,10 @@ def _load_model():
 
 def embed(texts: list[str]) -> np.ndarray:
     """Mean-pooled, L2-normalised embeddings (list[n] -> (n,DIM))."""
-    import torch
-
     if not texts:
         return np.zeros((0, DIM), dtype="float32")
     model, tok = _load_model()
+    import torch
     with torch.no_grad():
         enc = tok(texts, padding=True, truncation=True,
                   max_length=256, return_tensors="pt")
@@ -55,18 +97,42 @@ def embed(texts: list[str]) -> np.ndarray:
     return pooled.cpu().numpy().astype("float32")
 
 
+def _migrate_pk(con: sqlite3.Connection) -> None:
+    """向量表主键 id → (id, scope)（0499）。
+
+    旧结构以 ``id`` 单列为主键：不同库（主库 / 群记忆 / 测试）出现**同名 id**
+    时，后写的会直接**顶掉**先写的向量——分 scope 也挡不住，查 A 库会拿到
+    B 库的向量（而文本来自 A 库 = 相似度与文本对不上）。就地重建搬数据。
+    """
+    info = con.execute("PRAGMA table_info(vec)").fetchall()
+    if not info:
+        return
+    pk_cols = [r[1] for r in sorted((r for r in info if r[5]), key=lambda r: r[5])]
+    if pk_cols == ["id", "scope"]:
+        return
+    con.execute("ALTER TABLE vec RENAME TO vec_old")
+    con.execute("CREATE TABLE vec(id TEXT NOT NULL, scope TEXT NOT NULL, "
+                "vec BLOB NOT NULL, text TEXT, PRIMARY KEY(id, scope))")
+    cols = {r[1] for r in con.execute("PRAGMA table_info(vec_old)")}
+    tx = "text" if "text" in cols else "NULL"
+    con.execute(f"INSERT OR REPLACE INTO vec(id,scope,vec,text) "
+                f"SELECT id,scope,vec,{tx} FROM vec_old")
+    con.execute("DROP TABLE vec_old")
+
+
 def _conn() -> sqlite3.Connection:
     VEC_DB.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(str(VEC_DB))
     con.execute("CREATE TABLE IF NOT EXISTS vec("
-                "id TEXT PRIMARY KEY, scope TEXT NOT NULL, "
-                "vec BLOB NOT NULL)")
+                "id TEXT NOT NULL, scope TEXT NOT NULL, "
+                "vec BLOB NOT NULL, text TEXT, PRIMARY KEY(id, scope))")
     cols = {r[1] for r in con.execute("PRAGMA table_info(vec)")}
     if "text" not in cols:
         try:
             con.execute("ALTER TABLE vec ADD COLUMN text TEXT")
         except Exception:
             pass
+    _migrate_pk(con)
     con.commit()
     return con
 
@@ -187,12 +253,17 @@ _rr = {"model": None, "tok": None, "loading": False}
 
 def warm_reranker() -> None:
     """Load the reranker in the background (never blocks a turn)."""
+    from backend.memory_resource_policy import semantic_model_allowed
+    if not semantic_model_allowed():
+        return
     if _rr["model"] is not None or _rr["loading"]:
         return
     import threading
 
     def _load():
         try:
+            if not semantic_model_allowed():
+                return
             from transformers import (AutoModelForSequenceClassification,
                                       AutoTokenizer)
 
@@ -215,6 +286,9 @@ def rerank(query: str, docs: list[str]) -> list[float]:
     zeros for now (caller keeps its vector/literal order)."""
     q = str(query or "").strip()
     ds = [str(d or "") for d in (docs or [])]
+    from backend.memory_resource_policy import semantic_model_allowed
+    if not semantic_model_allowed():
+        raise RuntimeError("reranker disabled; preserve lexical scores")
     if not q or not ds:
         return [0.0 for _ in ds]
     if _rr["model"] is None:
@@ -233,22 +307,55 @@ def rerank(query: str, docs: list[str]) -> list[float]:
         return [0.0 for _ in ds]
 
 
+def l2_scope(db_path=None) -> str:
+    """L2 向量按**库**分 scope（0499）。
+
+    默认库保持 ``"l2"``（不动既有缓存，避免无谓重嵌入）；其它库（群记忆/测试）
+    用 ``"l2@<库名>"``。此前所有库共用 scope ``"l2"`` → 同名 id 会互相覆盖，
+    且不同库的条目被写进同一张表后永远查不到（静默失效 + 污染）。
+    """
+    p = pathlib.Path(db_path) if db_path else MEMORY_DB
+    try:
+        if p.resolve() == MEMORY_DB.resolve():
+            return "l2"
+    except Exception:
+        pass
+    stem = re.sub(r"[^\w\-]+", "_", p.stem)[:40] or "db"
+    return "l2@" + stem
+
+
+def _date_str(ts) -> str:
+    """条目日期（离线校验/召回上下文用；与 target_memory._date_str 同口径）。"""
+    try:
+        v = float(ts or 0)
+        return time.strftime("%Y-%m-%d", time.localtime(v)) if v > 0 else ""
+    except Exception:
+        return ""
+
+
 def semantic_l2(query: str, top: int = 8,
-                min_score: float = 0.35) -> list[dict]:
+                min_score: float = 0.35,
+                db_path=None,
+                include_invalid: bool = False) -> list[dict]:
     """Semantic search over L2 -> full item dicts from the memory db.
 
     Uses both the raw query and a topic-stripped variant, keeping the best
-    score per item (mitigates wording noise like 提问/客套)."""
+    score per item (mitigates wording noise like 提问/客套).
+    ``db_path`` 指定要 join 的库（默认主库）；scope 由 :func:`l2_scope` 决定。
+    ``include_invalid``：默认**排除软失效条目**（M1 契约：默认读只看现状；
+    旧实现没过滤 → 被取代的旧事实会经语义路径漏回召回）。
+    """
     raw = str(query or "").strip()
     if not raw:
         return []
+    scope = l2_scope(db_path)
     variants = [raw]
     t = _topic(raw)
     if t and t != raw:
         variants.append(t)
     best: dict[str, float] = {}
     for v in variants:
-        for iid, sc in vec_search("l2", v, top=top * 2):
+        for iid, sc in vec_search(scope, v, top=top * 2):
             if sc > best.get(iid, -1.0):
                 best[iid] = sc
     hits = sorted(best.items(), key=lambda x: x[1], reverse=True)[: top * 2]
@@ -256,12 +363,14 @@ def semantic_l2(query: str, top: int = 8,
         return []
     ids = [i for i, _ in hits]
     score = dict(hits)
-    con = sqlite3.connect(str(MEMORY_DB))
+    where = "" if include_invalid else " AND COALESCE(invalid_at,0)=0"
+    con = sqlite3.connect(str(db_path or MEMORY_DB))
     try:
         qmarks = ",".join("?" for _ in ids)
         rows = con.execute(
-            f"SELECT id, type, importance, status, summary "
-            f"FROM l2_items WHERE id IN ({qmarks})", ids).fetchall()
+            f"SELECT id, type, importance, status, summary, "
+            f"COALESCE(NULLIF(valid_at,0), created_at) "
+            f"FROM l2_items WHERE id IN ({qmarks}){where}", ids).fetchall()
     except Exception:
         rows = []
     finally:
@@ -276,7 +385,8 @@ def semantic_l2(query: str, top: int = 8,
             continue
         r = byid[i]
         out.append({"id": i, "type": r[1], "importance": r[2],
-                    "status": r[3], "summary": r[4], "score": round(s, 3)})
+                    "status": r[3], "summary": r[4], "score": round(s, 3),
+                    "date": _date_str(r[5])})
         if len(out) >= top:
             break
     return out

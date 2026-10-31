@@ -1,0 +1,10 @@
+{
+  "python": ".venv\\Scripts\\python.exe",
+  "cli": "tools\\music_cli.py",
+  "timeouts": {
+    "list": 15000,
+    "info": 15000,
+    "play": 15000,
+    "send": 60000
+  }
+}

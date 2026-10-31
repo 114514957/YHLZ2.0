@@ -4,6 +4,12 @@ tools for Yuanheng, with guarding.
 - file.list / file.read : WHOLE-DISK read-only browsing. Hard invariants:
   never write; refuse sensitive files (.env, credentials, keys, binaries,
   huge files); text decoding is tolerant.
+- file.download (2026-10-06): http/https URL -> one managed file under
+  cache/downloads/<date>/ (size/type/sensitive-name guarded).  This is the
+  only write path here and it never touches an existing user file.
+- file.share (2026-10-06): share_check() validates a local file for sending
+  back through the active chat (registered as a capability by
+  target_scheduler_tools; actual send happens in the QQ bridge).
 - web.fetch  : fetch a URL's text content (zero key, programmatic).
 - web.search : zero-key web search (DuckDuckGo html best-effort, with
   doc-site fallback list).
@@ -21,10 +27,29 @@ from typing import Any, Optional
 MAX_READ_BYTES = 1_000_000
 MAX_FETCH_BYTES = 1_000_000
 MAX_LIST_ENTRIES = 60
+MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024
+MAX_SHARE_BYTES = 50 * 1024 * 1024
+_URL = Path(__file__).resolve().parents[1]
+DOWNLOAD_DIR = _URL / "cache" / "downloads"
 TEXT_EXTS = {
     ".md", ".txt", ".py", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".ini", ".cfg",
     ".log", ".csv", ".xml", ".html", ".htm", ".css", ".js", ".ts", ".jsx",
     ".tsx", ".rst", ".bat", ".ps1", ".sh", ".env.example", ".lock", ".gitignore",
+}
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".ico", ".svg"}
+AUDIO_EXTS = {".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac", ".silk", ".opus"}
+VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".ts"}
+_DENIED_DOWNLOAD_EXTS = {
+    ".exe", ".msi", ".bat", ".cmd", ".ps1", ".vbs", ".vbe", ".js", ".jse",
+    ".wsf", ".wsh", ".scr", ".com", ".pif", ".cpl", ".reg", ".lnk", ".jar",
+    ".apk", ".dll", ".sys", ".so", ".dylib", ".hta", ".msc",
+}
+_CT_EXT = {
+    "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif",
+    "image/webp": ".webp", "image/bmp": ".bmp", "image/svg+xml": ".svg",
+    "audio/mpeg": ".mp3", "audio/wav": ".wav", "audio/x-wav": ".wav",
+    "audio/flac": ".flac", "audio/mp4": ".m4a", "video/mp4": ".mp4",
+    "application/pdf": ".pdf", "text/plain": ".txt", "text/markdown": ".md",
 }
 SENSITIVE_NAME_PARTS = (
     ".env", "secret", "credential", "password", ".pem", ".key", "token",
@@ -135,6 +160,24 @@ def _is_text_file(path: Path) -> bool:
     return not any(head.startswith(sig) for sig in _BIN_SIGNATURES) and b"\x00" not in head
 
 
+def is_image_path(path: Any) -> bool:
+    """True for files the QQ bridge should send as an image segment."""
+    return Path(str(path)).suffix.lower() in IMAGE_EXTS
+
+
+def _kind_label(p: Path) -> str:
+    ext = p.suffix.lower()
+    if ext in IMAGE_EXTS:
+        return "图片"
+    if ext in AUDIO_EXTS:
+        return "音频"
+    if ext in VIDEO_EXTS:
+        return "视频"
+    if ext in TEXT_EXTS:
+        return "文本"
+    return "文件"
+
+
 # ---------------- file.list ----------------
 def file_list(path: str, limit: int = MAX_LIST_ENTRIES) -> str:
     p = _resolve_arg(Path(path or "."))
@@ -143,7 +186,7 @@ def file_list(path: str, limit: int = MAX_LIST_ENTRIES) -> str:
     if not p.exists():
         return "路径不存在"
     if p.is_file():
-        return f"[文件] {p}"
+        return f"[{_kind_label(p)}] {p} ({p.stat().st_size} B)"
     try:
         entries = sorted(p.iterdir(), key=lambda x: (x.is_file(), str(x).lower()))
     except Exception as exc:
@@ -154,7 +197,7 @@ def file_list(path: str, limit: int = MAX_LIST_ENTRIES) -> str:
             if e.is_dir():
                 lines.append(f"[目录] {e.name}/")
             else:
-                lines.append(f"[文件] {e.name} ({e.stat().st_size} B)")
+                lines.append(f"[{_kind_label(e)}] {e.name} ({e.stat().st_size} B)")
         except Exception:
             continue
     total = len(entries)
@@ -185,6 +228,121 @@ def file_read(path: str, max_chars: int = 4000) -> str:
     except Exception as exc:
         return f"读取失败: {type(exc).__name__}"
     return text[: int(max_chars)]
+
+
+# ---------------- file.share（2026-10-06） ----------------
+def share_check(path: str) -> tuple[bool, str]:
+    """Validate a local file for sharing back through the active chat.
+
+    Returns (ok, resolved_path) or (False, reason).  Same policy as
+    ``can_send`` (non-dangerous file / 能发图文、能转发) plus existence and a
+    size cap so a chat send can never push an unbounded file.
+    """
+    raw = str(path or "").strip().strip('"')
+    if not raw:
+        return False, "缺少文件路径"
+    p = _resolve_arg(Path(raw))
+    if not _within_allowed(p):
+        return False, "拒绝分享：超出允许根目录"
+    if not p.exists():
+        return False, "路径不存在"
+    if _is_sensitive_path(p):
+        return False, "拒绝分享：该文件属于敏感文件（凭据/密钥类）"
+    if not p.is_file():
+        return False, "拒绝分享：不是文件（目录不能直接发送）"
+    try:
+        size = p.stat().st_size
+    except Exception as exc:
+        return False, f"无法访问: {type(exc).__name__}"
+    if size > MAX_SHARE_BYTES:
+        return False, (f"拒绝分享：文件过大（{size // 1024}KB > "
+                       f"{MAX_SHARE_BYTES // (1024 * 1024)}MB）")
+    return True, str(p)
+
+
+# ---------------- file.download（2026-10-06） ----------------
+def _safe_download_name(name: str) -> str:
+    import re as _re
+
+    base = Path(str(name or "")).name
+    base = _re.sub(r"[^\w.\-]", "_", base, flags=_re.UNICODE).strip("._")
+    return base[:80]
+
+
+def _pick_download_ext(name: str, url: str, content_type: str = "") -> str:
+    for cand in (name, url.split("?")[0]):
+        ext = Path(str(cand)).suffix.lower()
+        if 1 < len(ext) <= 6:
+            return ext
+    ct = str(content_type or "").split(";")[0].strip().lower()
+    return _CT_EXT.get(ct, "")
+
+
+async def file_download(url: str, name: str = "") -> str:
+    """Download one http/https file into cache/downloads/<date>/ (managed,
+    bounded).  Returns the local path so file.list / file.share can use it."""
+    import hashlib
+    import time
+
+    url = str(url or "").strip().strip('"')
+    if not url.startswith(("http://", "https://")):
+        return "仅支持 http/https 链接"
+    if _host_blocked(url):
+        return "拒绝下载：该域名在拦截名单"
+    wanted = _safe_download_name(name or Path(url.split("?")[0]).name)
+    pre_ext = Path(wanted).suffix.lower()
+    if pre_ext in _DENIED_DOWNLOAD_EXTS:
+        return f"拒绝下载：不允许的文件类型 {pre_ext}"
+    import httpx
+
+    data = b""
+    last_err = ""
+    content_type = ""
+    for _attempt in range(2):  # one retry: some hosts reset intermittently
+        try:
+            async with httpx.AsyncClient(timeout=25, follow_redirects=True,
+                                         headers=_BROWSER_HEADERS,
+                                         trust_env=True) as c:
+                async with c.stream("GET", url) as r:
+                    content_type = r.headers.get("content-type", "")
+                    if r.status_code != 200:
+                        return f"HTTP {r.status_code}"
+                    chunks: list[bytes] = []
+                    total = 0
+                    async for chunk in r.aiter_bytes():
+                        total += len(chunk)
+                        if total > MAX_DOWNLOAD_BYTES:
+                            return ("拒绝下载：文件过大（>"
+                                    f"{MAX_DOWNLOAD_BYTES // (1024 * 1024)}MB）")
+                        chunks.append(chunk)
+                    data = b"".join(chunks)
+            break
+        except Exception as exc:
+            last_err = f"{type(exc).__name__}"
+    if not data:
+        return f"下载失败: {last_err or 'empty'}"
+    ext = _pick_download_ext(name, url, content_type)
+    if ext in _DENIED_DOWNLOAD_EXTS:
+        return f"拒绝下载：不允许的文件类型 {ext}"
+    if not wanted or not Path(wanted).suffix:
+        wanted = (wanted or "file") + ext
+    if _is_sensitive_path(Path(wanted)):
+        return "拒绝下载：文件名涉及敏感模式"
+    cat = _category_blocked(data[: 512 * 1024].decode("utf-8", errors="ignore"))
+    if cat:
+        return f"内容被拦截（类别: {cat}）"
+    day = time.strftime("%Y%m%d")
+    d = DOWNLOAD_DIR / day
+    d.mkdir(parents=True, exist_ok=True)
+    h = hashlib.sha1(data).hexdigest()[:8]
+    target = d / f"{h}_{wanted}"
+    try:
+        target.write_bytes(data)
+    except Exception as exc:
+        return f"保存失败: {type(exc).__name__}"
+    kind = _kind_label(target)
+    return (f"已下载：[{kind}] {target} ({len(data)} B)\n"
+            "如需发到当前对话，用 file_share 分享该路径。")
 
 
 # ---------------- web ----------------

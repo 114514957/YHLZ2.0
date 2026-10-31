@@ -19,6 +19,7 @@ GGUF 转换/llama-server --lora 挂载见 docs/训练计划-元亨人格微调-G
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import sys
 from pathlib import Path
@@ -44,6 +45,7 @@ DEFAULTS = {
     "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj",
                         "gate_proj", "up_proj", "down_proj"],
     "load_in_4bit": True,
+    "full_finetune": False,   # True = 全量训练：不挂 LoRA，全参 bf16 + 8bit AdamW（需 ≥40G 显存，A800）
     "bnb_4bit_quant_type": "nf4",
     "use_double_quant": True,
     "gradient_checkpointing": True,
@@ -96,15 +98,37 @@ def _merge_system(messages: list[dict]) -> list[dict]:
 
 
 def _apply_template(tokenizer, messages: list[dict], add_generation_prompt: bool) -> str:
-    try:
-        return tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=add_generation_prompt)
-    except Exception:  # noqa: BLE001  (e.g. Gemma 模板不接受 system 角色)
-        return tokenizer.apply_chat_template(
-            _merge_system(messages), tokenize=False, add_generation_prompt=add_generation_prompt)
+    """套 chat template。
+
+    2026-10-24 加：**Qwen3 系列默认 enable_thinking=True**，而我们的训练数据是纯回答
+    （没有思考过程）。不关掉的话，模型会学出「先输出一段思考再回答」的形态，
+    推理时还得靠参数压制——训练和部署不一致。所以**优先尝试 enable_thinking=False**，
+    模板不认这个参数（Gemma 等）就退回去。
+    """
+    for kw in ({"enable_thinking": False}, {}):
+        try:
+            return tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=add_generation_prompt,
+                **kw)
+        except TypeError:
+            continue          # 模板不接受该参数
+        except Exception:     # noqa: BLE001  (e.g. 模板不接受 system 角色)
+            try:
+                return tokenizer.apply_chat_template(
+                    _merge_system(messages), tokenize=False,
+                    add_generation_prompt=add_generation_prompt, **kw)
+            except Exception:  # noqa: BLE001
+                continue
+    # 最后兜底：合掉 system 再套一次
+    return tokenizer.apply_chat_template(
+        _merge_system(messages), tokenize=False, add_generation_prompt=add_generation_prompt)
 
 
 def _encode(tokenizer, messages: list[dict], max_len: int, mask_prompt: bool) -> dict:
+    # 2026-10-24 修：v8 数据 389/3440 条 assistant 带 tool_calls 的消息**没有 content 键**，
+    # Qwen3 模板渲染 message['content'] 直接 UndefinedError 崩掉。训练侧统一补成空串，
+    # 不改原始数据文件（与 OpenAI/各家惯例一致：tool_calls 消息 content 为空）。
+    messages = [dict(m, content=m.get("content") or "") for m in messages]
     full = _apply_template(tokenizer, messages, add_generation_prompt=False)
     ids = tokenizer(full, add_special_tokens=True, truncation=True, max_length=max_len)["input_ids"]
     labels = list(ids)
@@ -128,6 +152,8 @@ def _dry_run(cfg: dict, train: list[dict], val: list[dict]) -> int:
         "epochs": cfg["epochs"],
         "batch_size": cfg["batch_size"],
         "grad_accum": cfg["grad_accum"],
+        "full_finetune": bool(cfg.get("full_finetune")),
+        "optim": "adamw_8bit" if cfg.get("full_finetune") else "adamw_torch",
         "lora_r": cfg["lora_r"],
         "target_modules": cfg["target_modules"],
     }
@@ -155,14 +181,15 @@ def _train(cfg: dict, train: list[dict], val: list[dict], resume_from: str | Non
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # 2026-10-24 修：原版硬编码 Gemma4 模型类。本机 transformers 5.15.1 无 Gemma4 时静默
+    # 回退 Auto（所以本地一直正常），但云端 5.20.2 有 Gemma4 → 拿 Gemma4 类加载 Qwen3
+    # 权重直接崩（sliding_window/rope_parameters 两连崩）。改为按底座 config 自动解析：
+    # 文本走 AutoModelForCausalLM，多模态走 AutoModelForImageTextToText。
     model_cls = None
     if cfg.get("multimodal"):
-        from transformers import Gemma4ForConditionalGeneration as model_cls  # noqa: N813
+        from transformers import AutoModelForImageTextToText as model_cls  # noqa: N813
     else:
-        try:
-            from transformers import Gemma4ForCausalLM as model_cls  # noqa: N813
-        except Exception:  # noqa: BLE001
-            from transformers import AutoModelForCausalLM as model_cls  # noqa: N813
+        from transformers import AutoModelForCausalLM as model_cls  # noqa: N813
 
     bnb = None
     if cfg.get("load_in_4bit"):
@@ -177,39 +204,91 @@ def _train(cfg: dict, train: list[dict], val: list[dict], resume_from: str | Non
         low_cpu_mem_usage=True, trust_remote_code=True)
     model.config.use_cache = False
     if cfg["gradient_checkpointing"]:
-        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
+        if bnb is not None:
+            model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
+        else:
+            # 全量/bf16 路径：没有量化，普通开启梯度检查点即可
+            model.gradient_checkpointing_enable()
 
-    lora = LoraConfig(
-        r=cfg["lora_r"], lora_alpha=cfg["lora_alpha"], lora_dropout=cfg["lora_dropout"],
-        target_modules=cfg["target_modules"], bias="none", task_type="CAUSAL_LM")
-    if resume_from:
-        print(f"[train] 从已有 adapter 续训：{resume_from}")
-        model = PeftModel.from_pretrained(model, resume_from, is_trainable=True)
+    # 全量模式（2026-10-24，老爹「做好全量的准备」）：不挂 LoRA，所有参数可训练，
+    # 配 8bit AdamW 省显存（A800-80G 规则见 方案_A800_全量训练.md §0/§1）。
+    # 带 --resume-from 时仍走 LoRA adapter 续训（全量续训直接重跑 + checkpoint）。
+    full = bool(cfg.get("full_finetune")) and not resume_from
+    if full:
+        n_all = sum(p.numel() for p in model.parameters())
+        n_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"[train] 全量模式：全参 bf16 + 8bit AdamW，无 LoRA｜"
+              f"参数总计 {n_all / 1e9:.2f}B，可训练 {n_train / 1e9:.2f}B")
     else:
-        model = get_peft_model(model, lora)
-    model.print_trainable_parameters()
+        lora = LoraConfig(
+            r=cfg["lora_r"], lora_alpha=cfg["lora_alpha"], lora_dropout=cfg["lora_dropout"],
+            target_modules=cfg["target_modules"], bias="none", task_type="CAUSAL_LM")
+        if resume_from:
+            print(f"[train] 从已有 adapter 续训：{resume_from}")
+            model = PeftModel.from_pretrained(model, resume_from, is_trainable=True)
+        else:
+            model = get_peft_model(model, lora)
+        model.print_trainable_parameters()
 
     def _map(rec: dict) -> dict:
         return _encode(tokenizer, rec["messages"], cfg["max_seq_len"], cfg["mask_prompt"])
 
-    ds_train = Dataset.from_list(train).map(_map, remove_columns=["messages", "source"]
-                                           if "source" in train[0] else ["messages"])
+    # 2026-10-20 修（老爹「工具要经过测试可用」）：
+    # 原写法 `Dataset.from_list(train)` 把**全部字段**交给 Arrow，而 V9 数据里有
+    # `tools`、`weight`、`safety_labels` 等异构字段，Arrow 推断类型时直接抛
+    #   ArrowInvalid: Could not convert '200' with type str: tried to convert to int64
+    #
+    # 2026-10-21 二修（审核发现）：只留 messages 仍然不够。加了工具轨迹后，
+    # **messages 内部结构也不一致**：
+    #   · 4,407 条是 [{'content','role'}]
+    #   · 1,443 条是 [{'content','name','role'}, …, {'content','role','tool_calls'}]
+    # Arrow 无法把这两种统一成一张表 → 仍然 ArrowInvalid，训练照样崩。
+    # 修法：把 messages **序列化成 JSON 字符串**存成一列，Arrow 只看到纯字符串列；
+    # `_map` 里再解析回来。这样任意结构都能过。
+    def _slim(rows: list[dict]) -> list[dict]:
+        out = []
+        for r in rows:
+            out.append({
+                "messages_json": json.dumps(r["messages"], ensure_ascii=False),
+                "source": str(r.get("source", "")),
+            })
+        return out
+
+    def _map_json(rec: dict) -> dict:
+        return _encode(tokenizer, json.loads(rec["messages_json"]),
+                       cfg["max_seq_len"], cfg["mask_prompt"])
+
+    ds_train = Dataset.from_list(_slim(train)).map(
+        _map_json, remove_columns=["messages_json", "source"])
     ds_val = None
     if val:
-        drop = ["messages", "source"] if "source" in val[0] else ["messages"]
-        ds_val = Dataset.from_list(val).map(_map, remove_columns=drop)
+        ds_val = Dataset.from_list(_slim(val)).map(
+            _map_json, remove_columns=["messages_json", "source"])
 
     collator = DataCollatorForSeq2Seq(tokenizer, padding=True, label_pad_token_id=-100)
     out_dir = ROOT / cfg["output_dir"]
-    args = TrainingArguments(
+    # 2026-10-23 补（老爹「记得之前的教训，把 loss、学习系数之类的参数准备好」）：
+    # 原来的坑：`report_to="none"` + `logging_steps=5` → loss 只在 stdout 滚过去，
+    # 上次 v8 的 LLM 训练**一条日志都没留下**，事后无法判断是不是发散、该不该调 lr。
+    # 现在：① lr 调度显式化（cosine + warmup）② loss 每 10 步落盘 ③ 训练后自动导出摘要。
+    _logs = out_dir / "logs"
+    # 2026-10-24 修：transformers 5.20 严格 dataclass——warmup_ratio/logging_dir/
+    # save_safetensors 已移除（warmup 只剩 warmup_steps），多传直接 TypeError。
+    # 改为按签名动态过滤 + warmup_ratio 手动换算 warmup_steps，新旧版本通吃。
+    import inspect as _inspect
+    _ta_params = set(_inspect.signature(TrainingArguments.__init__).parameters)
+    _ta_kwargs = dict(
         output_dir=str(out_dir),
         per_device_train_batch_size=cfg["batch_size"],
         gradient_accumulation_steps=cfg["grad_accum"],
         num_train_epochs=cfg["epochs"],
         learning_rate=cfg["lr"],
+        lr_scheduler_type=cfg.get("lr_scheduler_type", "cosine"),
+        optim=cfg.get("optim", "adamw_8bit" if full else "adamw_torch"),
         weight_decay=cfg["weight_decay"],
-        warmup_ratio=cfg["warmup_ratio"],
+        max_grad_norm=cfg.get("max_grad_norm", 1.0),
         logging_steps=cfg["logging_steps"],
+        logging_first_step=True,
         save_steps=cfg["save_steps"],
         save_total_limit=cfg["save_total_limit"],
         bf16=True,
@@ -218,15 +297,113 @@ def _train(cfg: dict, train: list[dict], val: list[dict], resume_from: str | Non
         seed=cfg["seed"],
         eval_strategy="steps" if ds_val else "no",
         eval_steps=cfg["save_steps"] if ds_val else None,
+        load_best_model_at_end=bool(ds_val),
+        metric_for_best_model="eval_loss" if ds_val else None,
+        greater_is_better=False if ds_val else None,
         remove_unused_columns=False,
     )
+    if "warmup_ratio" in _ta_params:
+        _ta_kwargs["warmup_ratio"] = cfg["warmup_ratio"]
+    else:  # transformers 5.20+：手动换算（3% × 总步数）
+        import math as _math
+        _steps_per_epoch = _math.ceil(
+            len(ds_train) / (cfg["batch_size"] * cfg["grad_accum"]))
+        _ta_kwargs["warmup_steps"] = max(
+            1, int(cfg["warmup_ratio"] * _steps_per_epoch * cfg["epochs"]))
+    if "logging_dir" in _ta_params:
+        _ta_kwargs["logging_dir"] = str(_logs)
+    if "save_safetensors" in _ta_params:
+        _ta_kwargs["save_safetensors"] = True
+    # 2026-10-24 修：数据盘 50G 被优化器状态撑爆（每 ckpt 18G）。全量短程
+    # 训练不需要断点续训 → save_only_model 只存模型（7.5G/ckpt）。
+    if "save_only_model" in _ta_params:
+        _ta_kwargs["save_only_model"] = bool(cfg.get("save_only_model"))
+    args = TrainingArguments(**_ta_kwargs)
     trainer = Trainer(model=model, args=args, train_dataset=ds_train,
                       eval_dataset=ds_val, data_collator=collator)
+
+    import time as _time
+    _t0 = _time.time()
     trainer.train()
+    _elapsed = _time.time() - _t0
+
     out_dir.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(str(out_dir))
     tokenizer.save_pretrained(str(out_dir))
+
+    # ── 训练摘要落盘（不依赖 tensorboard，纯 JSON/CSV，云端也能看）──
+    _hist = list(trainer.state.log_history or [])
+    try:
+        import csv as _csv
+        with io.open(str(out_dir / "train_log.csv"), "w", encoding="utf-8",
+                     newline="") as _fh:
+            _w = _csv.writer(_fh)
+            _w.writerow(["step", "epoch", "loss", "eval_loss", "learning_rate",
+                         "grad_norm"])
+            for _h in _hist:
+                _w.writerow([_h.get("step", ""), _h.get("epoch", ""),
+                             _h.get("loss", ""), _h.get("eval_loss", ""),
+                             _h.get("learning_rate", ""), _h.get("grad_norm", "")])
+    except Exception as _e:  # noqa: BLE001
+        print(f"[train] train_log.csv 写失败：{_e}")
+
+    _loss = [h["loss"] for h in _hist if "loss" in h]
+    _eval = [h["eval_loss"] for h in _hist if "eval_loss" in h]
+    _lrs = [h["learning_rate"] for h in _hist if "learning_rate" in h]
+    _summary = {
+        "base_model": cfg["base_model"],
+        "train_file": cfg["train_file"],
+        "n_train": len(ds_train),
+        "n_val": len(ds_val) if ds_val else 0,
+        "epochs": cfg["epochs"],
+        "batch_size": cfg["batch_size"],
+        "grad_accum": cfg["grad_accum"],
+        "effective_batch": cfg["batch_size"] * cfg["grad_accum"],
+        "lr": cfg["lr"],
+        "lr_scheduler_type": cfg.get("lr_scheduler_type", "cosine"),
+        "warmup_ratio": cfg["warmup_ratio"],
+        "lora_r": cfg["lora_r"],
+        "lora_alpha": cfg["lora_alpha"],
+        "max_seq_len": cfg["max_seq_len"],
+        "load_in_4bit": cfg.get("load_in_4bit"),
+        "full_finetune": cfg.get("full_finetune"),
+        "total_steps": trainer.state.global_step,
+        "elapsed_sec": round(_elapsed, 1),
+        "loss_first": _loss[0] if _loss else None,
+        "loss_last": _loss[-1] if _loss else None,
+        "loss_min": min(_loss) if _loss else None,
+        "loss_reduction_pct": (round(100.0 * (_loss[0] - _loss[-1]) / _loss[0], 2)
+                               if len(_loss) >= 2 and _loss[0] else None),
+        "eval_loss_first": _eval[0] if _eval else None,
+        "eval_loss_last": _eval[-1] if _eval else None,
+        "eval_loss_min": min(_eval) if _eval else None,
+        "lr_first": _lrs[0] if _lrs else None,
+        "lr_last": _lrs[-1] if _lrs else None,
+        "n_log_points": len(_hist),
+    }
+    with io.open(str(out_dir / "train_summary.json"), "w", encoding="utf-8") as _fh:
+        json.dump(_summary, _fh, ensure_ascii=False, indent=2)
+
+    with io.open(str(out_dir / "train_summary.md"), "w", encoding="utf-8") as _fh:
+        _fh.write("# V9 训练摘要\n\n")
+        for k, v in _summary.items():
+            _fh.write("- %s: %s\n" % (k, v))
+        _fh.write("\n## loss 采样（每 %d 步）\n\n" % cfg["logging_steps"])
+        for _h in _hist:
+            if "loss" in _h:
+                _fh.write("- step %s｜epoch %s｜loss %.6f｜lr %.3e\n"
+                          % (_h.get("step"), _h.get("epoch"), _h["loss"],
+                             _h.get("learning_rate") or 0))
+            elif "eval_loss" in _h:
+                _fh.write("- step %s｜**eval_loss %.6f**\n"
+                          % (_h.get("step"), _h["eval_loss"]))
+
     print(f"[train] adapter 已保存：{out_dir}")
+    print("[train] 摘要：train_summary.json / train_summary.md / train_log.csv")
+    print("[train] 总步数 %d｜耗时 %.1f 秒｜loss %.4f → %.4f（降 %s%%）"
+          % (_summary["total_steps"], _elapsed,
+             _summary["loss_first"] or 0, _summary["loss_last"] or 0,
+             _summary["loss_reduction_pct"]))
     return 0
 
 

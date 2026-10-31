@@ -99,6 +99,17 @@ ANSWER_PROMPT = (
     "answer short (a phrase or one sentence).\n\nContext:\n{ctx}\n\n"
     "Question: {q}\nAnswer:")
 
+# B3 (ledger 0451): enhanced variant — spread-activation extra hits + explicit
+# date reasoning. Same judge for comparability.
+ANSWER_PROMPT_ENH = (
+    "You answer questions about a long conversation. Context lines are "
+    "formatted [session date] speaker: text; the bracketed dates are accurate "
+    "session timestamps — use them for 'when' questions and for relative-time "
+    "math. Use ONLY the context. If it truly lacks the answer, make the "
+    "closest supported inference before falling back to: unknown. Keep the "
+    "answer short (a phrase or one sentence).\n\nContext:\n{ctx}\n\n"
+    "Question: {q}\nAnswer:")
+
 JUDGE_PROMPT = (
     "You are a strict grader. Given a question, the gold answer, and a model "
     "answer, reply with EXACTLY one word: CORRECT, PARTIAL, or WRONG.\n"
@@ -111,7 +122,13 @@ JUDGE_PROMPT = (
 def run_locomo(args) -> dict:
     data = json.loads(ensure_dataset(args.download).read_text(encoding="utf-8"))
     provider = str(getattr(args, "provider", "deepseek"))
+    enhanced = bool(getattr(args, "enh", False)) or bool(
+        getattr(args, "enh_retr", False))
+    date_hint = bool(getattr(args, "enh", False))
     prov_label = "A" if provider.lower() in ("openai", "a", "a-prime") else "DS"
+    mode = (f"locomo-{prov_label}"
+            + ("-enh" if getattr(args, "enh", False)
+               else "-enh-retr" if getattr(args, "enh_retr", False) else ""))
     llm = _llm_turn(provider)
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="yhlz_eval_"))
     results: list[dict] = []
@@ -144,9 +161,14 @@ def run_locomo(args) -> dict:
         for qa in qas:
             q = str(qa.get("question") or "")
             gold = str(qa.get("answer") or "")
-            hits = svc.recall(q, limit=10)
+            hits = svc.recall(q, limit=6 if enhanced else 10)
+            if enhanced:  # B3: append spreading-activation neighbours
+                have = {str(h.get("id", "")) for h in hits}
+                hits = hits + svc._spread_hits(q, 4, exclude=have)
             ctx = "\n".join(f"- {h['summary'][:300]}" for h in hits) or "(no hits)"
-            pred = _ask(llm, ANSWER_PROMPT.format(ctx=ctx, q=q))
+            pred = _ask(llm, (ANSWER_PROMPT_ENH
+                              if (enhanced and date_hint) else ANSWER_PROMPT)
+                        .format(ctx=ctx, q=q))
             verdict = _ask(llm, JUDGE_PROMPT.format(q=q, g=gold, m=pred))
             v = verdict.strip().upper().split()[0] if verdict.strip() else "?"
             results.append({"sample": si, "cat": qa.get("category"),
@@ -163,7 +185,7 @@ def run_locomo(args) -> dict:
         d["n"] += 1
         d["correct"] += 1 if r["verdict"] == "CORRECT" else 0
         d["partial"] += 1 if r["verdict"] == "PARTIAL" else 0
-    return {"mode": f"locomo-{prov_label}", "n": total, "correct": corr,
+    return {"mode": mode, "n": total, "correct": corr,
             "partial": part, "accuracy": corr / total, "by_cat": by_cat,
             "results": results}
 
@@ -274,6 +296,10 @@ def main() -> int:
     p1.add_argument("--provider", default="deepseek",
                     choices=("deepseek", "openai"),
                     help="answerer+judge provider (openai needs OPENAI_API_KEY)")
+    p1.add_argument("--enh", action="store_true",
+                    help="B3 enhanced retrieval: +spread activation +date emphasis")
+    p1.add_argument("--enh-retr", action="store_true",
+                    help="ablation: +spread activation only (no date emphasis)")
     p1.add_argument("--out", default="")
     p2 = sub.add_parser("scenes")
     p2.add_argument("--out", default="")

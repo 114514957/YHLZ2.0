@@ -1,0 +1,99 @@
+{
+ "file": "docs\\素材\\_草稿\\S01_长块首批_续写扩写新写_20261012.md",
+ "profile": "story",
+ "blocks": [
+  {
+   "name": "故事-103｜雪鲸下集·开春的码头",
+   "status": "FAIL",
+   "fails": [
+    "缺 ≥400 字超长句（最长 288）",
+    "分号 ×2"
+   ],
+   "warns": [
+    "收尾单一化 {'陈述': 20, '问': 1, '叹': 1}"
+   ],
+   "metrics": {
+    "rounds": 22,
+    "turns": 44,
+    "max_turn": 288,
+    "avg_turn": 18,
+    "short_turns": 30,
+    "interjections": 9,
+    "endings": {
+     "陈述": 20,
+     "问": 1,
+     "叹": 1
+    },
+    "self_refs": [
+     "我",
+     "咱",
+     "元亨"
+    ]
+   }
+  },
+  {
+   "name": "故事-104｜出门吃饭",
+   "status": "FAIL",
+   "fails": [
+    "缺 ≥400 字超长句（最长 271）",
+    "模板腔 ×1",
+    "分号 ×5",
+    "冒号 ×3"
+   ],
+   "warns": [
+    "收尾单一化 {'陈述': 18, '叹': 1}"
+   ],
+   "metrics": {
+    "rounds": 22,
+    "turns": 42,
+    "max_turn": 271,
+    "avg_turn": 19,
+    "short_turns": 27,
+    "interjections": 7,
+    "endings": {
+     "陈述": 18,
+     "叹": 1
+    },
+    "self_refs": [
+     "我",
+     "咱",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "故事-105｜井与门",
+   "status": "FAIL",
+   "fails": [
+    "缺 ≥400 字超长句（最长 326）",
+    "分号 ×1",
+    "冒号 ×2"
+   ],
+   "warns": [
+    "4字重复: [('井底之蛙', 4), ('在机器里', 3)]"
+   ],
+   "metrics": {
+    "rounds": 21,
+    "turns": 42,
+    "max_turn": 326,
+    "avg_turn": 20,
+    "short_turns": 25,
+    "interjections": 6,
+    "endings": {
+     "陈述": 18,
+     "问": 1,
+     "叹": 2
+    },
+    "self_refs": [
+     "我",
+     "咱"
+    ]
+   }
+  }
+ ],
+ "summary": {
+  "PASS": 0,
+  "WARN": 0,
+  "FAIL": 3
+ }
+}

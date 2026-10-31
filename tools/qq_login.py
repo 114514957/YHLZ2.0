@@ -6,7 +6,7 @@ Usage:
   python tools/qq_login.py 2258374446  # by uin
 
 Saves the chosen account as NapCat ``autoLoginAccount`` (webui.json) and
-launches it via ``launcher-user.bat <uin>``. QQNT quick-logs-in if that
+launches it through the shared non-elevated CMD entry. QQNT quick-logs-in if that
 account's session was saved before; otherwise scan the QR once.
 """
 from __future__ import annotations
@@ -49,13 +49,14 @@ def set_auto_account(uin: str) -> bool:
 
 
 def switch(uin: str) -> None:
-    kill = QQWATCH_SHELL / "KillQQ.bat"
-    if kill.exists():
-        subprocess.run(["cmd", "/c", str(kill)], cwd=str(QQWATCH_SHELL),
-                       capture_output=True)
-    subprocess.Popen(["cmd", "/c", str(NAPCAT_LAUNCHER), str(uin)],
-                     cwd=str(QQWATCH_SHELL), close_fds=True,
-                     creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
+    from backend.napcat_launcher import launch_napcat
+    from tools.qq_bridge_control import stop_napcat
+    from backend.yhlz_paths import ROOT
+
+    stopped = stop_napcat(ROOT / "cache" / "qq_bridge" / "lite")
+    if not stopped.get("stopped"):
+        raise RuntimeError("旧 NapCat 尚未退出，拒绝重复拉起")
+    launch_napcat(uin)
 
 
 def main() -> int:

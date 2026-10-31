@@ -12,7 +12,7 @@ import numpy as np
 
 def _clean_env():
     env = dict(os.environ)
-    env["PYTHONPATH"] = r"C:\Users\ACE_WAN——PROJECT\YHLZ"
+    env["PYTHONPATH"] = r"C:\Users\ACE_WAN——PROJECT\YHLZ\YH"
     return env
 
 

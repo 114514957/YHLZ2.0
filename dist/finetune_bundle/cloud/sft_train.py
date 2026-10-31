@@ -130,11 +130,17 @@ def main():
         return ex or {"input_ids": [], "attention_mask": [], "labels": []}
 
     def prep(rows):
-        rows = [r for r in rows
-                if any(m.get("role") == "assistant" for m in (r.get("messages") or []))]
-        ds = Dataset.from_list(rows)
-        drop = [c for c in ds.column_names if c in ("messages", "source", "tools", "meta")]
-        return ds.map(map_fn, remove_columns=drop)
+        # 纯 Python 里先 map 成扁平 {input_ids,attention_mask,labels}，避免新版
+        # datasets 对异构嵌套列（messages/tools）做 Arrow 类型推断而失败。
+        examples = []
+        for r in rows:
+            if not any(m.get("role") == "assistant"
+                       for m in (r.get("messages") or [])):
+                continue
+            ex = build_example(tok, r, args.seq)
+            if ex:
+                examples.append(ex)
+        return Dataset.from_list(examples)
 
     train = prep(read_jsonl(args.train))
     val_rows = read_jsonl(args.val) if args.val else []

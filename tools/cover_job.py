@@ -58,6 +58,8 @@ def _run(args: list[str], timeout: float) -> subprocess.CompletedProcess:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("target")
+    ap.add_argument("--legacy-soulx", action="store_true",
+                    help="已退出生产：只在回滚/对比时显式开启旧 SoulX 链路")
     ap.add_argument("--voice", default="xiaoyi", choices=sorted(_REF))
     ap.add_argument("--out-dir", default=str(_ROOT_OUT))
     ap.add_argument("--keep-vocal", action="store_true")
@@ -77,6 +79,15 @@ def main() -> int:
     ap.add_argument("--prep-timeout", type=float, default=2700)
     ap.add_argument("--svc-timeout", type=float, default=1800)
     args = ap.parse_args()
+
+    if not args.legacy_soulx:
+        print(json.dumps({
+            "ok": False,
+            "error": "旧 SoulX 链路已退出生产（台账 0935）；请用 "
+                     "python tools/cover_seedvc.py <target>，"
+                     "确需回滚再加 --legacy-soulx",
+        }, ensure_ascii=False))
+        return 3
 
     tgt = pathlib.Path(args.target).resolve()
     if not tgt.is_file():

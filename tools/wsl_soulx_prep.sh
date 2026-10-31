@@ -44,6 +44,8 @@ if [ "$SEP" = "1" ]; then
   fi
 else
   echo "[prep] target: F0 only (fast)"
+  rm -rf example/transcriptions/target_user
+  mkdir -p example/transcriptions/target_user
   python -m preprocess.pipeline --audio_path "example/audio/target_user.$EXT" \
     --save_dir example/transcriptions/target_user --language Mandarin \
     --device cuda --vocal_sep False --max_merge_duration 120000 \

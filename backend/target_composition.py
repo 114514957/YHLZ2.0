@@ -16,6 +16,7 @@ from typing import Any, Callable, Mapping, Optional
 
 from backend.asr_bridge import ASRBridge
 from backend.asr_provider_port import is_asr_provider_port, is_streaming_asr_provider_port
+from backend.barge_in import BargeInDetector
 from backend.media_adapter import MediaAdapter
 from backend.target_voice_gate import auto_voice_gate
 from backend.memory_guard import ReadOnlyMemoryFacade
@@ -55,6 +56,7 @@ class TargetVoiceCompositionConfig:
     asr_stream_queue_capacity: int = 20
     asr_stream_queue_duration_ms: int = 2_000
     noise_suppressor_enabled: bool = True
+    segmented_tts_enabled: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.qwen, QwenTTSConfig):
@@ -91,6 +93,7 @@ class TargetVoiceCompositionConfig:
             "asr_stream_queue_capacity": int(self.asr_stream_queue_capacity),
             "asr_stream_queue_duration_ms": int(self.asr_stream_queue_duration_ms),
             "noise_suppressor_enabled": bool(self.noise_suppressor_enabled),
+            "segmented_tts_enabled": bool(self.segmented_tts_enabled),
         }
 
 
@@ -136,6 +139,10 @@ class TargetVoiceComposition:
         provider = factory(config.qwen)
         if not is_tts_provider_port(provider):
             raise TargetCompositionError("VOICE-COMPOSITION-PROVIDER-INVALID")
+        if config.segmented_tts_enabled:
+            from backend.tts_segmented_provider import SegmentedTTSProvider
+
+            provider = SegmentedTTSProvider(provider, stop_timeout_s=config.stop_timeout_s)
         self.tts_provider = provider
         self.chain = TargetVoiceChain(
             kernel=self.kernel,
@@ -144,7 +151,7 @@ class TargetVoiceComposition:
             tts_provider=provider,
             playback=playback,
             memory=self.memory,
-            tts_voice_id=config.qwen.speaker,
+            tts_voice_id=config.qwen.resolved_voice_id,
         )
         self._runtime: Optional[TargetVoiceRuntime] = None
         self._bound_vad: Any = None
@@ -172,16 +179,41 @@ class TargetVoiceComposition:
         target_sample_rate: Optional[int] = None,
         environment_report: Optional[EnvironmentProbeReport] = None,
         acceptance_thresholds: Optional[AcceptanceThresholds] = None,
+        duplex_enabled: Optional[bool] = None,
+        native_audio_submit: Any = None,
     ) -> TargetVoiceRuntime:
         """Create the only runtime that may own the composition's media path."""
         is_streaming = is_streaming_asr_provider_port(asr)
-        if not is_streaming and not is_asr_provider_port(asr):
+        if native_audio_submit is not None and not callable(native_audio_submit):
+            raise TypeError("native_audio_submit must be callable")
+        if native_audio_submit is None and not is_streaming and not is_asr_provider_port(asr):
             raise TargetCompositionError("VOICE-COMPOSITION-ASR-PORT-INVALID")
         with self._lock:
             if self._closed:
                 raise TargetCompositionError("VOICE-COMPOSITION-CLOSED")
             if self._runtime is not None:
                 raise TargetCompositionError("VOICE-COMPOSITION-RUNTIME-ALREADY-BOUND")
+            # Auto-wire only our concrete callback-reference playback. Preserve
+            # external taps/helpers unless the caller explicitly opts in.
+            from backend.target_playback import SoundDevicePlaybackPort
+            playback = self._playback_or_none()
+            eligible = isinstance(playback, SoundDevicePlaybackPort)
+            auto = (eligible and not playback.reference_health()["attached"]
+                    and aec is None and resampler is None
+                    and target_sample_rate in (None, 16_000))
+            enabled = auto if duplex_enabled is None else duplex_enabled
+            duplex_pipeline = None
+            if enabled:
+                if not eligible or resampler is not None or target_sample_rate not in (None, 16_000):
+                    raise TargetCompositionError("VOICE-DUPLEX-CONFIG-INCOMPATIBLE")
+                from backend.duplex_reference import PlaybackReferenceTimeline
+                from backend.duplex_ingress import DuplexIngress
+                from backend.playback_aec import NLMSAECAdapter
+                timeline = PlaybackReferenceTimeline()
+                aec = aec if aec is not None else NLMSAECAdapter()
+                duplex_pipeline = DuplexIngress(timeline, aec)
+                playback.set_reference_tap(timeline.push)
+                target_sample_rate = 16_000
             # The composition root owns every injected helper's lifecycle.
             # A caller-provided VAD must be started here; otherwise the
             # runtime hits VAD-NOT-READY on the first frame (ledger 0129).
@@ -199,9 +231,13 @@ class TargetVoiceComposition:
                 queue_capacity=self.config.media_queue_capacity,
                 max_queue_duration_ms=self.config.media_queue_duration_ms,
                 voice_gate=auto_voice_gate(self._playback_or_none()),
-                denoiser=self._create_denoiser(),
+                denoiser=self._create_denoiser() if duplex_pipeline is None else None,
+                duplex_pipeline=duplex_pipeline,
             )
-            if is_streaming:
+            if native_audio_submit is not None:
+                from backend.native_audio_ingress import NativeAudioIngress
+                bridge = NativeAudioIngress(chain=self.chain, submit_audio=native_audio_submit)
+            elif is_streaming:
                 bridge = StreamingASRBridge(
                     asr=asr,
                     chain=self.chain,
@@ -223,6 +259,11 @@ class TargetVoiceComposition:
                 stop_timeout_s=self.config.stop_timeout_s,
                 environment_report=environment_report,
                 acceptance_thresholds=acceptance_thresholds,
+                # 阶段3: stop playback on sustained user speech while speaking.
+                # The media adapter already drops mic frames overlapping
+                # speaker playback until AEC is verified, so this is safe for
+                # the HEADSET route and inert on the unverified speaker route.
+                barge_in_detector=BargeInDetector(),
             )
             return self._runtime
 

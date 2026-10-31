@@ -1,7 +1,8 @@
-"""dev_runner dual-track backend tests (v1.1, ledger 0446).
+"""dev_runner harness-backend tests (v1.2, ledger 0797).
 
-The dsh backend proxies start/answer to tools/dsh_worker.py over HTTP; these
-tests use a fake worker so no SDK/CLI process is needed.
+The dsh/harness backend proxies start/answer to tools/dsh_worker.py over HTTP;
+these tests use a fake worker so no SDK/CLI process is needed. Since ledger
+0497 the backend is harness-only: the old opencode/env/file switch is read-only.
 """
 import importlib
 import json
@@ -71,13 +72,13 @@ class DevRunnerBackendTest(unittest.TestCase):
     def setUp(self):
         _FakeWorker.calls = []
 
-    def test_backend_selection(self):
-        os.environ["YHLZ_DEV_BACKEND"] = "bogus"
-        self.assertEqual(self.dr._backend(), "opencode")
-        os.environ["YHLZ_DEV_BACKEND"] = "dsh"
-        self.assertEqual(self.dr._backend(), "dsh")
+    def test_backend_is_harness_only(self):
+        """ledger 0797: env/file switches can no longer select opencode."""
+        for value in ("bogus", "opencode", "dsh", ""):
+            os.environ["YHLZ_DEV_BACKEND"] = value
+            self.assertEqual(self.dr._backend(), "dsh")
         os.environ.pop("YHLZ_DEV_BACKEND", None)
-        self.assertEqual(self.dr._backend(), "opencode")
+        self.assertEqual(self.dr._backend(), "dsh")
 
     def test_dsh_start_posts_to_worker(self):
         os.environ["YHLZ_DEV_BACKEND"] = "dsh"
@@ -98,8 +99,8 @@ class DevRunnerBackendTest(unittest.TestCase):
         self.assertEqual([c[0] for c in _FakeWorker.calls], ["/answer"])
         self.assertEqual(_FakeWorker.calls[0][1].get("text"), "用方案 A")
 
-    def test_backend_file_precedence(self):
-        """A1 (ledger 0450): env > backend.txt > opencode default."""
+    def test_legacy_switch_is_read_only(self):
+        """ledger 0797: backend.txt/env are history; #backend only reports."""
         import pathlib
         import tempfile
 
@@ -107,11 +108,11 @@ class DevRunnerBackendTest(unittest.TestCase):
         self.dr.BACKEND_FILE = pathlib.Path(tempfile.mkdtemp()) / "backend.txt"
         os.environ.pop("YHLZ_DEV_BACKEND", None)
         try:
-            self.assertEqual(self.dr._backend(), "opencode")
-            self.assertIn("dsh", self.dr.set_backend("dsh"))
+            self.assertIn("退役", self.dr.set_backend("opencode"))
             self.assertEqual(self.dr._backend(), "dsh")
-            os.environ["YHLZ_DEV_BACKEND"] = "opencode"
-            self.assertEqual(self.dr._backend(), "opencode")  # env wins
+            self.assertFalse(self.dr.BACKEND_FILE.exists())  # nothing written
+            self.assertIn("harness", self.dr.backend_status())
+            self.assertIn("harness", self.dr.set_backend("dsh"))
         finally:
             os.environ.pop("YHLZ_DEV_BACKEND", None)
             self.dr.BACKEND_FILE = old

@@ -1,0 +1,6326 @@
+{
+ "file": "docs\\素材\\记忆样本_v2.md",
+ "profile": "general",
+ "blocks": [
+  {
+   "name": "mem-1",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 稳了 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 23,
+    "avg_turn": 18,
+    "short_turns": 1,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-2",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 19,
+    "short_turns": 1,
+    "interjections": 5,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-3",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 20,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘",
+     "元亨"
+    ]
+   }
+  },
+  {
+   "name": "mem-4",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 20,
+    "avg_turn": 16,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "问": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-5",
+   "status": "PASS",
+   "fails": [],
+   "warns": [],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 35,
+    "avg_turn": 20,
+    "short_turns": 2,
+    "interjections": 1,
+    "endings": {
+     "问": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-6",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 23,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "问": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-7",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.7，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 18,
+    "short_turns": 2,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "咱",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-8",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 19,
+    "short_turns": 1,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "元亨"
+    ]
+   }
+  },
+  {
+   "name": "mem-9",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 22,
+    "avg_turn": 16,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "陈述": 1,
+     "问": 2
+    },
+    "self_refs": [
+     "咱",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-10",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 22,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "叹": 1,
+     "陈述": 1
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-11",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 1,
+    "interjections": 3,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-12",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "4字重复: [('能改就改', 3), ('改就改改', 3), ('就改改不', 3)]",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 32,
+    "avg_turn": 21,
+    "short_turns": 1,
+    "interjections": 4,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-13",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 22,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-14",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 20,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {
+     "问": 1,
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-15",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 37,
+    "avg_turn": 32,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-16",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 62,
+    "avg_turn": 34,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-17",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 19,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-18",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 22,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-19",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 33,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-20",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-21",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 28,
+    "avg_turn": 20,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-22",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 7,
+    "endings": {
+     "叹": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-23",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-24",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 24,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-25",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "问": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-26",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 39,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-27",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "4字重复: [('NEKO', 3)]",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-28",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 35,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-29",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 35,
+    "avg_turn": 30,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 1,
+     "叹": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-30",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-31",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-32",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-33",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1",
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-34",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 35,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "叹": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-35",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 32,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-36",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 36,
+    "avg_turn": 29,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-37",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-38",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 36,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 7,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-39",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 4,
+    "turns": 8,
+    "max_turn": 30,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 3,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-40",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-41",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "问": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-42",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "mem-43",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×2（书面表达，仅提示）",
+    "冒号 ×2（书面表达，仅提示）",
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.7，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 57,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-44",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 24,
+    "avg_turn": 19,
+    "short_turns": 1,
+    "interjections": 5,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-45",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 52,
+    "avg_turn": 30,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-46",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 50,
+    "avg_turn": 30,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 1,
+     "陈述": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-47",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-48",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 39,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 1,
+     "陈述": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-49",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 32,
+    "avg_turn": 29,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "叹": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-50",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 37,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-51",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "4字重复: [('0.6B', 4), ('1.7B', 3)]",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-52",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 30,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-53",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "问": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-54",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 23,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 1,
+     "陈述": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-55",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 23,
+    "avg_turn": 19,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-56",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "4字重复: [('语音链路', 3)]",
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 36,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-57",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-58",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-59",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "叹": 1,
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-60",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-61",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 2
+    },
+    "self_refs": [
+     "我",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-62",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-63",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-64",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "问": 1,
+     "叹": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-65",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.6，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 45,
+    "avg_turn": 30,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 1,
+     "问": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-66",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 19,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-67",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 稳了 ×1"
+   ],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-68",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 35,
+    "avg_turn": 30,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-69",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-70",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 32,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 2
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-71",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-72",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-73",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 24,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-74",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-75",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 22,
+    "avg_turn": 17,
+    "short_turns": 1,
+    "interjections": 3,
+    "endings": {
+     "叹": 1,
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-76",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 22,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "叹": 1,
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-77",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 22,
+    "short_turns": 1,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "陈述": 1
+    },
+    "self_refs": [
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "mem-78",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-79",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 49,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-80",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 7,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "元亨"
+    ]
+   }
+  },
+  {
+   "name": "mem-81",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 32,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-82",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "问": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-83",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 21,
+    "short_turns": 1,
+    "interjections": 5,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-84",
+   "status": "FAIL",
+   "fails": [
+    "填充语撞车: 接上 ×2"
+   ],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 37,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-85",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-86",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-87",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-88",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 28,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 2
+    },
+    "self_refs": [
+     "咱",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-89",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 35,
+    "avg_turn": 29,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-90",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-91",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-92",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×2（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 73,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "问": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-93",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-94",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-95",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-96",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.7，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 20,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-97",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-98",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "叹": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-99",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-100",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-101",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-102",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-103",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-104",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 32,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "咱",
+     "本小姐",
+     "老娘",
+     "元亨"
+    ]
+   }
+  },
+  {
+   "name": "mem-105",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 1,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-106",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 35,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-107",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 22,
+    "short_turns": 1,
+    "interjections": 5,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-108",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 23,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-109",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 1,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-110",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-111",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 22,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-112",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-113",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "mem-114",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-115",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-116",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 1,
+     "问": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-117",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-118",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 1,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-119",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "问": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-120",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-121",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 36,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 1,
+     "问": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-122",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-123",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 32,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-124",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 23,
+    "avg_turn": 18,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-125",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 35,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 7,
+    "endings": {
+     "问": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-126",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×2（书面表达，仅提示）",
+    "冒号 ×2（书面表达，仅提示）",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 42,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-127",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.6，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 4,
+    "turns": 8,
+    "max_turn": 37,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "叹": 1,
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "元亨"
+    ]
+   }
+  },
+  {
+   "name": "mem-128",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 32,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-129",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-130",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-131",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 32,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 8,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-132",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 30,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-133",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 29,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-134",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "问": 1,
+     "陈述": 1,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-135",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×2（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 50,
+    "avg_turn": 31,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-136",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 24,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 1,
+     "陈述": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-137",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 22,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-138",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 51,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-139",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-140",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-141",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "问": 2
+    },
+    "self_refs": [
+     "咱",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-142",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-143",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-144",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-145",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(12%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 4,
+    "turns": 8,
+    "max_turn": 27,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 3,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-146",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 37,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-147",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 37,
+    "avg_turn": 25,
+    "short_turns": 1,
+    "interjections": 6,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-148",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 7,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-149",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 20,
+    "short_turns": 1,
+    "interjections": 3,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-150",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 24,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "叹": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-151",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 22,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-152",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 22,
+    "avg_turn": 17,
+    "short_turns": 1,
+    "interjections": 3,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-153",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 49,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "问": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-154",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-155",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "问": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-156",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 52,
+    "avg_turn": 29,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "陈述": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-157",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-158",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 44,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "mem-159",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 24,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-160",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 27,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "叹": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-161",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.6，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 36,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-162",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "叹": 1,
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  },
+  {
+   "name": "mem-163",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×2（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 71,
+    "avg_turn": 36,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "叹": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-164",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-165",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 35,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-166",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 20,
+    "short_turns": 1,
+    "interjections": 4,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-167",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 23,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-168",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 20,
+    "short_turns": 1,
+    "interjections": 4,
+    "endings": {
+     "问": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-169",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 1,
+     "叹": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-170",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 1,
+     "叹": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-171",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 23,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "问": 1,
+     "陈述": 1,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-172",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-173",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-174",
+   "status": "FAIL",
+   "fails": [
+    "应答模板 ×1"
+   ],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-175",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "叹": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-176",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "问": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-177",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 23,
+    "avg_turn": 17,
+    "short_turns": 2,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "我",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-178",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 20,
+    "avg_turn": 16,
+    "short_turns": 1,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-179",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "问": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-180",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×2（书面表达，仅提示）",
+    "冒号 ×2（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.6，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 58,
+    "avg_turn": 37,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-181",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "陈述": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-182",
+   "status": "FAIL",
+   "fails": [
+    "应答模板 ×1"
+   ],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-183",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-184",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-185",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 1,
+    "interjections": 5,
+    "endings": {
+     "问": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-186",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 20,
+    "avg_turn": 18,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-187",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "元亨自称单一（<2 种）",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 4,
+    "turns": 8,
+    "max_turn": 22,
+    "avg_turn": 18,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-188",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 23,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-189",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-190",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 20,
+    "short_turns": 1,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-191",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 6,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-192",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 1,
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-193",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 43,
+    "avg_turn": 33,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-194",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.7，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 38,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "问": 2,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-195",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 24,
+    "avg_turn": 20,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "叹": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-196",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "叹": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "咱",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-197",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-198",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 1,
+     "叹": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-199",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 26,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "问": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-200",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "问": 1,
+     "陈述": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-201",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-202",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-203",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 22,
+    "short_turns": 1,
+    "interjections": 4,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-204",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 1,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-205",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 别指望 ×1"
+   ],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 21,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "叹": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-206",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 25,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 1,
+     "问": 1,
+     "叹": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-207",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 29,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 1,
+     "叹": 2
+    },
+    "self_refs": [
+     "咱",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-208",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 4,
+    "turns": 8,
+    "max_turn": 27,
+    "avg_turn": 20,
+    "short_turns": 1,
+    "interjections": 5,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-209",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 23,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-210",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 4,
+    "turns": 8,
+    "max_turn": 29,
+    "avg_turn": 18,
+    "short_turns": 3,
+    "interjections": 4,
+    "endings": {
+     "陈述": 3,
+     "问": 1
+    },
+    "self_refs": [
+     "咱"
+    ]
+   }
+  },
+  {
+   "name": "mem-211",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "叹": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-212",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 22,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 3
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-213",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×2（书面表达，仅提示）",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 60,
+    "avg_turn": 34,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-214",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 23,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "元亨"
+    ]
+   }
+  },
+  {
+   "name": "mem-215",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 7,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-216",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 24,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 1,
+     "陈述": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-217",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 34,
+    "avg_turn": 26,
+    "short_turns": 1,
+    "interjections": 2,
+    "endings": {
+     "叹": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-218",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 32,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-219",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "问": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-220",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "问": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-221",
+   "status": "FAIL",
+   "fails": [
+    "模板腔 ×2"
+   ],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 30,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "叹": 1,
+     "问": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-222",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 18,
+    "avg_turn": 16,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": []
+   }
+  },
+  {
+   "name": "mem-223",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-224",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-225",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 20,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-226",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-227",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-228",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 19,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-229",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-230",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 31,
+    "avg_turn": 23,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 3
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-231",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-232",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-233",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(0%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 45,
+    "avg_turn": 31,
+    "short_turns": 0,
+    "interjections": 9,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-234",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×2（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 2,
+    "turns": 4,
+    "max_turn": 69,
+    "avg_turn": 33,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-235",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "我",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-236",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 27,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 3
+    },
+    "self_refs": [
+     "我",
+     "咱",
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-237",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.7，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 5,
+    "turns": 10,
+    "max_turn": 46,
+    "avg_turn": 26,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 3,
+     "叹": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-239",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 19,
+    "short_turns": 1,
+    "interjections": 5,
+    "endings": {
+     "陈述": 1,
+     "问": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-240",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.3，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-241",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "叹": 2
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-242",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 25,
+    "avg_turn": 17,
+    "short_turns": 1,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-243",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(12%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 4,
+    "turns": 8,
+    "max_turn": 28,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "问": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-244",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.1，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 26,
+    "avg_turn": 22,
+    "short_turns": 0,
+    "interjections": 1,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-245",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "4字重复: [('任务技能', 3)]",
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 44,
+    "avg_turn": 28,
+    "short_turns": 0,
+    "interjections": 5,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-246",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.4，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 29,
+    "avg_turn": 21,
+    "short_turns": 1,
+    "interjections": 6,
+    "endings": {
+     "叹": 1,
+     "陈述": 2
+    },
+    "self_refs": [
+     "我",
+     "本小姐"
+    ]
+   }
+  },
+  {
+   "name": "mem-247",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "分号 ×1（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）",
+    "风格·句长太匀(p90/中位=1.8，宜≥1.8)"
+   ],
+   "metrics": {
+    "rounds": 6,
+    "turns": 12,
+    "max_turn": 60,
+    "avg_turn": 26,
+    "short_turns": 1,
+    "interjections": 12,
+    "endings": {
+     "问": 3,
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-249",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.0，宜≥1.8)",
+    "风格·全篇无留白(省略号)",
+    "风格·未称呼对方(老爹/利贞)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 24,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 3,
+    "endings": {
+     "叹": 2,
+     "陈述": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-250",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·句长太匀(p90/中位=1.2，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 28,
+    "avg_turn": 21,
+    "short_turns": 0,
+    "interjections": 4,
+    "endings": {
+     "陈述": 2,
+     "叹": 1
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  },
+  {
+   "name": "mem-251",
+   "status": "WARN",
+   "fails": [],
+   "warns": [
+    "风格·短句偏少(17%≤20字，宜≥25%)",
+    "风格·句长太匀(p90/中位=1.5，宜≥1.8)",
+    "风格·全篇无留白(省略号)"
+   ],
+   "metrics": {
+    "rounds": 3,
+    "turns": 6,
+    "max_turn": 33,
+    "avg_turn": 24,
+    "short_turns": 0,
+    "interjections": 2,
+    "endings": {
+     "叹": 1,
+     "问": 2
+    },
+    "self_refs": [
+     "本小姐",
+     "老娘"
+    ]
+   }
+  }
+ ],
+ "summary": {
+  "PASS": 1,
+  "WARN": 234,
+  "FAIL": 14
+ }
+}

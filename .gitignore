@@ -97,3 +97,48 @@ venv-dsh/
 
 # 图标原图备份（本地留档，不入库；tools/make_icons.py 生成）
 assets/icons/_backup_*/
+
+# Test/one-off temp dirs at repo root (2026-10-21 audit)
+/tmp*/
+
+# ── 2026-10-31 提交前审计补的规则 ──────────────────────────────
+# 根目录散落的音频（项目里已有 音频素材/ 目录，但这些漏在外面，单个 7–15MB）
+*.wav
+*.mp3
+*.flac
+
+# 压缩包一律不入库（dist/yuanheng-dapt-corpus-ptpd.tar.gz 有 76MB）
+*.tar.gz
+*.tgz
+
+# 训练/适配器产物：只留脚本与配置，数据与权重排除
+#   dist/v8_adapter/      323 MB
+#   dist/finetune_bundle/  80 MB（sft_persona_*.jsonl 各 7–8MB）
+dist/v8_adapter/
+dist/finetune_bundle/
+dist/v9_train_bundle/
+dist/retrain_pkg_*/
+# 但重训包里的脚本与配置要留（供复现）
+!dist/retrain_pkg_*/finetune_train.py
+!dist/retrain_pkg_*/run_retrain_*.sh
+!dist/retrain_pkg_*/config/
+
+# 临时备份与错误日志（改 prompt / 跑脚本时留下的）
+*.bak_prompt
+*.bak
+*.err
+
+# 外部克隆的参考仓库（嵌套 git 仓库，其中一个没有 commit 会让 git add -A 整体失败）
+#   research/CX-O、research/astrbot、research/deepseek-recipe 等
+research/
+
+# ── 2026-10-31 二次审计：这几个目录不该进库 ──────────────────
+# .tmp/       91 文件 34MB（dd_test.bin 11.9MB、scp_test.bin 11.2MB 等测试产物）
+# Seed-VC/   182 文件 6.5GB（外部语音转换项目，含 1.2GB pytorch_model.bin）
+# _pylib/    125 文件 3.7MB（pypdf 等依赖缓存 .pyc）
+# .archify/   34 文件 3.3MB（archify 技能生成的 HTML 产物）
+.tmp/
+Seed-VC/
+_pylib/
+.archify/
+

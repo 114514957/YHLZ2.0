@@ -133,6 +133,34 @@ def _to_input_audio(src: str) -> Optional[dict[str, Any]]:
     return {"type": "input_audio", "input_audio": {"data": data, "format": "wav"}}
 
 
+_FALLBACK_TOOL_NAMES = frozenset({
+    "system_time", "memory_save", "diary_write", "kb_add",
+    "bili_find", "bili_watch", "bili_status", "bili_notes", "bili_read",
+})
+
+
+def _compact_for_local(messages: list[dict[str, Any]],
+                       system_chars: int = 3000,
+                       turn_chars: int = 900, keep: int = 6) -> list[dict[str, Any]]:
+    """Fit a turn into the local 8k-context fallback.
+
+    The cloud prompt carries the full persona + 45 tool schemas + long
+    history (measured 10,782 tokens).  Gemma's llama.cpp server rejects that
+    with HTTP 400, so the fallback gets only: first system message (trimmed),
+    the last few turns (trimmed), and a small tool subset.
+    """
+    sys_msg = next((m for m in messages if m.get("role") == "system"), None)
+    rest = [m for m in messages if m.get("role") != "system"][-max(1, keep):]
+    out: list[dict[str, Any]] = []
+    if sys_msg is not None:
+        out.append({"role": "system",
+                    "content": str(sys_msg.get("content") or "")[:system_chars]})
+    for m in rest:
+        out.append({"role": m.get("role") or "user",
+                    "content": str(m.get("content") or "")[:turn_chars]})
+    return out
+
+
 def build_openai_compatible_llm_turn(
     *,
     base_url: str = "https://api.deepseek.com/v1/chat/completions",
@@ -251,17 +279,39 @@ def build_openai_compatible_llm_turn(
         async with httpx.AsyncClient(timeout=60) as c:
             try:
                 return await _post(c, base_url, headers, payload)
-            except Exception:
-                if fallback_url:
-                    fb_payload = dict(payload)
-                    fb_payload["model"] = fb_model or fb_payload["model"]
-                    fb_payload.pop("reasoning_effort", None)
-                    try:
-                        return await _post(c, fallback_url, {}, fb_payload)
-                    except Exception as exc2:
-                        raise RuntimeError(
-                            f"dual-rail failed: {type(exc2).__name__}") from exc2
-                raise
+            except Exception as exc1:
+                if not fallback_url:
+                    raise
+                fb_payload = dict(payload)
+                fb_payload["model"] = fb_model or fb_payload["model"]
+                fb_payload.pop("reasoning_effort", None)
+                # 8k local context: full persona + 45 tools + long history
+                # overflows, so trim to a survival prompt.
+                fb_payload["messages"] = _compact_for_local(messages)
+                tiny = [t for t in (tools or [])
+                        if t.get("function", {}).get("name")
+                        in _FALLBACK_TOOL_NAMES]
+                if tiny:
+                    fb_payload["tools"] = tiny
+                    fb_payload["tool_choice"] = "auto"
+                else:
+                    fb_payload.pop("tools", None)
+                    fb_payload.pop("tool_choice", None)
+                try:
+                    fb_payload["max_tokens"] = min(
+                        int(fb_payload.get("max_tokens") or 500), 500)
+                except Exception:
+                    fb_payload["max_tokens"] = 500
+                try:
+                    return await _post(c, fallback_url, {}, fb_payload)
+                except Exception as exc2:
+                    resp = getattr(exc2, "response", None)
+                    detail = (
+                        f"primary={type(exc1).__name__}:{str(exc1)[:100]} "
+                        f"fallback={type(exc2).__name__}:"
+                        f"{getattr(resp, 'status_code', '')}:"
+                        f"{str(getattr(resp, 'text', ''))[:160]}")
+                    raise RuntimeError(f"dual-rail failed: {detail}") from exc2
 
     def _with_stream(**overrides):
         options = dict(

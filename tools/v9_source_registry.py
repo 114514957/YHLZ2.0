@@ -29,16 +29,18 @@ CACHE_DIR = ROOT / "cache" / "v9_materials_preparation" / "20261013"
 
 # 导出稿 source/group 键（前缀）→ 登记册 id。
 # 只映射**有据可依**的：自有素材集→SRC-001、QQ 群语料→SRC-002、真实对话→SRC-003。
-# 工具轨迹（tooluse）在登记册里**没有对应条目** → 故意不映射，报为缺口。
+# 2026-10-18（ledger 0829）：工具轨迹补登 SRC-016、利贞数据集补登 SRC-017，
+# 原先 1252 行 tooluse 的"登记册缺口"就此收口。
 SOURCE_MAP = {
     "scene": "SRC-001",
-    "lizhen": "SRC-001",
+    "lizhen": "SRC-017",
     "memory": "SRC-001",
     "honesty": "SRC-001",
     "uncertain": "SRC-001",
     "refusal": "SRC-001",
     "golden": "SRC-001",
     "real": "SRC-003",
+    "tooluse": "SRC-016",
 }
 QQ_GROUP_SOURCE = "SRC-002"
 EXPORTS = (

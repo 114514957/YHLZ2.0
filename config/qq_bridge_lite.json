@@ -37,7 +37,7 @@
     "855372167"
   ],
   "wake": {
-    "enabled": true,
+    "enabled": false,
     "mode": "lively",
     "names": [
       "元亨",

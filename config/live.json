@@ -1,0 +1,11 @@
+{
+  "host": "127.0.0.1",
+  "port": 8377,
+  "tts_url": "http://127.0.0.1:8321/tts",
+  "tts_timeout_s": 240.0,
+  "segment_ttl_s": 30.0,
+  "max_queue": 24,
+  "lease_ttl_s": 15.0,
+  "poll_timeout_s": 10.0,
+  "audio_dir": "cache/live/audio"
+}

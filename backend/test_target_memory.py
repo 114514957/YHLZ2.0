@@ -51,7 +51,7 @@ class MemoryServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.service.set_llm_hooks(_FakeExtractor(), _FakeExtractor())
 
-    async def tearDown(self):
+    async def asyncTearDown(self):
         pass
 
     async def test_l1_window_and_compress(self) -> None:
@@ -92,6 +92,21 @@ class MemoryServiceTests(unittest.IsolatedAsyncioTestCase):
         self.service.rebuild_fts()
         self.assertTrue(self.service.recall("简洁"))
 
+    async def test_memory_wake_hit_probe(self) -> None:
+        from backend.target_memory import memory_wake_hit
+
+        items = await self.service.submit_candidates(
+            text="t", transcript="你好，元亨", evidence_ref="r"
+        )
+        await self.service.adjudicate_async(items)
+        db = self.tmp / "mem.db"
+        hit = memory_wake_hit("咱们说好的简洁直接呢", db_path=db)
+        self.assertIsNotNone(hit)
+        self.assertIn("简洁", hit["summary"])
+        # 无关闲聊不命中；太短不查
+        self.assertIsNone(memory_wake_hit("今天天气不错适合出门", db_path=db))
+        self.assertIsNone(memory_wake_hit("简洁", db_path=db))
+
     def test_persona_draft_reads_golden(self) -> None:
         draft = self.service.persona_draft()
         self.assertTrue(draft)
@@ -128,3 +143,43 @@ class ReasonerMemoryIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StructuredMemoryOutputTests(unittest.IsolatedAsyncioTestCase):
+    def test_repeated_identical_json_keeps_one_value(self):
+        text='```json\n[{"summary":"tea"}]\n<|turn>model\n```json\n[{"summary":"tea"}]'
+        self.assertEqual(MemoryLLMService._parse_json_array(text), [{"summary":"tea"}])
+
+    def test_conflicting_and_truncated_outputs_are_not_guessed(self):
+        for text in ['[{"a":1}] [{"a":2}]', '[{"a":1}] [{"a":', '[{"a":1}', 'no json']:
+            self.assertEqual(MemoryLLMService._parse_json_array(text), [], text)
+
+    async def test_judgment_budget_and_explicit_validated_status(self):
+        calls=[]
+        class P:
+            async def stream_chat(self,messages,**kwargs):
+                calls.append((messages,kwargs));yield '{"importance":6,"status":"active"}'
+        p=P();svc=MemoryLLMService(p,local=p)
+        self.assertEqual(await svc.adjudicate({'summary':'synthetic'}), {'importance':6,'status':'active'})
+        self.assertEqual(svc.last_judge_status,'validated')
+        self.assertEqual(svc.last_judge_route,'local')
+        self.assertEqual(calls[0][1]['max_tokens'],128)
+        self.assertEqual([m['role'] for m in calls[0][0]],['system','user'])
+
+    async def test_bad_verdict_is_reported_as_fallback(self):
+        class P:
+            async def stream_chat(self,*a,**kw):yield '{"importance":99,"status":"delete"}'
+        p=P();svc=MemoryLLMService(p,local=p)
+        value=await svc.adjudicate({'importance':4,'status':'active'})
+        self.assertEqual(value,{'importance':4,'status':'active'})
+        self.assertEqual(svc.last_judge_status,'invalid_output_fallback')
+
+    async def test_candidate_schema_and_empty_are_distinct(self):
+        class P:
+            output='[{"type":"L3","importance":5,"summary":"unsafe"}]'
+            async def stream_chat(self,*a,**kw):yield self.output
+        p=P();svc=MemoryLLMService(p,local=p)
+        self.assertEqual(await svc.candidates({'text':'synthetic'}),[])
+        self.assertEqual(svc.last_candidate_status,'invalid_output')
+        p.output='[]';self.assertEqual(await svc.candidates({'text':'synthetic'}),[])
+        self.assertEqual(svc.last_candidate_status,'validated_empty')

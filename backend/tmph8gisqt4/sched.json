@@ -1,0 +1,446 @@
+[
+ {
+  "id": "plan_midday",
+  "name": "午间自主回顾",
+  "cadence": {
+   "type": "daily",
+   "time": "13:00"
+  },
+  "steps": [
+   "看看上午有什么值得梳理的：可 task.plan 整理规划、kb.add 存一条新知识、或 diary.write 记一句。想做什么才做，简短收尾。"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "plan_night",
+  "name": "夜晚收尾",
+  "cadence": {
+   "type": "daily",
+   "time": "23:00"
+  },
+  "steps": [
+   "今天值得沉淀的（学到/发生/想通的）：可 task.plan 更新明天、kb.add 存知识、diary.write 写日记。做真正想做的，然后简单告诉我今天你的状态。"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "plan_1792163799665",
+  "name": "p0",
+  "cadence": {
+   "type": "daily",
+   "time": "08:00"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.6656454,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799676",
+  "name": "p1",
+  "cadence": {
+   "type": "daily",
+   "time": "08:01"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.6762266,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799708",
+  "name": "p2",
+  "cadence": {
+   "type": "daily",
+   "time": "08:02"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.7088215,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799735",
+  "name": "p3",
+  "cadence": {
+   "type": "daily",
+   "time": "08:03"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.7355402,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799754",
+  "name": "p4",
+  "cadence": {
+   "type": "daily",
+   "time": "08:04"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.7543166,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799783",
+  "name": "p5",
+  "cadence": {
+   "type": "daily",
+   "time": "08:05"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.7838058,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799809",
+  "name": "p6",
+  "cadence": {
+   "type": "daily",
+   "time": "08:06"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.8093727,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799833",
+  "name": "p7",
+  "cadence": {
+   "type": "daily",
+   "time": "08:07"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.833359,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799865",
+  "name": "p8",
+  "cadence": {
+   "type": "daily",
+   "time": "08:08"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.8659997,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799890",
+  "name": "p9",
+  "cadence": {
+   "type": "daily",
+   "time": "08:09"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.8909566,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799919",
+  "name": "p10",
+  "cadence": {
+   "type": "daily",
+   "time": "08:10"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.9199965,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799947",
+  "name": "p11",
+  "cadence": {
+   "type": "daily",
+   "time": "08:11"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.9471285,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163799985",
+  "name": "p12",
+  "cadence": {
+   "type": "daily",
+   "time": "08:12"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163799.9851234,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800021",
+  "name": "p13",
+  "cadence": {
+   "type": "daily",
+   "time": "08:13"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.0212202,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800062",
+  "name": "p14",
+  "cadence": {
+   "type": "daily",
+   "time": "08:14"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.0623925,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800088",
+  "name": "p15",
+  "cadence": {
+   "type": "daily",
+   "time": "08:15"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.0895212,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800130",
+  "name": "p16",
+  "cadence": {
+   "type": "daily",
+   "time": "08:16"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.1304562,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800175",
+  "name": "p17",
+  "cadence": {
+   "type": "daily",
+   "time": "08:17"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.1756794,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800208",
+  "name": "p18",
+  "cadence": {
+   "type": "daily",
+   "time": "08:18"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.2089593,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800263",
+  "name": "p19",
+  "cadence": {
+   "type": "daily",
+   "time": "08:19"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.2637434,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800308",
+  "name": "p20",
+  "cadence": {
+   "type": "daily",
+   "time": "08:20"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.3089256,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800335",
+  "name": "p21",
+  "cadence": {
+   "type": "daily",
+   "time": "08:21"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.3352425,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800361",
+  "name": "p22",
+  "cadence": {
+   "type": "daily",
+   "time": "08:22"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.3627746,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800395",
+  "name": "p23",
+  "cadence": {
+   "type": "daily",
+   "time": "08:23"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.3955376,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800421",
+  "name": "p24",
+  "cadence": {
+   "type": "daily",
+   "time": "08:24"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.421681,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800463",
+  "name": "p25",
+  "cadence": {
+   "type": "daily",
+   "time": "08:25"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.4634728,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800498",
+  "name": "p26",
+  "cadence": {
+   "type": "daily",
+   "time": "08:26"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.49869,
+  "priority": 0
+ },
+ {
+  "id": "plan_1792163800527",
+  "name": "p27",
+  "cadence": {
+   "type": "daily",
+   "time": "08:27"
+  },
+  "steps": [
+   "s"
+  ],
+  "enabled": true,
+  "last_run": "",
+  "created": 1792163800.527342,
+  "priority": 0
+ }
+]

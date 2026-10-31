@@ -1,8 +1,8 @@
 """Ledger CRUD store — the single programmatic interface to the project ledger.
 
 `docs/上下文台账.md` is the project's single source of truth.  Every agent
-(opencode, the daemon, the QQ bot, DeepSeek desktop, cron scripts) should mutate
-it through this module so that writes are:
+(利贞 on harness, the daemon, the QQ bot, DeepSeek desktop, cron scripts) should
+mutate it through this module so that writes are:
 
 * **surgical**  — only the affected record's lines change; the rest of the file
   is preserved byte-for-byte (no whole-file re-render / blank-line churn);

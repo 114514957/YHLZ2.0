@@ -27,6 +27,7 @@ from backend.session_kernel import (
     TurnLease,
 )
 from backend.voice_gate import GateDecision, GateEvent, WakeWordGate
+from backend.voice_turn_trace import current_trace, mark as trace_mark
 from backend.tts_provider_port import (
     TTSEventKind,
     TTSProviderCapabilities,
@@ -515,9 +516,18 @@ class TargetVoiceChain:
         *,
         source: str = "microphone",
         timestamp: Optional[float] = None,
+        audio: Optional[list] = None,
+        explicit_audio: bool = False,
     ) -> PipelineSubmission:
-        """Route a VAD-final ASR candidate through the single wake gate."""
-        decision = self.gate.observe(transcript, timestamp=timestamp)
+        """Route a VAD-final ASR candidate through the single wake gate.
+
+        ``audio`` (节点A): optional audio clip(s) (path/data-uri).  When set and
+        the reasoner supports ``generate_audio``, the accepted turn is driven
+        from the clip instead of ASR text, but still gets the same generation
+        lease / TTS content queue / cancellation as a text turn.
+        """
+        decision = (GateDecision(GateEvent.INPUT_ACCEPTED, self.gate.state, str(transcript or ""))
+                    if explicit_audio and audio else self.gate.observe(transcript, timestamp=timestamp))
         if decision.event != GateEvent.INPUT_ACCEPTED:
             return PipelineSubmission(decision)
         if self.reasoner is None:
@@ -561,7 +571,10 @@ class TargetVoiceChain:
                     control.needs_terminal_observation
                     for control in self._tts_controls.values()
                 )
-            lease = self.kernel.begin_turn(source=source, input_type="transcript")
+            lease = self.kernel.begin_turn(source=source, input_type="audio" if audio else "transcript")
+            trace = current_trace.get()
+            if trace is not None:
+                trace.bind(lease)
             if not self.kernel.mark_input_final(lease):
                 raise PipelineError("kernel rejected final input")
             signal = CancellationSignal()
@@ -588,7 +601,8 @@ class TargetVoiceChain:
             speech_waiter = self._speech_stop_waiter()
             if speech_waiter is not None:
                 signal.add_terminal_waiter(speech_waiter)
-            task = asyncio.create_task(self._run_turn(lease, decision.text, signal))
+            task = asyncio.create_task(
+                self._run_turn(lease, decision.text, signal, audio=audio))
             signal.bind_task(task)
             handle = CancellationHandle(
                 name="turn:" + lease.turn_id,
@@ -604,8 +618,11 @@ class TargetVoiceChain:
             self._signals[lease.turn_id] = signal
             return PipelineSubmission(decision, lease, task)
 
-    async def interrupt(self, reason: str = "user_interrupt", timeout_s: float = 3.0):
+    async def interrupt(self, reason: str = "user_interrupt", timeout_s: float = 3.0,
+                        *, expected_turn_id: Optional[str] = None):
         async with self._submission_lock:
+            if expected_turn_id is not None and self.kernel.snapshot().get("active_turn_id") != expected_turn_id:
+                return None
             cleanup_was_blocked = self._tts_cleanup_blocked
             active_id = self.kernel.snapshot().get("active_turn_id")
             active_task = self._tasks.get(active_id) if active_id else None
@@ -911,25 +928,44 @@ class TargetVoiceChain:
             return task.done()
         return task.done()
 
+    async def _reasoner_generate(self, text: str, signal: Any,
+                                 audio: Optional[list]) -> Any:
+        """Drive the reasoner for this turn.
+
+        节点A: when an audio clip is supplied and the reasoner advertises
+        ``generate_audio``, the turn is driven from the clip; otherwise the
+        existing text ``generate`` contract is used unchanged.
+        """
+        if audio and not callable(getattr(self.reasoner, "generate_audio", None)):
+            raise PipelineError("AUDIO-REASONER-REQUIRED")
+        if audio:
+            return await _invoke_provider(
+                self.reasoner.generate_audio, text, audio, signal)
+        return await _invoke_provider(self.reasoner.generate, text, signal)
+
     async def _run_turn(
         self,
         lease: TurnLease,
         text: str,
         signal: CancellationSignal,
+        *,
+        audio: Optional[list] = None,
     ) -> PipelineOutcome:
         if self.tts_provider is not None:
-            return await self._run_turn_with_tts_provider(lease, text, signal)
+            return await self._run_turn_with_tts_provider(
+                lease, text, signal, audio=audio)
         response_parts = []
         speech_id = "speech_" + uuid.uuid4().hex
         speaking = False
         try:
-            generator = await _invoke_provider(self.reasoner.generate, text, signal)
+            generator = await self._reasoner_generate(text, signal, audio)
             async for chunk in _aiter(generator):
                 if signal.is_cancelled() or not self.kernel.is_current(lease):
                     return PipelineOutcome("interrupted", lease.turn_id, "".join(response_parts))
                 chunk_text = str(chunk or "")
                 if not chunk_text:
                     continue
+                trace_mark("llm_first_content")
                 response_parts.append(chunk_text)
                 event = self.kernel.publish_output(
                     lease,
@@ -1019,6 +1055,8 @@ class TargetVoiceChain:
         lease: TurnLease,
         text: str,
         signal: CancellationSignal,
+        *,
+        audio: Optional[list] = None,
     ) -> PipelineOutcome:
         """Run reasoning and a text/audio dual stream through the new port."""
         response_parts = []
@@ -1087,7 +1125,7 @@ class TargetVoiceChain:
                 )
             )
 
-            generator = await _invoke_provider(self.reasoner.generate, text, signal)
+            generator = await self._reasoner_generate(text, signal, audio)
             async for chunk in _aiter(generator):
                 if signal.is_cancelled() or not self.kernel.is_current(lease):
                     return PipelineOutcome("interrupted", lease.turn_id, "".join(response_parts))
@@ -1100,6 +1138,7 @@ class TargetVoiceChain:
                 chunk_text = str(chunk or "")
                 if not chunk_text:
                     continue
+                trace_mark("llm_first_content")
                 response_parts.append(chunk_text)
                 event = self.kernel.publish_output(
                     lease,
@@ -1129,6 +1168,7 @@ class TargetVoiceChain:
                 )
 
             full_text = "".join(response_parts)
+            trace_mark("reasoner_done")
             await _invoke_provider(session.commit_text)
             # Mark the commit only after the provider accepted it.  Audio can
             # race with this await; DONE observed before its return must fail
@@ -1373,6 +1413,7 @@ class TargetVoiceChain:
                         chunk = normalized.chunk
                         if chunk is None:
                             continue
+                        trace_mark("first_pcm_received")
                         if not state["speaking"]:
                             if not self.kernel.mark_speaking(lease, speech_id):
                                 continue

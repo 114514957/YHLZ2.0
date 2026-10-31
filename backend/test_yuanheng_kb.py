@@ -61,6 +61,29 @@ class KbTest(unittest.TestCase):
         self.assertIn("llama.cpp", content)
         self.assertIn("今日新学", content)
 
+    def test_wake_hit_public_safe_no_side_effects(self):
+        kb.kb_add("ollama 本地推理建议开启 KV cache 量化以省显存", category="tech",
+                  source="qq:g1")
+        kb.kb_add("元亨最喜欢的摸鱼方式是发呆不写代码", category="method",
+                  source="自主")
+        hit = kb.kb_wake_hit("大家聊聊 ollama 的 KV cache 量化怎么开")
+        self.assertIsNotNone(hit)
+        self.assertIn("ollama", hit["summary"])
+        # 私人来源的条目不算"知道的信息"（公共安全子集）
+        self.assertIsNone(kb.kb_wake_hit("元亨最喜欢的摸鱼方式是发呆不写代码"))
+        # 探针无副作用：uses 必须保持 0
+        import sqlite3
+
+        con = sqlite3.connect(str(kb.DEFAULT_KB_DB))
+        uses = [r[0] for r in con.execute("SELECT uses FROM kb_items")]
+        con.close()
+        self.assertTrue(uses and all(v == 0 for v in uses))
+
+    def test_wake_hit_min_chars(self):
+        kb.kb_add("变调算法用 WORLD 比 PSOLA 更稳", category="tech")
+        self.assertIsNone(kb.kb_wake_hit("变调", min_chars=4))
+        self.assertIsNotNone(kb.kb_wake_hit("变调算法怎么调", min_chars=4))
+
 
 if __name__ == "__main__":
     unittest.main()

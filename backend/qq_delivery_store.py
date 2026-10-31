@@ -15,7 +15,11 @@ import sqlite3
 import time
 import uuid
 
-DEFAULT_DB = pathlib.Path(__file__).resolve().parent.parent / "cache" / "qq_deliveries.db"
+from backend.qq_bridge_state import path as _bridge_path
+
+DEFAULT_DB = _bridge_path(
+    "outbox.db",
+    pathlib.Path(__file__).resolve().parent.parent / "cache" / "qq_deliveries.db")
 
 STATES = ("queued", "sending", "confirmed", "rejected", "retryable", "unknown", "expired")
 

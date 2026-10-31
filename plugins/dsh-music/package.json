@@ -1,0 +1,24 @@
+{
+  "name": "dsh-music",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "把元亨的歌库接进 DSH：列歌、看详情、本机播放、发到 QQ。薄壳插件，真正的实现在 YH/tools/music_cli.py。",
+  "keywords": ["deepseek", "deepseek-harness", "dsh", "dsh-plugin", "music", "song"],
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": ["lib", "cordis.patch.yml", "config.json", "README.md", "install.mjs"],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "license": "MIT"
+}

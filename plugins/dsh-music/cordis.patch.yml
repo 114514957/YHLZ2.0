@@ -1,0 +1,16 @@
+# dsh-music —— DSH bundle patch
+#
+# 纯 Host 插件：只注册 4 个模型工具，没有 Client 半区、没有定时器、没有后台进程。
+# 安装（本地目录以 link 形式挂进当前 profile）：
+#   node plugins/dsh-music/install.mjs            # 装进 desktop profile
+#   node plugins/dsh-music/install.mjs --profile web
+# 关闭：在插件管理里禁用 dsh-music 这一行（Cordis 会卸载工具），或删掉本行。
+#
+# 路径默认按插件位置推导（plugins/dsh-music -> YH 根），一般不用改；
+# 要覆盖时取消下面 config 的注释。
+- insert:
+    - id: dsh-music
+      name: dsh-music
+      # config:
+      #   python: 'C:\path\to\YH\.venv\Scripts\python.exe'
+      #   cli: 'C:\path\to\YH\tools\music_cli.py'

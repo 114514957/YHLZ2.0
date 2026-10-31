@@ -15,11 +15,15 @@ Golden block format (robust to multi-line replies):
     <assistant turn, verbatim>
 
 Usage:
+    python tools/golden_build.py review         # 一键：重建候选 → 列出还没标过的干净条目
+    python tools/golden_build.py pick 1 3 7     # 选入 persona_golden.md（"这条我要"）
+    python tools/golden_build.py coverage       # 真实语料占比（real/golden/总量）
     python tools/golden_build.py build          # 收集候选 -> data/finetune/golden_candidates.jsonl
     python tools/golden_build.py list [--all]   # 编号罗列候选（默认隐藏已标记问题项）
     python tools/golden_build.py show 3         # 看某条全文
-    python tools/golden_build.py pick 1 3 7     # 选入 persona_golden.md
     python tools/golden_build.py stats
+
+注意：编号来自最近一次 build；请先 `review` 再 `pick`，别拿旧编号去选。
 """
 from __future__ import annotations
 
@@ -206,6 +210,85 @@ def cmd_seed(args: argparse.Namespace) -> int:
     return 0
 
 
+def _picked_keys() -> set:
+    return {g["user"].strip()[:40] for g in load_golden()}
+
+
+def fresh_candidates(rows: list[dict], picked: set) -> list[tuple[int, dict]]:
+    """还没标过的候选（编号沿用候选文件里的 1-based 序号，供 pick 直接用）。"""
+    return [(i, r) for i, r in enumerate(rows, 1)
+            if r.get("user", "").strip()[:40] not in picked]
+
+
+def coverage_summary(stats: dict) -> dict:
+    """真实语料占比（0500）：真实对话 / 已标 / 合成 各占多少。"""
+    total = int(stats.get("total") or 0)
+    cats = {k: int(stats.get(k) or 0)
+            for k in ("real", "golden", "scene", "memory", "extra", "lizhen")}
+    return {"tag": stats.get("tag", ""), "total": total, **cats,
+            "real_ratio": (cats["real"] / total) if total else 0.0,
+            "golden_ratio": (cats["golden"] / total) if total else 0.0,
+            "synthetic": max(0, total - cats["real"] - cats["golden"])}
+
+
+def cmd_review(args: argparse.Namespace) -> int:
+    """一键评审（0500）：重建候选池 → 列出**还没标过**的干净条目 + 下一步指令。"""
+    build()
+    rows = _load()
+    fresh = fresh_candidates(rows, _picked_keys())
+    clean = [(i, r) for i, r in fresh if not r.get("flags")]
+    flagged = [(i, r) for i, r in fresh if r.get("flags")]
+    print(f"候选 {len(rows)} 条；没标过 {len(fresh)}（干净 {len(clean)} / 有标记 {len(flagged)}）")
+    show = clean if not args.all else fresh
+    for i, r in show:
+        fl = ",".join(r.get("flags", [])) or "干净"
+        u = r["user"].replace("\n", " ")[:60]
+        print(f"{i:>3}  [{fl}]  {u}")
+    if not show:
+        print("（没有新的可标条目——真实对话只在 cache/sessions/*.json；"
+              "多和老爹/元亨聊几轮，再回来 review）")
+    else:
+        print("\n看全文：python tools/golden_build.py show <编号>")
+        print("要哪条就标哪条（可多选）：python tools/golden_build.py pick "
+              + " ".join(str(i) for i, _ in show[:3]) + " ...")
+        print("（标完跑 coverage 看真实语料占比变化）")
+    return 0
+
+
+def _latest_stats() -> dict:
+    """最近一次装配的 stats（data/finetune 与仓库根都找，取最新修改的）。"""
+    cands = list((ROOT / "data" / "finetune").glob("sft_persona_*.stats.json"))
+    cands += list(ROOT.glob("sft_persona_*.stats.json"))
+    cands = [p for p in cands if p.is_file()]
+    if not cands:
+        return {}
+    p = max(cands, key=lambda x: x.stat().st_mtime)
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    d["_file"] = str(p)
+    return d
+
+
+def cmd_coverage(_: argparse.Namespace) -> int:
+    """真实语料占比（0500）：让"标注一条"的效果可见，而不是凭感觉。"""
+    st = _latest_stats()
+    if not st:
+        print("没找到装配产物（先跑 python tools/finetune_assemble.py --tag vX）")
+        return 1
+    c = coverage_summary(st)
+    print(f"最新装配：{c['tag']}（{st.get('_file', '')}）")
+    print(f"  总量 {c['total']}｜真实对话 **{c['real']}（{c['real_ratio']:.1%}）**"
+          f"｜已标 golden {c['golden']}（{c['golden_ratio']:.1%}）"
+          f"｜合成/其它 {c['synthetic']}")
+    rows = _load()
+    fresh = [1 for _i, _r in fresh_candidates(rows, _picked_keys())]
+    print(f"  当前可标候选 {len(rows)} 条，其中没标过 {len(fresh)} 条 "
+          f"→ `review` 看清单，`pick` 选入")
+    return 0
+
+
 def cmd_stats(_: argparse.Namespace) -> int:
     rows = _load()
     from collections import Counter
@@ -230,10 +313,15 @@ def main() -> int:
     p_pick.add_argument("ids", type=int, nargs="+")
     p_seed = sub.add_parser("seed")
     p_seed.add_argument("--all", action="store_true")
+    p_review = sub.add_parser("review")
+    p_review.add_argument("--all", action="store_true",
+                          help="连有标记的条目一起列（默认只列干净候选）")
+    sub.add_parser("coverage")
     sub.add_parser("stats")
     args = ap.parse_args()
     return {"build": lambda a: build(), "list": cmd_list, "show": cmd_show,
-            "pick": cmd_pick, "seed": cmd_seed, "stats": cmd_stats}[args.cmd](args)
+            "pick": cmd_pick, "seed": cmd_seed, "review": cmd_review,
+            "coverage": cmd_coverage, "stats": cmd_stats}[args.cmd](args)
 
 
 if __name__ == "__main__":

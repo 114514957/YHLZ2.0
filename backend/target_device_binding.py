@@ -39,11 +39,16 @@ class ResolvedTargetDevices:
     output_index: int
     input_hostapi: int
     output_hostapi: int
+    input_sample_rate: int = 16_000
+    output_sample_rate: int = 24_000
+    input_channels: int = 1
+    output_channels: int = 2
 
     def descriptor(self) -> DeviceDescriptor:
         return DeviceDescriptor(
             device_id=str(self.input_index), name=self.binding.input_name,
-            input_channels=1, output_channels=0, sample_rate=16_000,
+            input_channels=self.input_channels, output_channels=self.output_channels,
+            sample_rate=self.input_sample_rate,
             route=self.binding.route, reference_available=False,
         )
 
@@ -83,13 +88,29 @@ def resolve_devices(sd: Any, binding: TargetDeviceBinding) -> ResolvedTargetDevi
         binding.input_name, "max_input_channels", binding.input_hostapi_name)
     output_index, output_row = select(
         binding.output_name, "max_output_channels", binding.output_hostapi_name)
-    try:
-        sd.check_input_settings(device=input_index, samplerate=16_000,
-                                channels=1, dtype="float32")
-        sd.check_output_settings(device=output_index, samplerate=24_000,
-                                 channels=2, dtype="float32")
-    except Exception as exc:
-        raise DeviceBindingError("TARGET-DEVICE-FORMAT-UNSUPPORTED") from exc
+    def negotiate(check, index, row, key, rates, channels):
+        # Probe formats ONLY on the explicitly selected endpoint. Never switch
+        # devices or mark reference/acoustic verification from a format probe.
+        default = int(row.get("default_samplerate", 0) or 0)
+        candidates = list(dict.fromkeys((*rates, default)))
+        for channel_count in channels:
+            if channel_count > int(row.get(key, 0)): continue
+            for rate in candidates:
+                if rate not in (8000,16000,24000,32000,44100,48000,96000): continue
+                try:
+                    check(device=index, samplerate=rate, channels=channel_count, dtype="float32")
+                    return rate, channel_count
+                except Exception:
+                    continue
+        raise DeviceBindingError("TARGET-DEVICE-FORMAT-UNSUPPORTED")
+
+    input_rate, input_channels = negotiate(
+        sd.check_input_settings,input_index,input_row,"max_input_channels",
+        (16000,48000,44100,32000,24000,8000),(1,2))
+    output_rate, output_channels = negotiate(
+        sd.check_output_settings,output_index,output_row,"max_output_channels",
+        (24000,48000,44100,32000,16000,8000),(2,1))
     return ResolvedTargetDevices(binding, input_index, output_index,
                                  int(input_row.get("hostapi", -1)),
-                                 int(output_row.get("hostapi", -1)))
+                                 int(output_row.get("hostapi", -1)),
+                                 input_rate,output_rate,input_channels,output_channels)

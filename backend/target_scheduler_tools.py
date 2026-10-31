@@ -15,7 +15,10 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from backend.target_access import file_list, file_read, web_fetch, web_search  # noqa: F401
+from backend.target_access import (  # noqa: F401
+    file_download, file_list, file_read, share_check, web_fetch, web_search,
+)
+from backend import bili_tools
 from backend.target_capability_registry import Capability, CapabilityRegistry
 from backend.target_memory import TargetMemoryService
 from backend.yhlz_paths import (
@@ -28,9 +31,44 @@ LEDGER = _PROJECT_ROOT / "docs" / "上下文台账.md"
 SCHEDULER_CATEGORY = "scheduler"
 SCHEDULER_POLICY = "scheduler_allowed"
 
+# Silent vec_add failures used to hide the fact that a saved memory never got a
+# vector (semantic disabled / model load failure). Counter is exposed below.
+_VEC_ADD_FAILURES = {"n": 0}
+
+
+def vec_add_failures() -> int:
+    """How many memory saves failed to write a vector in this process."""
+    return int(_VEC_ADD_FAILURES["n"])
+
 
 def _policy_always_true() -> bool:
     return True
+
+
+def _qqops_enabled() -> bool:
+    """Old QQ capture/export chain is retired while Lite owns QQ (0831).
+
+    Fail-closed: missing/corrupt config or an import error means disabled.
+    """
+    try:
+        import sys
+
+        tools_dir = str(_PROJECT_ROOT / "tools")
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+        from yhlz_launcher import qq_management  # noqa: PLC0415
+
+        return qq_management() != "external"
+    except Exception:
+        return False
+
+
+QQOPS_ENABLED = _qqops_enabled()
+QQOPS_RETIRED = (
+    "[qq.*] 旧 QQ 采集/导出链已退役（ledger 0831）：QQ 归 QQ Bridge Lite 独占，"
+    "external 模式下不再启动/停止 NapCat 或 watcher。历史导出需另立独立账号与"
+    "独立 OneBot 端口，不能复用 3001。"
+)
 
 
 def ledger_search(query: str, limit: int = 8) -> str:
@@ -347,11 +385,19 @@ def memory_save(content: str, kind: str = "preference", importance: int = 0,
     except Exception:
         pass
     try:
-        from backend.vector_memory import vec_add
+        from backend.vector_memory import l2_scope, vec_add
+        from backend.memory_resource_policy import semantic_model_allowed
 
-        vec_add("l2", item.id, f"{item.summary} {item.keywords}".strip())
+        # Scope must follow the DB this service owns (0499). A hardcoded "l2"
+        # makes group-memory DBs write their vectors into the owner's scope.
+        if not vec_add(l2_scope(getattr(svc, "db_path", None)), item.id,
+                       f"{item.summary} {item.keywords}".strip()):
+            # Expected no-op while the semantic sidecar is off; only an
+            # unexpected failure (mode on but embed broke) is worth counting.
+            if semantic_model_allowed():
+                _VEC_ADD_FAILURES["n"] += 1
     except Exception:
-        pass
+        _VEC_ADD_FAILURES["n"] += 1
     return f"已保存 ({kind})"
 
 
@@ -691,6 +737,37 @@ def bind_memory_recall_service(registry: CapabilityRegistry, service: Any) -> No
             override=True)
 
 
+def _file_share_unbound(path: str = "") -> str:
+    """Fail-closed default: an unbound registry (MCP/eval) has no chat sink."""
+    return "分享通道未就绪：当前会话不支持发送文件"
+
+
+def bind_file_share_service(registry: CapabilityRegistry,
+                            sink: Any) -> None:
+    """Bind file.share to a session-owned sink (owner channels only).
+
+    The capability still runs the real share_check; the sink receives the
+    validated local path so the session can hand it to the chat transport.
+    """
+    from dataclasses import replace
+
+    cap = registry.get("file.share")
+    if cap is None:
+        return
+
+    def _share(params: dict, _sink: Any = sink) -> str:
+        ok, detail = share_check(str((params or {}).get("path", "")))
+        if not ok:
+            return detail
+        try:
+            _sink(detail)
+        except Exception:
+            return "分享失败：发送队列不可用"
+        return f"已放入发送队列：{Path(detail).name}"
+
+    registry.register_capability(replace(cap, handler=_share), override=True)
+
+
 def _verify_time(output: Any) -> bool:
     return "星期" in str(output)
 
@@ -983,11 +1060,31 @@ def scheduler_capabilities() -> list[Capability]:
             verify=lambda output: isinstance(output, list),
         ),
         Capability(
+            name="member.profile",
+            description="查看 QQ 群友档案：身份（老爹/群友）、QQ 号、昵称、发言量、"
+                        "活跃时段、说话风格、爱好、口头禅、印象句、跟谁熟。"
+                        "action=show 查一个人（qq 给号码，或 name 给昵称片段）；"
+                        "action=list 看列表（默认前 20 名、可传 limit 最多 50；"
+                        "列表头会带总人数）。",
+            handler=lambda p: member_profile_handle(
+                str(p.get("action", "show") or "show"),
+                str(p.get("qq", "") or ""),
+                str(p.get("name", "") or ""),
+                p.get("limit", 20)),
+            input=(),
+            optional_input=("action", "qq", "name", "limit"),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+            verify=_verify_nonempty,
+        ),
+        Capability(
             name="qq.bootstrap",
             description="从零启动整条QQ捕获导出链（NapCat+QQ自动登录+QCE+watcher）。链路没开时第一步用它。",
             handler=_qqops_bootstrap,
             input=(),
             requires=(QQOPS_POLICY,),
+            llm_exposed=QQOPS_ENABLED,
             side_effect=True,
             risk="high",
         ),
@@ -997,6 +1094,7 @@ def scheduler_capabilities() -> list[Capability]:
             handler=_qqops_shutdown,
             input=(),
             requires=(QQOPS_POLICY,),
+            llm_exposed=QQOPS_ENABLED,
             side_effect=True,
             risk="high",
         ),
@@ -1006,55 +1104,65 @@ def scheduler_capabilities() -> list[Capability]:
             handler=_qqops_runbatch,
             input=(),
             requires=(QQOPS_POLICY,),
+            llm_exposed=QQOPS_ENABLED,
             side_effect=True,
             risk="medium",
         ),
         Capability(
             name="qq.export",
-            description="导出某群全部历史聊天到候选区（补拉用）。group_id 可填群号数字或群名片段（自动匹配群名，多个时返回候选供确认）。",
+            description=(
+                "导出某个QQ群的历史聊天到本地文件（只读导出，返回条数与文件路径）。"
+                "group_id 填群号，留空=导出全部群；limit 可限制每群条数。"
+                "要回答「群里都聊了啥」或补拉历史时用它。"
+            ),
             handler=_qqops_export,
-            input=("group_id",),
-            optional_input=("session_name",),
-            requires=(QQOPS_POLICY,),
-            side_effect=True,
-            risk="medium",
-            verify=_verify_nonempty,
+            input=(),
+            optional_input=("group_id", "limit"),
+            llm_exposed=True,
+            side_effect=False,
+            risk="low",
         ),
         Capability(
             name="qq.status",
-            description="查看QQ捕获链路状态：白名单群、候选与待处理数、原文留痕、知识库条数。回答群里有什么新知识类问题先看它。",
+            description=(
+                "查看QQ数据状态：群历史条数（按群）、白名单、候选与待处理数、知识库条数。"
+                "回答「群里有什么新东西」「现在攒了多少」这类问题先看它。只读。"
+            ),
             handler=lambda p: qqops_status(),
             input=(),
-            requires=(QQOPS_POLICY,),
+            llm_exposed=True,
             side_effect=False,
             risk="low",
         ),
         Capability(
             name="qq.process",
-            description="处理待处理候选：云端筛选并抽取技术知识存入知识库（有API成本，待处理大于0才值得跑）。",
+            description=(
+                "处理待处理候选：云端筛选并抽取技术知识存入知识库（有API成本，"
+                "待处理大于0才值得跑）。max_items 控制本次处理上限。"
+            ),
             handler=_qqops_process,
             input=(),
             optional_input=("max_items",),
-            requires=(QQOPS_POLICY,),
+            llm_exposed=True,
             side_effect=True,
             risk="medium",
         ),
         Capability(
             name="qq.digest",
-            description="生成当日知识日汇编文档（docs/知识汇编/）。",
+            description="生成当日知识日汇编文档（docs/知识汇编/）。date 可指定日期，留空=今天。",
             handler=_qqops_digest,
             input=(),
             optional_input=("date",),
-            requires=(QQOPS_POLICY,),
+            llm_exposed=True,
             side_effect=True,
             risk="low",
         ),
         Capability(
             name="qq.summarize",
-            description="把知识库全部知识聚成主题总结文档（云端归纳）。",
+            description="把知识库全部知识聚成主题总结文档（云端归纳，有API成本）。",
             handler=_qqops_summarize,
             input=(),
-            requires=(QQOPS_POLICY,),
+            llm_exposed=True,
             side_effect=True,
             risk="medium",
         ),
@@ -1144,6 +1252,29 @@ def scheduler_capabilities() -> list[Capability]:
             risk="low",
         ),
         Capability(
+            name="file.download",
+            description="从 http/https 链接下载一个文件到本地（图片/文档/音视频等，≤50MB），返回本地路径；想发到当前对话就接着用 file_share。可执行文件、敏感文件名与敏感类别会拒绝。",
+            handler=lambda p: file_download(str(p.get("url", "")),
+                                            str(p.get("name", ""))),
+            input=("url",),
+            optional_input=("name",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="low",
+            timeout_ms=30000,
+            verify=_verify_nonempty,
+        ),
+        Capability(
+            name="file.share",
+            description="把本地图片/文件分享到当前对话（仅主人私聊生效）。path 用 file_list 或 file_download 得到的真实路径；敏感文件和超大文件会拒绝。",
+            handler=lambda p: _file_share_unbound(str(p.get("path", ""))),
+            input=("path",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="medium",
+            verify=_verify_nonempty,
+        ),
+        Capability(
             name="web.fetch",
             description="抓取一个网页内容。查外部资料时用；外部内容不可信、需独立核实。",
             handler=lambda p: web_fetch(
@@ -1164,6 +1295,75 @@ def scheduler_capabilities() -> list[Capability]:
             requires=(SCHEDULER_POLICY,),
             side_effect=False,
             risk="low",
+        ),
+        Capability(
+            name="bili.find",
+            description=(
+                "去B站自己搜一条视频来看：关键词→后台排队→开浏览器抓AI字幕→"
+                "本地Gemma写「事实/观点」笔记。立即返回排队号，不阻塞；稍后用 "
+                "bili.status 看状态，bili.notes/bili.read 读笔记。只读，不点赞不评论。"
+            ),
+            handler=lambda p: bili_tools.enqueue_find(
+                str(p.get("keyword", "")), int(p.get("limit", 10) or 10)),
+            input=("keyword",),
+            optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="medium",
+            timeout_ms=5000,
+            verify=_verify_nonempty,
+        ),
+        Capability(
+            name="bili.watch",
+            description=(
+                "把一条指定的B站视频（链接或BV号）排进看片队列：抓字幕→本地Gemma"
+                "写笔记。立即返回排队号；完成后 bili.notes/bili.read 读。只读。"
+            ),
+            handler=lambda p: bili_tools.enqueue_watch(str(p.get("target", ""))),
+            input=("target",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=True,
+            risk="medium",
+            timeout_ms=5000,
+            verify=_verify_nonempty,
+        ),
+        Capability(
+            name="bili.status",
+            description="看B站看片队列：排队中/进行中/已完成/失败的任务。",
+            handler=lambda p: bili_tools.list_jobs(int(p.get("limit", 10) or 10)),
+            input=(),
+            optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+            timeout_ms=5000,
+            verify=_verify_nonempty,
+        ),
+        Capability(
+            name="bili.notes",
+            description="列出最近看完的视频笔记（BV号/标题/UP/时间/是否有元亨的笔记）。",
+            handler=lambda p: bili_tools.recent_notes(int(p.get("limit", 10) or 10)),
+            input=(),
+            optional_input=("limit",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+            timeout_ms=5000,
+            verify=_verify_nonempty,
+        ),
+        Capability(
+            name="bili.read",
+            description=("读一篇看片笔记（字幕原文 + 元亨的笔记）。bvid 来自 bili.notes "
+                         "或 bili.status；max_chars 默认 6000。"),
+            handler=lambda p: bili_tools.read_note(
+                str(p.get("bvid", "")), int(p.get("max_chars", 6000) or 6000)),
+            input=("bvid",),
+            optional_input=("max_chars",),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+            timeout_ms=5000,
+            verify=_verify_nonempty,
         ),
     ]
 
@@ -1474,6 +1674,69 @@ def skill_search(query: str, limit: int = 3) -> str:
         if h.get("detail"):
             lines.append("   步骤：" + h["detail"][:300].replace(chr(10), "；"))
     return chr(10).join(lines)
+
+
+def _member_profiles_store():
+    """群友档案库解析（2026-10-09）：优先 Lite 状态目录，其次 legacy。"""
+    from backend.qq_bridge_state import path as _bridge_path
+    from backend.qq_profiles import MemberProfileStore
+
+    lite = _PROJECT_ROOT / "cache" / "qq_bridge" / "lite" / "profiles.db"
+    p = lite if lite.exists() else _bridge_path(
+        "profiles.db", _PROJECT_ROOT / "cache" / "tmp" / "qq_profiles.db")
+    return MemberProfileStore(p)
+
+
+def member_profile_handle(action: str, qq: str = "", name: str = "",
+                          limit: Any = 20) -> str:
+    """群友档案查询（2026-10-09）：她的主动查询入口（工作台/私聊）。只读。
+
+    action=show: qq 给号码 → 单人档案；name 给昵称片段 → 匹配（多人列候选）。
+    action=list: 全员列表（按发言量）。
+    """
+    from backend.qq_profiles import MemberProfileStore
+
+    try:
+        lim = max(1, min(int(limit or 20), 50))
+    except Exception:  # noqa: BLE001
+        lim = 20
+    store = _member_profiles_store()
+
+    def _render(profile: dict) -> str:
+        """档案文本 + 主记忆相关片段（2026-10-12：读时合并，接入主记忆）。"""
+        text = MemberProfileStore.profile_text(profile)
+        try:
+            mem = recall_memory(
+                str(profile.get("nickname") or profile.get("qq") or ""),
+                limit=3)
+        except Exception:  # noqa: BLE001
+            mem = ""
+        if mem and mem != "记忆库无匹配":
+            text += "\n\n【主记忆中的相关片段】\n" + mem
+        return text
+
+    act = str(action or "show").strip().lower()
+    if act in ("list", "all", "名单", "列表"):
+        return store.list_text(lim)
+    digits = "".join(ch for ch in str(qq or "") if ch.isdigit())
+    if digits:
+        profile = store.get(digits)
+        if not profile:
+            return f"还没有 {digits} 的档案（需要他在群里发过言；白名单外的人不收录）"
+        return _render(profile)
+    frag = str(name or "").strip()
+    if not frag:
+        return ("用法：member_profile(action=\"show\", qq=QQ号) 或 name=昵称片段；"
+                "action=\"list\" 看全员列表。")
+    hits = store.search_name(frag, limit=5)
+    if not hits:
+        return f"没找到昵称含「{frag}」的群友（可以先用 list 看全员）"
+    if len(hits) == 1:
+        profile = store.get(str(hits[0]["qq"]))
+        return _render(profile) if profile else "档案读取失败"
+    return "匹配到多人：\n" + "\n".join(
+        f"- {h['nickname']}({h['qq']}) 发言{h['msg_count']}"
+        for h in hits)
 
 
 def skill_feedback(query: str, good: bool) -> str:
@@ -1804,19 +2067,39 @@ def qqops_status() -> str:
     - 原文留痕 = cache/qqwatch/_skip.jsonl（低价值消息留痕，非候选）
     - 知识 = data/yuanheng_kb.db（知识库，抽取沉淀的唯一去处）
     """
+    # 2026-10-20 老爹定：qq.export 等必须是**工具**。本函数只读本地文件与知识库，
+    # Full 链没开也能给出真实数据（Lite 模式下额外报群历史库条数），故解除早退。
     import json
     import pathlib
 
     base = pathlib.Path(_PROJECT_ROOT)
     cfg_p = base / "config" / "qqwatch.json"
     cand_dir = base / "cache" / "qqwatch"
-    parts = ["QQ 捕获链路状态："]
+    parts = []
+    if not _qqops_enabled():
+        parts.append("采集链=external（Lite 持有 QQ 号，旧 NapCat 链未启动）")
     if cfg_p.exists():
         cfg = json.loads(cfg_p.read_text(encoding="utf-8"))
         groups = cfg.get("groups") or []
         bl = cfg.get("blacklist_groups") or []
         parts.append(f"白名单 {len(groups)} 群（{','.join(map(str, groups[:3]))}）"
                      + (f"，黑名单 {len(bl)} 群" if bl else ""))
+    # Lite 群历史库（真消息来源）
+    try:
+        import sqlite3
+
+        db = base / "cache" / "qq_bridge" / "lite" / "group_history.db"
+        if db.exists():
+            con = sqlite3.connect("file:%s?mode=ro" % db.as_posix(), uri=True)
+            rows = con.execute("select group_id, count(*) from group_messages "
+                               "group by group_id order by count(*) desc").fetchall()
+            con.close()
+            total = sum(r[1] for r in rows)
+            parts.append("群历史 %d 条（%d 群：%s）"
+                         % (total, len(rows),
+                            "，".join("%s=%d" % (g, n) for g, n in rows[:3])))
+    except Exception:
+        pass
     all_f = cand_dir / "all.jsonl"
     skip_f = cand_dir / "_skip.jsonl"
     cursor = 0
@@ -1836,7 +2119,7 @@ def qqops_status() -> str:
         parts.append(f"知识库 {st['items']} 条（{cats}）")
     except Exception:
         pass
-    return "；".join(parts)
+    return "QQ 数据状态：" + "｜".join(parts)
 
 
 async def _qqops_bootstrap(params: dict) -> str:
@@ -1846,6 +2129,8 @@ async def _qqops_bootstrap(params: dict) -> str:
     Returns a step-by-step status report. QQ QR login (if auto-login misses)
     needs the owner to scan the NapCat window.
     """
+    if not _qqops_enabled():
+        return QQOPS_RETIRED
     import asyncio
     import json
     import os
@@ -1942,6 +2227,8 @@ async def _qqops_bootstrap(params: dict) -> str:
 async def _qqops_shutdown(params: dict) -> str:
     """Stop the QQ capture chain (NapCat/QQ + watcher). Use when done —
     Yuanheng lifecycle discipline: start when needed, shut down when finished."""
+    if not _qqops_enabled():
+        return QQOPS_RETIRED
     import subprocess
 
     report: list[str] = []
@@ -1984,6 +2271,8 @@ async def _qqops_runbatch(params: dict) -> str:
     own console window; returns immediately — progress lands in
     cache/qqwatch/extract.log; batch exits by itself when drained (no residue).
     """
+    if not _qqops_enabled():
+        return QQOPS_RETIRED
     import os
     import subprocess
 
@@ -2069,6 +2358,108 @@ async def _fetch_qce_groups() -> list[dict]:
 
 
 async def _qqops_export(params: dict) -> str:
+    """导出群历史。**双路**（2026-10-20 老爹定：qq.async 导出必须是工具，不是技能）：
+
+    · Full 链在跑（qq_management=full，QCE 在 40653）→ 走 QCE 插件导出并入库；
+    · 否则（默认 external，Lite 持有 QQ 号）→ 走 **Lite 本地历史库**（只读导出）。
+
+    两条路的返回结构一致：{ok, group_id, messages, file, source}。
+    """
+    if _qqops_enabled():
+        return await _qqops_export_qce(params)
+    return _qqops_export_lite(params)
+
+
+def _qqops_export_lite(params: dict) -> str:
+    """从 Lite 的 group_history.db 只读导出群历史到 JSONL。
+
+    不依赖 NapCat/QCE，不需要抢占 QQ 账号，纯读本地库。
+    参数：group_id（群号；留空=全部群）、limit（每群上限，默认 0=全部）。
+    """
+    import json
+    import pathlib
+    import time
+
+    db = _PROJECT_ROOT / "cache" / "qq_bridge" / "lite" / "group_history.db"
+    if not db.exists():
+        return json.dumps({"ok": False, "error": "Lite 群历史库不存在：%s" % db},
+                          ensure_ascii=False)
+    group = str(params.get("group_id") or "").strip()
+    # 2026-10-20 加固：limit 宽松解析（"abc" 会 ValueError），非数字一律当 0=全部；
+    # group_id 传 None/空 → 导出全部群（而不是报"群「None」对不上"）。
+    raw_limit = params.get("limit")
+    try:
+        limit = int(float(raw_limit)) if str(raw_limit).strip() else 0
+    except Exception:
+        limit = 0
+    limit = max(0, limit)
+
+    import sqlite3
+
+    # 群名 → 群号：config/qqwatch.json 的 group_names 是权威映射
+    names: dict[str, str] = {}
+    try:
+        cfgp = _PROJECT_ROOT / "config" / "qqwatch.json"
+        if cfgp.exists():
+            names = dict(json.loads(cfgp.read_text(encoding="utf-8")).get("group_names") or {})
+    except Exception:
+        names = {}
+
+    con = sqlite3.connect("file:%s?mode=ro" % db.as_posix(), uri=True)
+    try:
+        groups = [r[0] for r in con.execute(
+            "select distinct group_id from group_messages").fetchall()]
+        if group:
+            # 解析顺序：群号精确 → 群名（含片段）→ 群号片段
+            if group not in groups:
+                if group in names:
+                    group = names[group]
+                else:
+                    byname = [gid for gid, nm in names.items()
+                              if gid in groups and (group in nm or nm in group)]
+                    byprefix = [g for g in groups if group in str(g)]
+                    cand = byname or byprefix
+                    if len(cand) == 1:
+                        group = cand[0]
+                    else:
+                        return json.dumps({
+                            "ok": False, "error": "群「%s」对不上" % group,
+                            "available": [{"group_id": g,
+                                           "name": names.get(g, "")} for g in groups],
+                        }, ensure_ascii=False)
+        targets = [group] if group else groups
+        out_dir = _PROJECT_ROOT / "cache" / "qq_export"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        total = 0
+        files = []
+        for gid in targets:
+            sql = ("select group_id, message_id, seq, sender_id, sender_name, text, at "
+                   "from group_messages where group_id=? order by seq")
+            if limit > 0:
+                sql += " limit %d" % limit
+            rows = con.execute(sql, (gid,)).fetchall()
+            if not rows:
+                continue
+            path = out_dir / ("qq_export_%s_%s.jsonl" % (gid, stamp))
+            with open(path, "w", encoding="utf-8") as fh:
+                for r in rows:
+                    fh.write(json.dumps({
+                        "group_id": r[0], "message_id": r[1], "seq": r[2],
+                        "sender_id": r[3], "sender_name": r[4],
+                        "text": r[5], "at": r[6],
+                    }, ensure_ascii=False) + "\n")
+            total += len(rows)
+            files.append({"group_id": gid, "messages": len(rows),
+                          "file": str(path.relative_to(_PROJECT_ROOT))})
+        return json.dumps({"ok": True, "source": "lite_group_history",
+                           "messages": total, "groups": len(files),
+                           "files": files[:10]}, ensure_ascii=False)
+    finally:
+        con.close()
+
+
+async def _qqops_export_qce(params: dict) -> str:
     """Export a QQ group's chat history via the local QCE plugin (port 40653)
     and auto-ingest the JSON into the candidate store.
 
@@ -2147,24 +2538,44 @@ async def _qqops_export(params: dict) -> str:
 
 
 async def _qqops_process(params: dict) -> str:
+    # 2026-10-20：候选抽取只读 cache/qqwatch/all.jsonl + 知识库，不依赖 NapCat/QCE，
+    # Lite 模式下同样能跑，故解除 _qqops_enabled() 早退。
+    # 2026-10-20 加固：参数一律**宽松解析**——模型可能传 "abc"/负数/超大数，
+    # 直接 int() 会 ValueError 崩在工具里（实测 "abc" 必崩）。
     from backend import qqextract
 
-    max_items = int(params.get("max_items") or 12)
-    res = await qqextract.run_batch(max_items=min(int(max_items), 48))
     import json
 
+    raw = params.get("max_items")
+    try:
+        max_items = int(float(raw)) if str(raw).strip() else 12
+    except Exception:
+        return json.dumps({"ok": False, "processed": 0, "stored": 0,
+                           "error": "max_items 需要整数，收到 %r" % (raw,)},
+                          ensure_ascii=False)
+    max_items = max(1, min(max_items, 48))
+    res = await qqextract.run_batch(max_items=max_items)
     return json.dumps(res, ensure_ascii=False)
 
 
 async def _qqops_digest(params: dict) -> str:
+    # 2026-10-20：日汇编只读知识库往前一天聚合，不依赖采集链，解除早退。
+    # 2026-10-20 加固：date 必须是 YYYY-MM-DD，随便传个数字会崩在内部
+    # strptime（实测 date=12345 必崩），这里先校验再往下走。
+    import re
+
     from backend import qqextract
 
-    date = str(params.get("date") or "")
+    raw = params.get("date")
+    date = str(raw).strip() if raw not in (None, "") else ""
+    if date and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        return "date 需要 YYYY-MM-DD 格式，收到 %r；留空则生成今天的日汇编。" % (raw,)
     f = await qqextract.digest_async(date or None)
     return f"已生成日汇编：{f}"
 
 
 async def _qqops_summarize(params: dict) -> str:
+    # 2026-10-20：主题总结只读知识库做云端归纳，不依赖采集链，解除早退。
     from backend import qqextract
 
     res = await qqextract.summarize()
@@ -2243,7 +2654,7 @@ def setup_scheduler_capabilities(registry: Optional[CapabilityRegistry] = None) 
     if not registry.get_policy(TASK_AUTO_POLICY):
         registry.register_policy(TASK_AUTO_POLICY, _policy_always_true)
     if not registry.get_policy(QQOPS_POLICY):
-        registry.register_policy(QQOPS_POLICY, _policy_always_true)
+        registry.register_policy(QQOPS_POLICY, _qqops_enabled)
     if not registry.get_policy(KB_POLICY):
         registry.register_policy(KB_POLICY, _policy_always_true)
     if not registry.get_policy(APPROVE_POLICY):

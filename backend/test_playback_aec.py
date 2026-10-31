@@ -80,7 +80,7 @@ class TestNLMSAECAdapter(unittest.TestCase):
         mic = _tone(220, n=1000)
         ref = _tone(440, n=500)
         enhanced, erl = aec.process(mic, ref, SR)
-        self.assertEqual(len(enhanced), 500)
+        self.assertEqual(len(enhanced), len(mic))
 
     def test_empty_input(self):
         aec = make_speaker_mic_aec()

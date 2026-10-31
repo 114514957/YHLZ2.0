@@ -1,6 +1,4 @@
-@echo off
-chcp 65001 >nul
-cd /d "%~dp0"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\test-center.ps1"
-echo.
-pause
+@echo off
+rem Compatibility wrapper: primary entrypoint is YH_test_start.bat (2026-10-21).
+call "%~dp0YH_test_start.bat" %*
+exit /b %errorlevel%

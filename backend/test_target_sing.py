@@ -1,4 +1,5 @@
 """Workbench singing module tests (Phase B, ledger 0457)."""
+import json
 import pathlib
 import tempfile
 import types
@@ -60,6 +61,46 @@ class SingModuleTest(unittest.TestCase):
         sl.SONGS_DIR, sl.INDEX = getattr(self, "_sl_dir", sl.SONGS_DIR), \
             getattr(self, "_sl_idx", sl.INDEX)
 
+    def _fake_ok(self, calls):
+        """Fake subprocess.run for the 3-stem job: creates stage outputs."""
+
+        def fake_run(cmd, **kw):
+            calls.append(cmd)
+            joined = " ".join(map(str, cmd))
+            if "cover_seedvc.py" in joined:
+                outdir = cs.SING_DIR / "seedvc_job" / "run"
+                outdir.mkdir(parents=True, exist_ok=True)
+                final = outdir / "成品_test_seedvc_e.wav"
+                final.write_bytes(b"RIFFseedvc")
+                for n in ("干声", "和声", "伴奏"):
+                    (outdir / f"{n}.wav").write_bytes(b"RIFF" + n.encode())
+                return types.SimpleNamespace(
+                    returncode=0,
+                    stdout=json.dumps({"ok": True, "out_dir": str(outdir),
+                                       "outputs": [str(final)]},
+                                      ensure_ascii=False),
+                    stderr="")
+            stem_dir = cs.SING_DIR / "stem3"
+            stem_dir.mkdir(parents=True, exist_ok=True)
+            if "wsl_stem3_split.sh" in joined:
+                for n in ("lead", "backing", "bgm"):
+                    (stem_dir / f"{n}.wav").write_bytes(b"RIFF" + n.encode())
+            out = cs.SING_DIR / "out"
+            out.mkdir(parents=True, exist_ok=True)
+            if "wsl_dereverb.sh" in joined:
+                (stem_dir / "lead_dry.wav").write_bytes(b"RIFFdry")
+            if "wsl_soulx_svc.sh" in joined:
+                (out / "generated.wav").write_bytes(b"RIFFxxxx")
+            if "wsl_clarity_enhance.sh" in joined:
+                (out / "enhanced.wav").write_bytes(b"RIFFenh")
+            if "cover_v3_dsp.py" in joined:
+                (out / "dsp_soft.wav").write_bytes(b"RIFFdsp")
+            if "wsl_mix3.sh" in joined:
+                (out / "mixed.wav").write_bytes(b"RIFFmix")
+            return types.SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+        return fake_run
+
     def test_wsl_path_conversion(self):
         p = pathlib.Path(r"C:\Users\ACE\song.mp3")
         self.assertEqual(cs._wsl_path(p), "/mnt/c/Users/ACE/song.mp3")
@@ -79,93 +120,99 @@ class SingModuleTest(unittest.TestCase):
         finally:
             cs._sing_lock.release()
 
-    def test_job_success_two_stage(self):
+    def test_job_success_seedvc(self):
+        """2026-10-21 (台账 0935): 生产链路 = 三轨分离 + Seed-VC 44k + 柔化 e。"""
         calls = []
-
-        def fake_run(cmd, **kw):
-            calls.append(cmd)
-            if len(calls) == 1:  # prep stage (no window)
-                return types.SimpleNamespace(returncode=0, stdout="prep ok",
-                                             stderr="")
-            out = cs.SING_DIR / "out"
-            out.mkdir(parents=True, exist_ok=True)
-            (out / "generated.wav").write_bytes(b"RIFFxxxx")
-            return types.SimpleNamespace(returncode=0, stdout="svc ok",
-                                         stderr="")
-
-        cs.subprocess.run = fake_run
+        cs.subprocess.run = self._fake_ok(calls)
         res = cs.sing_start(str(self.target))
         self.assertTrue(res["ok"])
         self.assertEqual(cs.SING_STATE["status"], "done")
         self.assertTrue(pathlib.Path(cs.SING_STATE["result"]).exists())
         self.assertTrue(self.closed)  # window always closed
-        self.assertEqual(len(calls), 2)
-        self.assertIn("wsl_soulx_prep.sh", " ".join(map(str, calls[0])))
-        self.assertIn("wsl_soulx_svc.sh", " ".join(map(str, calls[1])))
-        # finished song auto-saved to the local library (ledger 0460/0464:
-        # library REFERENCES the 音频素材/翻唱产出/ file, no second copy)
+        joined = [" ".join(map(str, c)) for c in calls]
+        self.assertEqual(len(joined), 1)
+        self.assertIn("cover_seedvc.py", joined[0])
+        self.assertIn("--presets e", joined[0])
+        self.assertIn("--voice bright", joined[0])
         import backend.song_library as sl
 
         self.assertTrue(cs.SING_STATE["song_id"])
-        outs = list(cs.SING_OUT_DIR.glob("*.wav"))
+        outs = list(cs.SING_OUT_DIR.glob("**/成品_*.wav"))
         self.assertEqual(len(outs), 1)
-        self.assertIn("Xiaoyi嗓", outs[0].name)
-        it = sl.resolve("Xiaoyi嗓")
+        self.assertIn("清亮嗓", outs[0].name)
+        run_dir = outs[0].parent
+        # 2026-10-21 老爹定：产出只要成品，不再保留分层/说明。
+        self.assertFalse((run_dir / "说明.txt").exists())
+        self.assertEqual(
+            sorted(p.name for p in run_dir.iterdir()), [outs[0].name])
+        it = sl.resolve("清亮嗓")
         self.assertIsNotNone(it)
         self.assertEqual(sl.song_path(it["id"]), outs[0])
 
     def test_voice_bright_uses_bright_prompt(self):
         calls = []
-
-        def fake_run(cmd, **kw):
-            calls.append(cmd)
-            if len(calls) == 1:
-                return types.SimpleNamespace(returncode=0, stdout="",
-                                             stderr="")
-            out = cs.SING_DIR / "out"
-            out.mkdir(parents=True, exist_ok=True)
-            (out / "generated.wav").write_bytes(b"RIFF")
-            return types.SimpleNamespace(returncode=0, stdout="", stderr="")
-
-        cs.subprocess.run = fake_run
+        cs.subprocess.run = self._fake_ok(calls)
         res = cs.sing_start(str(self.target), voice="bright")
         self.assertTrue(res["ok"])
-        self.assertIn("bright", " ".join(map(str, calls[0])))
-        outs = list(cs.SING_OUT_DIR.glob("*.wav"))
+        self.assertIn("bright", " ".join(" ".join(map(str, c))
+                                         for c in calls))
+        outs = list(cs.SING_OUT_DIR.glob("**/成品_*.wav"))
         self.assertTrue(any("清亮嗓" in p.name for p in outs), outs)
 
     def test_job_failure_restores_and_reports(self):
         calls = []
+        ok = self._fake_ok(calls)
 
         def fake_run(cmd, **kw):
-            calls.append(cmd)
-            if len(calls) == 1:
-                return types.SimpleNamespace(returncode=0, stdout="",
-                                             stderr="")
-            return types.SimpleNamespace(returncode=1, stdout="",
-                                         stderr="boom")
+            if "cover_seedvc.py" in " ".join(map(str, cmd)):
+                calls.append(cmd)
+                return types.SimpleNamespace(returncode=1, stdout="",
+                                             stderr="boom")
+            return ok(cmd, **kw)
 
         cs.subprocess.run = fake_run
         res = cs.sing_start(str(self.target))
         self.assertTrue(res["ok"])
         self.assertEqual(cs.SING_STATE["status"], "error")
-        self.assertIn("SVC 失败", cs.SING_STATE["error"])
+        self.assertIn("新链路失败", cs.SING_STATE["error"])
         self.assertTrue(self.closed)
 
-    def test_vocal_sep_flag_propagates(self):
+    @unittest.skip("旧 SoulX 分轨失败路径已退出生产（台账 0935）")
+    def test_stage_errors_reports_split_failure(self):
+        """Rule 2026-10-09: split failure is reported (no SVC attempted)."""
+        calls = []
+
         def fake_run(cmd, **kw):
-            fake_run.n = getattr(fake_run, "n", 0) + 1
-            if fake_run.n == 1:
-                return types.SimpleNamespace(returncode=0, stdout="",
-                                             stderr="")
-            out = cs.SING_DIR / "out"
-            out.mkdir(parents=True, exist_ok=True)
-            (out / "generated.wav").write_bytes(b"RIFF")
+            calls.append(cmd)
+            if "wsl_stem3_split.sh" in " ".join(map(str, cmd)):
+                return types.SimpleNamespace(returncode=2, stdout="",
+                                             stderr="demucs failed")
             return types.SimpleNamespace(returncode=0, stdout="", stderr="")
 
         cs.subprocess.run = fake_run
-        cs.sing_start(str(self.target), vocal_sep=False)
-        self.assertFalse(cs.SING_STATE["vocal_sep"])
+        res = cs.sing_start(str(self.target))
+        self.assertTrue(res["ok"])
+        self.assertEqual(cs.SING_STATE["status"], "error")
+        self.assertIn("分轨失败", cs.SING_STATE["error"])
+        self.assertEqual(len(calls), 1)  # split failed → nothing downstream
+        self.assertTrue(self.closed)  # window closed even on failure
+
+    @unittest.skip("旧 SoulX 三轨规则测试已退出生产（台账 0935）")
+    def test_cover_rule_only_lead_uses_ai(self):
+        """老爹 2026-10-09: 干声换 AI，和声/背景沿用原声（三轨混回）。"""
+        calls = []
+        cs.subprocess.run = self._fake_ok(calls)
+        cs.sing_start(str(self.target))
+        joined = [" ".join(map(str, c)) for c in calls]
+        # F0/SVC target the dereverbed dry lead; clarity enhance uses the
+        # dereverbed lead's high band; the mixdown consumes softened AI lead +
+        # untouched backing(和声)/bgm(伴奏).
+        self.assertIn("lead_dry.wav", joined[2])
+        self.assertIn("wsl_clarity_enhance.sh", joined[4])
+        self.assertIn("generated.wav", joined[4])
+        self.assertIn("dsp_soft.wav", joined[6])
+        self.assertIn("backing.wav", joined[6])
+        self.assertIn("bgm.wav", joined[6])
 
     def test_sing_status_shape(self):
         st = cs.sing_status()
@@ -177,17 +224,8 @@ class SingModuleTest(unittest.TestCase):
         """ledger 0459: one singing job owns the GPU; released on finish."""
         import backend.gpu_lock as gl
 
-        def fake_run(cmd, **kw):
-            fake_run.n = getattr(fake_run, "n", 0) + 1
-            if fake_run.n == 1:
-                return types.SimpleNamespace(returncode=0, stdout="",
-                                             stderr="")
-            out = cs.SING_DIR / "out"
-            out.mkdir(parents=True, exist_ok=True)
-            (out / "generated.wav").write_bytes(b"RIFF")
-            return types.SimpleNamespace(returncode=0, stdout="", stderr="")
-
-        cs.subprocess.run = fake_run
+        calls = []
+        cs.subprocess.run = self._fake_ok(calls)
         self.assertTrue(gl.acquire_sing())  # simulate a running job
         try:
             res = cs.sing_start(str(self.target))
@@ -197,6 +235,7 @@ class SingModuleTest(unittest.TestCase):
             gl.release_sing()
         res = cs.sing_start(str(self.target))
         self.assertTrue(res["ok"])
+        self.assertEqual(cs.SING_STATE["status"], "done")
         self.assertEqual(gl.owner(), "")  # released after the sync job
 
 

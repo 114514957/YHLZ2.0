@@ -12,6 +12,8 @@ P0-3 (2026-09-28): streaming resample adapter (stateful, cancel-safe).
 
 from __future__ import annotations
 
+from backend.voice_turn_trace import current_trace
+
 import asyncio
 import queue
 import threading
@@ -24,6 +26,7 @@ from typing import Any, Callable, Deque, Dict, List, Mapping, Optional, Tuple
 import numpy as np
 
 from backend.tts_provider_port import TTSProviderPortError
+from backend.duplex_clock import CallbackClock, clock_value
 
 
 class PlaybackError(TTSProviderPortError):
@@ -116,58 +119,32 @@ class PlaybackConfig:
 
 @dataclass(frozen=True, slots=True)
 class PlaybackReferenceFrame:
-    """A reference frame captured from the playback chain (P0 AEC input).
+    """Owned final device samples captured at the output callback, not enqueue.
 
-    Contains the audio that was actually sent to the device (after resampling),
-    with generation info so the AEC can correlate with microphone input.
+    DAC/monotonic timestamps may be unavailable; clock_valid is explicit.
+    Boundary markers do not erase already-played audio (its echo can arrive
+    after a cancellation). Arbitrary consumers run on a bounded worker queue.
     """
-    samples: Any  # np.ndarray float32, device rate
+    samples: Any
     sample_rate: int
     generation: int
     sequence: int
     is_final: bool = False
+    dac_time: Optional[float] = None
+    callback_time: Optional[float] = None
+    played_at: Optional[float] = None
+    clock_epoch: int = 0
+    clock_valid: bool = False
+    status: str = ""
+    reason: str = "callback"
 
 
-class _StreamResampler:
-    """Stateful streaming resampler (P0-3).
 
-    Converts mono float32 audio from source rate to device rate using
-    ``scipy.signal.resample_poly``.  Keeps a small carry buffer so chunk
-    boundaries do not produce clicks.  ``flush()`` emits the tail; ``reset()``
-    clears state (called on cancel/interrupt).
-    """
+from backend.duplex_resampler import PolyphaseResampler
 
-    def __init__(self, source_rate: int, device_rate: int) -> None:
-        from math import gcd
-        g = gcd(source_rate, device_rate)
-        self._up = device_rate // g
-        self._down = source_rate // g
-        self._source_rate = source_rate
-        self._device_rate = device_rate
-        self._carry = np.zeros(0, dtype=np.float32)
 
-    def process(self, mono: np.ndarray) -> np.ndarray:
-        if len(self._carry):
-            mono = np.concatenate([self._carry, mono])
-        if self._up == self._down:
-            self._carry = np.zeros(0, dtype=np.float32)
-            return mono
-        from scipy.signal import resample_poly
-        out = resample_poly(mono, self._up, self._down).astype(np.float32)
-        carry_n = min(len(mono), 64)
-        self._carry = mono[-carry_n:].copy() if carry_n else np.zeros(0, dtype=np.float32)
-        return out
-
-    def flush(self) -> np.ndarray:
-        if not len(self._carry):
-            return np.zeros(0, dtype=np.float32)
-        from scipy.signal import resample_poly
-        out = resample_poly(self._carry, self._up, self._down).astype(np.float32)
-        self._carry = np.zeros(0, dtype=np.float32)
-        return out
-
-    def reset(self) -> None:
-        self._carry = np.zeros(0, dtype=np.float32)
+class _StreamResampler(PolyphaseResampler):
+    """Playback compatibility name for the exact-phase streaming resampler."""
 
 
 def negotiate_output_format(
@@ -216,6 +193,8 @@ class _TurnSlot:
     cancelled: bool = False
     normal_completed: bool = False
     started_at: Optional[float] = None
+    trace: Any = None
+    first_nonzero_observed: bool = False
 
 
 class SoundDevicePlaybackPort:
@@ -242,8 +221,16 @@ class SoundDevicePlaybackPort:
         self.on_event = on_event
         self._reference_tap = reference_tap
         self._ref_seq = 0
+        self._reference_queue: queue.Queue = queue.Queue(maxsize=64)
+        self._reference_stop = threading.Event()
+        self._reference_thread = None
+        self._reference_open = False
+        self._reference_dropped = 0
+        self._reference_errors = 0
+        self._reference_clock = CallbackClock()
         self._lock = threading.RLock()
         self._not_full = threading.Condition(self._lock)
+        self._producer_lock = threading.Lock()
         self._state = PlaybackState.STOPPED
         self._stream: Any = None
         self._blocks: Deque[np.ndarray] = deque()
@@ -277,7 +264,9 @@ class SoundDevicePlaybackPort:
         with self._lock:
             if self._state in (PlaybackState.READY, PlaybackState.PLAYING):
                 return
+        stream = None
         try:
+            self._start_reference_dispatch()
             sounddevice = self._module()
             stream = sounddevice.OutputStream(
                 device=self.config.device,
@@ -290,6 +279,13 @@ class SoundDevicePlaybackPort:
             )
             stream.start()
         except Exception as exc:
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
+            self._reference_open = False
+            self._stop_reference_dispatch()
             self._record_error("VOICE-PLAYBACK-START-FAILED", type(exc).__name__)
             raise PlaybackError("VOICE-PLAYBACK-START-FAILED", type(exc).__name__) from exc
         with self._lock:
@@ -303,6 +299,9 @@ class SoundDevicePlaybackPort:
 
     async def finish(self, lease: Any, signal: Any) -> bool:
         """Wait until the callback has physically drained one normal turn."""
+        if self._resampler is not None:
+            if not await asyncio.to_thread(self._enqueue_resampler_tail, lease, signal):
+                return False
         slot: Optional[_TurnSlot]
         events: list[tuple[str, Optional[str], dict]] = []
         with self._lock:
@@ -318,13 +317,42 @@ class SoundDevicePlaybackPort:
         confirmed = await asyncio.to_thread(slot.done_event.wait, self.config.stop_timeout_s)
         return bool(confirmed and slot.normal_completed and not slot.cancelled)
 
+    def _enqueue_resampler_tail(self, lease, signal):
+        with self._producer_lock:
+            return self._enqueue_resampler_tail_serial(lease, signal)
+
+    def _enqueue_resampler_tail_serial(self, lease, signal):
+        with self._not_full:
+            slot = self._slot_for_lease_locked(lease)
+            if slot is None or slot.cancelled or _is_cancelled(signal):
+                return False
+            tail = self._resampler.flush()
+            if not len(tail):
+                return True
+            duration = _frames_to_ms(len(tail), self.config.resolved_device_sample_rate)
+            deadline = time.monotonic() + self.config.enqueue_timeout_s
+            while (len(self._blocks) + int(self._current is not None) >= self.config.max_queue_blocks
+                   or self._queue_duration_ms_locked() + duration > self.config.max_queue_duration_ms):
+                if self._slot is not slot or slot.cancelled or _is_cancelled(signal):
+                    return False
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise PlaybackError("VOICE-PLAYBACK-BACKPRESSURE", "resampler tail")
+                self._not_full.wait(min(.05, remaining))
+            if self._slot is not slot or slot.cancelled or _is_cancelled(signal):
+                return False
+            self._blocks.append(np.repeat(tail.reshape(-1, 1), self.config.channels, axis=1))
+            self._queued_frames += len(tail)
+            self._enqueued_frames += len(tail)
+            return True
+
     def interrupt(self, reason: str = "interrupted") -> bool:
         """Drop old audio and require one callback pass of silence as proof."""
         events: list[tuple[str, Optional[str], dict]] = []
         with self._lock:
             slot = self._slot
             if slot is None:
-                self._flush_reference(0)
+                self._flush_reference(self._generation, "interrupted")
                 return True
             slot.cancelled = True
             slot.finish_requested = False
@@ -333,7 +361,9 @@ class SoundDevicePlaybackPort:
             self._last_stop_slot = slot
             self._clear_queue_locked()
             if self._resampler is not None:
-                self._resampler.reset()
+                # Detach, never reset state another producer may be processing.
+                self._resampler = _StreamResampler(
+                    self.config.sample_rate, self.config.resolved_device_sample_rate)
             self._slot = None
             if self._stream is None or not bool(getattr(self._stream, "active", True)):
                 slot.stopped_event.set()
@@ -353,6 +383,7 @@ class SoundDevicePlaybackPort:
                     )
                 )
             self._state = PlaybackState.READY
+            self._flush_reference(slot.generation, "interrupted")
             self._not_full.notify_all()
         self._emit_many(events)
         return True
@@ -377,8 +408,23 @@ class SoundDevicePlaybackPort:
             return True
         return bool(await asyncio.to_thread(event.wait, timeout))
 
+    async def stop_and_wait(self, timeout_s: float = 1.0,
+                            reason: str = "interrupted") -> bool:
+        """Barge-in stop (对话链路收口 阶段3): drop the queued tail and wait
+        until a callback pass proves silence.
+
+        Combines ``interrupt`` (cancel active slot + clear the audio queue) and
+        ``wait_stopped`` so callers do not have to remember the pair.  Returns
+        ``True`` when silence is observed within ``timeout_s``.
+        """
+        self.interrupt(reason)
+        return await self.wait_stopped(timeout_s)
+
     def close(self, reason: str = "shutdown") -> None:
         """Release the sounddevice stream after clearing all transient audio."""
+        with self._lock:
+            if self._state == PlaybackState.STOPPED and self._stream is None and not self._reference_open:
+                return
         self.interrupt(reason)
         with self._lock:
             stream, self._stream = self._stream, None
@@ -386,14 +432,22 @@ class SoundDevicePlaybackPort:
             self._state = PlaybackState.STOPPED
             slot = self._last_stop_slot
             self._not_full.notify_all()
-        if stream is not None:
-            try:
-                stream.stop()
-            finally:
-                stream.close()
-        if slot is not None:
-            slot.stopped_event.set()
-        self._flush_reference(0)
+        try:
+            if stream is not None:
+                try:
+                    stream.stop()
+                finally:
+                    stream.close()
+            if slot is not None:
+                slot.stopped_event.set()
+        except Exception as exc:
+            self._record_error("VOICE-PLAYBACK-CLOSE-FAILED", type(exc).__name__)
+            raise PlaybackError("VOICE-PLAYBACK-CLOSE-FAILED", type(exc).__name__) from exc
+        finally:
+            # Release our worker even when the device refuses stop/close.
+            self._flush_reference(self._generation, "closed")
+            self._reference_open = False
+            self._stop_reference_dispatch()
 
     shutdown = close
 
@@ -415,6 +469,7 @@ class SoundDevicePlaybackPort:
                 "generation": self._generation,
                 "last_error_code": self._last_error_code,
                 "play_rms": round(self._play_rms, 6),
+                "reference": self.reference_health(),
             }
 
     def playback_rms(self) -> float:
@@ -434,6 +489,10 @@ class SoundDevicePlaybackPort:
             }
 
     def _enqueue(self, chunk: Any, lease: Any, signal: Any) -> bool:
+        with self._producer_lock:
+            return self._enqueue_serial(chunk, lease, signal)
+
+    def _enqueue_serial(self, chunk: Any, lease: Any, signal: Any) -> bool:
         if _is_cancelled(signal):
             return False
         block = self._normalize_chunk(chunk)
@@ -446,8 +505,11 @@ class SoundDevicePlaybackPort:
             self._require_ready_locked()
             slot = self._slot
             if slot is None:
+                if self._resampler is not None:
+                    self._resampler = _StreamResampler(
+                        self.config.sample_rate, self.config.resolved_device_sample_rate)
                 self._generation += 1
-                slot = _TurnSlot(self._generation, turn_id)
+                slot = _TurnSlot(self._generation, turn_id, trace=current_trace.get())
                 self._slot = slot
                 self._last_stop_slot = None
             elif slot.turn_id != turn_id:
@@ -456,7 +518,16 @@ class SoundDevicePlaybackPort:
             if slot.finish_requested or slot.cancelled:
                 self._dropped_stale_blocks += 1
                 raise PlaybackError("VOICE-PLAYBACK-TURN-TERMINAL", turn_id)
-            block_duration_ms = _frames_to_ms(len(block), self.config.resolved_device_sample_rate)
+            resampler = self._resampler
+        # FIR work must not hold the lock needed by the output callback.
+        # A per-turn instance plus a producer-only lock protects phase state.
+        if resampler is not None:
+            mono = resampler.process(block[:, 0])
+            block = np.repeat(mono.reshape(-1, 1), self.config.channels, axis=1)
+        block_duration_ms = _frames_to_ms(len(block), self.config.resolved_device_sample_rate)
+        with self._not_full:
+            if self._slot is not slot or slot.cancelled or _is_cancelled(signal):
+                return False
             if block_duration_ms > self.config.max_queue_duration_ms:
                 raise PlaybackError("VOICE-PLAYBACK-CHUNK-TOO-LARGE")
             while (
@@ -495,39 +566,112 @@ class SoundDevicePlaybackPort:
                 self._blocks.append(block)
                 self._queued_frames += len(block)
                 self._enqueued_frames += len(block)
-                self._emit_reference(block, slot.generation)
                 return True
         self._emit_many(events)
         raise PlaybackError("VOICE-PLAYBACK-BACKPRESSURE", "queue wait timed out")
 
-    def _flush_reference(self, generation: int) -> None:
+    def set_reference_tap(self, tap) -> None:
+        """Attach the owned integration before opening the audio stream."""
+        with self._lock:
+            if self._stream is not None:
+                raise PlaybackError("VOICE-REFERENCE-ALREADY-STARTED")
+            if self._reference_tap is not None and tap is not self._reference_tap:
+                raise PlaybackError("VOICE-REFERENCE-ALREADY-BOUND")
+            self._reference_tap = tap
+
+    def reference_health(self) -> dict:
+        return {"attached": self._reference_tap is not None,
+                "worker_alive": bool(self._reference_thread and self._reference_thread.is_alive()),
+                "queue_depth": self._reference_queue.qsize(),
+                "dropped": self._reference_dropped, "errors": self._reference_errors,
+                "clock": self._reference_clock.snapshot(), "capture_point": "output_callback"}
+
+    def _start_reference_dispatch(self):
         if self._reference_tap is None:
             return
+        if self._reference_thread and self._reference_thread.is_alive():
+            raise PlaybackError("VOICE-REFERENCE-WORKER-STILL-RUNNING")
+        self._reference_clock.reset()
+        self._reference_open = True
+        self._reference_stop.clear()
+        self._reference_thread = threading.Thread(
+            target=self._reference_dispatch, name="target-playback-reference", daemon=True)
+        self._reference_thread.start()
+
+    def _reference_dispatch(self):
+        while not self._reference_stop.is_set() or not self._reference_queue.empty():
+            try:
+                frame = self._reference_queue.get(timeout=.025)
+            except queue.Empty:
+                continue
+            try:
+                self._reference_tap(frame)
+            except Exception:
+                self._reference_errors += 1
+            finally:
+                self._reference_queue.task_done()
+
+    def wait_reference_idle(self, timeout=1.0):
+        deadline = time.monotonic() + timeout
+        while self._reference_queue.unfinished_tasks:
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(.001)
+        return True
+
+    def _stop_reference_dispatch(self):
+        self._reference_stop.set()
+        thread = self._reference_thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=1.0)
+            if thread.is_alive():
+                self._reference_errors += 1
+
+    def _queue_reference(self, frame):
+        if not self._reference_open:
+            return
+        self._ref_seq += 1
         try:
-            self._reference_tap(PlaybackReferenceFrame(
+            self._reference_queue.put_nowait(frame)
+        except queue.Full:
+            self._reference_dropped += 1
+            if frame.is_final:
+                # Reserve a boundary at overload, especially CLOSED. Losing a
+                # data frame is observable as a sequence gap; losing CLOSED
+                # could retain old PCM after shutdown. No callback blocking.
+                try:
+                    self._reference_queue.get_nowait()
+                    self._reference_queue.task_done()
+                except queue.Empty:
+                    pass
+                try:
+                    self._reference_queue.put_nowait(frame)
+                except queue.Full:
+                    self._reference_dropped += 1
+
+    def _flush_reference(self, generation: int, reason="boundary") -> None:
+        if self._reference_tap is not None:
+            self._queue_reference(PlaybackReferenceFrame(
                 samples=np.zeros(0, dtype=np.float32),
                 sample_rate=self.config.resolved_device_sample_rate,
-                generation=generation,
-                sequence=self._ref_seq,
-                is_final=True,
-            ))
-            self._ref_seq += 1
-        except Exception:
-            pass
+                generation=generation, sequence=self._ref_seq,
+                is_final=True, clock_epoch=self._reference_clock.epoch, reason=reason))
 
-    def _emit_reference(self, block: Any, generation: int) -> None:
+    def _capture_reference(self, outdata, generation, time_info, status):
         if self._reference_tap is None:
             return
-        try:
-            self._reference_tap(PlaybackReferenceFrame(
-                samples=block,
-                sample_rate=self.config.resolved_device_sample_rate,
-                generation=generation,
-                sequence=self._ref_seq,
-            ))
-            self._ref_seq += 1
-        except Exception:
-            pass
+        current = clock_value(time_info, "currentTime")
+        dac = clock_value(time_info, "outputBufferDacTime")
+        played_at = self._reference_clock.map(dac, current, time.monotonic())
+        samples = np.array(outdata, dtype=np.float32, copy=True)
+        samples.setflags(write=False)
+        self._queue_reference(PlaybackReferenceFrame(
+            samples=samples, sample_rate=self.config.resolved_device_sample_rate,
+            generation=generation, sequence=self._ref_seq, dac_time=dac,
+            callback_time=current, played_at=played_at,
+            clock_epoch=self._reference_clock.epoch,
+            clock_valid=played_at is not None and not bool(status),
+            status=str(status)[:160] if status else ""))
 
     def _normalize_chunk(self, chunk: Any) -> np.ndarray:
         sample_rate = int(getattr(chunk, "sample_rate", 0) or 0)
@@ -552,8 +696,6 @@ class SoundDevicePlaybackPort:
             raise PlaybackError("VOICE-PLAYBACK-PCM-INVALID", "PCM byte length is invalid")
         mono = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
         mono *= float(self.config.volume)
-        if self._resampler is not None:
-            mono = self._resampler.process(mono)
         return np.repeat(mono.reshape(-1, 1), self.config.channels, axis=1)
 
     def _callback(self, outdata: Any, frames: int, time_info: Any, status: Any) -> None:
@@ -589,6 +731,10 @@ class SoundDevicePlaybackPort:
                     copied = self._copy_frames_locked(outdata, int(frames))
                     if copied:
                         self._played_frames += copied
+                        if not slot.first_nonzero_observed and np.any(outdata):
+                            slot.first_nonzero_observed = True
+                            if slot.trace is not None:
+                                slot.trace.mark("playback_callback_first_nonzero")
                     elif slot.finish_requested:
                         events.extend(self._complete_slot_locked(slot))
                     else:
@@ -603,6 +749,7 @@ class SoundDevicePlaybackPort:
                             )
                         )
                 self._not_full.notify_all()
+            self._capture_reference(outdata, slot.generation if slot else self._generation, time_info, status)
         # Cheap playback energy reference for the input side's voice gate
         # (borrowed from 对话DEMO, ledger 0130). A stale/zero RMS means the
         # speaker is silent — gate remains permissive.

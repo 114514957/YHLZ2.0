@@ -1,4 +1,4 @@
-"""T6 真机连通（ledger 0617）：同入口 + 临时载体 + 现有 Gemma（本地 8081）。
+﻿"""T6 真机连通（ledger 0617）：同入口 + 临时载体 + 现有 Gemma（本地 8081）。
 
 流程：临时沙箱载体 → console 会话（同 daemon 工作台入口形态）→ 多轮真机 →
 核对 工具/读回/效果字段 → **新会话（同库）复读**证明持久。
@@ -51,7 +51,7 @@ async def main() -> int:
         uses = info.get("tool_uses") or []
         rows.append({"q": q, "answer": str(info.get("answer"))[:80],
                      "tools": [u.get("name") for u in uses],
-                     "readback": [getattr(u, "readback", "") for u in uses]})
+                     "readback": [u.get("effect", "") if isinstance(u, dict) else getattr(u, "readback", "") for u in uses]})
         print(f"Q: {q}")
         print(f"  A: {str(info.get('answer'))[:80]}")
         print(f"  tools={[u.get('name') for u in uses]} readback={[getattr(u,'readback','') for u in uses]}")

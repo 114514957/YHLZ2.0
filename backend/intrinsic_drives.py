@@ -165,6 +165,28 @@ def inject_block(limit: int = 3) -> str:
             "若相互冲突，以老爹的期待为先）：\n" + "\n".join(lines))
 
 
+# ── 触发信号（0501）：内在因不只注入文本，还要能影响**行为何时发生** ──
+_URGE_EXCLUDE = ("期待",)  # 宪法式持续授权（恒高位），不是"该起身做点什么"的脉冲
+
+
+def urge() -> dict:
+    """当前"想起身做点什么"的强度（纯读，不改状态）。
+
+    取**非「期待」**驱动里最强的一条：期待是老爹立定的持续授权（strength 恒 1.0、
+    不衰减），若参与比较就永远压过其它驱动、阈值形同虚设。好奇/渴望这类被对话
+    反复抬升（`add` +0.15）又没被兑现（`satisfy` 才降）的，才是"该动一动"的信号。
+    """
+    ds = [d for d in load()
+          if d.get("status") == "active" and d.get("category") not in _URGE_EXCLUDE]
+    if not ds:
+        return {"name": "", "category": "", "strength": 0.0, "note": ""}
+    top = max(ds, key=lambda d: float(d.get("strength", 0)))
+    return {"name": str(top.get("name", "")),
+            "category": str(top.get("category", "")),
+            "strength": round(float(top.get("strength", 0)), 3),
+            "note": str(top.get("note", ""))[:80]}
+
+
 # ---- 更新规则（对话抽取，规则式；LLM 抽取可后加）----
 _CURIOSITY = ("为什么", "好奇", "想知道", "怎么回事", "原理", "探索", "研究一下", "了解一下")
 _WANT = ("我想要", "我希望", "想得到", "想达成", "期待", "盼望", "渴望", "想要")

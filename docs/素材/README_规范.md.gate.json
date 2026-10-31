@@ -1,0 +1,58 @@
+{
+ "file": "docs\\素材\\README_规范.md",
+ "profile": "general",
+ "blocks": [
+  {
+   "name": "<类别>-<编号>｜<子类>",
+   "status": "FAIL",
+   "fails": [
+    "未授权发言人: <角色>",
+    "未授权发言人: <角色>",
+    "括号 ×3",
+    "星号 ×21",
+    "列表行 ×7"
+   ],
+   "warns": [
+    "分号 ×2（书面表达，仅提示）",
+    "冒号 ×1（书面表达，仅提示）"
+   ],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 357,
+    "avg_turn": 180,
+    "short_turns": 1,
+    "interjections": 0,
+    "endings": {},
+    "self_refs": []
+   }
+  },
+  {
+   "name": "人格-101｜承认做不到",
+   "status": "FAIL",
+   "fails": [
+    "客服腔词（老爹点名）: 我这边 ×1"
+   ],
+   "warns": [],
+   "metrics": {
+    "rounds": 1,
+    "turns": 2,
+    "max_turn": 87,
+    "avg_turn": 56,
+    "short_turns": 0,
+    "interjections": 0,
+    "endings": {
+     "陈述": 1
+    },
+    "self_refs": [
+     "我"
+    ]
+   }
+  }
+ ],
+ "summary": {
+  "PASS": 0,
+  "WARN": 0,
+  "FAIL": 2
+ }
+}

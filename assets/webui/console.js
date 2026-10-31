@@ -1,7 +1,8 @@
 "use strict";
-// YHLZ workbench: streaming text + voice dialog + dashboard drawer.
+// YH workbench: streaming text + voice dialog + dashboard drawer.
 const $ = (id) => document.getElementById(id);
 const msgs = $("msgs");
+const chat = $("chat");
 let busy = false;
 let stage = "idle";
 const bc = "BroadcastChannel" in window ? new BroadcastChannel("yhlz-avatar") : null;
@@ -37,8 +38,8 @@ function setVad(level, speech) {
   b.classList.toggle("hot", !!speech);
 }
 let nearBottom = true;
-function atBottom() { return msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 60; }
-function scrollBottom() { msgs.scrollTop = msgs.scrollHeight; }
+function atBottom() { return chat.scrollHeight - chat.scrollTop - chat.clientHeight < 60; }
+function scrollBottom() { chat.scrollTop = chat.scrollHeight; }
 function follow() {
   if (nearBottom) { scrollBottom(); }
   else { const b = $("toBottom"); if (b) b.style.display = "block"; }
@@ -227,6 +228,17 @@ $("q-wake").addEventListener("click", async () => {
   alert(r.ok ? (r.note || "已唤起 NapCat，请登录元亨号") : ("唤起失败：" + (r.error || "")));
   loadDashboard();
 });
+async function bridgeAct(action, okMsg) {
+  const r = await (await fetch("/control", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action }) })).json();
+  alert(r.ok ? (r.note || okMsg) : ("操作失败：" + (r.error || "")));
+  setTimeout(loadDashboard, 4000);
+  setTimeout(loadDashboard, 12000);
+}
+$("q-start").addEventListener("click", () => bridgeAct("qq_bridge_start", "QQ 桥启动中"));
+$("q-restart").addEventListener("click", () => bridgeAct("qq_bridge_restart", "QQ 桥重启中"));
+$("q-stop").addEventListener("click", () => bridgeAct("qq_bridge_stop", "QQ 桥已停止自动恢复"));
 async function launch(action, okMsg) {
   const r = await (await fetch("/control", { method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -342,7 +354,7 @@ async function streamFetch(path, payload, ev, signal) {
           let e; try { e = JSON.parse(ln.slice(5)); } catch (x) { continue; }
           if (ev[e.type]) ev[e.type](e);
         }
-        msgs.scrollTop = msgs.scrollHeight;
+        follow();
       }
     }
   } catch (e) { if (ev.error) ev.error("(连接错误) " + e); }
@@ -417,11 +429,11 @@ async function loadHistory() {
       if (m.role === "user") addMsg("u", "你", m.content);
       else if (m.role === "assistant") addMsg("a", "元亨", m.content);
     }
-    msgs.scrollTop = msgs.scrollHeight;
+    scrollBottom();
   } catch (e) {}
 }
 
-msgs.addEventListener("scroll", () => {
+chat.addEventListener("scroll", () => {
   nearBottom = atBottom();
   const b = $("toBottom");
   if (b) b.style.display = nearBottom ? "none" : "block";
@@ -551,7 +563,7 @@ window.addEventListener("load", () => {
       if (timer) { clearInterval(timer); timer = null; }
       if (go) go.disabled = false;
       if (s.status === "done") {
-        setSt("完成 ✓（已存到 音频素材/翻唱产出/，并加入歌曲库）");
+        setSt("完成 ✓（只换干声，和声/伴奏原声；成品+分层已存 翻唱产出/ 并入库）");
         if (au) { au.src = "/sing/result?t=" + Date.now(); au.style.display = "block"; }
         loadSongs();
       } else if (s.status === "error") {
@@ -573,11 +585,10 @@ window.addEventListener("load", () => {
     setSt("启动翻唱…");
     let r;
     try {
-      const sep = $("sing-sep") ? $("sing-sep").checked : true;
-      const voice = $("sing-voice") ? $("sing-voice").value : "xiaoyi";
+      const voice = $("sing-voice") ? $("sing-voice").value : "bright";
       r = await (await fetch("/sing", { method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: up.path, vocal_sep: sep,
+        body: JSON.stringify({ target: up.path,
                                voice: voice }) })).json();
     } catch (e) { setSt("启动失败：网络错误"); return; }
     if (!r.ok) { setSt("启动失败：" + (r.error || "")); return; }
@@ -587,4 +598,92 @@ window.addEventListener("load", () => {
   });
   poll().then((running) => { if (running && !timer) timer = setInterval(poll, 2000); });
   loadSongs();
+})();
+
+// ---- 启动入口：NapCat 面板 + 翻唱链路官方 UI（台账 0792） ----
+(function () {
+  const nap = $("ln-napcat"), off = $("ln-official");
+  const stopB = $("ln-official-stop"), st = $("ln-status");
+  const napSt = $("ln-napcat-status");
+  if (!nap || !off) return;
+  let offState = { status: "idle" };
+  const setSt = (t) => { if (st) st.textContent = t; };
+  const setNap = (t) => { if (napSt) napSt.textContent = t; };
+
+  nap.addEventListener("click", async () => {
+    setNap("NapCat 面板：检查中…");
+    let r;
+    try {
+      r = await (await fetch("/control", { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "napcat_ui" }) })).json();
+    } catch (e) { setNap("NapCat 面板：网络错误"); return; }
+    if (!r.ok) { setNap("NapCat 面板：" + (r.error || "失败")); return; }
+    if (r.up) { window.open(r.url, "_blank"); setNap(r.note || "NapCat 面板已打开"); }
+    else { setNap(r.note || "NapCat 启动中…"); }
+  });
+
+  function renderOff() {
+    const s = (offState && offState.status) || "idle";
+    if (s === "running") {
+      off.textContent = "打开官方UI"; off.disabled = false;
+      if (stopB) stopB.style.display = "inline-block";
+      setSt("官方UI 运行中：" + (offState.url || "") +
+        (offState.attached ? "（接住外部实例）" : "") + "（聊天暂停中）");
+    } else if (s === "starting") {
+      off.textContent = "启动中…"; off.disabled = true;
+      if (stopB) stopB.style.display = "none";
+      setSt("官方UI 启动中：" + (offState.step || ""));
+    } else if (s === "stopping") {
+      off.disabled = true;
+      if (stopB) stopB.style.display = "none";
+      setSt("官方UI 关闭中（恢复聊天服务）…");
+    } else if (s === "error") {
+      off.textContent = "重试官方UI"; off.disabled = false;
+      if (stopB) stopB.style.display = "none";
+      setSt("官方UI 启动失败：" + (offState.error || ""));
+    } else {
+      off.textContent = "翻唱官方UI"; off.disabled = false;
+      if (stopB) stopB.style.display = "none";
+      setSt("官方UI 未开启（独占唱窗，启动后聊天暂停）");
+    }
+  }
+  async function pollOff() {
+    try {
+      offState = await (await fetch("/official-ui/status",
+        { cache: "no-store" })).json();
+    } catch (e) {}
+    renderOff();
+  }
+  off.addEventListener("click", async () => {
+    if (offState.status === "running") {
+      window.open(offState.url || "http://127.0.0.1:7861", "_blank");
+      return;
+    }
+    if (offState.status === "starting" || offState.status === "stopping") return;
+    off.disabled = true;
+    let r;
+    try {
+      r = await (await fetch("/control", { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "official_ui_start" }) })).json();
+    } catch (e) { off.disabled = false; setSt("官方UI：网络错误"); return; }
+    if (!r.ok) { off.disabled = false; setSt("官方UI 启动失败：" + (r.error || "")); return; }
+    setSt("官方UI 启动中…（开唱窗约 1-2 分钟）");
+    pollOff();
+  });
+  if (stopB) stopB.addEventListener("click", async () => {
+    if (!confirm("关闭官方UI并把聊天服务拉回来？")) return;
+    stopB.disabled = true;
+    try {
+      const r = await (await fetch("/control", { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "official_ui_stop" }) })).json();
+      if (!r.ok) alert("关闭失败：" + (r.error || ""));
+    } catch (e) {}
+    stopB.disabled = false;
+    pollOff();
+  });
+  pollOff();
+  setInterval(pollOff, 3000);
 })();

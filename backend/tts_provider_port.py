@@ -515,6 +515,7 @@ class TTSStreamNormalizer:
         self._first_chunk_ms: Optional[int] = None
         self._saw_effective = False
         self._done = False
+        self._pcm_stream_ended = False
         self._pcm_duration_ms = 0
         self._input_chunk_count = 0
         self._output_frame_count = 0
@@ -549,11 +550,23 @@ class TTSStreamNormalizer:
             self._stale_event_count += 1
             return ()
         if kind == TTSEventKind.PCM_CHUNK.value:
+            if self._pcm_stream_ended:
+                self._error_count += 1
+                self._last_error_code = "VOICE-TTS-PCM-AFTER-STREAM-END"
+                raise TTSProviderPortError(
+                    self._last_error_code, "provider emitted PCM after stream end"
+                )
             return self._accept_pcm(event)
         if kind == TTSEventKind.READY.value:
             return (event,)
         if kind == TTSEventKind.PCM_STREAM_END.value:
-            return (event,)
+            if self._pcm_stream_ended:
+                return ()
+            # The playback consumer drains immediately at this boundary. Flush
+            # the repacker's partial frame first, never after playback closes.
+            output = self._flush_frames()
+            self._pcm_stream_ended = True
+            return (*output, event)
         if kind == TTSEventKind.DONE.value:
             return self._accept_done(event)
         if kind == TTSEventKind.ERROR.value:
