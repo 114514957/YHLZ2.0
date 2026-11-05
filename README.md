@@ -78,6 +78,7 @@
 - 利贞（开发执行体）跑在 **harness** 上：常驻网关 `tools/dsh_worker.py` 把 `yhlz` MCP
   （`tools/yhlz_mcp_server.py`）以 `--patch` 覆盖层注入她的 profile，她用
   `mcp__yhlz__*` 工具查台账 / 记忆；Full/Lite 两条链路都走它（opencode 已退役，ledger 0497）
+- **本地门禁**：`.venv\Scripts\python.exe tools\ci_check.py`（环境 + 279 项单测；加 `--smoke` 连栈检查）
 - 台账（**唯一事实源**）：`docs/上下文台账.md`
 - 台账增删查改（任何 agent 通用程序）：`python tools/ledger_cli.py {search,list,get,add,update,delete,stats,index}`
   （Python 直接 `import backend.ledger_store`；MCP 工具 `ledger_search/get/list/add/update/delete` 同源）
@@ -89,6 +90,7 @@
 - **本文所有 `python ...` 命令都指 `.venv\Scripts\python.exe`。** PATH 里排第一的是全局
   3.12（没有 httpx/numpy/psutil），直接敲 `python` 会跑进错误环境。
   另外 `backend/__init__` 在导入时会把 `NO_PROXY` 里带方括号的项（如 `[::1]`）清掉——
-  那是 httpx 的 `InvalidURL` 来源（台账 1096）。
+  那是 httpx 的 `InvalidURL` 来源（台账 1096）；`.venv/Lib/site-packages/sitecustomize.py`
+  在解释器启动时做同样的事，覆盖 gradio 这类“导入阶段就读环境”的库（参照实现 `tools/env_guard.py`）。
 - 依赖：按用途看 `requirements-target-*.txt` / `requirements-tts-primary.txt` / `requirements-target-runtime.txt` / `requirements-bili.txt`；根 `requirements.txt` 为**旧版聚合，已过时**。
 - 旧世代代码（embodied / vision / personality / action / voice_identity / main.py 等）已归档到 `archive/2026-09-12-prune/`。
