@@ -36,6 +36,7 @@ CORE = [
     "backend.test_bili_tools",
     "backend.test_dev_runner_backend",
     "backend.test_prompt_structure",
+    "backend.test_prompt_budget",
     "backend.test_target_prompts",
     "backend.test_session_migration",
     "backend.test_text_memory_inference_gate",

@@ -82,7 +82,7 @@
 - 利贞（开发执行体）跑在 **harness** 上：常驻网关 `tools/dsh_worker.py` 把 `yhlz` MCP
   （`tools/yhlz_mcp_server.py`）以 `--patch` 覆盖层注入她的 profile，她用
   `mcp__yhlz__*` 工具查台账 / 记忆；Full/Lite 两条链路都走它（opencode 已退役，ledger 0497）
-- **本地门禁**：`.venv\Scripts\python.exe tools\ci_check.py`（环境 + 结构 + 279 项单测；加 `--smoke` 连栈检查）
+- **本地门禁**：`.venv\Scripts\python.exe tools\ci_check.py`（环境 + 结构 + 285 项单测；加 `--smoke` 连栈检查）
 - **结构检查**：`.venv\Scripts\python.exe tools\structure_lint.py`（根目录白名单；违规退出码 1）
 - **只读体检**：`.venv\Scripts\python.exe tools\smoke.py`（gemma / daemon / worker / ollama / QQ / GUI）
 - 台账（**唯一事实源**）：`docs/上下文台账.md`

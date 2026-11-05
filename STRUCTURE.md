@@ -71,7 +71,7 @@
 | 工具 | 用途 |
 |---|---|
 | `tools/smoke.py` | 只读体检：gemma / daemon / worker / ollama(可选) / QQ / GUI；FAIL 才算挂 |
-| `tools/ci_check.py` | 本地门禁：环境检查 + 结构检查 + 核心 16 模块 177 项 + 记忆 8 模块 102 项；`--smoke` 连栈 |
+| `tools/ci_check.py` | 本地门禁：环境检查 + 结构检查 + 核心 **17 模块 183 项** + 记忆 8 模块 102 项；`--smoke` 连栈 |
 | `tools/structure_lint.py` | 根目录白名单检查（入口/文档/依赖/环境之外的都算违规） |
 | `tools/memory_index_audit.py` | 记忆投影审计 / 重建（`audit` / `rebuild-keyword` …），默认只读 |
 | `tools/memory_drain.py` | L1→L2 摘要积压显式排空（默认 dry-run，`--apply` 才写） |
@@ -88,7 +88,7 @@
 |---|---|
 | `target_daemon.py` | daemon 生命周期、调度、autonomy、记忆维护、HTTP 路由 |
 | `target_entry.py` | 一轮对话编排、工具注入、身份 / 规则、派单 |
-| `target_orchestrator.py` / `llm_stream.py` | LLM 流式、上下文压缩（mid-loop compaction） |
+| `target_orchestrator.py` / `llm_stream.py` | LLM 流式、上下文压缩（mid-loop compaction）；`prompt_budget.py` 给代理链路做 token 预算 |
 | `target_memory.py` | L1/L2/L3 记忆、显著度 / 衰减、召回 |
 | `target_chain.py` / `target_sherpa_asr.py` | 语音链、sherpa-onnx 流式 ASR |
 | `intrinsic_drives.py` | 内在因（好奇 / 渴望 / 期待） |

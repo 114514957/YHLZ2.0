@@ -895,6 +895,19 @@ class DaemonRuntime:
         from backend.env_loader import ensure_env_loaded
 
         messages = payload.get("messages") or []
+        # F-08（台账 1104）：代理链按字符预算裁剪，避免把 8k 窗口打爆成 400。
+        try:
+            from backend.prompt_budget import fit_messages
+
+            messages, _budget = fit_messages(messages)
+            if _budget.get("dropped_messages") or _budget.get("truncated"):
+                print("[prompt-budget] "
+                      f"{_budget['original_tokens']}->{_budget['fitted_tokens']} tokens "
+                      f"dropped={_budget['dropped_messages']} "
+                      f"truncated={_budget['truncated']} "
+                      f"budget={_budget['budget_tokens']}", flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[prompt-budget] skip {type(exc).__name__}", flush=True)
         ensure_env_loaded()
         import os
 
@@ -937,6 +950,19 @@ class DaemonRuntime:
 
     def openai_chat(self, payload: dict) -> dict:
         messages = payload.get("messages") or []
+        # F-08（台账 1104）：非流式入口同样先过预算，避免单条巨型消息打爆窗口。
+        try:
+            from backend.prompt_budget import fit_messages
+
+            messages, _budget = fit_messages(messages)
+            if _budget.get("dropped_messages") or _budget.get("truncated"):
+                print("[prompt-budget] "
+                      f"{_budget['original_tokens']}->{_budget['fitted_tokens']} tokens "
+                      f"dropped={_budget['dropped_messages']} "
+                      f"truncated={_budget['truncated']} "
+                      f"budget={_budget['budget_tokens']}", flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[prompt-budget] skip {type(exc).__name__}", flush=True)
         user_msgs = [m for m in messages if m.get("role") == "user"]
         text = str((user_msgs[-1] or {}).get("content", "")).strip()
         if not text:
