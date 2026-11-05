@@ -33,3 +33,14 @@ Harness）上，工具名是 `mcp__yhlz__ledger_search` / `mcp__yhlz__memory_rec
 
 - 用户明确要求（2026-10-15）：所有命令执行走普通 CMD（cmd.exe），不使用管理员模式，不请求提权，不调用 runas。
 - 启动子进程同样保持非管理员权限；验证权限时以进程令牌为准。
+
+## 链路纪律（2026-11-05 立）
+
+- **一条资源只有一个消费者**：QQ 号（Lite 独占）、8321、8081、8348、看门狗，各有且只有一个主人。
+- **换链 = 先停旧链、再起新链、台账记一笔**；禁止新旧并行。external 模式下旧 QQ 链
+  （`qq_bot.py` / `napcat_watch.py`）由启动器与看门狗每 tick 收掉。
+- **自启唯一**：Startup 只保留「YH 开机自启.lnk」；新增自启前先删旧条目并登记，不许叠加。
+- **自主默认关（fail-closed）**：只有显式设 `YHLZ_AUTONOMY_ENABLE=1` 才运行；
+  `cache/autonomy_disabled.flag` 或 `YHLZ_AUTONOMY_DISABLED=1` 随时关。
+- **自主失败必须退避**（60s→30min），不允许 30 秒紧循环重试；成功 tick 才重置。
+- 运行时审计：`tools/chain_guard.py`（双链 / 旧链残留 / 自启重叠 / 自主被意外打开），已接进 `smoke.py`。

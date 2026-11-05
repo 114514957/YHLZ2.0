@@ -18,6 +18,8 @@ import json
 import os
 import pathlib
 import socket
+import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -67,6 +69,21 @@ def check_ollama() -> tuple[str, str, str]:
     if enabled:
         return WARN, "ollama 11434", "not listening but YHLZ_START_OLLAMA is set"
     return OK, "ollama 11434", "off (optional; YHLZ_START_OLLAMA unset)"
+
+
+def check_chains() -> tuple[str, str, str]:
+    """一条链一个消费者：双链/旧链残留/自启重叠/自主被意外打开都算 FAIL。"""
+    try:
+        r = subprocess.run([sys.executable, str(ROOT / "tools" / "chain_guard.py"), "--json"],
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=30)
+        data = json.loads(r.stdout)
+    except Exception as exc:  # noqa: BLE001
+        return WARN, "chains", f"chain_guard unavailable: {type(exc).__name__}"
+    if data.get("ok"):
+        return OK, "chains", "single consumer per role; autonomy off"
+    kinds = ",".join(str(p.get("kind")) for p in data.get("problems", []))
+    return FAIL, "chains", (kinds or "violation")[:160]
 
 
 def check_daemon() -> tuple[str, str, str]:
@@ -126,7 +143,7 @@ def main() -> int:
     args = ap.parse_args()
 
     checks = [check_gemma(), check_daemon(), check_worker(), check_ollama(),
-              check_bridge(), check_napcat(), check_gui()]
+              check_chains(), check_bridge(), check_napcat(), check_gui()]
     failed = sum(1 for level, _, _ in checks if level == FAIL)
     warned = sum(1 for level, _, _ in checks if level == WARN)
 

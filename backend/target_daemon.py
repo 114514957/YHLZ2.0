@@ -41,14 +41,27 @@ AUTONOMY_FLAG = _PROJECT / "cache" / "autonomy_disabled.flag"
 
 
 def autonomy_disabled() -> bool:
+    """自主总闸（fail-closed，2026-11-05 台账 1105）。
+
+    以前只有 `autonomy_disabled.flag` 一个开关：flag 丢了/被删了就**自动恢复**
+    自主，等于“没人看着也会自己开跑”。现在改成必须**显式开启**：
+
+        YHLZ_AUTONOMY_ENABLE=1   ← 不设 = 永久关
+
+    `YHLZ_AUTONOMY_DISABLED=1` 与 flag 仍可随时再加一道关；三者任一为“关”即关。
+    """
     import os
-    env = os.getenv("YHLZ_AUTONOMY_DISABLED", "").strip().lower()
-    if env in ("1", "true", "yes", "on"):
+
+    env_off = os.getenv("YHLZ_AUTONOMY_DISABLED", "").strip().lower()
+    if env_off in ("1", "true", "yes", "on"):
         return True
+    env_on = os.getenv("YHLZ_AUTONOMY_ENABLE", "").strip().lower()
+    if env_on not in ("1", "true", "yes", "on"):
+        return True  # fail-closed：没有显式授权就不自主
     try:
         return AUTONOMY_FLAG.exists()
     except Exception:
-        return False
+        return True
 
 from backend.console_server import ConsoleHandler  # noqa: E402 (workbench UI base)
 from backend import notify_guard  # noqa: E402 (F5 dedupe/rate-limit)
@@ -251,6 +264,9 @@ class DaemonRuntime:
         # 起算冷却——否则重启时若某条驱动恰好高位，会立刻触发一次自主（不是我们想要的）
         self._autonomy_last = time.time()
         self._autonomy_urge_last = time.time()
+        # 台账 1105：自主失败退避——失败不更新 last，旧逻辑会每 30s 重试到天亮。
+        self._autonomy_fail = 0
+        self._autonomy_next = 0.0
         threading.Thread(target=self._autonomy_loop, daemon=True).start()
 
     def _autonomy_loop(self) -> None:
@@ -261,6 +277,8 @@ class DaemonRuntime:
         while True:
             time.sleep(min(AUTONOMY_POLL_SECONDS, max(30.0, self.autonomy_seconds / 10)))
             if autonomy_disabled():
+                continue
+            if time.time() < self._autonomy_next:
                 continue
             try:
                 u = _drive_urge()
@@ -333,13 +351,22 @@ class DaemonRuntime:
                     "reason": reason,
                 })
                 self._autonomy_last = time.time()
+                self._autonomy_fail = 0
+                self._autonomy_next = 0.0
                 if trigger == "urge":
                     self._autonomy_urge_last = time.time()
                 print("[autonomy] tick(" + trigger + "): "
                       + str(info.get("answer", ""))[:90]
                       + f" | diary={pushed}/{reason}", flush=True)
             except Exception as exc:  # noqa: BLE001
-                print(f"[autonomy] skip {type(exc).__name__}", flush=True)
+                # 台账 1105：失败指数退避（60s→120→…→30min 封顶），
+                # 不进死循环重试；成功 tick 时才重置。
+                self._autonomy_fail += 1
+                delay = min(1800.0, 60.0 * (2 ** min(self._autonomy_fail - 1, 5)))
+                self._autonomy_next = time.time() + delay
+                print(f"[autonomy] skip {type(exc).__name__} "
+                      f"(fail #{self._autonomy_fail}, retry in {int(delay)}s)",
+                      flush=True)
 
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self._loop)

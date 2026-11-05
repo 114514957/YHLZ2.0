@@ -33,6 +33,16 @@
 测试的 `tempfile.mkdtemp()` 统一落到 `cache/tmp`（`backend/__init__` 在 unittest 下重定向），
 不再往根目录扔 `tmp*`。历史上 `web/live_output/player.html` 已挪到 `assets/live_output/`。
 
+## 链路单一消费者与自主闸门（2026-11-05）
+
+- **一个资源一个消费者**：QQ 号 / 8321 / 8081 / 8348 / 看门狗。换链必须先停旧链，禁止新旧并行；
+  external 模式下 `qq_bot.py` / `napcat_watch.py` 由 launcher 与 watchdog 每 tick 回收。
+- **自启唯一**：Startup 只有「YH 开机自启.lnk」；新增自启先删旧条目并登记。
+- **自主 fail-closed**：必须 `YHLZ_AUTONOMY_ENABLE=1` 才跑；flag 或 `YHLZ_AUTONOMY_DISABLED=1` 随时关；
+  失败指数退避 60s→30min，成功才重置（防 30s 紧循环重试）。
+- **审计**：`tools/chain_guard.py` 检查双链、旧链残留、自启重叠、自主被意外打开；
+  已接进 `smoke.py`（FAIL 会算进体检失败）。
+
 ## 入口
 
 | 入口 | 说明 |
@@ -71,7 +81,8 @@
 | 工具 | 用途 |
 |---|---|
 | `tools/smoke.py` | 只读体检：gemma / daemon / worker / ollama(可选) / QQ / GUI；FAIL 才算挂 |
-| `tools/ci_check.py` | 本地门禁：环境检查 + 结构检查 + 核心 **17 模块 183 项** + 记忆 8 模块 102 项；`--smoke` 连栈 |
+| `tools/ci_check.py` | 本地门禁：环境检查 + 结构检查 + 核心 **18 模块 187 项** + 记忆 8 模块 102 项；`--smoke` 连栈 |
+| `tools/chain_guard.py` | 链路单一消费者审计（双链 / 旧链残留 / 自启重叠 / 自主被意外打开）；已接进 `smoke.py` |
 | `tools/structure_lint.py` | 根目录白名单检查（入口/文档/依赖/环境之外的都算违规） |
 | `tools/memory_index_audit.py` | 记忆投影审计 / 重建（`audit` / `rebuild-keyword` …），默认只读 |
 | `tools/memory_drain.py` | L1→L2 摘要积压显式排空（默认 dry-run，`--apply` 才写） |
