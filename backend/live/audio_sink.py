@@ -29,7 +29,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_CONFIG_PATH = ROOT / "config" / "live.json"
 LOCAL_CONFIG_PATH = ROOT / "config" / "live.local.json"
-PAGE_PATH = ROOT / "web" / "live_output" / "player.html"
+PAGE_PATH = ROOT / "assets" / "live_output" / "player.html"
 MAX_TEXT_CHARS = 200
 MAX_BODY_BYTES = 64 * 1024
 AUDIO_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+\.wav$")

@@ -22,3 +22,19 @@ if str(_os.getenv("YHLZ_SKIP_ENV_SANITIZE", "")).strip().lower() not in (
         _ENV_CHANGES = _sanitize_proxy_env()
     except Exception:
         _ENV_CHANGES = []
+
+# 2026-11-05（台账 1103）：测试期临时目录重定向。
+# 113 个测试用 tempfile.mkdtemp()（不带 dir=），会把 tmp* 扔进当前目录=仓库根。
+# 只在 unittest 已导入时生效，生产进程不受影响；根目录从此不再长临时目录。
+try:
+    import sys as _sys
+
+    if "unittest" in _sys.modules:
+        import tempfile as _tempfile
+        from pathlib import Path as _Path
+
+        _tmp_root = _Path(__file__).resolve().parent.parent / "cache" / "tmp"
+        _tmp_root.mkdir(parents=True, exist_ok=True)
+        _tempfile.tempdir = str(_tmp_root)
+except Exception:
+    pass

@@ -18,6 +18,21 @@
 
 新增/删改模块时按此三区自检；落进 archive 的模块不再维护，只在考古时读。
 
+## 根目录规矩（2026-11-05 立）
+
+根目录只允许四类东西：
+
+1. **入口脚本**：`*.bat` / `*.cmd`（YH_* / YHLZ_* 转发壳 / start_* / 登录NapCat 等）；
+2. **顶层文档**：`README.md` / `STRUCTURE.md` / `AGENTS.md`；
+3. **依赖清单**：`requirements*.txt`；
+4. **环境文件**：`.env*` / `.gitignore`；外加 jieba 的生成缓存 `jieba.cache`。
+
+其余一律归位：报告 → `docs/报告/`；研究/调研 → `docs/研究/`；脚本 → `tools/`；
+静态资源 → `assets/`；运行时产物 → `cache/`；退役物 → `archive/`。
+`tools/structure_lint.py` 按白名单做机器检查（退出码 1 = 有违规），已接进 `ci_check.py`。
+测试的 `tempfile.mkdtemp()` 统一落到 `cache/tmp`（`backend/__init__` 在 unittest 下重定向），
+不再往根目录扔 `tmp*`。历史上 `web/live_output/player.html` 已挪到 `assets/live_output/`。
+
 ## 入口
 
 | 入口 | 说明 |
@@ -56,7 +71,8 @@
 | 工具 | 用途 |
 |---|---|
 | `tools/smoke.py` | 只读体检：gemma / daemon / worker / ollama(可选) / QQ / GUI；FAIL 才算挂 |
-| `tools/ci_check.py` | 本地门禁：环境检查 + 核心 16 模块 177 项 + 记忆 8 模块 102 项（每批独立子进程）；`--smoke` 连栈 |
+| `tools/ci_check.py` | 本地门禁：环境检查 + 结构检查 + 核心 16 模块 177 项 + 记忆 8 模块 102 项；`--smoke` 连栈 |
+| `tools/structure_lint.py` | 根目录白名单检查（入口/文档/依赖/环境之外的都算违规） |
 | `tools/memory_index_audit.py` | 记忆投影审计 / 重建（`audit` / `rebuild-keyword` …），默认只读 |
 | `tools/memory_drain.py` | L1→L2 摘要积压显式排空（默认 dry-run，`--apply` 才写） |
 | `tools/snapshot.py` | 全量快照（认知/人格/风格/内在因/实体图/memstore/embvec/kw） |
