@@ -156,7 +156,13 @@ class QQBridgeTests(unittest.IsolatedAsyncioTestCase):
 
 class PersonaBoundaryTests(unittest.TestCase):
     def test_public_ignores_all_private_inputs(self):
-        with patch("backend.target_prompts.load_persona_five_dim", side_effect=AssertionError("private access")):
+        # 2026-11-05（台账 1097）：工具清单文本块默认关闭（10/22 实测省 ~1.8k token，
+        # 见 target_prompts.tool_text_block_enabled）。这条测的是「公共频道只保留
+        # web_search/web_fetch」的过滤逻辑，不是开关本身，所以这里把开关钉成开。
+        with patch("backend.target_prompts.load_persona_five_dim",
+                   side_effect=AssertionError("private access")), \
+                patch("backend.target_prompts.tool_text_block_enabled",
+                      return_value=True):
             text = render_system_prompt(public=True, persona="PRIVATE_PERSONA", five_dim=["PRIVATE_DIM"],
                 style_lines=["PRIVATE_STYLE"], tools=[{"function": {"name": "memory_save"}},
                                                      {"function": {"name": "web_search"}}])

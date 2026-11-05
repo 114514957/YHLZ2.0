@@ -110,6 +110,25 @@ def _to_data_url(src: str) -> str:
     return f"data:image/{mime};base64,{b}"
 
 
+def _tool_image_enabled() -> bool:
+    """工具结果里能不能带图（出问题一键退回纯文本）。"""
+    return str(os.getenv("YHLZ_TOOL_IMAGE", "1")).strip().lower() not in (
+        "0", "off", "false", "no")
+
+
+def _tool_image_part(path: Any) -> Optional[dict[str, Any]]:
+    """工具产出的图片路径 -> OpenAI image_url part；拿不到就返回 None。"""
+    if not path:
+        return None
+    try:
+        url = _to_data_url(str(path))
+    except Exception:
+        return None
+    if not url:
+        return None
+    return {"type": "image_url", "image_url": {"url": url}}
+
+
 def _to_input_audio(src: str) -> Optional[dict[str, Any]]:
     """Local wav path -> llama.cpp ``input_audio`` content part (ledger 0406).
 
@@ -426,6 +445,10 @@ class TurnOrchestrator:
         tool_uses: list[ToolUse] = []
         answer = ""
         iterations = 0
+        # 本轮已经执行过的「一次性」工具（cap.once_per_turn）。
+        # 2026-11-04：模型见过图之后还会再调一次 see_now，把答案挤掉，
+        # 于是空回答；这一层是硬闸，不靠提示词。
+        ran_once: set[str] = set()
         for _ in range(self.max_tool_rounds + 1):
             if should_stop is not None and should_stop():
                 break  # 优雅停止：保留已产出
@@ -487,6 +510,15 @@ class TurnOrchestrator:
                                      "name": name, "content": json.dumps({"error": error})})
                     continue
                 cap = self.registry.get_by_openai_name(name)
+                if (cap is not None and getattr(cap, "once_per_turn", False)
+                        and name in ran_once):
+                    error = "本轮已经用过这个工具，不重复执行"
+                    tool_uses.append(ToolUse(name=name, arguments=args, ok=False,
+                                             error=error, elapsed_ms=0))
+                    messages.append({
+                        "role": "tool", "tool_call_id": tc["id"], "name": name,
+                        "content": json.dumps({"error": error}, ensure_ascii=False)})
+                    continue
                 denied = False
                 needs_approval = (
                     cap is not None and cap.side_effect and self.approver is not None
@@ -522,11 +554,18 @@ class TurnOrchestrator:
                 pre_state = (turn_evidence.carrier_state(name, args)
                              if (cap is not None and cap.side_effect) else None)
                 out = await self.registry.execute_openai_async(name, args)
+                # handler 可能返回 dict（如 see.now 的 {text,image,...}）：
+                # 证据/日志只要文本，图单独走 content parts。
+                raw_out = out.get("output") if out.get("ok") else None
+                if isinstance(raw_out, dict):
+                    text_out = str(raw_out.get("text") or raw_out.get("output") or "")
+                else:
+                    text_out = str(raw_out or "")
                 use = ToolUse(
                     name=name,
                     arguments=args,
                     ok=bool(out.get("ok")),
-                    output=str(out.get("output") or "") if out.get("ok") else None,
+                    output=text_out if out.get("ok") else None,
                     error=str(out.get("error") or "") if not out.get("ok") else "",
                     elapsed_ms=round((time.perf_counter() - t0) * 1000, 1),
                     trace_id=trace_id,
@@ -537,16 +576,25 @@ class TurnOrchestrator:
                     rb = turn_evidence.readback(name, args, use.output or "", before=pre_state)
                     use.readback = str(rb.get("status") or "")
                 tool_uses.append(use)
+                if cap is not None and getattr(cap, "once_per_turn", False) and use.ok:
+                    ran_once.add(name)
+                # 工具结果默认是字符串；如果 handler 返回 dict 且带 image
+                # （见 backend/see_now.py），就把图拼成 content parts 一起回填。
+                # 实测 llama.cpp 接受 role:"tool" 的 parts 并渲染 <|image|>（台账 1076）。
+                body: Any = (use.output if use.ok
+                             else json.dumps({"error": use.error}, ensure_ascii=False))
+                image_path = raw_out.get("image") if isinstance(raw_out, dict) else None
+                part = _tool_image_part(image_path) if image_path else None
+                if part is not None and _tool_image_enabled():
+                    content: Any = [{"type": "text", "text": str(body)[:4000]}, part]
+                else:
+                    content = str(body)[:4000]
                 messages.append(
                     {
                         "role": "tool",
                         "tool_call_id": tc["id"],
                         "name": name,
-                        "content": (
-                            use.output
-                            if use.ok
-                            else json.dumps({"error": use.error}, ensure_ascii=False)
-                        )[:4000],
+                        "content": content,
                     }
                 )
             if _chars(messages) > CTX_BUDGET_CHARS:

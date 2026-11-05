@@ -58,13 +58,21 @@ def _copy_db(src: pathlib.Path, dst: pathlib.Path) -> None:
         s.close()
 
 
-def create(tag: str = "") -> str:
-    """Snapshot current state; returns the snapshot dir ('' on failure)."""
+def create(tag: str = "", *, exclude: tuple[str, ...] = ()) -> str:
+    """Snapshot current state; returns the snapshot dir ('' on failure).
+
+    ``exclude`` skips named targets. Daily automatic backups exclude the
+    derived ``kw_index`` (rebuildable from the authority DB) to keep them
+    small; manual/pre-change snapshots should stay complete.
+    """
     ts = time.strftime("%Y%m%d_%H%M%S")
     dest = SNAP_DIR / ts
     dest.mkdir(parents=True, exist_ok=True)
-    manifest: dict = {"ts": ts, "tag": str(tag), "time": time.time(), "files": {}}
+    manifest: dict = {"ts": ts, "tag": str(tag), "time": time.time(),
+                      "excluded": list(exclude), "files": {}}
     for name, src in _targets().items():
+        if name in exclude:
+            continue
         try:
             if src.exists():
                 target = dest / (name + src.suffix)

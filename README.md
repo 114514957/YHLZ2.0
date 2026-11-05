@@ -30,7 +30,7 @@
 
 | 链路 | 模型 | 说明 |
 |---|---|---|
-| 元亨本体（对话 / 人格） | 本地 **Gemma-4-E4B-Aggressive**（`gemma4-e4b-aggr-q4km.gguf` + 视觉 `mmproj`） | llama.cpp 起，端口 8081，reasoning 模型 |
+| 元亨本体（对话 / 人格） | 本地 **Gemma-4-E4B**（`gemma-4-E4B_q4_0-it.gguf` + `yuanheng-v7b-lora.gguf` + 视觉 `mmproj`） | llama.cpp 起，端口 8081，reasoning 模型 |
 | 开发派单（`[[dev:]]`） | **deepseek/deepseek-v4-flash** | 利贞跑在 **DeepSeek Harness（dsh）** 上，常驻网关 `tools/dsh_worker.py`（禁 git commit/push） |
 
 ## 感知链路（本地优先）
@@ -86,5 +86,9 @@
 ## 说明
 
 - Python 3.12 + `.venv`；目录结构见 `STRUCTURE.md`。
+- **本文所有 `python ...` 命令都指 `.venv\Scripts\python.exe`。** PATH 里排第一的是全局
+  3.12（没有 httpx/numpy/psutil），直接敲 `python` 会跑进错误环境。
+  另外 `backend/__init__` 在导入时会把 `NO_PROXY` 里带方括号的项（如 `[::1]`）清掉——
+  那是 httpx 的 `InvalidURL` 来源（台账 1096）。
 - 依赖：按用途看 `requirements-target-*.txt` / `requirements-tts-primary.txt` / `requirements-target-runtime.txt` / `requirements-bili.txt`；根 `requirements.txt` 为**旧版聚合，已过时**。
 - 旧世代代码（embodied / vision / personality / action / voice_identity / main.py 等）已归档到 `archive/2026-09-12-prune/`。

@@ -7,13 +7,15 @@ Usage:
     python tools/smoke.py
     python tools/smoke.py --json
 
-Hard failures (exit 1): daemon 8321, worker 8347.
-Degradations (warn only): NapCat 3001, QQ bridge ws_state, DSH GUI 61447.
+Hard failures (exit 1): gemma 8081, daemon 8321, worker 8347.
+Degradations (warn only): NapCat 3001, QQ bridge ws_state, DSH GUI.
+Optional (never FAIL): Ollama 11434 — `YHLZ_START_OLLAMA` is off by design.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import socket
 import time
@@ -22,11 +24,12 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BRIDGE_STATUS = ROOT / "cache" / "qq_bridge" / "lite" / "bridge_status.json"
+DSH_GUI_PORT = int(os.getenv("YHLZ_DSH_GUI_PORT", "61175"))
 
 OK, WARN, FAIL = "OK", "WARN", "FAIL"
 
 
-def _http(url: str, timeout: float = 3.0) -> tuple[bool, dict | str]:
+def _http(url: str, timeout: float = 5.0) -> tuple[bool, dict | str]:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             raw = resp.read(200_000)
@@ -44,6 +47,26 @@ def _port(host: str, port: int, timeout: float = 1.5) -> bool:
             return True
     except OSError:
         return False
+
+
+def check_gemma() -> tuple[str, str, str]:
+    ok, body = _http("http://127.0.0.1:8081/health")
+    if not ok:
+        return FAIL, "gemma 8081", str(body)
+    if not isinstance(body, dict) or body.get("status") != "ok":
+        return FAIL, "gemma 8081", "health responded but status != ok"
+    return OK, "gemma 8081", f"status=ok slots={body.get('slots')}"
+
+
+def check_ollama() -> tuple[str, str, str]:
+    """Optional by design (launcher leaves it alone unless YHLZ_START_OLLAMA=1)."""
+    enabled = str(os.getenv("YHLZ_START_OLLAMA", "")).strip().lower() in (
+        "1", "true", "yes", "on")
+    if _port("127.0.0.1", 11434):
+        return OK, "ollama 11434", "listening"
+    if enabled:
+        return WARN, "ollama 11434", "not listening but YHLZ_START_OLLAMA is set"
+    return OK, "ollama 11434", "off (optional; YHLZ_START_OLLAMA unset)"
 
 
 def check_daemon() -> tuple[str, str, str]:
@@ -92,9 +115,9 @@ def check_napcat() -> tuple[str, str, str]:
 
 
 def check_gui() -> tuple[str, str, str]:
-    if _port("127.0.0.1", 61447):
-        return OK, "dsh gui 61447", "listening"
-    return WARN, "dsh gui 61447", "not listening"
+    if _port("127.0.0.1", DSH_GUI_PORT):
+        return OK, f"dsh gui {DSH_GUI_PORT}", "listening"
+    return WARN, f"dsh gui {DSH_GUI_PORT}", "not listening — set YHLZ_DSH_GUI_PORT"
 
 
 def main() -> int:
@@ -102,7 +125,8 @@ def main() -> int:
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     args = ap.parse_args()
 
-    checks = [check_daemon(), check_worker(), check_bridge(), check_napcat(), check_gui()]
+    checks = [check_gemma(), check_daemon(), check_worker(), check_ollama(),
+              check_bridge(), check_napcat(), check_gui()]
     failed = sum(1 for level, _, _ in checks if level == FAIL)
     warned = sum(1 for level, _, _ in checks if level == WARN)
 

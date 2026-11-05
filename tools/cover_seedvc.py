@@ -85,6 +85,30 @@ def native_demucs_split(tgt: Path, stem_dir: Path) -> tuple[bool, str]:
     return False, ((r.stdout or "")[-300:] + (r.stderr or "")[-300:]) if r else "demucs failed"
 
 
+def native_karaoke_split(stem_dir: Path) -> tuple[bool, str]:
+    """原生卡拉OK拆分（MSST + becruily mel-band-roformer）：demucs 的 vocals → lead/backing。
+
+    2026-11-02：WSL 在本机起不来（E_ACCESSDENIED，daemon 同样），把 `wsl_stem3_split.sh`
+    的第二段搬到 Windows。实测：202s 歌曲 194.6s（含开唱窗），权重 1.72 GB，
+    lead/backing 同度泄漏 corr≈0.01（不串原唱）。
+    """
+    voc = stem_dir / "lead.wav"          # native_demucs_split 把 demucs vocals 放在这
+    if not voc.is_file():
+        return False, "no demucs vocals"
+    out = stem_dir / "_karaoke"
+    py = ROOT / ".venv" / "Scripts" / "python.exe"
+    r = run([str(py if py.is_file() else sys.executable),
+             str(ROOT / "tools" / "svc_karaoke_split.py"),
+             str(voc), str(out)], timeout=3600)
+    lead, back = out / "lead.wav", out / "backing.wav"
+    if r.returncode != 0 or not lead.is_file() or not back.is_file():
+        return False, ("karaoke failed: "
+                       + ((r.stdout or "")[-200:] + (r.stderr or "")[-200:]))
+    shutil.copy2(lead, stem_dir / "lead.wav")
+    shutil.copy2(back, stem_dir / "backing.wav")
+    return True, "native-demucs+karaoke"
+
+
 def run(cmd: list[str], timeout: float, cwd: Path | None = None,
         env: dict | None = None, flags: int | None = None) -> subprocess.CompletedProcess:
     print("[run]", " ".join(str(c) for c in cmd), flush=True)
@@ -111,6 +135,41 @@ def ensure_ascii_junction() -> str | None:
     return link if os.path.isdir(link) else None
 
 
+def _is_ascii(s: str) -> bool:
+    return all(ord(c) < 128 for c in s)
+
+
+def ascii_root() -> str | None:
+    """ROOT 的纯 ASCII 路径（优先 8.3 短路径，其次专用 junction C:\\yhz）。
+
+    2026-11-01 查到的坑：`C:\\yhlz` 这个 junction 早先被指到了 **YHLZ**（项目根），
+    而本脚本把它当 YH 根来拼 bat 路径 → `/mnt/c/yhlz/tools/...` 不存在 →
+    计划任务那条 WSL 分轨永远失败 → 静默退回 demucs 两轨（无和声、带伴奏泄漏）。
+    所以这里不再盲信 C:\\yhlz：先取 8.3 短路径（不动文件系统），再校验目标。
+    """
+    try:
+        r = run(["cmd.exe", "/c", 'for %I in ("%s") do @echo %%~sI' % ROOT],
+                timeout=30, flags=0)
+        lines = [x.strip() for x in (r.stdout or "").splitlines() if x.strip()]
+        cand = lines[-1] if lines else ""
+        if cand and _is_ascii(cand) and Path(cand).is_dir():
+            return cand
+    except Exception:  # noqa: BLE001
+        pass
+    link = "C:\\yhz"
+    try:
+        if os.path.isdir(link):
+            if Path(link).resolve() == ROOT.resolve():
+                return link
+        else:
+            run(["cmd.exe", "/c", "mklink", "/J", link, str(ROOT)], timeout=60, flags=0)
+            if os.path.isdir(link) and Path(link).resolve() == ROOT.resolve():
+                return link
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 def wsl_split_via_task(tgt: Path, stem_dir: Path,
                        timeout: float = 1800) -> tuple[bool, str]:
     """把 WSL 三轨分离交给计划任务（cmd 有控制台，WSL 可用）。
@@ -118,9 +177,6 @@ def wsl_split_via_task(tgt: Path, stem_dir: Path,
     daemon 是 pythonw/GUI 子系统，直接 spawn wsl.exe 必 E_ACCESSDENIED；
     bat 由计划任务以 cmd 跑则正常。全 ASCII 路径，避免 em dash/日文编码。
     """
-    link = ensure_ascii_junction()
-    if not link:
-        return False, "junction failed"
     in_wav = ROOT / "cache" / "sing" / "_task_in.wav"
     conv = run([str(FFMPEG / "ffmpeg.exe"), "-y", "-i", str(tgt),
                 "-ac", "2", "-ar", "44100", str(in_wav)], timeout=600)
@@ -132,21 +188,29 @@ def wsl_split_via_task(tgt: Path, stem_dir: Path,
     marker.unlink(missing_ok=True)
     log = ROOT / "cache" / "wsl_split.log"
     bat = ROOT / "cache" / "wsl_split.bat"
+    ar = ascii_root()
+    if not ar:
+        return False, "ascii root failed (8.3 短路径与 C:\\yhz 都拿不到)"
+
+    def _w(p: Path) -> str:  # Windows 绝对路径（ASCII）
+        return ar.rstrip("\\") + "\\" + str(p.relative_to(ROOT)).replace("/", "\\")
+
+    def _m(p: Path) -> str:  # WSL /mnt 路径
+        w = _w(p)
+        return "/mnt/" + w[0].lower() + w[2:].replace("\\", "/")
+
     bat.write_text(
         "@echo off\r\n"
-        "del C:\\yhlz\\cache\\wsl_split_done.txt 2>nul\r\n"
-        "rmdir /s /q C:\\yhlz\\cache\\sing\\_task_stems 2>nul\r\n"
-        "wsl.exe -d Ubuntu-22.04 -- bash /mnt/c/yhlz/tools/wsl_stem3_split.sh "
-        "/mnt/c/yhlz/cache/sing/_task_in.wav "
-        "/mnt/c/yhlz/cache/sing/_task_stems "
-        "> C:\\yhlz\\cache\\wsl_split.log 2>&1\r\n"
-        "echo %ERRORLEVEL% > C:\\yhlz\\cache\\wsl_split_done.txt\r\n",
+        f"del {_w(marker)} 2>nul\r\n"
+        f"rmdir /s /q {_w(stems)} 2>nul\r\n"
+        f"wsl.exe -d Ubuntu-22.04 -- bash {_m(ROOT / 'tools' / 'wsl_stem3_split.sh')} "
+        f"{_m(in_wav)} {_m(stems)} > {_w(log)} 2>&1\r\n"
+        f"echo %ERRORLEVEL% > {_w(marker)}\r\n",
         encoding="ascii")
     task = "YHLZ_wsl_split"
     # schtasks 对 /tr 的路径校验在 daemon 里会报“找不到路径”；
     # 用 cmd.exe 作程序、bat 作参数，绕开该校验。
-    action = ('C:\\Windows\\System32\\cmd.exe /c '
-              '"C:\\yhlz\\cache\\wsl_split.bat"')
+    action = ('C:\\Windows\\System32\\cmd.exe /c "%s"' % _w(bat))
     run(["schtasks", "/delete", "/tn", task, "/f"], timeout=60, flags=0)
     r = run(["schtasks", "/create", "/tn", task, "/tr",
              action, "/sc", "once", "/st", "23:55", "/f"], timeout=60, flags=0)
@@ -243,6 +307,13 @@ def main() -> int:
             if ok:
                 sep_ok = True
                 result["sep"] = detail
+                # 2026-11-02：WSL 起不来，把 wsl_stem3_split.sh 的第二段（卡拉OK拆
+                # lead/backing）搬到原生 MSST；成不成都要把 sep 记清楚。
+                ok2, detail2 = native_karaoke_split(stem_dir)
+                if ok2:
+                    result["sep"] = "native-demucs+karaoke"
+                else:
+                    result["karaoke_error"] = detail2
             else:
                 result["error"] = "separation failed (wsl + task + demucs)"
                 result["tail"] = detail

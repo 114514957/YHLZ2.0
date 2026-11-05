@@ -36,6 +36,9 @@ class Capability:
     input_model: Any = None  # optional pydantic BaseModel: typed arg contract (R1)
     description: str = ""  # real tool guidance shown to the model (ledger 0184)
     llm_exposed: bool = True  # False = owner-only, never shown to the LLM
+    # 一轮对话里只允许成功执行一次（见 orchestrator 的 ran_once 闸）。
+    # see.now 用它挡住“看过图还反复拍”导致答案被挤空（台账 1082）。
+    once_per_turn: bool = False
 
     @property
     def all_inputs(self) -> tuple[str, ...]:

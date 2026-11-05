@@ -185,6 +185,14 @@ def main(argv: list[str] | None = None) -> int:
     p_repair.add_argument("--dry-run", action="store_true")
 
     a = ap.parse_args(argv)
+    # Always speak UTF-8: the DSH plugin decodes our stdout as UTF-8, while the
+    # Windows console would otherwise make Python emit GBK (titles turn into
+    # mojibake inside the chat tool card).
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     lib = _load_library()
 
     if a.cmd == "list":

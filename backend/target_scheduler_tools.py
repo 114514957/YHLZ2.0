@@ -10,6 +10,7 @@ from typing import Literal
 from pydantic import model_validator
 
 import datetime
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -772,8 +773,68 @@ def _verify_time(output: Any) -> bool:
     return "星期" in str(output)
 
 
+def _screen_text_caps() -> list[Capability]:
+    """screen.text —— 用 Windows 自带 OCR 读屏幕文字（不联网、不调模型）。"""
+    if str(os.getenv("YHLZ_SEE_NOW", "off")).strip().lower() not in (
+            "1", "on", "true", "yes"):
+        return []
+    from backend import ocr
+
+    return [
+        Capability(
+            name="screen.text",
+            description=(
+                "把屏幕上的字读出来（Windows 自带 OCR，不花图片 token）。"
+                "老爹问“上面写了什么/这段报错是什么/标题是什么”时用它，比看图准。"
+                "可以传 region 只读一块；默认整屏。"),
+            handler=ocr.capability_result,
+            input=(),
+            optional_input=("region", "limit"),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+            timeout_ms=30000,
+        ),
+    ]
+
+
+def _see_now_caps() -> list[Capability]:
+    """see.now —— 看屏幕（给元亨，2026-11-04；默认关，见 YHLZ_SEE_NOW）。
+
+    handler 返回 dict（text/image/tokens/frames），由 orchestrator 决定
+    是否把 image 拼进工具结果（见 target_orchestrator 的 tool 回填处）。
+    """
+    if str(os.getenv("YHLZ_SEE_NOW", "off")).strip().lower() not in (
+            "1", "on", "true", "yes"):
+        return []
+    from backend import see_now
+
+    return [
+        Capability(
+            name="see.now",
+            description=(
+                "看一眼老爹现在的屏幕（最近几秒，按画面变化筛过的拼图）。"
+                "只在老爹说“看/屏幕/这个界面”这类话时用；一次调用覆盖几秒，"
+                "不要连续调用。默认 low 档只够看布局与颜色，**看不清小字**；"
+                "**要读具体文字：传 region 框住那块 + raw=true**（原生像素，读得准且更省），"
+                "读不清就说读不清，不要编版本号、文件名或标题。"),
+            handler=see_now.capability_result,
+            input=(),
+            optional_input=("seconds", "quality", "region", "raw"),
+            requires=(SCHEDULER_POLICY,),
+            side_effect=False,
+            risk="low",
+            timeout_ms=60000,
+            once_per_turn=True,
+            input_model=see_now.SeeNowArgs,
+        ),
+    ]
+
+
 def scheduler_capabilities() -> list[Capability]:
     return [
+        *_screen_text_caps(),
+        *_see_now_caps(),
         Capability(
             name="ledger.search",
             description="查项目台账：历史决策、编号、计划、经验教训。回答项目史类问题先用它。",

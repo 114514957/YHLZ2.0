@@ -142,3 +142,11 @@ Seed-VC/
 _pylib/
 .archify/
 
+# --- 2026-11-05 base maintenance (ledger 1096) ---
+# pip unpack dirs left at repo root (380 dirs / 324 MB)
+/pip-*/
+# old env dirs (venv-train / venv-dsh were already ignored)
+/venv-gsv5/
+/venv-sep/
+# local-only archive of old root clutter (never committed)
+/archive/2026-11-05-root-clutter/

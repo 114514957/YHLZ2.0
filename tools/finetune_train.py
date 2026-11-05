@@ -97,15 +97,30 @@ def _merge_system(messages: list[dict]) -> list[dict]:
     return rest
 
 
-def _apply_template(tokenizer, messages: list[dict], add_generation_prompt: bool) -> str:
+def _apply_template(tokenizer, messages: list[dict], add_generation_prompt: bool,
+                    tools: list[dict] | None = None) -> str:
     """套 chat template。
 
     2026-10-24 加：**Qwen3 系列默认 enable_thinking=True**，而我们的训练数据是纯回答
     （没有思考过程）。不关掉的话，模型会学出「先输出一段思考再回答」的形态，
     推理时还得靠参数压制——训练和部署不一致。所以**优先尝试 enable_thinking=False**，
     模板不认这个参数（Gemma 等）就退回去。
+
+    2026-11-01 修（**关键**）：训练时没传 `tools`，而评测/部署时传了 43 个工具定义。
+    gemma 的模板只有在收到 `tools` 时才会渲染
+        <|turn>system …<|tool>declaration:name{...}<tool|><turn|>
+    以及把 assistant 的 tool_calls 渲染成
+        <|tool_call>call:name{...}<tool_call|>
+    不传的话，训练集里 984 条工具样本的 tool_calls **根本没进序列**，
+    模型学的是「没有工具定义时该怎么回」，评测时却给了它 43 个工具
+    → 实测工具题从 13/16 崩到 2/16，人格也从 18 掉到 9。
+    所以这里必须把 tools 传下去，和 cloud_eval_gemma.py 保持一致。
     """
-    for kw in ({"enable_thinking": False}, {}):
+    if tools:
+        kws = [{"enable_thinking": False, "tools": tools}, {"tools": tools}]
+    else:
+        kws = [{"enable_thinking": False}, {}]
+    for kw in kws:
         try:
             return tokenizer.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=add_generation_prompt,
@@ -119,21 +134,24 @@ def _apply_template(tokenizer, messages: list[dict], add_generation_prompt: bool
                     add_generation_prompt=add_generation_prompt, **kw)
             except Exception:  # noqa: BLE001
                 continue
-    # 最后兜底：合掉 system 再套一次
+    # 最后兜底：合掉 system 再套一次（不带 tools）
     return tokenizer.apply_chat_template(
         _merge_system(messages), tokenize=False, add_generation_prompt=add_generation_prompt)
 
 
-def _encode(tokenizer, messages: list[dict], max_len: int, mask_prompt: bool) -> dict:
+def _encode(tokenizer, messages: list[dict], max_len: int, mask_prompt: bool,
+            tools: list[dict] | None = None) -> dict:
     # 2026-10-24 修：v8 数据 389/3440 条 assistant 带 tool_calls 的消息**没有 content 键**，
     # Qwen3 模板渲染 message['content'] 直接 UndefinedError 崩掉。训练侧统一补成空串，
     # 不改原始数据文件（与 OpenAI/各家惯例一致：tool_calls 消息 content 为空）。
+    # 2026-11-01：加 tools 透传（见 _apply_template 的注释）
     messages = [dict(m, content=m.get("content") or "") for m in messages]
-    full = _apply_template(tokenizer, messages, add_generation_prompt=False)
+    full = _apply_template(tokenizer, messages, add_generation_prompt=False, tools=tools)
     ids = tokenizer(full, add_special_tokens=True, truncation=True, max_length=max_len)["input_ids"]
     labels = list(ids)
     if mask_prompt and len(messages) >= 2:
-        prompt = _apply_template(tokenizer, messages[:-1], add_generation_prompt=True)
+        prompt = _apply_template(tokenizer, messages[:-1], add_generation_prompt=True,
+                                 tools=tools)
         p_ids = tokenizer(prompt, add_special_tokens=True, truncation=True, max_length=max_len)["input_ids"]
         n = min(len(p_ids), len(ids))
         labels = [-100] * n + ids[n:]
@@ -230,8 +248,28 @@ def _train(cfg: dict, train: list[dict], val: list[dict], resume_from: str | Non
             model = get_peft_model(model, lora)
         model.print_trainable_parameters()
 
+    # 2026-11-01：读工具定义（与评测同一份 snapshot），训练时一并喂给 chat template
+    _tools = None
+    _tf = cfg.get("tools_file")
+    if _tf:
+        _tp = Path(_tf)
+        if not _tp.is_absolute():
+            _tp = ROOT / _tp
+        if _tp.exists():
+            try:
+                _td = json.loads(_tp.read_text(encoding="utf-8"))
+                _inner = _td.get("tools") or _td
+                _tools = [t if "function" in t
+                          else {"type": "function", "function": t} for t in _inner]
+                print(f"[train] 工具定义 {len(_tools)} 个 ← {_tp.name}")
+            except Exception as _e:  # noqa: BLE001
+                print(f"[train] ⚠ 读 tools_file 失败：{_e}，退回不带 tools 训练")
+        else:
+            print(f"[train] ⚠ tools_file 不存在：{_tp}")
+
     def _map(rec: dict) -> dict:
-        return _encode(tokenizer, rec["messages"], cfg["max_seq_len"], cfg["mask_prompt"])
+        return _encode(tokenizer, rec["messages"], cfg["max_seq_len"],
+                       cfg["mask_prompt"], tools=_tools)
 
     # 2026-10-20 修（老爹「工具要经过测试可用」）：
     # 原写法 `Dataset.from_list(train)` 把**全部字段**交给 Arrow，而 V9 数据里有
@@ -256,7 +294,7 @@ def _train(cfg: dict, train: list[dict], val: list[dict], resume_from: str | Non
 
     def _map_json(rec: dict) -> dict:
         return _encode(tokenizer, json.loads(rec["messages_json"]),
-                       cfg["max_seq_len"], cfg["mask_prompt"])
+                       cfg["max_seq_len"], cfg["mask_prompt"], tools=_tools)
 
     ds_train = Dataset.from_list(_slim(train)).map(
         _map_json, remove_columns=["messages_json", "source"])

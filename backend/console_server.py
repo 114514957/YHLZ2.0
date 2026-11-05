@@ -315,6 +315,12 @@ def _job_seedvc(tgt: Path, voice: str) -> None:
                     continue
         if r.returncode != 0 or not info or not info.get("ok"):
             raise RuntimeError(f"新链路失败 exit={r.returncode}: {tail[-280:]}")
+        # 2026-11-01：分离引擎必须可见——上一次静默退回 demucs 两轨（无和声）
+        # 直接把质量拉低，却没人知道。降级就在日志里明写。
+        _sep = str(info.get("sep") or "")
+        if _sep.startswith("demucs"):
+            SING_STATE["log"] = (SING_STATE.get("log", "")
+                                 + " ⚠ 分离降级：demucs 两轨（无和声轨）")[-900:]
         outputs = info.get("outputs") or []
         if not outputs:
             raise RuntimeError("新链路没有产出")
@@ -945,6 +951,41 @@ def _qq_status() -> dict:
     except Exception:
         pass
     return out
+
+
+_OLLAMA_CACHE = {"ts": 0.0, "state": "down"}
+_OLLAMA_TTL = 30.0
+
+
+def _ollama_state(*, ttl: float = _OLLAMA_TTL, timeout: float = 1.0) -> str:
+    """Ollama state: ``ok`` / ``down`` / ``off`` (ledger 1096, 2026-11-05).
+
+    Ollama is optional — launcher only starts it when ``YHLZ_START_OLLAMA`` is
+    set. Probing a refused loopback port costs ~2 s on this machine (even with
+    a shorter socket timeout), and the workbench polls /state every 3 s, so
+    when the option is off we report ``off`` without touching the socket.
+    When it is on, probe at most once per ``ttl``.
+    """
+    enabled = str(os.getenv("YHLZ_START_OLLAMA", "")).strip().lower() in (
+        "1", "true", "yes", "on")
+    if not enabled:
+        return "off"
+    now = time.time()
+    if _OLLAMA_CACHE["state"] and now - float(_OLLAMA_CACHE["ts"]) < ttl:
+        return str(_OLLAMA_CACHE["state"])
+    state = "down"
+    try:
+        import urllib.request
+
+        with urllib.request.urlopen("http://127.0.0.1:11434/api/tags",
+                                    timeout=timeout) as resp:
+            body = json.loads(resp.read())
+        state = "ok" if "models" in body else "down"
+    except Exception:
+        state = "down"
+    _OLLAMA_CACHE["ts"] = now
+    _OLLAMA_CACHE["state"] = state
+    return state
 
 
 def _sse(data: dict) -> bytes:
@@ -2230,12 +2271,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             except Exception:
                 out["gemma"] = "down"
             out["daemon"] = "ok"
-            try:
-                o = json.loads(urllib.request.urlopen(
-                    "http://127.0.0.1:11434/api/tags", timeout=3).read())
-                out["ollama"] = "ok" if "models" in o else "down"
-            except Exception:
-                out["ollama"] = "down"
+            out["ollama"] = _ollama_state()
             out["qq"] = _qq_status()
             try:
                 # 0831：工作台显示的也是唯一任务库（Lite job store），

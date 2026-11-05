@@ -49,15 +49,23 @@ class MemoryLLMService:
                          max_tokens: int = 256) -> str:
         if self._resource_guard:
             from backend.memory_resource_policy import load_memory_resource_policy, MemoryWorkDeferred
-            if not load_memory_resource_policy().llm_enabled:
+            # 2026-11-05（台账 1097）：summary-only 模式（YHLZ_MEMORY_SUMMARY_MODE=local，
+            # llm_enabled=False / summary_enabled=True）以前在这里被误杀——闸门只认
+            # llm_enabled，于是 L1 压缩永远抛 "background inference paused"，积压只增不减
+            # （console 25、qq_p 31，从 10/15 起堆着）。summary 是显式授权的本地压缩，
+            # 必须放行；候选抽取/裁决仍由 SummaryOnlyHooks 挡住。
+            _policy = load_memory_resource_policy()
+            if not (_policy.llm_enabled or _policy.summary_enabled):
                 raise MemoryWorkDeferred("background inference paused")
         if provider is None or not callable(getattr(provider, "stream_chat", None)):
             return ""
         from backend.text_memory_inference_gate import inference_gate
         async with inference_gate().slot(background=True):
             # Training may start while this request waits behind foreground work.
-            if self._resource_guard and not load_memory_resource_policy().llm_enabled:
-                raise MemoryWorkDeferred("background inference paused while queued")
+            if self._resource_guard:
+                _policy = load_memory_resource_policy()
+                if not (_policy.llm_enabled or _policy.summary_enabled):
+                    raise MemoryWorkDeferred("background inference paused while queued")
             chunks: list[str] = []
             async for delta in provider.stream_chat(
                 messages, max_tokens=min(max_tokens, self._max_tokens), temperature=0.1

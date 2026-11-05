@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>LLM 工作台 · 元亨</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>LLM 工作台</h1>
+  <span class="sub">版本控制 · 对话测试 · 评测</span>
+  <span class="chip"><span id="dotSrv" class="dot off"></span><span id="srvTxt">未启动</span></span>
+  <span class="chip">显存空闲 <b id="vram">-</b></span>
+  <span class="chip" id="procChip" title="工作台自己的 llama-server">PID <b id="pidTxt">-</b></span>
+  <span class="spacer"></span>
+  <button id="btnScan">重扫版本</button>
+  <button id="btnStop" class="danger">停止实例</button>
+</header>
+
+<main>
+  <aside id="side">
+    <div class="side-head"><span>版本</span><span id="verCount" class="muted"></span></div>
+    <div id="verList"></div>
+  </aside>
+
+  <section id="main">
+    <div class="tabs">
+      <div class="tab on" data-tab="overview">概览</div>
+      <div class="tab" data-tab="chat">对话测试</div>
+      <div class="tab" data-tab="eval">评测</div>
+      <div class="tab" data-tab="runs">记录</div>
+    </div>
+
+    <div class="pages">
+      <!-- 概览 -->
+      <div class="page on" id="pg-overview">
+        <div class="card" id="verCard">
+          <h3>版本详情</h3>
+          <div class="empty">左边选一个版本</div>
+        </div>
+
+        <div class="card">
+          <h3>服务控制</h3>
+          <div class="row">
+            <label>端口 <input id="port" value="8091" style="width:78px"></label>
+            <label>ctx <input id="ctx" value="8192" style="width:80px"></label>
+            <button class="primary" id="btnStart">用选中版本启动</button>
+            <label class="muted"><input type="checkbox" id="force"> 强制（显存不足也起）</label>
+          </div>
+          <div class="hint">工作台只启动/停止自己起的实例；8081/8082 是外部实例，需要你确认才能停。</div>
+          <div id="externals" style="margin-top:10px"></div>
+          <pre class="log" id="logTail" style="margin-top:10px;display:none"></pre>
+        </div>
+
+        <div class="card">
+          <h3>基座</h3>
+          <div class="kv" id="baseInfo"></div>
+        </div>
+      </div>
+
+      <!-- 对话 -->
+      <div class="page chat" id="pg-chat">
+        <div class="chatbar">
+          <label>实例 <select id="chatPort"></select></label>
+          <label>温度 <input id="temp" value="0.7" style="width:60px"></label>
+          <label>max <input id="maxTok" value="512" style="width:70px"></label>
+          <label class="muted"><input type="checkbox" id="useTools" checked> 带工具</label>
+          <label class="muted"><input type="checkbox" id="useSys" checked> 带系统提示</label>
+          <button id="btnSys">改系统提示</button>
+          <span class="spacer"></span>
+          <button id="btnSaveChat">保存对话</button>
+          <button id="btnClearChat">清空</button>
+        </div>
+        <div id="msgs"><div class="empty">先选实例，然后说话</div></div>
+        <div class="composer">
+          <div class="row">
+            <textarea id="input" placeholder="Enter 发送，Shift+Enter 换行"></textarea>
+            <button class="primary" id="btnSend">发送</button>
+          </div>
+          <div class="hint" id="chatHint">—</div>
+        </div>
+      </div>
+
+      <!-- 评测 -->
+      <div class="page" id="pg-eval">
+        <div class="card">
+          <h3>跑分</h3>
+          <div class="row">
+            <label>套件
+              <select id="suite">
+                <option value="persona56">56 题人格库（判分）</option>
+                <option value="group">12 题群聊语境（判分·多人/@/短回合）</option>
+                <option value="material20">20 题素材探针（只看答案）</option>
+              </select>
+            </label>
+            <label>实例 <select id="evalPort"></select></label>
+            <label>tag <input id="evalTag" value="local" style="width:110px"></label>
+            <label>max <input id="evalMax" value="300" style="width:70px"></label>
+            <label class="muted" title="服务端被聊过之后，同权重同参数会低 1 分（台账 1068）"><input type="checkbox" id="evalCold" checked> 冷态（先重启实例）</label>
+            <button class="primary" id="btnEval">开始评测</button>
+          </div>
+          <div class="hint">判分复用 tools/persona_bank.verify()；工具题带 snapshot 里的 43 个工具。
+            「冷态」= 重启实例后再评：先聊过天的话，同权重会从 45 掉到 44（p10/p11 翻）。</div>
+          <div class="bar"><i id="evalBar"></i></div>
+          <div class="muted" id="evalProg">—</div>
+        </div>
+        <div id="evalResult"></div>
+      </div>
+
+      <!-- 记录 -->
+      <div class="page" id="pg-runs">
+        <div class="card">
+          <h3>评测记录</h3>
+          <div class="row" style="margin-bottom:10px">
+            <label>A <select id="diffA" style="max-width:280px"></select></label>
+            <label>B <select id="diffB" style="max-width:280px"></select></label>
+            <button class="primary" id="btnDiff">对比</button>
+            <label class="muted"><input type="checkbox" id="diffOnly" checked> 只看有差异的题</label>
+          </div>
+          <div class="hint" id="diffHint">选两条 persona56 记录做逐题对比（素材探针没有判分，不能比）</div>
+          <div id="runList" class="empty">还没有记录</div>
+        </div>
+        <div id="diffView"></div>
+        <div id="runDetail"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

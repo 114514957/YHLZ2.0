@@ -1,10 +1,15 @@
 """Turn Orchestrator tests (ADR-007 core loop, fake LLM driven)."""
 
+import os
 import unittest
 
 from backend.target_capability_registry import Capability, CapabilityRegistry
 from backend.target_orchestrator import TurnOrchestrator
 from backend.target_scheduler_tools import setup_scheduler_capabilities
+
+# 2026-11-05（台账 1097）：与 test_target_capability_registry 同口径——
+# see_now/screen_text 由 YHLZ_SEE_NOW 控制，钉成生产值以免环境差异造成假红。
+os.environ.setdefault("YHLZ_SEE_NOW", "1")
 
 
 def _ok(params: dict) -> str:
@@ -178,6 +183,7 @@ class TestTurnOrchestrator(unittest.TestCase):
              "member_profile", "report_qq_weekly",
              "qq_export", "qq_status", "qq_process", "qq_digest", "qq_summarize",
              "schedule_plan", "skill_add", "skill_feedback", "skill_search",
+             "see_now", "screen_text",
              "song_list", "song_play", "song_send",
              "bili_find", "bili_watch", "bili_status", "bili_notes",
              "bili_read"},

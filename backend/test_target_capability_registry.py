@@ -1,5 +1,6 @@
 """Capability Registry + scheduler tests (ADR-007 / ledger 0145)."""
 
+import os
 import unittest
 
 from backend.target_capability_registry import Capability, CapabilityRegistry
@@ -12,6 +13,11 @@ from backend.target_scheduler_tools import (
     setup_scheduler_capabilities,
     system_time,
 )
+
+# 2026-11-05（台账 1097）：11/04 上线 see_now / screen_text，是否进能力表由
+# YHLZ_SEE_NOW 决定；.env 里是 1（生产 47 工具），但裸跑单测时不会加载 .env。
+# 这里钉成生产值，免得同一份代码在"有 .env / 没 .env"两种环境下给出两套结果。
+os.environ.setdefault("YHLZ_SEE_NOW", "1")
 
 
 def _sq(params: dict) -> str:
@@ -184,6 +190,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
              "skill.add", "skill.feedback", "skill.search",
              "file.download", "file.list", "file.read", "file.share",
              "runtime.status", "web.fetch", "web.search",
+             "see.now", "screen.text",
              "bili.find", "bili.watch", "bili.status", "bili.notes",
              "bili.read"},
         )
@@ -220,6 +227,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
               "skill_add", "skill_feedback", "skill_search",
               "file_download", "file_list", "file_read", "file_share",
               "runtime_status", "web_fetch", "web_search",
+              "see_now", "screen_text",
               "bili_find", "bili_watch", "bili_status", "bili_notes",
               "bili_read"}
         # 0831：QQ 归 Lite 独占时，旧采集/导出工具对 LLM 隐藏（fail-closed）。
@@ -245,6 +253,7 @@ class TestSchedulerCapabilities(unittest.TestCase):
              "report.qq_weekly",
              "runtime.status",
              "schedule.plan",
+             "screen.text", "see.now",
              "skill.add", "skill.feedback", "skill.search",
              "song.list", "song.play", "song.send", "system.time",
              "task.plan", "web.fetch", "web.search"])

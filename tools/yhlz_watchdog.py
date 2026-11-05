@@ -150,13 +150,61 @@ def _log(msg: str) -> None:
         pass
 
 
+BACKUP_STAMP = _ROOT / "cache" / "backup_last.json"
+BACKUP_HOUR = int(os.getenv("YHLZ_BACKUP_HOUR", "9"))
+# 2026-11-05（台账 1097）：ollama 是可选项（launcher 里 YHLZ_START_OLLAMA 默认关）。
+# 老逻辑把它算进 all(status.values())，于是每个 tick 都判"掉线"，每 10 个 tick 记一行
+# "仍掉线"，还每轮多跑一次 ensure_stack —— watchdog.log 累计 2,600 行、launcher.log
+# 9,042 行 'ollama': False 全是这么来的。健康判定只看必选项。
+OPTIONAL_CHECKS = {"ollama"}
+
+
+def _down_keys(st: dict) -> list[str]:
+    return [k for k, v in st.items() if not v and k not in OPTIONAL_CHECKS]
+
+
+def _healthy(st: dict) -> bool:
+    return not _down_keys(st)
+
+
+def _daily_backup() -> None:
+    """Daily slim snapshot — deliberately NOT gated by the autonomy flag.
+
+    2026-10-24 关掉自主后，daemon 的每周维护（连带快照）一起停了，于是
+    10/24~11/05 没有任何备份（台账 1096）。备份是纯 I/O，不是自主思考，
+    所以放进 supervisor：每天过一次，排除可重建的 kw_index（约 117 MB）。
+    """
+    try:
+        if time.localtime().tm_hour < BACKUP_HOUR:
+            return
+        today = time.strftime("%Y-%m-%d")
+        last = ""
+        try:
+            last = str(json.loads(
+                BACKUP_STAMP.read_text(encoding="utf-8")).get("date", ""))
+        except Exception:
+            last = ""
+        if last == today:
+            return
+        from backend import snapshots
+
+        dest = snapshots.create("daily", exclude=("kw_index",))
+        BACKUP_STAMP.parent.mkdir(parents=True, exist_ok=True)
+        BACKUP_STAMP.write_text(json.dumps(
+            {"date": today, "snapshot": dest, "ts": time.time()},
+            ensure_ascii=False), encoding="utf-8")
+        _log(f"每日备份完成: {pathlib.Path(dest).name if dest else '失败'}")
+    except Exception as exc:  # noqa: BLE001
+        _log(f"每日备份失败 {type(exc).__name__}: {exc}")
+
+
 def tick() -> dict:
     from yhlz_launcher import (ensure_stack, napcat_status, qq_management,
                                qqbot_status, status, _port_open, _proc_alive,
                                _reap_legacy_qq, _spawn_napcat)
 
     before = status()
-    down = [k for k, v in before.items() if not v]
+    down = _down_keys(before)
     state = _load_state()
     # F2: /health can time out while the daemon is alive (busy turn/DB). Only
     # after 3 consecutive bad ticks AND with the process still alive do we
@@ -256,20 +304,21 @@ def main() -> int:
     if a.once:
         st = tick()
         _log(f"once: {st}")
-        return 0 if all(st.values()) else 1
+        return 0 if _healthy(st) else 1
     _log(f"看门狗启动，每 {a.interval:.0f}s 巡检一次（单实例锁已持有）")
     bad_streak = 0
     while True:
         try:
             st = tick()
-            if not all(st.values()):
+            if not _healthy(st):
                 bad_streak += 1
                 if bad_streak <= 3 or bad_streak % 10 == 0:
-                    _log(f"仍掉线: {st}（连续 {bad_streak} 次）")
+                    _log(f"仍掉线: {_down_keys(st)}（连续 {bad_streak} 次）")
             else:
                 bad_streak = 0
         except Exception as exc:  # noqa: BLE001
             _log(f"巡检异常 {type(exc).__name__}: {exc}")
+        _daily_backup()
         time.sleep(max(10.0, a.interval))
 
 
