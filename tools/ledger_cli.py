@@ -149,6 +149,41 @@ def cmd_delete(args) -> int:
                  f"（{ls.stats(args.ledger)['records']} 条记录）")
 
 
+def cmd_check(args) -> int:
+    """台账编号自检：缺号 / 重号 / 顺序（台账 1098）。
+
+    历史缺号（132/158/…）是旧账，不阻断；重号才是结构问题。
+    退出码：0 = 无重号（缺号只报告）；1 = 存在重号。
+    """
+    import re
+    from collections import Counter
+
+    text = Path(args.ledger).read_text(encoding="utf-8")
+    nums = [int(m) for m in re.findall(r"^## 记录 (\d+)", text, re.M)]
+    counts = Counter(nums)
+    dup = sorted(n for n, c in counts.items() if c > 1)
+    gaps = ([n for n in range(min(nums), max(nums) + 1) if n not in counts]
+            if nums else [])
+    data = {
+        "records": len(nums),
+        "min": min(nums) if nums else 0,
+        "max": max(nums) if nums else 0,
+        "gaps": gaps,
+        "gap_count": len(gaps),
+        "duplicates": dup,
+        "ordered": nums == sorted(nums),
+    }
+    human = (f"records={data['records']} min={data['min']} max={data['max']} "
+             f"gaps={data['gap_count']} duplicates={len(dup)} ordered={data['ordered']}")
+    if gaps:
+        human += "\n  missing: " + ",".join(str(n) for n in gaps[:20]) + (
+            " ..." if len(gaps) > 20 else "")
+    if dup:
+        human += "\n  duplicated: " + ",".join(str(n) for n in dup[:20])
+    _emit(data, args.json, human)
+    return 1 if dup else 0
+
+
 def cmd_stats(args) -> int:
     s = ls.stats(args.ledger)
     return _emit(s, args.json,
@@ -216,6 +251,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     st = sub.add_parser("stats", help="台账统计")
     st.set_defaults(func=cmd_stats)
+
+    ck = sub.add_parser("check", help="查：编号自检（缺号/重号/顺序）")
+    ck.set_defaults(func=cmd_check)
 
     ix = sub.add_parser("index", help="刷新检索索引")
     ix.add_argument("--all", action="store_true", help="全量重建")
