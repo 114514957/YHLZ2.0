@@ -1,8 +1,8 @@
 # YH 项目结构
 
-> 更新：2026-10-21（入口改名 YH、退役文件归档、结构偏差登记，台账 0957）。上一版 2026-09-24（死代码归档，台账 0496）；再上一版 2026-09-12（台账 0295）。
->
-> 结构债清单与改进计划见 `docs/架构债清单与改进计划_20261021.md`；本文与它冲突时，以架构债清单里的实测证据为准。
+> 更新：2026-11-05（对照台账重建，记录 1096–1100）。上一版 2026-10-21（台账 0957）；
+> 再上一版 2026-09-24（0496）、2026-09-12（0295）。
+> 结构债清单与改进计划见 `docs/架构债清单与改进计划_20261021.md`；本文与它冲突时以台账最新记录为准。
 
 ## 定位
 
@@ -22,9 +22,10 @@
 
 | 入口 | 说明 |
 |---|---|
-| `YH_boot.bat` | **唯一开机自启**（Windows 启动项 `YH 开机自启.lnk`）：服务栈 → Full 看门狗 → QQ Lite `resume` |
+| `YH_boot.bat` | **唯一开机自启**（启动项 `YH 开机自启.lnk`）：服务栈 → Full 看门狗 → QQ Lite `resume` |
 | `YH_workbench_normal.bat` | 手动启动工作台（普通权限守卫，拒绝管理员令牌） |
 | `YH_全家桶.bat` | 兼容入口：转调 `YH_boot.bat` + 开工作台 + 桌宠 |
+| `start_yuanheng.bat` | 2026-10-22 重建的启动入口包装（旧链丢失后补的）；`启动元亨.bat` 是它的中文别名 |
 | `tools/yhlz_launcher.py` | 确保 ollama(11434) / gemma(8081) / daemon+UI(8321)；external 模式顺手收旧 QQ 链残留 |
 | `tools/yhlz_watchdog.py` | 自愈看门狗（单实例锁）；external 模式每个 tick 收旧 QQ 链，不碰 QQ |
 | `tools/qq_bridge_control.py` | QQ Lite 整链管理：status/start/stop/restart/resume（NapCat→watchdog→bridge） |
@@ -37,6 +38,33 @@
   没有 junction；脚本里的 `YH` 就是这一层目录名。
 - 6 个 `YH_*.bat` 是正式入口；6 个 `YHLZ_*.bat` 是**转发壳**，只为旧快捷方式存活。
   新脚本一律用 `YH_*`，不要再往 `YHLZ_*` 里加逻辑。
+
+## 端口与常驻
+
+| 端口 | 归属 | 说明 |
+|---|---|---|
+| 8081 | Gemma（llama.cpp） | 生产模型 `gemma-4-E4B_q4_0-it.gguf` + `yuanheng-v7b-lora.gguf` + `mmproj`，`-c 8192` |
+| 8321 | daemon + 工作台 | `/state /monitor /logs /mem /docs …`；`/v1/chat/completions` 兼容口 |
+| 8347 | dev worker | 元亨的 QQ 派单网关（`tools/dsh_worker.py`），按需起 |
+| 3001 | NapCat OneBot WS | QQ 链；未登录时没有监听 |
+| 11434 | Ollama（可选） | `YHLZ_START_OLLAMA` 默认关，launcher 不再拉起 |
+| 8090 | llm_workbench | 训练/评测开发台（`llm_workbench/server.py`），按需起 |
+| 8348 | **利贞链路**（不属 YH） | `LZ\tools\lz_link.py`，LZ 自己的 .venv 与日志 |
+
+## 健康、门禁与备份（2026-11-05 新增）
+
+| 工具 | 用途 |
+|---|---|
+| `tools/smoke.py` | 只读体检：gemma / daemon / worker / ollama(可选) / QQ / GUI；FAIL 才算挂 |
+| `tools/ci_check.py` | 本地门禁：环境检查 + 核心 16 模块 177 项 + 记忆 8 模块 102 项（每批独立子进程）；`--smoke` 连栈 |
+| `tools/memory_index_audit.py` | 记忆投影审计 / 重建（`audit` / `rebuild-keyword` …），默认只读 |
+| `tools/memory_drain.py` | L1→L2 摘要积压显式排空（默认 dry-run，`--apply` 才写） |
+| `tools/snapshot.py` | 全量快照（认知/人格/风格/内在因/实体图/memstore/embvec/kw） |
+| `tools/env_guard.py` | 清 `NO_PROXY` 方括号项；`.venv` 的 `sitecustomize.py` 在解释器启动时做同样的事 |
+| `tools/ledger_cli.py check` | 台账编号自检（缺号/重号/顺序） |
+
+备份策略（2026-11-05 起）：看门狗每天过一次 **slim 快照**（排除可重建的 `kw_index`，约 5.8 MB/次，
+保留 20 份），**不受自主开关影响**；全量快照用于动手前，约 123 MB。
 
 ## 核心 backend（live 链）
 
@@ -51,27 +79,31 @@
 | `entity_graph.py` / `associations.py` / `communities.py` / `memory_judge.py` / `reflection.py` | 实体图 / PPR 激活扩散 / 社区摘要 / 冲突裁决 / 主动反思 |
 | `growth_log.py` / `snapshots.py` / `qq_outbox.py` / `qq_token.py` | 成长日志 / 快照回滚 / 主动联系 / QQ token |
 | `voice_frontend.py` | 自适应增益 + 噪声底门限（修“开头几秒被当噪声”） |
+| `see_now.py` / `ocr.py` | 看屏（ffmpeg 抓帧→图片）与系统 OCR（`screen.text`，0 图片 token）；11/04 上线 |
 | `embodied/companion/{constitution,memory_stabilization}` | 仅存的 embodied 模块（其余已归档） |
 
 工具注册与执行只有一条路：`target_capability_registry.py`（`CapabilityRegistry`，
 策略 fail-closed）+ `target_scheduler_tools.py`（能力定义），LLM 工具面由
-`CapabilityRegistry.export_openai_tools()` 导出。Agent-Core（`backend/agent/` 的
-brain/planner/tool_executor/ToolRegistry）已于 2026-09-24 整体归档，不再有第二套注册表。
+`CapabilityRegistry.export_openai_tools()` 导出。
+Agent-Core（`backend/agent/` 的 brain/planner/tool_executor/ToolRegistry）已于 2026-09-24 整体归档，
+不再有第二套注册表。
 
-## tools/
+**能力面（2026-11-05）**：`YHLZ_SEE_NOW=1` 时 **47 个工具**，含 `see_now`（看图）与 `screen_text`（系统 OCR）。
+`/state` 的 `ollama` 可选：未启用时报 `off`、不做探活（避免每次轮询白等 ~2 s）。
+
+## tools/（按用途）
 
 - 启动 / 看护：`yhlz_launcher.py`、`yhlz_watchdog.py`、`daemon_restart.py`
-- 体检：`smoke.py`（只读，一条命令报栈状态；`--json` 机读；FAIL 才算挂，WARN 表示降级）
+- 体检 / 门禁：`smoke.py`、`ci_check.py`、`env_guard.py`、`snapshot.py`、`memory_drain.py`
 - QQ：**Lite 独占**（`config/qq_management.json`=external）——`qq_bridge_service.py`（桥服务）、
   `qq_bridge_watchdog.py`（Lite 看护）、`qq_bridge_control.py`（整链启停）；旧 Full 链
-  `napcat_watch.py` 在 external 模式下由启动器/看门狗收掉；
-  `qq_bot_restart.py` 只转调 Lite control，`qq_bot_start.bat` 已删除
-- **`qq_bot.py` 不是死代码（2026-10-21 更正）**：2215 行，是「共享库 + Full 链运行代码」的混合体，
-  被 17 个非测试模块 import（含 `console_server.py`、`qq_bridge_service.py`、`qq_bridge_watchdog.py`、
-  `yhlz_launcher.py`、`yhlz_watchdog.py`）。退役的是 Full 链的**运行方式**，不是这个模块。
+  `napcat_watch.py` 在 external 模式下由启动器/看门狗收掉；`qq_bot_restart.py` 只转调 Lite control。
+  **`qq_bot.py` 不是死代码**（2215 行，共享库 + Full 链运行代码的混合体，被 17 个非测试模块 import）；
   删它之前先看架构债 C1 的三步剥离计划。
-- MCP：`yhlz_mcp_server.py`（台账 / 记忆 / 文件 / 网络 / 时间）
-- 语音底层：`tts_test_start.py`；派单：`dev_runner.py`；快照：`snapshot.py`
+- MCP：`yhlz_mcp_server.py`（台账 / 记忆 / 文件 / 网络 / 时间）、`lizhen_cmd_mcp.py`（cmd / cmd_station）
+- 台账：`ledger_cli.py`（增删查改 + `check`）、`ledger_mem_import.py`（索引）
+- 语音底层：`tts_test_start.py`；派单：`dev_runner.py`；翻唱：`cover_*.py` / `gsv5_*.py`；看屏：见 backend
+- 评测与训练：`persona_regression.py`、`memory_eval.py`、`v9_*.py`、`finetune_*.py`、`llm_workbench/`
 
 ## 评测与训练数据（都不占 GPU 的那部分）
 
@@ -98,27 +130,29 @@ QQ 群导出只做知识 corpus（纪律：别人的话不得伪装成元亨对�
 
 - `config/qqwatch.json`（入库，token 留空）+ `config/qqwatch.local.json`（**未入库**，真实 token）
 - `.env`（**未入库**，密钥）；`opencode.json` 已退役并于 2026-10-21 移入 `archive/2026-10-21-retired/`（原台账 0497）
-- 利贞 harness：`venv-dsh/`（SDK 独立 venv，未入库）+ `tools/dsh_worker.py`（常驻网关：`/start`/`/answer` 与 job 面）+ `tools/dev_contract.py`（提示词/分类契约）+ `tools/harness_gateway.py`（网关客户端）；MCP 覆盖层生成在 `cache/dev/harness_mcp.patch.yml`
+- **环境（2026-11-05 收敛后 3 套）**：`.venv`（运行时）、`venv-dsh`（利贞 harness SDK）、`venv-gsv5`（翻唱链）。
+  `venv-train` / `venv-sep` 已确认无引用并删除。
 - `requirements-target-{llm,asr,input}.txt`、`requirements-tts-primary.txt`、`requirements-target-runtime.txt`
+- `.venv/Lib/site-packages/sitecustomize.py`：解释器启动即清 `NO_PROXY` 的 `[::1]`（httpx `InvalidURL` 根因）；
+  参照实现 `tools/env_guard.py`。backend 导入时也会消毒一次。
 
 ## 运行产物（未入库）
 
-- `cache/`（记忆库 / 快照 / 日志 / 临时）、`data/`
+- `cache/`（记忆库 / 快照 / 日志 / 临时）、`data/`、`models/`
 
 ## 归档
 
 - `archive/2026-09-12-prune/`：P2 归档的旧世代代码（`embodied` 大部分、`vision` / `personality` / `action` / `voice_identity` / `main.py`、`plugins` / `frontend` / `updates` / `apps` / `webui_templates` / `webui_server.py` / `start.bat` 等）。
 - `archive/2026-09-24-deadcode/`：live 链零引用的旧链路——
-  - `context_manager.py` / `conversation_manager.py`（旧回合/上下文栈，最后触点 `archive/2026-09-12-prune/backend_main.py`）；
-  - `agent/`（Agent-Core 整包：brain / planner / tool_executor / llm_adapter / memory / ToolRegistry + 其 10 个测试；唯一 live 触点曾是 `target_scheduler_tools.setup_scheduler_tools` 桥，已随包删除）。
-- `archive/2026-10-21-retired/`：`opencode.json`（opencode 时代 MCP 注册，2026-10-21 移入）。旧的 `.opencode-backup-20261008-101357`（0.2 GB）已移出仓库到 `C:\Users\ACE_WAN——PROJECT\_backup\`，不再占仓库空间。
+  `context_manager.py` / `conversation_manager.py`、`agent/`（Agent-Core 整包 + 10 个测试）。
+- `archive/2026-10-21-retired/`：`opencode.json`（opencode 时代 MCP 注册）。
+- `archive/2026-11-05-root-clutter/`：仓库根旧散件（18 个 html/json/怪名文件 + 20 个实验 wav，197.9 MB），
+  仅本地留档、`.gitignore` 排除。
 
 ## 历史遗留（不在三区内，保留但已与当前链路脱钩）
 
-- `对话DEMO/`：M0 语音身份时期的独立 demo + 测试；其中 `test_voice_identity_compat.py` /
-  `test_v1_final_audit.py` 依赖已归档的 `context_manager`，`test_m04_endpoints_smoke.py` /
-  `test_comprehensive.py` 依赖已归档的 `backend.main`。**不再是测试基线的一部分**，
-  当前测试基线是 `backend/test_*.py`（`python -m unittest backend.test_xxx`）。
+- `对话DEMO/`：M0 语音身份时期的独立 demo + 测试；依赖已归档的 `context_manager` / `backend.main`。
+  **不再是测试基线的一部分**，当前测试基线是 `backend/test_*.py`（`python -m unittest backend.test_xxx`）。
 
 ## 外部（不在仓库）
 

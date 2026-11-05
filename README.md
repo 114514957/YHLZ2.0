@@ -37,6 +37,8 @@
 
 - **ASR**：SenseVoiceSmall（FunASR）+ sherpa-onnx 流式（边说边出）
 - **TTS**：Qwen3-TTS（faster-qwen3-tts，主）+ edge-tts（兜底）
+- **看屏**：`see_now`（抓帧看图，默认关，`.env` 里 `YHLZ_SEE_NOW=1` 才注册）+
+  `screen_text`（Windows 自带 OCR：整屏约 0.8 s、0 图片 token；要字用它，要布局用 see_now）
 - **VAD / 门限**：`backend/voice_frontend.py`
 - 语音**只在工作台 / 桌宠**做连续对话；QQ 语音为“语音消息”
 
@@ -71,6 +73,8 @@
 
 - L1 / L2 / L3；主库 `cache/memstore/memstore.db`，向量侧表 `cache/embvec.db`
 - **零删除**（只降权 / 归档）；快照 `cache/snapshots/`
+- 备份：看门狗每天一次 **slim 快照**（排除可重建的 `kw_index`，约 5.8 MB/次，留 20 份）；
+  动手改东西前用 `tools\snapshot.py create <tag>` 做全量（约 123 MB，可整体回滚）
 - 成长日志：`docs/元亨的成长日志.md`
 
 ## 开发 / Agent
@@ -79,9 +83,10 @@
   （`tools/yhlz_mcp_server.py`）以 `--patch` 覆盖层注入她的 profile，她用
   `mcp__yhlz__*` 工具查台账 / 记忆；Full/Lite 两条链路都走它（opencode 已退役，ledger 0497）
 - **本地门禁**：`.venv\Scripts\python.exe tools\ci_check.py`（环境 + 279 项单测；加 `--smoke` 连栈检查）
+- **只读体检**：`.venv\Scripts\python.exe tools\smoke.py`（gemma / daemon / worker / ollama / QQ / GUI）
 - 台账（**唯一事实源**）：`docs/上下文台账.md`
-- 台账增删查改（任何 agent 通用程序）：`python tools/ledger_cli.py {search,list,get,add,update,delete,stats,index}`
-  （Python 直接 `import backend.ledger_store`；MCP 工具 `ledger_search/get/list/add/update/delete` 同源）
+- 台账增删查改（任何 agent 通用程序）：`python tools/ledger_cli.py {search,list,get,add,update,delete,stats,index,check}`
+  （`check` 自检缺号/重号；Python 直接 `import backend.ledger_store`；MCP 工具 `ledger_search/get/list/add/update/delete` 同源）
 - 规则：`AGENTS.md`
 
 ## 说明
