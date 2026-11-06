@@ -29,6 +29,8 @@
 
 其余一律归位：报告 → `docs/报告/`；研究/调研 → `docs/研究/`；脚本 → `tools/`；
 静态资源 → `assets/`；运行时产物 → `cache/`；退役物 → `archive/`。
+例外：`experiments/` 是 2026-11-06 起模型实验线的实验站工作区（台账 1114/1117），
+由那条线自管，不改结构。
 `tools/structure_lint.py` 按白名单做机器检查（退出码 1 = 有违规），已接进 `ci_check.py`。
 测试的 `tempfile.mkdtemp()` 统一落到 `cache/tmp`（`backend/__init__` 在 unittest 下重定向），
 不再往根目录扔 `tmp*`。历史上 `web/live_output/player.html` 已挪到 `assets/live_output/`。

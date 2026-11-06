@@ -66,6 +66,33 @@ def _find_pids(*, exe: str = "", script: str = "") -> list[int]:
     return out
 
 
+def _llama_pids(port: int = 8081) -> list[int]:
+    """生产 llama 的 pid（只认 `--port 8081`），不碰实验站的 8093。
+
+    2026-11-06：按镜像名杀会把别的链的 llama 一起带走，`close_window` 也会
+    误以为生产还活着。一条链只认自己的端口。
+    """
+    try:
+        import psutil
+    except Exception:
+        return []
+    import re
+
+    pat = re.compile(r"--port\s+%d\b" % int(port))
+    out: list[int] = []
+    for p in psutil.process_iter(["pid", "name", "cmdline"]):
+        try:
+            nm = str(p.info.get("name") or "").lower()
+            if not nm.startswith("llama-server"):
+                continue
+            cl = " ".join(str(x) for x in (p.info.get("cmdline") or []))
+            if pat.search(cl):
+                out.append(int(p.info["pid"]))
+        except Exception:
+            continue
+    return out
+
+
 def _kill_pids(pids: list[int]) -> int:
     n = 0
     try:
@@ -94,7 +121,7 @@ def _free_mb() -> int:
 
 def state() -> dict:
     return {"free_mb": _free_mb(),
-            "llama": bool(_find_pids(exe=_LLAMA + ".exe")),
+            "llama": bool(_llama_pids()),
             "watchdog": bool(_find_pids(script=_WATCH)),
             "window": _FLAG.exists()}
 
@@ -108,7 +135,7 @@ def open_window(require_free_mb: int = 6500, timeout: float = 150.0) -> dict:
     is open. Only llama (the VRAM holder) is stopped.
     """
     _set_window(True)
-    killed = {"llama": _kill_pids(_find_pids(exe=_LLAMA + ".exe")),
+    killed = {"llama": _kill_pids(_llama_pids()),
               "watchdog_kept": bool(_find_pids(script=_WATCH))}
     # WSL caches GPU memory for the VM lifetime — drop the distro so the
     # window actually gets the VRAM back (it restarts in seconds).
@@ -134,7 +161,7 @@ def close_window() -> dict:
     _set_window(False)
     out: dict = {"llama": False, "watchdog": False}
     try:
-        if _find_pids(exe=_LLAMA + ".exe"):
+        if _llama_pids():
             out["llama"] = True          # already running (or never stopped)
         else:
             tools = str(_ROOT / "tools")

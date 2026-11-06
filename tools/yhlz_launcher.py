@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -348,6 +349,31 @@ def _reap_legacy_qq() -> list[str]:
     return killed
 
 
+def _llama_port_alive(port: int = 8081) -> bool:
+    """只认**生产那一个** llama（命令行带 `--port 8081`）。
+
+    2026-11-06 事故：实验站的 llama（8093，`-ngl 0`）一开，`_proc_alive("llama-server")`
+    也返回 True，production 8081 被 GPU 唱窗杀掉后再也拉不起来——看门狗以为 llama 还在。
+    一条链只认自己的端口，别的 llama 不算数。
+    """
+    try:
+        import psutil
+    except Exception:
+        return False
+    pat = re.compile(r"--port\s+%d\b" % int(port))
+    for p in psutil.process_iter(["name", "cmdline"]):
+        try:
+            nm = str(p.info.get("name") or "").lower()
+            if not nm.startswith("llama-server"):
+                continue
+            cl = " ".join(str(x) for x in (p.info.get("cmdline") or []))
+            if pat.search(cl):
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def _proc_alive(script: str) -> bool:
     """True if the matching process is running (hardened 2026-10-12).
 
@@ -495,7 +521,7 @@ def ensure_stack() -> dict:
     # During a singing/Seed-VC window the watchdog stays alive but must not
     # bring llama back until the window closes.
     if (not window and not st["gemma"] and not _port_open("127.0.0.1", 8081)
-            and not _proc_alive("llama-server")
+            and not _llama_port_alive(8081)
             and _spawn_allowed("llama", 180)):
         _try_spawn("llama", _spawn_llama)
     if (not st["daemon"] and not _port_open("127.0.0.1", 8321)

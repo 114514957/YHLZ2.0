@@ -188,10 +188,10 @@ SING_PROMPT = _PROJECT_ROOT / "models" / "tts" / "refs" / "xiaoyi" / "ref01.wav"
 SING_OUT_DIR = _PROJECT_ROOT / "音频素材" / "翻唱产出"
 _sing_lock = threading.Lock()
 SING_STATE: dict = {"status": "idle", "step": "", "error": "", "result": "",
-                    "output": "", "voice": "xiaoyi", "log": "",
+                    "output": "", "voice": "xiaoyi", "log": "", "sep": "",
                     "started": 0.0, "finished": 0.0, "song_id": ""}
 # 2026-10-21 验收：Seed-VC 44k + 柔化 e 成为生产链路；SoulX 退居回滚位。
-_COVER_ENGINE = "seedvc"
+_COVER_ENGINE = os.getenv("YH_COVER_ENGINE", "produce")  # produce（投产，2026-11-06）/ seedvc / soulx（回滚）
 
 
 def _wsl_path(p) -> str:
@@ -368,6 +368,102 @@ def _job_seedvc(tgt: Path, voice: str) -> None:
             pass
 
 
+def _job_produce(tgt: Path, voice: str) -> None:
+    """投产链路（2026-11-06，台账 1106/1066）：走 tools/cover_produce.py S1–S7。
+
+    与 _job_seedvc 的区别：分轨不再靠 cover_seedvc 的 WSL/demucs 兜底，而是
+    Kim(MSST) → MDX(audio-separator) → Seed-VC；`sep` 必须回传到 SING_STATE。
+    """
+    from backend import gpu_lock, gpu_window
+
+    _py = _PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+    try:
+        SING_STATE["step"] = "卸载本地 TTS，腾显存"
+        _unload_tts()
+        SING_STATE["step"] = "等待聊天结束（GPU 互锁）"
+        if not gpu_lock.enter_window():
+            raise RuntimeError("互锁状态异常（无法进入唱窗）")
+        gpu_lock.wait_chat_idle(timeout=120)
+        _unload_tts()
+        SING_STATE["step"] = "翻唱中（Kim → MDX → Seed-VC → 混音，约 6–7 分钟）"
+        job_dir = SING_DIR / f"produce_{time.strftime('%Y%m%d_%H%M%S')}"
+        job_dir.mkdir(parents=True, exist_ok=True)
+        env = dict(os.environ)
+        env.update({
+            "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8",
+            "HF_ENDPOINT": "https://hf-mirror.com",
+            "NO_PROXY": "localhost,127.0.0.1,::1,.maas.aliyuncs.com",
+        })
+        r = subprocess.run(
+            [str(_py if _py.exists() else sys.executable),
+             str(_PROJECT_ROOT / "tools" / "cover_produce.py"),
+             str(tgt), "--voice", voice, "--presets", "e",
+             "--out-dir", str(job_dir)],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=7200, env=env,
+            creationflags=0x08000000)
+        tail = (r.stdout or "")[-1500:] + (r.stderr or "")[-600:]
+        SING_STATE["log"] = tail[-900:]
+        info = None
+        for line in reversed((r.stdout or "").splitlines()):
+            line = line.strip()
+            if line.startswith("{") and '"ok"' in line:
+                try:
+                    info = json.loads(line)
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
+        if r.returncode != 0 or not info or not info.get("ok"):
+            raise RuntimeError(f"投产链路失败 exit={r.returncode}: {tail[-280:]}")
+        sep = str(info.get("sep") or "")
+        SING_STATE["sep"] = sep
+        if not sep.startswith("native-kim"):
+            SING_STATE["log"] = (SING_STATE.get("log", "")
+                                 + f" ⚠ 分轨链路：{sep or '未知'}")[-900:]
+        final_src = Path(str(info.get("final") or ""))
+        if not final_src.is_file():
+            raise RuntimeError("投产链路没有成品")
+
+        SING_OUT_DIR.mkdir(parents=True, exist_ok=True)
+        stem = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", tgt.stem)[:40] or "cover"
+        vtag = "清亮嗓" if voice == "bright" else "Xiaoyi嗓"
+        run_dir = SING_OUT_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}_{stem}"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        final = run_dir / f"成品_{stem}_{vtag}.wav"
+        shutil.copy2(final_src, final)
+        sid = ""
+        try:
+            from backend import song_library
+
+            item = song_library.save_ref(
+                title=f"{stem}（元亨翻唱·{vtag}·{sep or 'native'}）",
+                wav_path=final, source="workbench-cover-produce",
+                target=str(tgt), tags=["翻唱", "SeedVC", sep or "native"])
+            sid = str(item.get("id") or "")
+        except Exception:  # noqa: BLE001
+            sid = ""
+        SING_STATE.update(status="done", step="完成", result=str(final),
+                          output=str(final), song_id=sid)
+    except Exception as exc:  # noqa: BLE001
+        SING_STATE.update(status="error", step="失败",
+                          error=f"{type(exc).__name__}: {exc}"[:280])
+    finally:
+        SING_STATE["step"] = "恢复 LLM 与看护"
+        try:
+            gpu_window.close_window()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            gpu_lock.release_sing()
+        except Exception:  # noqa: BLE001
+            pass
+        SING_STATE["finished"] = time.time()
+        try:
+            _sing_lock.release()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def sing_start(target: str, prompt: str = "", voice: str = "bright") -> dict:
     """Kick off a cover job in a background thread; returns immediately.
 
@@ -405,6 +501,9 @@ def sing_start(target: str, prompt: str = "", voice: str = "bright") -> dict:
     def _job() -> None:
         from backend import gpu_window
 
+        if _COVER_ENGINE == "produce":
+            _job_produce(tgt, voice)
+            return
         if _COVER_ENGINE == "seedvc":
             _job_seedvc(tgt, voice)
             return
