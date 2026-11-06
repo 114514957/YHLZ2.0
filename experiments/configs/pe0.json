@@ -1,0 +1,21 @@
+{
+  "id": "pe0",
+  "name": "纯 IT 基础模型，不加 LoRA，只用现有提示词",
+  "factor": "F1+F3",
+  "model": {
+    "base": "models/gemma4-gguf/gemma-4-E4B_q4_0-it.gguf",
+    "mmproj": "models/gemma4-gguf/gemma-4-E4B-it-mmproj.gguf",
+    "lora": [],
+    "control_vector": [],
+    "ngl": 0,
+    "ctx": 8192
+  },
+  "prompt": {"kind": "private"},
+  "sampling": {"temperature": 0.0, "top_p": 0.95, "repeat_penalty": 1.0, "dry_multiplier": 0.0},
+  "grammar": null,
+  "logit_bias": [],
+  "tests": [{"suite": "persona56"}, {"suite": "group"}],
+  "cold": true,
+  "repeats": 1,
+  "notes": "对照组：0 个 LoRA，检验题目在 IT 基座上的原始表现"
+}

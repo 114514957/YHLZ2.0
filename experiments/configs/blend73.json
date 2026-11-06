@@ -1,0 +1,44 @@
+{
+ "id": "blend73",
+ "name": "F1 = v9t7:0.7+v9t8:0.3（冠军配置·复原）",
+ "factor": "F0",
+ "model": {
+  "base": "models/gemma4-gguf/gemma-4-E4B_q4_0-it.gguf",
+  "mmproj": "models/gemma4-gguf/gemma-4-E4B-it-mmproj.gguf",
+  "lora": [
+   {
+    "path": "models/gguf-lora/yuanheng-v9t7-lora.gguf",
+    "scale": 0.7
+   },
+   {
+    "path": "models/gguf-lora/yuanheng-v9t8-lora.gguf",
+    "scale": 0.3
+   }
+  ],
+  "control_vector": [],
+  "ngl": 0,
+  "ctx": 8192
+ },
+ "prompt": {
+  "kind": "private"
+ },
+ "sampling": {
+  "temperature": 0.0,
+  "top_p": 0.95,
+  "repeat_penalty": 1.0,
+  "dry_multiplier": 0.0
+ },
+ "grammar": null,
+ "logit_bias": [],
+ "tests": [
+  {
+   "suite": "persona56"
+  },
+  {
+   "suite": "group"
+  }
+ ],
+ "cold": true,
+ "repeats": 1,
+ "notes": "其余实验都以它为底，只改一个因子"
+}

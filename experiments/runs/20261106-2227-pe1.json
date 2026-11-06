@@ -1,0 +1,102 @@
+{
+ "exp_id": "pe1",
+ "name": "纯 IT 基础模型 + 硬提示词（不加 LoRA）",
+ "config_hash": "4ed20152558ec671",
+ "started_at": "2026-11-06T22:23:02",
+ "backend": "cpu",
+ "judge_version": 6,
+ "server_cmd": [
+  "C:\\Users\\ACE_WAN——PROJECT\\YHLZ\\YH\\models\\llama-cuda\\llama-server.exe",
+  "-m",
+  "models/gemma4-gguf/gemma-4-E4B_q4_0-it.gguf",
+  "--mmproj",
+  "models/gemma4-gguf/gemma-4-E4B-it-mmproj.gguf",
+  "--no-mmproj-offload",
+  "-ngl",
+  "0",
+  "-c",
+  "8192",
+  "--parallel",
+  "1",
+  "-rea",
+  "off",
+  "--jinja",
+  "--alias",
+  "pe1",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "8093",
+  "--temp",
+  "0.0",
+  "--top-p",
+  "0.95",
+  "--repeat-penalty",
+  "1.0"
+ ],
+ "cold": true,
+ "repeats": [
+  {
+   "run": 1,
+   "results": [
+    {
+     "suite": "persona56",
+     "ok": 29,
+     "total": 56,
+     "by_cat": {
+      "人格": [
+       13,
+       20
+      ],
+      "关系": [
+       7,
+       12
+      ],
+      "工具遵循": [
+       5,
+       16
+      ],
+      "风格": [
+       4,
+       8
+      ]
+     },
+     "gate_ok": false,
+     "gate_fail": [
+      "r08"
+     ],
+     "failed_ids": [
+      "p03",
+      "p06",
+      "p07",
+      "p10",
+      "r02",
+      "r03",
+      "r04",
+      "r08",
+      "r10",
+      "t01",
+      "t02",
+      "t03",
+      "t05",
+      "t06",
+      "t07",
+      "t08",
+      "t09",
+      "t10",
+      "t12",
+      "t13",
+      "s03",
+      "s07",
+      "s10",
+      "st01",
+      "st02",
+      "st03",
+      "st05"
+     ],
+     "elapsed": 243.3
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "base",
+  "name": "基线：v9t7 单 LoRA，私聊提示词，CPU",
+  "factor": "F0",
+  "model": {
+    "base": "models/gemma4-gguf/gemma-4-E4B_q4_0-it.gguf",
+    "mmproj": "models/gemma4-gguf/gemma-4-E4B-it-mmproj.gguf",
+    "lora": [
+      {"path": "models/gguf-lora/yuanheng-v9t7-lora.gguf", "scale": 1.0}
+    ],
+    "control_vector": [],
+    "ngl": 0,
+    "ctx": 8192
+  },
+  "prompt": {"kind": "private"},
+  "sampling": {"temperature": 0.0, "top_p": 0.95, "repeat_penalty": 1.0, "dry_multiplier": 0.0},
+  "grammar": null,
+  "logit_bias": [],
+  "tests": [{"suite": "persona56"}, {"suite": "group"}],
+  "cold": true,
+  "repeats": 1,
+  "notes": "其余实验都以它为底，只改一个因子"
+}

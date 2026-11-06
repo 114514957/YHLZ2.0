@@ -150,3 +150,9 @@ _pylib/
 /venv-sep/
 # local-only archive of old root clutter (never committed)
 /archive/2026-11-05-root-clutter/
+
+# 实验站运行时日志与版本产物目录（含 adapter/gguf/tar 大文件，不入库）
+experiments/runs/server_*.log
+experiments/runs/probe_*.log
+dist/v9t7_产物/
+dist/v9t8_产物/

@@ -1,0 +1,27 @@
+{
+ "n": 6579,
+ "median": 27,
+ "p90": 99,
+ "short20": 2047,
+ "short_pct": 31.1,
+ "short10_pct": 9.5,
+ "short_by_src": {
+  "opendialogue": 493,
+  "teaching": 8,
+  "personality": 264,
+  "scene": 342,
+  "refusal": 117,
+  "uncertain": 152,
+  "memory": 80,
+  "emotional": 22,
+  "relation": 10,
+  "golden": 20,
+  "identity": 115,
+  "harden": 114,
+  "discipline": 230,
+  "internal_refusal": 2,
+  "qq_short": 77,
+  "real": 1
+ },
+ "watch_openers": []
+}

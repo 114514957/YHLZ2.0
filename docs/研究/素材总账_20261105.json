@@ -1,0 +1,1181 @@
+{
+ "pack": {
+  "rows": 6607,
+  "by_source": {
+   "scene": 1954,
+   "personality": 1182,
+   "memory": 569,
+   "opendialogue": 591,
+   "teaching": 8,
+   "honesty": 174,
+   "refusal": 117,
+   "identity": 132,
+   "golden": 76,
+   "uncertain": 152,
+   "realtask": 33,
+   "emotional": 22,
+   "philo": 68,
+   "relation": 40,
+   "metaphor": 24,
+   "harden": 151,
+   "discipline": 1008,
+   "real": 23,
+   "cotdeep": 122,
+   "cot": 79,
+   "internal_refusal": 5,
+   "qq_short": 77
+  }
+ },
+ "md": [
+  {
+   "file": "个性样本.md",
+   "blocks": 1200,
+   "pairs": 2467,
+   "contract": {
+    "VOICE_ANCHOR": 1200
+   },
+   "size": 484147
+  },
+  {
+   "file": "个性样本_压缩前.md",
+   "blocks": 2040,
+   "pairs": 4202,
+   "contract": {
+    "VOICE_ANCHOR": 2040
+   },
+   "size": 825646
+  },
+  {
+   "file": "个性样本_改名块头前.md",
+   "blocks": 2040,
+   "pairs": 4202,
+   "contract": {
+    "VOICE_ANCHOR": 2040
+   },
+   "size": 807284
+  },
+  {
+   "file": "个性样本_补称呼前.md",
+   "blocks": 2040,
+   "pairs": 4202,
+   "contract": {
+    "VOICE_ANCHOR": 2040
+   },
+   "size": 805027
+  },
+  {
+   "file": "优质样本.md",
+   "blocks": 8,
+   "pairs": 16,
+   "contract": {
+    "VOICE_ANCHOR": 8
+   },
+   "size": 4529
+  },
+  {
+   "file": "优质样本_改名块头前.md",
+   "blocks": 8,
+   "pairs": 16,
+   "contract": {
+    "VOICE_ANCHOR": 8
+   },
+   "size": 4391
+  },
+  {
+   "file": "元亨说话_老爹故事.md",
+   "blocks": 0,
+   "pairs": 0,
+   "contract": {},
+   "size": 3693
+  },
+  {
+   "file": "哲学观点样本.md",
+   "blocks": 69,
+   "pairs": 206,
+   "contract": {
+    "FIDELITY_CLAUSE": 69
+   },
+   "size": 109275
+  },
+  {
+   "file": "哲学观点样本_改名块头前.md",
+   "blocks": 69,
+   "pairs": 206,
+   "contract": {
+    "FIDELITY_CLAUSE": 69
+   },
+   "size": 108650
+  },
+  {
+   "file": "安全拒绝样本.md",
+   "blocks": 120,
+   "pairs": 240,
+   "contract": {
+    "ATTACK_SILENT_CLAUSE": 120
+   },
+   "size": 53215
+  },
+  {
+   "file": "安全拒绝样本_v1.1.md",
+   "blocks": 120,
+   "pairs": 240,
+   "contract": {
+    "ATTACK_SILENT_CLAUSE": 120
+   },
+   "size": 53215
+  },
+  {
+   "file": "对话样本.md",
+   "blocks": 1993,
+   "pairs": 4935,
+   "contract": {
+    "VOICE_ANCHOR": 1993
+   },
+   "size": 2607991
+  },
+  {
+   "file": "开源对话样本.md",
+   "blocks": 603,
+   "pairs": 1233,
+   "contract": {
+    "ANCHOR": 603
+   },
+   "size": 272468
+  },
+  {
+   "file": "情绪承接样本.md",
+   "blocks": 24,
+   "pairs": 48,
+   "contract": {
+    "VOICE_ANCHOR": 24
+   },
+   "size": 10016
+  },
+  {
+   "file": "情绪承接样本_改名块头前.md",
+   "blocks": 24,
+   "pairs": 48,
+   "contract": {
+    "VOICE_ANCHOR": 24
+   },
+   "size": 9654
+  },
+  {
+   "file": "承认不确定样本.md",
+   "blocks": 155,
+   "pairs": 309,
+   "contract": {
+    "ANTI_HALLUCINATION": 155
+   },
+   "size": 59077
+  },
+  {
+   "file": "教样本.md",
+   "blocks": 8,
+   "pairs": 22,
+   "contract": {
+    "VOICE_ANCHOR": 8
+   },
+   "size": 4075
+  },
+  {
+   "file": "教样本_改名块头前.md",
+   "blocks": 8,
+   "pairs": 22,
+   "contract": {
+    "VOICE_ANCHOR": 8
+   },
+   "size": 3865
+  },
+  {
+   "file": "比喻理解样本.md",
+   "blocks": 24,
+   "pairs": 49,
+   "contract": {
+    "VOICE_ANCHOR": 24
+   },
+   "size": 33340
+  },
+  {
+   "file": "比喻理解样本_改名块头前.md",
+   "blocks": 24,
+   "pairs": 49,
+   "contract": {
+    "VOICE_ANCHOR": 24
+   },
+   "size": 33122
+  },
+  {
+   "file": "真实对话样本.md",
+   "blocks": 31,
+   "pairs": 31,
+   "contract": {
+    "VOICE_ANCHOR": 31
+   },
+   "size": 45768
+  },
+  {
+   "file": "素材库.md",
+   "blocks": 0,
+   "pairs": 0,
+   "contract": {},
+   "size": 2469
+  },
+  {
+   "file": "记忆样本_v2.1.md",
+   "blocks": 249,
+   "pairs": 672,
+   "contract": {
+    "BACKGROUND_CLAUSE": 249
+   },
+   "size": 211776
+  },
+  {
+   "file": "记忆样本_v2.md",
+   "blocks": 249,
+   "pairs": 672,
+   "contract": {
+    "BACKGROUND_CLAUSE": 249
+   },
+   "size": 211258
+  },
+  {
+   "file": "诚实边界样本.md",
+   "blocks": 180,
+   "pairs": 360,
+   "contract": {
+    "HONESTY_CLAUSE": 180
+   },
+   "size": 118390
+  },
+  {
+   "file": "黄金样本.md",
+   "blocks": 73,
+   "pairs": 73,
+   "contract": {
+    "VOICE_ANCHOR": 73
+   },
+   "size": 36154
+  }
+ ],
+ "jsonl": [
+  {
+   "file": "corpus_qq.jsonl",
+   "n": 18567,
+   "size": 3359544
+  },
+  {
+   "file": "corpus_qq_raw.jsonl",
+   "n": 19806,
+   "size": 10677343
+  },
+  {
+   "file": "corpus_qq_raw_all.jsonl",
+   "n": 31500,
+   "size": 17439108
+  },
+  {
+   "file": "cot_deep.jsonl",
+   "n": 780,
+   "size": 415538
+  },
+  {
+   "file": "cot_samples.jsonl",
+   "n": 600,
+   "size": 278972
+  },
+  {
+   "file": "generated_extra_v9t.jsonl",
+   "n": 1097,
+   "size": 557725
+  },
+  {
+   "file": "generated_extra_v9u.jsonl",
+   "n": 1697,
+   "size": 878033
+  },
+  {
+   "file": "generated_extra_v9v.jsonl",
+   "n": 2037,
+   "size": 1349273
+  },
+  {
+   "file": "generated_extra_v9w.jsonl",
+   "n": 2300,
+   "size": 1761863
+  },
+  {
+   "file": "generated_extra_v9x.jsonl",
+   "n": 3211,
+   "size": 2582863
+  },
+  {
+   "file": "generated_extra_v9y.jsonl",
+   "n": 3571,
+   "size": 3171115
+  },
+  {
+   "file": "generated_extra_v9y_trimmed.jsonl",
+   "n": 2392,
+   "size": 2578848
+  },
+  {
+   "file": "golden_candidates.jsonl",
+   "n": 30,
+   "size": 26484
+  },
+  {
+   "file": "harden_v9t2.jsonl",
+   "n": 159,
+   "size": 111002
+  },
+  {
+   "file": "harden_v9t3.jsonl",
+   "n": 157,
+   "size": 348120
+  },
+  {
+   "file": "identity_v2.jsonl",
+   "n": 136,
+   "size": 276064
+  },
+  {
+   "file": "memory_qstyle.jsonl",
+   "n": 705,
+   "size": 325047
+  },
+  {
+   "file": "persona_memory.jsonl",
+   "n": 239,
+   "size": 312908
+  },
+  {
+   "file": "podcast_ai.jsonl",
+   "n": 360,
+   "size": 588252
+  },
+  {
+   "file": "qq_napcat_history.jsonl",
+   "n": 288,
+   "size": 163614
+  },
+  {
+   "file": "relation_v9.jsonl",
+   "n": 40,
+   "size": 82702
+  },
+  {
+   "file": "sft_lizhen_v9.jsonl",
+   "n": 131,
+   "size": 117647
+  },
+  {
+   "file": "sft_lizhen_v9t2.jsonl",
+   "n": 131,
+   "size": 117647
+  },
+  {
+   "file": "sft_lizhen_v9t3.jsonl",
+   "n": 131,
+   "size": 117647
+  },
+  {
+   "file": "sft_lizhen_v9t4.jsonl",
+   "n": 131,
+   "size": 117647
+  },
+  {
+   "file": "sft_lizhen_v9t5.jsonl",
+   "n": 131,
+   "size": 117647
+  },
+  {
+   "file": "sft_lizhen_v9t6.jsonl",
+   "n": 131,
+   "size": 117647
+  },
+  {
+   "file": "sft_lizhen_v9y.jsonl",
+   "n": 131,
+   "size": 117647
+  },
+  {
+   "file": "sft_persona.jsonl",
+   "n": 38,
+   "size": 25992
+  },
+  {
+   "file": "sft_persona_train.jsonl",
+   "n": 32,
+   "size": 21328
+  },
+  {
+   "file": "sft_persona_v1.jsonl",
+   "n": 96,
+   "size": 75096
+  },
+  {
+   "file": "sft_persona_v1_train.jsonl",
+   "n": 82,
+   "size": 63437
+  },
+  {
+   "file": "sft_persona_v1_val.jsonl",
+   "n": 14,
+   "size": 11659
+  },
+  {
+   "file": "sft_persona_v2.jsonl",
+   "n": 105,
+   "size": 82245
+  },
+  {
+   "file": "sft_persona_v2_train.jsonl",
+   "n": 89,
+   "size": 69627
+  },
+  {
+   "file": "sft_persona_v2_val.jsonl",
+   "n": 16,
+   "size": 12618
+  },
+  {
+   "file": "sft_persona_v3.jsonl",
+   "n": 1214,
+   "size": 971962
+  },
+  {
+   "file": "sft_persona_v3_train.jsonl",
+   "n": 1032,
+   "size": 827328
+  },
+  {
+   "file": "sft_persona_v3_val.jsonl",
+   "n": 182,
+   "size": 144634
+  },
+  {
+   "file": "sft_persona_v4.jsonl",
+   "n": 1575,
+   "size": 1162220
+  },
+  {
+   "file": "sft_persona_v4_train.jsonl",
+   "n": 1339,
+   "size": 988076
+  },
+  {
+   "file": "sft_persona_v4_val.jsonl",
+   "n": 236,
+   "size": 174144
+  },
+  {
+   "file": "sft_persona_v5.jsonl",
+   "n": 1575,
+   "size": 1056803
+  },
+  {
+   "file": "sft_persona_v5_train.jsonl",
+   "n": 1339,
+   "size": 897602
+  },
+  {
+   "file": "sft_persona_v5_val.jsonl",
+   "n": 236,
+   "size": 159201
+  },
+  {
+   "file": "sft_persona_v6.jsonl",
+   "n": 1955,
+   "size": 1546265
+  },
+  {
+   "file": "sft_persona_v6_train.jsonl",
+   "n": 1662,
+   "size": 1316507
+  },
+  {
+   "file": "sft_persona_v6_val.jsonl",
+   "n": 293,
+   "size": 229758
+  },
+  {
+   "file": "sft_persona_v7.jsonl",
+   "n": 1955,
+   "size": 1546265
+  },
+  {
+   "file": "sft_persona_v7_train.jsonl",
+   "n": 1662,
+   "size": 1316507
+  },
+  {
+   "file": "sft_persona_v7_val.jsonl",
+   "n": 293,
+   "size": 229758
+  },
+  {
+   "file": "sft_persona_v8.jsonl",
+   "n": 4047,
+   "size": 5251007
+  },
+  {
+   "file": "sft_persona_v8_train.jsonl",
+   "n": 3440,
+   "size": 4474678
+  },
+  {
+   "file": "sft_persona_v8_val.jsonl",
+   "n": 607,
+   "size": 776329
+  },
+  {
+   "file": "sft_persona_v8r1.jsonl",
+   "n": 4047,
+   "size": 5962319
+  },
+  {
+   "file": "sft_persona_v8r2.jsonl",
+   "n": 4047,
+   "size": 5973861
+  },
+  {
+   "file": "sft_persona_v8r3.jsonl",
+   "n": 4047,
+   "size": 6000956
+  },
+  {
+   "file": "sft_persona_v8r4.jsonl",
+   "n": 4047,
+   "size": 6010593
+  },
+  {
+   "file": "sft_persona_v8r4t_test.jsonl",
+   "n": 72,
+   "size": 132419
+  },
+  {
+   "file": "sft_persona_v8r4t_train.jsonl",
+   "n": 3260,
+   "size": 5667516
+  },
+  {
+   "file": "sft_persona_v8r4t_val.jsonl",
+   "n": 715,
+   "size": 1184839
+  },
+  {
+   "file": "sft_persona_v8test.jsonl",
+   "n": 1187,
+   "size": 1214945
+  },
+  {
+   "file": "sft_persona_v9.jsonl",
+   "n": 7003,
+   "size": 7837677
+  },
+  {
+   "file": "sft_persona_v9_lizhen_pool.jsonl",
+   "n": 300,
+   "size": 333344
+  },
+  {
+   "file": "sft_persona_v9_quarantine.jsonl",
+   "n": 2612,
+   "size": 5643982
+  },
+  {
+   "file": "sft_persona_v9_test.jsonl",
+   "n": 9,
+   "size": 9026
+  },
+  {
+   "file": "sft_persona_v9_train.jsonl",
+   "n": 835,
+   "size": 832679
+  },
+  {
+   "file": "sft_persona_v9_val.jsonl",
+   "n": 291,
+   "size": 343934
+  },
+  {
+   "file": "sft_persona_v9r.jsonl",
+   "n": 3448,
+   "size": 4517738
+  },
+  {
+   "file": "sft_persona_v9r_gated_lizhen_pool.jsonl",
+   "n": 131,
+   "size": 153880
+  },
+  {
+   "file": "sft_persona_v9r_gated_quarantine.jsonl",
+   "n": 2196,
+   "size": 4184075
+  },
+  {
+   "file": "sft_persona_v9r_gated_test.jsonl",
+   "n": 13,
+   "size": 12687
+  },
+  {
+   "file": "sft_persona_v9r_gated_train.jsonl",
+   "n": 998,
+   "size": 1043543
+  },
+  {
+   "file": "sft_persona_v9r_gated_val.jsonl",
+   "n": 110,
+   "size": 105683
+  },
+  {
+   "file": "sft_persona_v9r_test.jsonl",
+   "n": 60,
+   "size": 97933
+  },
+  {
+   "file": "sft_persona_v9r_train.jsonl",
+   "n": 2931,
+   "size": 4514286
+  },
+  {
+   "file": "sft_persona_v9r_val.jsonl",
+   "n": 457,
+   "size": 733264
+  },
+  {
+   "file": "sft_persona_v9s.jsonl",
+   "n": 3463,
+   "size": 4531024
+  },
+  {
+   "file": "sft_persona_v9s_gated_lizhen_pool.jsonl",
+   "n": 131,
+   "size": 153880
+  },
+  {
+   "file": "sft_persona_v9s_gated_quarantine.jsonl",
+   "n": 2211,
+   "size": 4195748
+  },
+  {
+   "file": "sft_persona_v9s_gated_test.jsonl",
+   "n": 13,
+   "size": 12687
+  },
+  {
+   "file": "sft_persona_v9s_gated_train.jsonl",
+   "n": 998,
+   "size": 1049849
+  },
+  {
+   "file": "sft_persona_v9s_gated_val.jsonl",
+   "n": 110,
+   "size": 105683
+  },
+  {
+   "file": "sft_persona_v9s_test.jsonl",
+   "n": 60,
+   "size": 97933
+  },
+  {
+   "file": "sft_persona_v9s_train.jsonl",
+   "n": 2950,
+   "size": 4536493
+  },
+  {
+   "file": "sft_persona_v9s_val.jsonl",
+   "n": 453,
+   "size": 728396
+  },
+  {
+   "file": "sft_persona_v9t.jsonl",
+   "n": 4422,
+   "size": 4883388
+  },
+  {
+   "file": "sft_persona_v9t2.jsonl",
+   "n": 7162,
+   "size": 7938086
+  },
+  {
+   "file": "sft_persona_v9t2t_test.jsonl",
+   "n": 121,
+   "size": 163058
+  },
+  {
+   "file": "sft_persona_v9t2t_train.jsonl",
+   "n": 6081,
+   "size": 8318378
+  },
+  {
+   "file": "sft_persona_v9t2t_val.jsonl",
+   "n": 960,
+   "size": 1240577
+  },
+  {
+   "file": "sft_persona_v9t3.jsonl",
+   "n": 7160,
+   "size": 7944258
+  },
+  {
+   "file": "sft_persona_v9t3t_test.jsonl",
+   "n": 119,
+   "size": 161508
+  },
+  {
+   "file": "sft_persona_v9t3t_train.jsonl",
+   "n": 6086,
+   "size": 8331260
+  },
+  {
+   "file": "sft_persona_v9t3t_val.jsonl",
+   "n": 955,
+   "size": 1234388
+  },
+  {
+   "file": "sft_persona_v9t4.jsonl",
+   "n": 7160,
+   "size": 15604428
+  },
+  {
+   "file": "sft_persona_v9t4t_test.jsonl",
+   "n": 119,
+   "size": 314563
+  },
+  {
+   "file": "sft_persona_v9t4t_train.jsonl",
+   "n": 6087,
+   "size": 14667405
+  },
+  {
+   "file": "sft_persona_v9t4t_val.jsonl",
+   "n": 954,
+   "size": 2405324
+  },
+  {
+   "file": "sft_persona_v9t5.jsonl",
+   "n": 7200,
+   "size": 15687170
+  },
+  {
+   "file": "sft_persona_v9t5t_test.jsonl",
+   "n": 119,
+   "size": 294592
+  },
+  {
+   "file": "sft_persona_v9t5t_train.jsonl",
+   "n": 6116,
+   "size": 14776152
+  },
+  {
+   "file": "sft_persona_v9t5t_val.jsonl",
+   "n": 965,
+   "size": 2408852
+  },
+  {
+   "file": "sft_persona_v9t6.jsonl",
+   "n": 7336,
+   "size": 15963370
+  },
+  {
+   "file": "sft_persona_v9t6t_test.jsonl",
+   "n": 123,
+   "size": 305661
+  },
+  {
+   "file": "sft_persona_v9t6t_train.jsonl",
+   "n": 6155,
+   "size": 14344429
+  },
+  {
+   "file": "sft_persona_v9t6t_val.jsonl",
+   "n": 1057,
+   "size": 3135972
+  },
+  {
+   "file": "sft_persona_v9t_gated_lizhen_pool.jsonl",
+   "n": 131,
+   "size": 153880
+  },
+  {
+   "file": "sft_persona_v9t_gated_quarantine.jsonl",
+   "n": 3169,
+   "size": 4810737
+  },
+  {
+   "file": "sft_persona_v9t_gated_test.jsonl",
+   "n": 15,
+   "size": 13776
+  },
+  {
+   "file": "sft_persona_v9t_gated_train.jsonl",
+   "n": 1005,
+   "size": 1052646
+  },
+  {
+   "file": "sft_persona_v9t_gated_val.jsonl",
+   "n": 102,
+   "size": 96199
+  },
+  {
+   "file": "sft_persona_v9t_test.jsonl",
+   "n": 116,
+   "size": 156253
+  },
+  {
+   "file": "sft_persona_v9t_train.jsonl",
+   "n": 5959,
+   "size": 8224454
+  },
+  {
+   "file": "sft_persona_v9t_val.jsonl",
+   "n": 928,
+   "size": 1203454
+  },
+  {
+   "file": "sft_persona_v9u.jsonl",
+   "n": 5025,
+   "size": 5123066
+  },
+  {
+   "file": "sft_persona_v9u_gated_lizhen_pool.jsonl",
+   "n": 131,
+   "size": 153880
+  },
+  {
+   "file": "sft_persona_v9u_gated_quarantine.jsonl",
+   "n": 3572,
+   "size": 5077096
+  },
+  {
+   "file": "sft_persona_v9u_gated_test.jsonl",
+   "n": 16,
+   "size": 14665
+  },
+  {
+   "file": "sft_persona_v9u_gated_train.jsonl",
+   "n": 1002,
+   "size": 1049198
+  },
+  {
+   "file": "sft_persona_v9u_gated_val.jsonl",
+   "n": 104,
+   "size": 98758
+  },
+  {
+   "file": "sft_persona_v9u_test.jsonl",
+   "n": 68,
+   "size": 98708
+  },
+  {
+   "file": "sft_persona_v9u_train.jsonl",
+   "n": 4183,
+   "size": 5237368
+  },
+  {
+   "file": "sft_persona_v9u_val.jsonl",
+   "n": 774,
+   "size": 983798
+  },
+  {
+   "file": "sft_persona_v9v.jsonl",
+   "n": 5376,
+   "size": 5561336
+  },
+  {
+   "file": "sft_persona_v9v_gated_lizhen_pool.jsonl",
+   "n": 131,
+   "size": 153880
+  },
+  {
+   "file": "sft_persona_v9v_gated_quarantine.jsonl",
+   "n": 4123,
+   "size": 5741801
+  },
+  {
+   "file": "sft_persona_v9v_gated_test.jsonl",
+   "n": 17,
+   "size": 15621
+  },
+  {
+   "file": "sft_persona_v9v_gated_train.jsonl",
+   "n": 1004,
+   "size": 1050574
+  },
+  {
+   "file": "sft_persona_v9v_gated_val.jsonl",
+   "n": 101,
+   "size": 96426
+  },
+  {
+   "file": "sft_persona_v9v_test.jsonl",
+   "n": 69,
+   "size": 102504
+  },
+  {
+   "file": "sft_persona_v9v_train.jsonl",
+   "n": 4683,
+   "size": 5894213
+  },
+  {
+   "file": "sft_persona_v9v_val.jsonl",
+   "n": 624,
+   "size": 843539
+  },
+  {
+   "file": "sft_persona_v9w.jsonl",
+   "n": 5639,
+   "size": 5943000
+  },
+  {
+   "file": "sft_persona_v9w_gated_lizhen_pool.jsonl",
+   "n": 131,
+   "size": 153880
+  },
+  {
+   "file": "sft_persona_v9w_gated_quarantine.jsonl",
+   "n": 4386,
+   "size": 6193267
+  },
+  {
+   "file": "sft_persona_v9w_gated_test.jsonl",
+   "n": 17,
+   "size": 15884
+  },
+  {
+   "file": "sft_persona_v9w_gated_train.jsonl",
+   "n": 1001,
+   "size": 1045377
+  },
+  {
+   "file": "sft_persona_v9w_gated_val.jsonl",
+   "n": 104,
+   "size": 101360
+  },
+  {
+   "file": "sft_persona_v9w_test.jsonl",
+   "n": 107,
+   "size": 139582
+  },
+  {
+   "file": "sft_persona_v9w_train.jsonl",
+   "n": 4836,
+   "size": 6235437
+  },
+  {
+   "file": "sft_persona_v9w_val.jsonl",
+   "n": 696,
+   "size": 908024
+  },
+  {
+   "file": "sft_persona_v9x.jsonl",
+   "n": 6550,
+   "size": 6652734
+  },
+  {
+   "file": "sft_persona_v9x_gated_lizhen_pool.jsonl",
+   "n": 131,
+   "size": 153880
+  },
+  {
+   "file": "sft_persona_v9x_gated_quarantine.jsonl",
+   "n": 5296,
+   "size": 7147030
+  },
+  {
+   "file": "sft_persona_v9x_gated_test.jsonl",
+   "n": 13,
+   "size": 11932
+  },
+  {
+   "file": "sft_persona_v9x_gated_train.jsonl",
+   "n": 887,
+   "size": 923275
+  },
+  {
+   "file": "sft_persona_v9x_gated_val.jsonl",
+   "n": 223,
+   "size": 228047
+  },
+  {
+   "file": "sft_persona_v9x_test.jsonl",
+   "n": 205,
+   "size": 193218
+  },
+  {
+   "file": "sft_persona_v9x_train.jsonl",
+   "n": 5431,
+   "size": 6919010
+  },
+  {
+   "file": "sft_persona_v9x_val.jsonl",
+   "n": 914,
+   "size": 1095111
+  },
+  {
+   "file": "sft_persona_v9y.jsonl",
+   "n": 8003,
+   "size": 7873655
+  },
+  {
+   "file": "sft_persona_v9y_gated_quarantine.jsonl",
+   "n": 6880,
+   "size": 8944507
+  },
+  {
+   "file": "sft_persona_v9y_gated_test.jsonl",
+   "n": 18,
+   "size": 19209
+  },
+  {
+   "file": "sft_persona_v9y_gated_train.jsonl",
+   "n": 938,
+   "size": 973697
+  },
+  {
+   "file": "sft_persona_v9y_gated_val.jsonl",
+   "n": 167,
+   "size": 172217
+  },
+  {
+   "file": "sft_persona_v9y_test.jsonl",
+   "n": 142,
+   "size": 201868
+  },
+  {
+   "file": "sft_persona_v9y_train.jsonl",
+   "n": 6765,
+   "size": 8343446
+  },
+  {
+   "file": "sft_persona_v9y_val.jsonl",
+   "n": 1096,
+   "size": 1259149
+  },
+  {
+   "file": "sft_persona_val.jsonl",
+   "n": 6,
+   "size": 4664
+  },
+  {
+   "file": "sft_v9_all.jsonl",
+   "n": 3968,
+   "size": 11609266
+  },
+  {
+   "file": "supplement_v9t7.jsonl",
+   "n": 82,
+   "size": 184329
+  },
+  {
+   "file": "tool_discipline_v9.jsonl",
+   "n": 1008,
+   "size": 1463300
+  },
+  {
+   "file": "tool_dsh_v1.jsonl",
+   "n": 443,
+   "size": 704222
+  },
+  {
+   "file": "tool_extra_v9.jsonl",
+   "n": 1950,
+   "size": 2188819
+  },
+  {
+   "file": "tool_harness_v1.jsonl",
+   "n": 536,
+   "size": 740575
+  },
+  {
+   "file": "tool_multistep_real.jsonl",
+   "n": 36,
+   "size": 105403
+  },
+  {
+   "file": "tool_use_v6.jsonl",
+   "n": 380,
+   "size": 489462
+  },
+  {
+   "file": "tool_use_v8.jsonl",
+   "n": 626,
+   "size": 1621674
+  },
+  {
+   "file": "tool_use_v8_a.jsonl",
+   "n": 207,
+   "size": 529268
+  },
+  {
+   "file": "tool_use_v8_b.jsonl",
+   "n": 186,
+   "size": 488375
+  },
+  {
+   "file": "tool_use_v8_c.jsonl",
+   "n": 195,
+   "size": 503251
+  },
+  {
+   "file": "tool_use_v8_d.jsonl",
+   "n": 38,
+   "size": 100780
+  },
+  {
+   "file": "tool_use_v8_final.jsonl",
+   "n": 626,
+   "size": 1578171
+  },
+  {
+   "file": "tool_use_v8_remapped.jsonl",
+   "n": 626,
+   "size": 1577215
+  },
+  {
+   "file": "tool_use_v9_synth.jsonl",
+   "n": 147,
+   "size": 118509
+  }
+ ],
+ "gaps": [
+  {
+   "name": "身份·被问是不是 AI",
+   "have": 0,
+   "need": 30,
+   "note": "问题里不带「助手」的 AI 问法，一条样本都没有（1107 实测回退）"
+  },
+  {
+   "name": "身份·总盘",
+   "have": 132,
+   "need": 30,
+   "note": "包里 identity 源条数（1059：临界 30）"
+  },
+  {
+   "name": "寒暄",
+   "have": 14,
+   "need": 30,
+   "note": "1077：素材原文只找到 14 条"
+  },
+  {
+   "name": "短答（≤20 字）",
+   "have": null,
+   "need": 30,
+   "note": "1078：群里中位 10 字，模型 59 字"
+  },
+  {
+   "name": "安全拒绝",
+   "have": 117,
+   "need": 30,
+   "note": "已有 117，够"
+  },
+  {
+   "name": "自我贬低/存在（E 类）",
+   "have": 15,
+   "need": 30,
+   "note": "1063：E 类 15 条没治住 m14"
+  }
+ ]
+}

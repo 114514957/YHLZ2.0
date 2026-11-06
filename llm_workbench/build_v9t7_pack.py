@@ -102,8 +102,16 @@ with io.open(SUPP, "w", encoding="utf-8") as f:
 print("补丁 %s（%d 条）" % (SUPP, len(rows)))
 
 if os.path.exists(DST_PKG):
-    shutil.rmtree(DST_PKG)
-shutil.copytree(SRC_PKG, DST_PKG)
+    # 2026-11-06 事故：原来是 rmtree + copytree，重跑一次把 v9t7 自己的 config/run/README 全冲掉了，
+    # 只剩 v9t6 的配置和旧文件名。改成「只覆盖数据，别的文件不动」。
+    print("目标已存在：只覆盖 train/val，配置与脚本保持原样")
+    os.makedirs(DST_PKG, exist_ok=True)
+    os.makedirs(os.path.join(DST_PKG, "config"), exist_ok=True)
+    if not os.path.exists(os.path.join(DST_PKG, "finetune_train.py")):
+        shutil.copy2(os.path.join(SRC_PKG, "finetune_train.py"),
+                     os.path.join(DST_PKG, "finetune_train.py"))
+else:
+    shutil.copytree(SRC_PKG, DST_PKG)
 
 def read_jsonl(p):
     with io.open(p, encoding="utf-8") as f:
@@ -138,8 +146,8 @@ for i, r in enumerate(rows):
 train = base_train + supp_train
 val = base_val + supp_val
 
-for name, data in (("sft_persona_v9t6t_train.jsonl", train),
-                   ("sft_persona_v9t6t_val.jsonl", val)):
+for name, data in (("sft_persona_v9t7_train.jsonl", train),
+                   ("sft_persona_v9t7_val.jsonl", val)):
     p = os.path.join(DST_PKG, name)
     with io.open(p, "w", encoding="utf-8") as f:
         for r in data:
