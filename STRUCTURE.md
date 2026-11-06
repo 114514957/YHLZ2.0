@@ -109,6 +109,7 @@
 | `growth_log.py` / `snapshots.py` / `qq_outbox.py` / `qq_token.py` | 成长日志 / 快照回滚 / 主动联系 / QQ token |
 | `voice_frontend.py` | 自适应增益 + 噪声底门限（修“开头几秒被当噪声”） |
 | `see_now.py` / `ocr.py` | 看屏（ffmpeg 抓帧→图片）与系统 OCR（`screen.text`，0 图片 token）；11/04 上线 |
+| `status_views.py` | 只读状态视图（内在因列表 / QQ 桥状态 / Ollama 探活），从 console_server 拆出（F-27 第一刀，11/06） |
 | `embodied/companion/{constitution,memory_stabilization}` | 仅存的 embodied 模块（其余已归档） |
 
 工具注册与执行只有一条路：`target_capability_registry.py`（`CapabilityRegistry`，
