@@ -45,6 +45,17 @@
 - **审计**：`tools/chain_guard.py` 检查双链、旧链残留、自启重叠、自主被意外打开；
   已接进 `smoke.py`（FAIL 会算进体检失败）。
 
+## 桌面入口（2026-11-07）
+
+| 快捷方式 | 打开 | 端口没起时 |
+|---|---|---|
+| `YH 元亨利贞.lnk` | 8321 元亨工作台 | 走 `YH_workbench_normal.bat`（起栈+等+开浏览器） |
+| `元亨·翻唱工作站.lnk` | `http://127.0.0.1:8321/cover` | `open_page.py --boot yh` → `YH_boot.bat`，等 8321 后开 Edge 应用窗 |
+| `元亨·训练工作台.lnk` | `http://127.0.0.1:8090/` | `open_page.py --boot train` → 起 `llm_workbench/server.py` |
+
+重建：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\shortcuts\make_desktop_shortcuts.ps1`
+（脚本带 UTF-8 BOM；PS 5.1 按 GBK 读中文会把括号吃掉。）
+
 ## 入口
 
 | 入口 | 说明 |
