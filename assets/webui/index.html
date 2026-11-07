@@ -3,175 +3,238 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YH · 元 · 亨 · 利 · 贞</title>
+<title>元亨 · 工作台</title>
 <link rel="icon" href="/favicon.png?v=20261017">
 <link rel="stylesheet" href="/console.css">
 </head>
-<body>
-<header>
-  <h1>YH · 元 · 亨 · 利 · 贞 <span id="ver" class="dim">工作台</span></h1>
-  <div id="lamps" class="lamps">
-    <span class="lamp" id="l-busy">空闲</span>
-    <button id="avatarBtn" class="btn" type="button" title="打开桌面形象窗口">形象</button>
-    <button id="petBtn" class="btn" type="button" title="启动桌面桌宠">桌宠</button>
-    <button id="allBtn" class="btn" type="button" title="启动全家桶（服务+工作台）">全家桶</button>
-    <button id="clearBtn" class="btn" type="button" title="清空对话，开新会话">清空 / 新对话</button>
-    <button id="dashBtn" class="btn" type="button" title="打开/收起仪表盘">仪表盘 ▸</button>
-  </div>
-</header>
+<body data-theme="dark">
+<div class="app">
 
-<aside id="side" class="glass">
-  <div class="side-head">仪表盘 <button id="dashClose" class="btn-mini" type="button">✕ 收起</button></div>
-  <section class="card">
-    <h3>对话模式</h3>
-    <div class="qrow">
-      <button id="modeText" class="btn-mini" type="button">文本模式</button>
-      <button id="modeVoice" class="btn-mini" type="button">语音模式</button>
-    </div>
-    <p class="kv" style="font-size:11px;opacity:.75">文本：打字；语音：连续对话（免点击，边说边识别）</p>
-  </section>
-  <section class="card">
-    <h3>启动入口</h3>
-    <div class="qrow">
-      <button id="ln-napcat" class="btn-mini" type="button" title="NapCat 管理面板（6099）；未运行会自动拉起">NapCat 面板</button>
-      <button id="ln-official" class="btn-mini" type="button" style="display:none" title="旧 SoulX 链路已退出生产（台账 0935）">翻唱官方UI（已停用）</button>
-      <button id="ln-official-stop" class="btn-mini" type="button" style="display:none" title="关闭官方 UI 并恢复聊天">关闭官方UI</button>
-    </div>
-    <div id="ln-status" class="kv" style="font-size:12px;opacity:.8">旧 SoulX 官方UI 已退出生产（改用本页「开始翻唱」）</div>
-    <div id="ln-napcat-status" class="kv" style="font-size:12px;opacity:.8">点击按钮打开（未运行会自动拉起）</div>
-  </section>
-  <section class="card">
-    <h3>后台情况</h3>
-    <ul class="svc">
-      <li><span class="dot" id="s-gemma"></span>Gemma 8081</li>
-      <li><span class="dot" id="s-daemon"></span>常驻服务 8321</li>
-      <li><span class="dot" id="s-ollama"></span>ollama 11434</li>
-      <li><span class="dot" id="s-qq"></span>元亨 QQ</li>
-    </ul>
-  </section>
-  <section class="card">
-    <h3>元亨 QQ</h3>
-    <p class="kv"><span>账号</span><b id="q-uin">-</b></p>
-    <p class="kv"><span>状态</span><b id="q-online">-</b></p>
-    <p class="kv"><span>NapCat WS</span><b id="q-ws">-</b></p>
-    <p class="kv"><span>桥接</span><b id="q-bridge">-</b></p>
-    <div class="qrow">
-      <button id="q-wake" class="btn-mini" type="button" title="唤起 NapCat 以便登录元亨号">唤起登录</button>
-      <button id="q-start" class="btn-mini" type="button" title="启动 QQ 桥 Lite（看门狗+桥；NapCat 已登录时秒开）">启动QQ桥</button>
-      <button id="q-restart" class="btn-mini" type="button" title="重启 QQ 桥（NapCat 登录保持不动）">重启桥</button>
-      <button id="q-stop" class="btn-mini" type="button" title="停止桥和看门狗，保留 QQ 登录；下次登录系统也保持停止">停止桥</button>
-    </div>
-    <div id="qqQrWrap" style="display:none;text-align:center;margin-top:8px">
-      <img id="qqQr" alt="登录二维码" style="width:150px;height:150px;border-radius:8px;background:#fff">
-      <p class="kv" style="font-size:11px;opacity:.8">用手机 QQ 扫码登录元亨号 3655185302</p>
-    </div>
-  </section>
-  <section class="card">
-    <h3>元亨状态</h3>
-    <p class="kv"><span>当前阶段</span><b id="m-stage">空闲</b></p>
-    <p class="kv"><span>对话轮次</span><b id="m-turns">0</b></p>
-    <p class="kv"><span>记忆 L2</span><b id="m-l2">0</b></p>
-    <p class="kv"><span>人格草稿</span><b id="m-persona">-</b></p>
-  </section>
-  <section class="card">
-    <h3>内在因（驱动力）</h3>
-    <ul id="drivesList" class="ql"></ul>
-    <div class="qrow"><input id="driveName" placeholder="新增内在因（如：好奇量子计算）"><button id="driveAdd" class="btn-mini" type="button">加</button></div>
-  </section>
-  <section class="card">
-    <h3>工作进度</h3>
-    <p class="kv"><span>进行中</span><b id="m-work">-</b></p>
-    <p class="kv"><span>链状态</span><b id="m-chain">-</b></p>
-    <p class="kv"><span>开发(opencode)</span><b id="m-dev">空闲</b></p>
-  </section>
-  <section class="card">
-    <h3>资源占用</h3>
-    <p class="kv"><span>GPU 利用率</span><b id="m-gpu">-</b></p>
-    <div class="bar"><i id="m-gpub"></i></div>
-    <p class="kv"><span>显存</span><b id="m-vram">-</b></p>
-    <div class="bar"><i id="m-vramb"></i></div>
-    <p class="kv"><span>CPU</span><b id="m-cpu">-</b></p>
-    <div class="bar"><i id="m-cpub"></i></div>
-    <p class="kv"><span>内存</span><b id="m-ram">-</b></p>
-    <p class="kv"><span>磁盘</span><b id="m-disk">-</b></p>
-  </section>
-  <section class="card">
-    <h3>台账查询</h3>
-    <div class="qrow"><input id="ledgerQ" placeholder="查台账记录（如：0219）"><button id="ledgerBtn" class="btn-mini" type="button">查</button></div>
-    <ul id="ledgerList" class="ql"></ul>
-  </section>
-  <section class="card">
-    <h3>记忆检索</h3>
-    <div class="qrow"><input id="memQ" placeholder="查记忆（如：用户偏好）"><button id="memBtn" class="btn-mini" type="button">查</button></div>
-    <ul id="memList" class="ql"></ul>
-  </section>
-  <section class="card">
-    <h3>会话档案</h3>
-    <ul id="sessList" class="ql"></ul>
-  </section>
-  <section class="card">
-    <h3>链路设置</h3>
-    <div class="grid2">
-      <label>设备<select id="cf-device"></select></label>
-      <label>降噪<select id="cf-denoise"><option>rnnoise</option><option>off</option></select></label>
-      <label>断句秒<select id="cf-duration"><option>2</option><option>3</option><option>5</option><option>8</option></select></label>
-      <label>音色<select id="cf-speaker"><option>Vivian</option><option>Serena</option><option>Ono_Anna</option><option>Sohee</option></select></label>
-      <label>TTS模型<select id="cf-ttsmodel" title="8GB 显存仅支持 0.6B；默认=克隆·清亮嗓"><option>0.6B</option><option value="clone">克隆·清亮嗓（默认）</option><option value="clone:bright">克隆·清亮嗓</option><option value="clone:xiaoyi">克隆·Xiaoyi</option><option value="clone:yuanheng">克隆·元亨本音 v2（试验）</option></select></label>
-      <label class="ck"><input type="checkbox" id="cf-speak"> 回复发声</label>
-      <label class="ck"><input type="checkbox" id="cf-qqsilent" title="开发模式：不自动拉起 NapCat、不推送掉线通知；随时可关"> 开发模式（QQ 静默）</label>
-    </div>
-    <div class="qrow">
-      <button id="cf-save" class="btn-mini" type="button">保存设置</button>
-      <button id="cf-free" class="btn-mini" type="button">释放显存</button>
-    </div>
-  </section>
-  <section class="card">
-    <h3>唱歌（翻唱）</h3>
-    <div class="qrow">
-      <input type="file" id="sing-file" accept="audio/*">
-      <button id="sing-go" class="btn-mini" type="button">开始翻唱</button>
-    </div>
-    <div class="qrow">
-      <span style="opacity:.85;font-size:12px">规则：只翻唱干声，和声/伴奏保留原声（自动分轨混回）</span>
-      <label>翻唱嗓<select id="sing-voice"><option value="bright">清亮俏皮（默认）</option><option value="xiaoyi">Xiaoyi（平静）</option></select></label>
-    </div>
-    <div id="sing-status" class="qrow" style="opacity:.8;font-size:12px">
-      选一首歌 → 开始：自动三轨分离 → Seed-VC 44k 只换干声 → 柔化 e → 混回原声和声/伴奏 → 存「音频素材/翻唱产出/」并入库。唱窗期间聊天暂停约 3 分钟。
-    </div>
-    <audio id="sing-audio" controls style="width:100%;display:none;margin-top:6px"></audio>
-    <div id="songs-list" class="qrow" style="flex-wrap:wrap;gap:6px;font-size:12px"></div>
-  </section>
-  <section class="card">
-    <h3>成长日志</h3>
-    <ul id="growthList" class="ql"></ul>
-  </section>
-  <section class="card">
-    <h3>最近日志</h3>
-    <ul id="logsList" class="ql logs"></ul>
-  </section>
-</aside>
-
-<main>
-  <section id="chat">
-    <div id="msgs"></div>
-    <button id="toBottom" class="btn-mini" type="button" title="回到最底" style="display:none">↓ 回到最新</button>
-  </section>
-  <footer>
-    <div id="bar">
-      <form id="talk">
-        <textarea id="in" rows="1" autocomplete="off" placeholder="输入消息：回车发送 · Shift+回车换行"></textarea>
-        <button id="send" class="btn" type="submit">发送</button>
-        <button id="stopBtn" class="btn" type="button" style="display:none" title="停止本轮输出">停止</button>
-      </form>
-      <div id="voiceCtrls" style="display:none">
-        <button id="voiceBtn" class="btn-gold" type="button" title="说一句话（说完自动断）">🎤 语音</button>
-        <button id="contBtn" class="btn" type="button" title="连续对话：一直听、免点击、可插话">连续对话</button>
-        <div id="vad"><i id="vadbar"></i></div>
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">元</div>
+      <div class="brand-text">
+        <div class="brand-title">元亨 <span id="ver" class="brand-sub">工作台</span></div>
+        <div class="brand-desc">元 · 亨 · 利 · 贞</div>
       </div>
     </div>
-    <p id="hint" class="dim">工作台：文本/语音对话流式 · 记忆/台账/链路设置陆续接入</p>
-  </footer>
-</main>
+
+    <div class="top-status" id="lamps">
+      <span class="lamp idle" id="l-busy">空闲</span>
+      <span class="conn" id="conn-hint" title="服务连接状态">—</span>
+    </div>
+
+    <div class="top-actions">
+      <button id="themeBtn" class="icon-btn" type="button" title="切换明暗">◐</button>
+      <button id="clearBtn" class="ghost-btn" type="button" title="清空对话，开新会话">新对话</button>
+      <button id="dashBtn" class="ghost-btn" type="button" title="打开右侧面板（Ctrl+K 也可）">面板</button>
+      <div class="menu">
+        <button id="moreBtn" class="icon-btn" type="button" title="更多入口">⋯</button>
+        <div class="menu-pop" id="moreMenu">
+          <button id="avatarBtn" type="button">形象窗口</button>
+          <button id="petBtn" type="button">启动桌宠</button>
+          <button id="allBtn" type="button">启动全家桶</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主区：对话 -->
+  <main class="stage">
+    <section id="chat" class="chat">
+      <div class="chat-head">
+        <div class="chat-title">对话</div>
+        <div class="chat-meta" id="chatMeta">—</div>
+      </div>
+      <div id="msgs" class="msgs"></div>
+      <button id="toBottom" class="to-bottom" type="button" title="回到最底" style="display:none">↓ 回到最新</button>
+
+      <footer id="bar" class="composer">
+        <div id="voiceCtrls" class="voice-row" style="display:none">
+          <button id="voiceBtn" class="pill-btn gold" type="button" title="说一句话（说完自动断）">🎤 语音</button>
+          <button id="contBtn" class="pill-btn" type="button" title="连续对话：一直听、免点击、可插话">连续对话</button>
+          <div id="vad" class="vad"><i id="vadbar"></i></div>
+        </div>
+        <form id="talk" class="talk">
+          <textarea id="in" rows="1" autocomplete="off" placeholder="和元亨说点什么…（Enter 发送 · Shift+Enter 换行）"></textarea>
+          <button id="send" class="send-btn" type="submit">发送</button>
+          <button id="stopBtn" class="stop-btn" type="button" title="停止本轮输出" style="display:none">停止</button>
+        </form>
+        <p id="hint" class="hint">文本/语音流式对话 · 右侧面板看记忆、台账、状态与翻唱</p>
+      </footer>
+    </section>
+
+    <!-- 右侧抽屉：所有旧卡片按标签分组，id 全保留 -->
+    <aside id="side" class="drawer">
+      <div class="drawer-head">
+        <div class="drawer-title">控制面板</div>
+        <button id="dashClose" class="icon-btn" type="button" title="收起">✕</button>
+      </div>
+
+      <nav class="drawer-tabs" id="drawerTabs">
+        <button class="tab on" data-panel="status" type="button">状态</button>
+        <button class="tab" data-panel="memory" type="button">记忆</button>
+        <button class="tab" data-panel="ledger" type="button">台账</button>
+        <button class="tab" data-panel="media" type="button">翻唱</button>
+        <button class="tab" data-panel="settings" type="button">设置</button>
+      </nav>
+
+      <div class="drawer-body">
+
+        <!-- 状态 -->
+        <section class="panel on" data-panel="status">
+          <div class="card">
+            <h3>后台情况</h3>
+            <ul class="svc">
+              <li><span class="dot" id="s-gemma"></span>Gemma 8081</li>
+              <li><span class="dot" id="s-daemon"></span>常驻服务 8321</li>
+              <li><span class="dot" id="s-ollama"></span>ollama 11434</li>
+              <li><span class="dot" id="s-qq"></span>元亨 QQ</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>元亨状态</h3>
+            <p class="kv"><span>当前阶段</span><b id="m-stage">空闲</b></p>
+            <p class="kv"><span>对话轮次</span><b id="m-turns">0</b></p>
+            <p class="kv"><span>记忆 L2</span><b id="m-l2">0</b></p>
+            <p class="kv"><span>人格草稿</span><b id="m-persona">-</b></p>
+          </div>
+          <div class="card">
+            <h3>工作进度</h3>
+            <p class="kv"><span>进行中</span><b id="m-work">-</b></p>
+            <p class="kv"><span>链状态</span><b id="m-chain">-</b></p>
+            <p class="kv"><span>开发(opencode)</span><b id="m-dev">空闲</b></p>
+          </div>
+          <div class="card">
+            <h3>资源占用</h3>
+            <p class="kv"><span>GPU 利用率</span><b id="m-gpu">-</b></p>
+            <div class="bar"><i id="m-gpub"></i></div>
+            <p class="kv"><span>显存</span><b id="m-vram">-</b></p>
+            <div class="bar"><i id="m-vramb"></i></div>
+            <p class="kv"><span>CPU</span><b id="m-cpu">-</b></p>
+            <div class="bar"><i id="m-cpub"></i></div>
+            <p class="kv"><span>内存</span><b id="m-ram">-</b></p>
+            <p class="kv"><span>磁盘</span><b id="m-disk">-</b></p>
+          </div>
+          <div class="card">
+            <h3>元亨 QQ</h3>
+            <p class="kv"><span>账号</span><b id="q-uin">-</b></p>
+            <p class="kv"><span>状态</span><b id="q-online">-</b></p>
+            <p class="kv"><span>NapCat WS</span><b id="q-ws">-</b></p>
+            <p class="kv"><span>桥接</span><b id="q-bridge">-</b></p>
+            <div class="qrow">
+              <button id="q-wake" class="btn-mini" type="button" title="唤起 NapCat 以便登录元亨号">唤起登录</button>
+              <button id="q-start" class="btn-mini" type="button" title="启动 QQ 桥 Lite">启动QQ桥</button>
+              <button id="q-restart" class="btn-mini" type="button" title="重启 QQ 桥">重启桥</button>
+              <button id="q-stop" class="btn-mini" type="button" title="停止桥和看门狗">停止桥</button>
+            </div>
+            <div id="qqQrWrap" style="display:none;text-align:center;margin-top:8px">
+              <img id="qqQr" alt="登录二维码" style="width:150px;height:150px;border-radius:8px;background:#fff">
+              <p class="kv" style="font-size:11px;opacity:.8">用手机 QQ 扫码登录元亨号 3655185302</p>
+            </div>
+          </div>
+          <div class="card">
+            <h3>内在因（驱动力）</h3>
+            <ul id="drivesList" class="ql"></ul>
+            <div class="qrow"><input id="driveName" placeholder="新增内在因（如：好奇量子计算）"><button id="driveAdd" class="btn-mini" type="button">加</button></div>
+          </div>
+        </section>
+
+        <!-- 记忆 -->
+        <section class="panel" data-panel="memory">
+          <div class="card">
+            <h3>记忆检索</h3>
+            <div class="qrow"><input id="memQ" placeholder="查记忆（如：用户偏好）"><button id="memBtn" class="btn-mini" type="button">查</button></div>
+            <ul id="memList" class="ql"></ul>
+          </div>
+          <div class="card">
+            <h3>会话档案</h3>
+            <ul id="sessList" class="ql"></ul>
+          </div>
+          <div class="card">
+            <h3>成长日志</h3>
+            <ul id="growthList" class="ql"></ul>
+          </div>
+        </section>
+
+        <!-- 台账 -->
+        <section class="panel" data-panel="ledger">
+          <div class="card">
+            <h3>台账查询</h3>
+            <div class="qrow"><input id="ledgerQ" placeholder="查台账记录（如：0219）"><button id="ledgerBtn" class="btn-mini" type="button">查</button></div>
+            <ul id="ledgerList" class="ql"></ul>
+          </div>
+          <div class="card">
+            <h3>最近日志</h3>
+            <ul id="logsList" class="ql logs"></ul>
+          </div>
+        </section>
+
+        <!-- 翻唱 -->
+        <section class="panel" data-panel="media">
+          <div class="card">
+            <h3>唱歌（翻唱）</h3>
+            <div class="qrow">
+              <input type="file" id="sing-file" accept="audio/*">
+              <button id="sing-go" class="btn-mini" type="button">开始翻唱</button>
+            </div>
+            <div class="qrow">
+              <span style="opacity:.85;font-size:12px">只翻唱干声，和声/伴奏保留原声（自动分轨混回）</span>
+              <label>翻唱嗓<select id="sing-voice"><option value="bright">清亮俏皮（默认）</option><option value="xiaoyi">Xiaoyi（平静）</option></select></label>
+            </div>
+            <div id="sing-status" class="qrow" style="opacity:.8;font-size:12px">
+              选一首歌 → 开始：Kim 分轨 → MDX 卡拉OK → Seed-VC 44k 只换干声 → 柔化 e → 混回原声和声/伴奏 → 存「音频素材/翻唱产出/」并入库。唱窗期间聊天暂停约 6 分钟。
+            </div>
+            <audio id="sing-audio" controls style="width:100%;display:none;margin-top:6px"></audio>
+            <div id="songs-list" class="qrow" style="flex-wrap:wrap;gap:6px;font-size:12px"></div>
+          </div>
+          <div class="card">
+            <h3>启动入口</h3>
+            <div class="qrow">
+              <button id="ln-napcat" class="btn-mini" type="button" title="NapCat 管理面板（6099）">NapCat 面板</button>
+              <button id="ln-official" class="btn-mini" type="button" style="display:none">翻唱官方UI（已停用）</button>
+              <button id="ln-official-stop" class="btn-mini" type="button" style="display:none">关闭官方UI</button>
+            </div>
+            <div id="ln-status" class="kv" style="font-size:12px;opacity:.8">旧 SoulX 官方UI 已退出生产</div>
+            <div id="ln-napcat-status" class="kv" style="font-size:12px;opacity:.8">点击按钮打开（未运行会自动拉起）</div>
+          </div>
+        </section>
+
+        <!-- 设置 -->
+        <section class="panel" data-panel="settings">
+          <div class="card">
+            <h3>对话模式</h3>
+            <div class="qrow">
+              <button id="modeText" class="btn-mini" type="button">文本模式</button>
+              <button id="modeVoice" class="btn-mini" type="button">语音模式</button>
+            </div>
+            <p class="kv" style="font-size:11px;opacity:.75">文本：打字；语音：连续对话（免点击，边说边识别）</p>
+          </div>
+          <div class="card">
+            <h3>链路设置</h3>
+            <div class="grid2">
+              <label>设备<select id="cf-device"></select></label>
+              <label>降噪<select id="cf-denoise"><option>rnnoise</option><option>off</option></select></label>
+              <label>断句秒<select id="cf-duration"><option>2</option><option>3</option><option>5</option><option>8</option></select></label>
+              <label>音色<select id="cf-speaker"><option>Vivian</option><option>Serena</option><option>Ono_Anna</option><option>Sohee</option></select></label>
+              <label>TTS模型<select id="cf-ttsmodel" title="8GB 显存仅支持 0.6B；默认=克隆·清亮嗓"><option>0.6B</option><option value="clone">克隆·清亮嗓（默认）</option><option value="clone:bright">克隆·清亮嗓</option><option value="clone:xiaoyi">克隆·Xiaoyi</option><option value="clone:yuanheng">克隆·元亨本音 v2（试验）</option></select></label>
+              <label class="ck"><input type="checkbox" id="cf-speak"> 回复发声</label>
+              <label class="ck"><input type="checkbox" id="cf-qqsilent" title="开发模式：不自动拉起 NapCat、不推送掉线通知"> 开发模式（QQ 静默）</label>
+            </div>
+            <div class="qrow">
+              <button id="cf-save" class="btn-mini" type="button">保存设置</button>
+              <button id="cf-free" class="btn-mini" type="button">释放显存</button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </aside>
+    <div class="drawer-scrim" id="drawerScrim"></div>
+  </main>
+</div>
 <script src="/console.js"></script>
+<script src="/ui.js"></script>
 </body>
 </html>

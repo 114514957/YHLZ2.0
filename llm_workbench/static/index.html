@@ -2,29 +2,61 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>LLM 工作台 · 元亨</title>
+<title>训练工作台 · 元亨</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header>
-  <h1>LLM 工作台</h1>
-  <span class="sub">版本控制 · 对话测试 · 评测</span>
-  <span class="chip"><span id="dotSrv" class="dot off"></span><span id="srvTxt">未启动</span></span>
-  <span class="chip">显存空闲 <b id="vram">-</b></span>
-  <span class="chip" id="procChip" title="工作台自己的 llama-server">PID <b id="pidTxt">-</b></span>
-  <span class="spacer"></span>
-  <button id="btnScan">重扫版本</button>
-  <button id="btnStop" class="danger">停止实例</button>
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">训</div>
+    <div>
+      <div class="brand-title">训练工作台 <span class="sub">模型版本 · 对话 · 评测</span></div>
+      <div class="brand-desc">元亨模型线 · LoRA / GGUF / 跑分</div>
+    </div>
+  </div>
+
+  <div class="chips">
+    <span class="chip"><span id="dotSrv" class="dot off"></span><span id="srvTxt">未启动</span></span>
+    <span class="chip">显存空闲 <b id="vram">-</b></span>
+    <span class="chip" id="procChip" title="工作台自己的 llama-server">PID <b id="pidTxt">-</b></span>
+  </div>
+
+  <div class="actions">
+    <button id="btnScan" class="ghost">重扫版本</button>
+    <button id="btnStop" class="danger">停止实例</button>
+  </div>
 </header>
 
-<main>
-  <aside id="side">
+<main class="layout">
+  <aside id="side" class="versions">
     <div class="side-head"><span>版本</span><span id="verCount" class="muted"></span></div>
-    <div id="verList"></div>
+    <div id="verList" class="ver-list"></div>
   </aside>
 
-  <section id="main">
+  <section id="main" class="work">
+    <div class="dash" id="dash">
+      <div class="stat">
+        <div class="stat-k">最新 56 题</div>
+        <div class="stat-v" id="statLatest">—</div>
+        <div class="stat-s" id="statLatestSub">没有记录</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k">历史最佳</div>
+        <div class="stat-v" id="statBest">—</div>
+        <div class="stat-s" id="statBestSub">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k">闸门</div>
+        <div class="stat-v" id="statGate">—</div>
+        <div class="stat-s" id="statGateSub">最近一次</div>
+      </div>
+      <div class="stat spark">
+        <div class="stat-k">分数趋势（persona56）</div>
+        <canvas id="trend" width="320" height="64"></canvas>
+      </div>
+    </div>
+
     <div class="tabs">
       <div class="tab on" data-tab="overview">概览</div>
       <div class="tab" data-tab="chat">对话测试</div>
@@ -72,7 +104,7 @@
           <button id="btnSaveChat">保存对话</button>
           <button id="btnClearChat">清空</button>
         </div>
-        <div id="msgs"><div class="empty">先选实例，然后说话</div></div>
+        <div id="msgs" class="msgs"><div class="empty">先选实例，然后说话</div></div>
         <div class="composer">
           <div class="row">
             <textarea id="input" placeholder="Enter 发送，Shift+Enter 换行"></textarea>
@@ -100,8 +132,7 @@
             <label class="muted" title="服务端被聊过之后，同权重同参数会低 1 分（台账 1068）"><input type="checkbox" id="evalCold" checked> 冷态（先重启实例）</label>
             <button class="primary" id="btnEval">开始评测</button>
           </div>
-          <div class="hint">判分复用 tools/persona_bank.verify()；工具题带 snapshot 里的 43 个工具。
-            「冷态」= 重启实例后再评：先聊过天的话，同权重会从 45 掉到 44（p10/p11 翻）。</div>
+          <div class="hint">判分复用 tools/persona_bank.verify()；工具题带 snapshot 里的 43 个工具。</div>
           <div class="bar"><i id="evalBar"></i></div>
           <div class="muted" id="evalProg">—</div>
         </div>
@@ -129,5 +160,6 @@
 </main>
 
 <script src="/static/app.js"></script>
+<script src="/static/dash.js"></script>
 </body>
 </html>

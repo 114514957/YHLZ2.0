@@ -979,7 +979,7 @@ def _sse(data: dict) -> bytes:
     return ("data: " + json.dumps(data, ensure_ascii=False) + "\n\n").encode("utf-8")
 
 
-GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/state",
+GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/ui.js", "/state",
           "/history", "/monitor", "/settings", "/devices", "/logs",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
           "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html",
@@ -1138,6 +1138,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._serve_file("console.css")
         elif p == "/console.js":
             self._serve_file("console.js")
+        elif p == "/ui.js":
+            self._serve_file("ui.js")
         elif p == "/state":
             self._send_json(200, self._state())
         elif p == "/history":
