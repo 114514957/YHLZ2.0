@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>翻唱工作站 · 元亨</title>
+<link rel="icon" href="/favicon.png?v=20261017">
+<link rel="stylesheet" href="/cover.css">
+</head>
+<body data-theme="dark">
+<div class="app">
+  <header class="topbar">
+    <a class="back" href="/" title="回元亨工作台">← 工作台</a>
+    <div class="brand"><span class="brand-mark">唱</span>
+      <div><div class="brand-title">翻唱工作站</div>
+        <div class="brand-desc">Kim → MDX → Seed-VC → 柔化 e → 三轨混回</div></div>
+    </div>
+    <div class="top-status">
+      <span id="jobState" class="pill idle">空闲</span>
+      <span id="jobTime" class="dim">—</span>
+      <span id="gpuHint" class="dim"></span>
+    </div>
+    <div class="top-actions">
+      <button id="themeBtn" class="icon-btn" type="button" title="明暗">◐</button>
+      <a class="ghost" href="/songs/audio" hidden></a>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- 左：输入 -->
+    <section class="card left">
+      <h3>1 · 选歌</h3>
+      <label id="drop" class="drop">
+        <input type="file" id="file" accept="audio/*">
+        <div class="drop-icon">♫</div>
+        <div class="drop-main"><b>拖一首歌进来</b><span>或点击选择 m4a / mp3 / wav / flac</span></div>
+        <div id="fileName" class="drop-file"></div>
+      </label>
+
+      <h3>2 · 设定</h3>
+      <div class="row">
+        <label class="field">翻唱嗓
+          <select id="voice">
+            <option value="bright">清亮俏皮（默认）</option>
+            <option value="xiaoyi">Xiaoyi（平静）</option>
+          </select>
+        </label>
+        <label class="field">柔化
+          <select id="preset"><option value="e">e（验收版）</option></select>
+        </label>
+      </div>
+      <p class="hint">只换干声；和声/伴奏保留原声。整首约 6–7 分钟，唱窗期间聊天会暂停。</p>
+
+      <button id="startBtn" class="primary" type="button" disabled>开始翻唱</button>
+      <div id="msg" class="msg-line"></div>
+
+      <h3>链路</h3>
+      <ol class="steps" id="steps">
+        <li data-step="s1"><span>1</span>S1 规范化 44.1k</li>
+        <li data-step="s2"><span>2</span>S2 Kim 人声分离</li>
+        <li data-step="s3"><span>3</span>S3 MDX 卡拉OK</li>
+        <li data-step="s4"><span>4</span>S4 Seed-VC 换声</li>
+        <li data-step="s5"><span>5</span>S5 柔化 e</li>
+        <li data-step="s6"><span>6</span>S6 三轨混回</li>
+        <li data-step="s7"><span>7</span>S7 归档入库</li>
+      </ol>
+      <p class="hint" id="sepLine">分轨链：—</p>
+    </section>
+
+    <!-- 右：运行 -->
+    <section class="card right">
+      <h3>运行</h3>
+      <div class="stage-head">
+        <div id="stageTitle" class="stage-title">等待开始</div>
+        <div id="stageTimer" class="mono">00:00</div>
+      </div>
+      <div class="bar"><i id="bar"></i></div>
+      <pre id="log" class="log">还没有任务。</pre>
+
+      <h3>试听 / 对比</h3>
+      <div class="ab">
+        <div class="ab-col">
+          <div class="ab-title">原曲</div>
+          <audio id="audioOrig" controls preload="none"></audio>
+        </div>
+        <div class="ab-col">
+          <div class="ab-title">成品</div>
+          <audio id="audioOut" controls preload="none"></audio>
+        </div>
+      </div>
+      <div id="resultLine" class="hint">完成后这里出现成品。</div>
+    </section>
+
+    <!-- 下：成品库 -->
+    <section class="card library">
+      <div class="lib-head">
+        <h3>成品库</h3>
+        <button id="refreshSongs" class="ghost" type="button">刷新</button>
+      </div>
+      <div id="songs" class="songs"><div class="empty">还没有翻唱成品</div></div>
+    </section>
+  </main>
+</div>
+<script src="/cover.js"></script>
+</body>
+</html>
