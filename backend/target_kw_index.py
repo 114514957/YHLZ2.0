@@ -129,7 +129,11 @@ class KeywordIndex:
                 )
                 """
             )
+            con.execute("PRAGMA temp_store=MEMORY")
             con.execute("CREATE INDEX IF NOT EXISTS idx_kw_term ON kw_index(term)")
+            # 2026-11-07：没有 docid 索引时，bulk_upsert 的逐条 DELETE 会全表扫描，
+            # 15k 文档 ≈ O(n²)，全量重建跑到天亮（实测 60min+ 仍未提交）。
+            con.execute("CREATE INDEX IF NOT EXISTS idx_kw_docid ON kw_index(docid)")
             con.execute("CREATE INDEX IF NOT EXISTS idx_kw_docext ON kw_docs(source, status)")
             con.commit()
 
@@ -204,7 +208,10 @@ class KeywordIndex:
                     )
                     con.execute("DELETE FROM kw_docs WHERE source=?", (clear_source,))
                 for docid, source, summary, title, importance, status, updated, terms in prepared:
-                    con.execute("DELETE FROM kw_index WHERE docid=?", (docid,))
+                    # clear_source 已经把该来源整表清空，这里再逐条 DELETE 纯属浪费；
+                    # 它在无 docid 索引时是 O(n²) 的元凶（2026-11-07）。
+                    if not clear_source:
+                        con.execute("DELETE FROM kw_index WHERE docid=?", (docid,))
                     con.execute(
                         """INSERT OR REPLACE INTO kw_docs
                         (docid,source,summary,record_title,importance,status,updated_at)

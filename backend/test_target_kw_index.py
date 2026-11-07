@@ -74,6 +74,19 @@ class TestKeywordIndex(unittest.TestCase):
         self.assertEqual(h["docs"], 1)
         self.assertGreater(h["terms"], 0)
 
+    def test_bulk_upsert_clear_source_drops_stale_docs(self):
+        """2026-11-07 回归：clear_source 重建后旧 doc 必须消失（顺带覆盖 O(n²) 修复）。"""
+        docs = [{"docid": "ledger:9001:1", "source": "ledger", "summary": "stale doc one"},
+                {"docid": "ledger:9001:2", "source": "ledger", "summary": "stale doc two"}]
+        self.kw.bulk_upsert_docs(docs, clear_source="ledger")
+        self.assertEqual(len(self.kw.query("stale")), 2)
+        fresh = [{"docid": "ledger:9002:1", "source": "ledger", "summary": "fresh doc"}]
+        self.kw.bulk_upsert_docs(fresh, clear_source="ledger")
+        rows = self.kw.query("fresh")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["docid"], "ledger:9002:1")
+        self.assertEqual(self.kw.query("stale"), [])
+
 
 if __name__ == "__main__":
     unittest.main()
