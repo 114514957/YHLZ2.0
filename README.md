@@ -14,6 +14,7 @@
 3. QQ Bridge Lite（`tools/qq_bridge_control.py resume`；`auto_resume` 决定是否随登录恢复）
 
 **其余桌面入口**：`元亨·翻唱工作站` / `元亨·训练工作台`（`tools/shortcuts/open_page.py`，端口没起会自动拉起再开 Edge 应用窗）。
+模型工作台已并入主工作台：`http://127.0.0.1:8321/train`（8090 只作后端）。
 `YH_全家桶.bat` 仍可用，但它只转调 `YH_boot.bat`（同一套实现）再开工作台、拉桌宠——不要再各自维护一套启动逻辑。
 启动诊断：`cache/logs/boot.log`（启动脚本）、`cache/logs/launcher.log`（每一步 spawn/失败）、`cache/logs/daemon.log`。
 

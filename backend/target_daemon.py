@@ -1095,6 +1095,10 @@ class _Handler(ConsoleHandler):
             return
         if self._ui_route("GET"):
             return
+        # 训练工作台已并入 8321（2026-11-08）：/train + /static + /api 交给 console 代理到 8090
+        if self.path.startswith(("/train", "/static/", "/api/")):
+            self.console_do_GET()
+            return
         if self.path.startswith(("/sing", "/songs")):
             self.console_do_GET()
             return
@@ -1109,6 +1113,9 @@ class _Handler(ConsoleHandler):
 
     def do_POST(self):
         if self._ui_route("POST"):
+            return
+        if self.path.startswith("/api/"):
+            self.console_do_POST()
             return
         if self.path.startswith(("/sing", "/songs")):
             # upload/sing/song routes read the raw body themselves

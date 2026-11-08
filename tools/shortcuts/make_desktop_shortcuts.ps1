@@ -27,8 +27,8 @@ function New-Link {
 
 New-Link '元亨·翻唱工作站.lnk' 'http://127.0.0.1:8321/cover' 8321 'yh' `
     '元亨翻唱工作站（拖歌→分轨→换声→A/B→成品库）' $icon
-New-Link '元亨·训练工作台.lnk' 'http://127.0.0.1:8090/' 8090 'train' `
-    '元亨训练工作台（版本/对话/评测/记录 + 仪表盘）' (Join-Path $root 'assets\icons\yhlz-app.ico')
+New-Link '元亨·训练工作台.lnk' 'http://127.0.0.1:8321/train' 8321 'yh' `
+    '元亨模型工作台（版本/对话/评测/记录 + 仪表盘；已并入 8321）' (Join-Path $root 'assets\icons\yhlz-app.ico')
 
 # 元亨工作台：沿用原有「YH 元亨利贞.lnk」；若不存在则补一个
 $main = Join-Path $desk 'YH 元亨利贞.lnk'

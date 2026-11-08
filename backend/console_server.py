@@ -1007,6 +1007,78 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _ensure_train_backend(self) -> bool:
+        """训练台后端（8090）懒启动：并入后只有一个入口，不能要求老爹先开 8090。"""
+        import socket
+        import subprocess
+        import time
+
+        def up() -> bool:
+            try:
+                with socket.create_connection(("127.0.0.1", 8090), timeout=0.5):
+                    return True
+            except OSError:
+                return False
+
+        if up():
+            return True
+        try:
+            pyw = _PROJECT_ROOT / ".venv" / "Scripts" / "pythonw.exe"
+            flags = (getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+                     | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200))
+            subprocess.Popen(
+                [str(pyw), "-B", str(_PROJECT_ROOT / "llm_workbench" / "server.py")],
+                cwd=str(_PROJECT_ROOT), creationflags=flags,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL)
+        except Exception:  # noqa: BLE001
+            return False
+        for _ in range(24):
+            time.sleep(0.5)
+            if up():
+                return True
+        return False
+
+    def _proxy_to(self, port: int, path: str) -> None:
+        """把训练工作台并入本工作台（2026-11-08）：同源代理 8090 的页面/静态/API。
+
+        这样元亨工作台只对外一个入口 8321；`/train` 是训练台页面，`/api/*`
+        与 `/static/*` 原样转给 8090。训练台本身不需要暴露给浏览器。
+        """
+        import http.client
+
+        body = b""
+        try:
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            if n > 0:
+                body = self.rfile.read(n)
+        except Exception:  # noqa: BLE001
+            body = b""
+        if port == 8090:
+            self._ensure_train_backend()
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=120)
+            headers = {}
+            for k in ("Content-Type", "Accept"):
+                v = self.headers.get(k)
+                if v:
+                    headers[k] = v
+            conn.request(self.command, path, body=body or None, headers=headers)
+            resp = conn.getresponse()
+            data = resp.read()
+            self.send_response(resp.status)
+            for k in ("Content-Type", "Content-Length", "Cache-Control"):
+                v = resp.getheader(k)
+                if v:
+                    self.send_header(k, v)
+            if not resp.getheader("Content-Length"):
+                self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            conn.close()
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(502, {"error": f"train proxy: {type(exc).__name__}"})
+
     def _serve_file(self, name: str) -> None:
         path = (STATIC_DIR / name).resolve()
         if not path.is_file() or STATIC_DIR not in path.parents:
@@ -1101,6 +1173,10 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
     def console_do_GET(self):
         p = self.path.split("?", 1)[0]
+        # 训练工作台已并入 8321（2026-11-08）：/train 页面 + /static + /api 同源代理
+        if p == "/train" or p.startswith("/static/") or p.startswith("/api/"):
+            self._proxy_to(8090, "/" if p == "/train" else p)
+            return
         if p == "/talk_result":
             # 段5（0635）：断连后按 request_id **取结果**（不重放副作用）
             import urllib.parse as _up
@@ -1244,6 +1320,9 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
     def console_do_POST(self):
         p = self.path.split("?", 1)[0]
+        if p.startswith("/api/"):
+            self._proxy_to(8090, p)
+            return
         if p == "/talk":
             from backend import gpu_lock
 

@@ -52,11 +52,15 @@
 |---|---|---|
 | `YH 元亨利贞.lnk` | 8321 元亨工作台 | 走 `YH_workbench_normal.bat`（起栈+等+开浏览器） |
 | `元亨·翻唱工作站.lnk` | `http://127.0.0.1:8321/cover` | `open_page.py --boot yh` → `YH_boot.bat`，等 8321 后开 Edge 应用窗 |
-| `元亨·训练工作台.lnk` | `http://127.0.0.1:8090/` | `open_page.py --boot train` → 起 `llm_workbench/server.py` |
+| `元亨·训练工作台.lnk` | `http://127.0.0.1:8321/train` | `open_page.py --boot yh` → `YH_boot.bat`，等 8321 后开 Edge 应用窗 |
 
 重建：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\shortcuts\make_desktop_shortcuts.ps1`
 （脚本带 UTF-8 BOM；PS 5.1 按 GBK 读中文会把括号吃掉。）
 
+> **模型工作台已并入 8321（2026-11-08）**：页面在 `/train`，`/static/*` 与 `/api/*` 由
+> `console_server._proxy_to()` 同源代理到 `llm_workbench/server.py`（8090，只作后端，不再对外）；
+> 首次访问 `/train` 会自动拉起 8090（`_ensure_train_backend`），不用先手动开训练台。
+>
 > **开机不自启（2026-11-08 老爹定）**：Startup 里的 `YH 开机自启.lnk` 已改名 `.disabled` 留档；
 > `tools/shortcuts/repair_shortcuts.vbs` 已改为「只修桌面入口、发现旧自启项就地禁用」。
 
