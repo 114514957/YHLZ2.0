@@ -62,6 +62,7 @@
       <div class="tab on" data-tab="overview">概览</div>
       <div class="tab" data-tab="chat">对话测试</div>
       <div class="tab" data-tab="eval">评测</div>
+      <div class="tab" data-tab="materials">素材</div>
       <div class="tab" data-tab="runs">记录</div>
     </div>
 
@@ -140,6 +141,22 @@
           <div class="muted" id="evalProg">—</div>
         </div>
         <div id="evalResult"></div>
+      </div>
+
+      <!-- 素材 -->
+      <div class="page" id="pg-materials">
+        <div class="card">
+          <h3>黄金样本库</h3>
+          <div id="matGolden" class="kv"><span class="muted">加载中…</span></div>
+        </div>
+        <div class="card">
+          <h3>素材集（docs/素材）</h3>
+          <div id="matSets" class="muted">加载中…</div>
+        </div>
+        <div class="card">
+          <h3>训练包（dist/retrain_pkg_*）</h3>
+          <div id="matPkgs" class="muted">加载中…</div>
+        </div>
       </div>
 
       <!-- 记录 -->

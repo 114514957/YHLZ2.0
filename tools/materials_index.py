@@ -65,13 +65,17 @@ def collect() -> list[dict]:
         return {"category": cat, "name": name, "path": str(path), "count": count,
                 "note": note, "license": license_}
 
+    # 2026-11-08：索引里写死「记忆样本.md」，但盘上实际是 v2.1/v2 —— 索引一直报「缺失」。
+    mem_candidates = [ROOT / "docs" / "素材" / n
+                      for n in ("记忆样本_v2.1.md", "记忆样本_v2.md", "记忆样本.md")]
+    mem_doc = next((p for p in mem_candidates if p.exists()), mem_candidates[-1])
     items = [
         item("人格核心", "黄金样本", ROOT / "docs" / "素材" / "黄金样本.md",
              _golden_count(), "老爹批准的元亨口吻样本", "内部"),
         item("人格核心", "真实对白(sft_persona)", ROOT / "data" / "finetune" / "sft_persona.jsonl",
              _count_lines(ROOT / "data" / "finetune" / "sft_persona.jsonl"), "老爹↔元亨真实会话对", "内部"),
-        item("人格核心", "记忆样本(可编辑)", ROOT / "docs" / "素材" / "记忆样本.md",
-             _count_lines(ROOT / "docs" / "素材" / "记忆样本.md"), "记忆→问答(带emo/scene/关系)", "内部"),
+        item("人格核心", "记忆样本(可编辑)", mem_doc,
+             _count_lines(mem_doc), "记忆→问答(带emo/scene/关系)", "内部"),
         item("元亨记忆", "L2 记忆库", ROOT / "cache" / "memstore" / "memstore.db",
              _sql_count(ROOT / "cache" / "memstore" / "memstore.db",
                         "SELECT COUNT(*) FROM l2_items WHERE status='active'"),

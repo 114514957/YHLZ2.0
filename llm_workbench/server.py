@@ -62,6 +62,94 @@ def api_state(debug: int = 0):
     return out
 
 
+@app.get("/api/materials")
+def api_materials():
+    """素材总览（2026-11-08）：黄金样本 / docs/素材 集 / dist 训练包，给工作台「素材」页用。
+
+    只读、带 60s 缓存；不碰数据本身。
+    """
+    now = time.time()
+    cached = _MAT_CACHE.get("data")
+    if cached and now - _MAT_CACHE.get("ts", 0) < 60:
+        return cached
+
+    root = os.path.dirname(HERE)
+
+    def lines(path: str) -> int:
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                return sum(1 for _ in f)
+        except Exception:  # noqa: BLE001
+            return 0
+
+    def blocks(path: str) -> int:
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                return sum(1 for line in f if line.startswith("## "))
+        except Exception:  # noqa: BLE001
+            return 0
+
+    mat_dir = os.path.join(root, "docs", "素材")
+    sets = []
+    try:
+        for name in sorted(os.listdir(mat_dir)):
+            p = os.path.join(mat_dir, name)
+            if not os.path.isfile(p) or not name.endswith(".md"):
+                continue
+            sets.append({"name": name[:-3], "file": name,
+                         "blocks": blocks(p),
+                         "kb": round(os.path.getsize(p) / 1024, 1),
+                         "mtime": int(os.path.getmtime(p))})
+    except Exception:  # noqa: BLE001
+        pass
+
+    golden_path = os.path.join(mat_dir, "黄金样本.md")
+    golden = {"path": golden_path, "exists": os.path.isfile(golden_path),
+              "blocks": 0, "adopted": None,
+              "kb": round(os.path.getsize(golden_path) / 1024, 1) if os.path.isfile(golden_path) else 0,
+              "mtime": int(os.path.getmtime(golden_path)) if os.path.isfile(golden_path) else 0}
+    try:
+        with open(golden_path, "r", encoding="utf-8", errors="replace") as f:
+            golden["blocks"] = sum(1 for line in f if line.startswith("## golden-"))
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from tools.golden_build import load_golden
+
+        golden["adopted"] = sum(1 for g in load_golden()
+                                if g.get("status") in ("keep", "fixed"))
+    except Exception:  # noqa: BLE001
+        pass
+
+    pkgs = []
+    dist = os.path.join(root, "dist")
+    try:
+        for name in sorted(os.listdir(dist)):
+            p = os.path.join(dist, name)
+            if not os.path.isdir(p) or not name.startswith("retrain_pkg"):
+                continue
+            files = [f for f in os.listdir(p) if f.endswith(".jsonl")]
+            train_lines = sum(lines(os.path.join(p, f)) for f in files if "train" in f)
+            val_lines = sum(lines(os.path.join(p, f)) for f in files if "val" in f)
+            mb = round(sum(os.path.getsize(os.path.join(p, f))
+                           for f in os.listdir(p) if os.path.isfile(os.path.join(p, f))) / 1e6, 1)
+            pkgs.append({"name": name, "files": len(files),
+                         "train_lines": train_lines, "val_lines": val_lines,
+                         "mb": mb, "mtime": int(os.path.getmtime(p))})
+    except Exception:  # noqa: BLE001
+        pass
+
+    out = {"ok": True, "golden": golden, "sets": sets, "packages": pkgs,
+           "materials_md": os.path.join(mat_dir, "素材库.md")}
+    _MAT_CACHE.update({"ts": now, "data": out})
+    return out
+
+
+_MAT_CACHE: dict = {}
+
+
 @app.post("/api/scan")
 def api_scan():
     return registry.scan(force=True)

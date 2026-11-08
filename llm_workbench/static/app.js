@@ -589,8 +589,39 @@ function renderDiff(d) {
   </div>`;
 }
 
+/* ---------------------------------------------------------------- 素材 */
+function renderMaterials() {
+  const g = $('matGolden'), s = $('matSets'), p = $('matPkgs');
+  if (!g || g.dataset.loaded) return;
+  api('/api/materials').then(d => {
+    g.dataset.loaded = '1';
+    const gd = d.golden || {};
+    g.innerHTML = `
+      <div class="k">文件</div><div class="v">${esc(gd.path || '')}</div>
+      <div class="k">块数</div><div class="v">${gd.blocks ?? '—'} 块${gd.adopted != null ? `（采纳 ${gd.adopted}）` : ''}</div>
+      <div class="k">大小</div><div class="v">${gd.kb} KB</div>
+      <div class="k">修改</div><div class="v">${gd.mtime ? fmtTime(gd.mtime) : '—'}</div>`;
+
+    const sets = d.sets || [];
+    s.innerHTML = sets.length
+      ? sets.map(x => `<div class="ver"><span class="nm">${esc(x.name)}</span>
+          <span class="tag">${x.blocks} 块</span><span class="sz">${x.kb} KB</span></div>`).join('')
+      : '<div class="empty">docs/素材 下没读到 .md</div>';
+
+    const pkgs = d.packages || [];
+    p.innerHTML = pkgs.length
+      ? pkgs.map(x => `<div class="ver"><span class="nm">${esc(x.name)}</span>
+          <span class="tag gg">train ${x.train_lines}</span>
+          <span class="tag">val ${x.val_lines}</span>
+          <span class="sz">${x.mb} MB</span></div>`).join('')
+      : '<div class="empty">dist 下没读到训练包</div>';
+  }).catch(() => {
+    g.innerHTML = '<span class="bad">素材接口读取失败</span>';
+  });
+}
+
 /* ---------------------------------------------------------------- 深链 */
-const TABS = ['overview', 'chat', 'eval', 'runs'];
+const TABS = ['overview', 'chat', 'eval', 'materials', 'runs'];
 function activate(tab) {
   document.querySelectorAll('.tab').forEach(x =>
     x.classList.toggle('on', x.dataset.tab === tab));
@@ -600,6 +631,7 @@ function activate(tab) {
     const v = currentVersion();
     if (v) $('evalTag').value = v.version;
   }
+  if (tab === 'materials') renderMaterials();
   if (tab === 'runs' && S.runs.length && !$('runDetail').innerHTML) {
     api('/api/runs/' + encodeURIComponent(S.runs[0].file))
       .then(d => renderEvalResult(d, 'runDetail')).catch(() => {});
