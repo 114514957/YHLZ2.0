@@ -6,15 +6,14 @@
 
 ## 快速开始
 
-**开机自启（唯一入口）**：Windows「启动」里只有一条 `YH 开机自启.lnk` → `YH_boot.bat`，
+**启动（2026-11-08 起不再开机自启）**：双击桌面 `YH 元亨利贞` → `YH_workbench_normal.bat` → `YH_boot.bat`，
 按顺序拉起：
 
 1. 服务栈：本地 Gemma（llama.cpp，**8081**）/ Ollama 兜底（**11434**）/ daemon + 工作台（**8321**）
 2. Full 看门狗 `tools/yhlz_watchdog.py`（只管模型与 daemon，不再碰 QQ）
 3. QQ Bridge Lite（`tools/qq_bridge_control.py resume`；`auto_resume` 决定是否随登录恢复）
 
-**手动启动（唯一桌面入口）**：桌面只有一条 `YH 元亨利贞`（→ 仓库里的 `YH_workbench_normal.bat`）。
-它先 `call YH_boot.bat` 走同一套启动链，等 8321 就绪后打开工作台；不再使用桌面副本 bat。
+**其余桌面入口**：`元亨·翻唱工作站` / `元亨·训练工作台`（`tools/shortcuts/open_page.py`，端口没起会自动拉起再开 Edge 应用窗）。
 `YH_全家桶.bat` 仍可用，但它只转调 `YH_boot.bat`（同一套实现）再开工作台、拉桌宠——不要再各自维护一套启动逻辑。
 启动诊断：`cache/logs/boot.log`（启动脚本）、`cache/logs/launcher.log`（每一步 spawn/失败）、`cache/logs/daemon.log`。
 
@@ -22,7 +21,8 @@
   （`tools/qq_bridge_service.py` + `tools/qq_bridge_watchdog.py`，由 `tools/qq_bridge_control.py` 管理）。
   旧 Full 链（`tools/qq_bot.py` / `napcat_watch.py`）在 external 模式下会被启动器/看门狗当场收掉；
   旧入口 `tools/qq_bot_start.bat` 已删除，`tools/qq_bot_restart.py` 只转调 Lite control。
-- 自启项安装/回滚：`python tools/yhlz_boot_startup.py --apply|--rollback`。
+- 自启已停用（2026-11-08 老爹定）：`YH 开机自启.lnk` 已改名为 `.disabled` 留档；不要再用
+  `tools/yhlz_boot_startup.py --apply` 把自启装回来（`--rollback` 只用于清理旧的启动项）。
 
 然后浏览器打开 <http://127.0.0.1:8321>。
 

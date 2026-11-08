@@ -39,7 +39,8 @@
 
 - **一个资源一个消费者**：QQ 号 / 8321 / 8081 / 8348 / 看门狗。换链必须先停旧链，禁止新旧并行；
   external 模式下 `qq_bot.py` / `napcat_watch.py` 由 launcher 与 watchdog 每 tick 回收。
-- **自启唯一**：Startup 只有「YH 开机自启.lnk」；新增自启先删旧条目并登记。
+- **开机不自启（2026-11-08 老爹定）**：Startup 里不放元亨入口；启动走桌面快捷方式
+  （`YH 元亨利贞` / `元亨·翻唱工作站` / `元亨·训练工作台`），端口没起由 `open_page.py` 自动拉起。
 - **自主 fail-closed**：必须 `YHLZ_AUTONOMY_ENABLE=1` 才跑；flag 或 `YHLZ_AUTONOMY_DISABLED=1` 随时关；
   失败指数退避 60s→30min，成功才重置（防 30s 紧循环重试）。
 - **审计**：`tools/chain_guard.py` 检查双链、旧链残留、自启重叠、自主被意外打开；
@@ -56,11 +57,14 @@
 重建：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\shortcuts\make_desktop_shortcuts.ps1`
 （脚本带 UTF-8 BOM；PS 5.1 按 GBK 读中文会把括号吃掉。）
 
+> **开机不自启（2026-11-08 老爹定）**：Startup 里的 `YH 开机自启.lnk` 已改名 `.disabled` 留档；
+> `tools/shortcuts/repair_shortcuts.vbs` 已改为「只修桌面入口、发现旧自启项就地禁用」。
+
 ## 入口
 
 | 入口 | 说明 |
 |---|---|
-| `YH_boot.bat` | **唯一开机自启**（启动项 `YH 开机自启.lnk`）：服务栈 → Full 看门狗 → QQ Lite `resume` |
+| `YH_boot.bat` | 手动启动链（桌面「YH 元亨利贞」→ `YH_workbench_normal.bat` → 本脚本）：服务栈 → Full 看门狗 → QQ Lite `resume`；**不再挂开机自启** |
 | `YH_workbench_normal.bat` | 手动启动工作台（普通权限守卫，拒绝管理员令牌） |
 | `YH_全家桶.bat` | 兼容入口：转调 `YH_boot.bat` + 开工作台 + 桌宠 |
 | `start_yuanheng.bat` | 2026-10-22 重建的启动入口包装（旧链丢失后补的）；`启动元亨.bat` 是它的中文别名 |
