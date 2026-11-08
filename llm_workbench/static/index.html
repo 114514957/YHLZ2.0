@@ -18,7 +18,7 @@
 
   <div class="chips">
     <span class="chip"><span id="dotSrv" class="dot off"></span><span id="srvTxt">未启动</span></span>
-    <span class="chip">显存空闲 <b id="vram">-</b></span>
+    <span class="chip">显存 <b id="vram">-</b></span>
     <span class="chip" id="procChip" title="工作台自己的 llama-server">PID <b id="pidTxt">-</b></span>
   </div>
 
@@ -81,6 +81,8 @@
             <label class="muted"><input type="checkbox" id="force"> 强制（显存不足也起）</label>
           </div>
           <div class="hint">工作台只启动/停止自己起的实例；8081/8082 是外部实例，需要你确认才能停。</div>
+          <div class="hint">启动需要 ≥5.0 GB 空闲显存（模型预算 5 GB）；生产 8081 常驻约 3.5 GB。显存不够会如实报错，不会偷偷杀别人的实例。</div>
+          <div class="hint warn" id="vramWarn"></div>
           <div id="externals" style="margin-top:10px"></div>
           <pre class="log" id="logTail" style="margin-top:10px;display:none"></pre>
         </div>

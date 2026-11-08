@@ -186,7 +186,15 @@ function renderServer() {
     ? `${own.version || '?'} :${own.port}${own.healthy ? '' : '（无响应）'}`
     : (sp.running ? `启动中 ${String(sp.version || '').split(':').pop()}` : '未启动');
   $('pidTxt').textContent = on ? own.pid : '-';
-  $('vram').textContent = sv.gpu_free_mb != null ? sv.gpu_free_mb + ' MB' : 'n/a';
+  $('vram').textContent = sv.gpu
+    ? `空闲 ${(sv.gpu.free_mb / 1024).toFixed(1)} / ${(sv.gpu.total_mb / 1024).toFixed(1)} GB`
+    : (sv.gpu_free_mb != null ? sv.gpu_free_mb + ' MB' : 'n/a');
+  const vw = $('vramWarn');
+  if (vw) {
+    vw.textContent = (sv.gpu && sv.gpu.free_mb < 5000)
+      ? `⚠ 空闲 ${(sv.gpu.free_mb / 1024).toFixed(1)} GB < 5.0 GB 预算：直接启动会被拒；先停外部实例，或勾「强制」硬起。`
+      : '';
+  }
 
   const ex = sv.externals || [];
   $('externals').innerHTML = ex.length ? ('<div class="muted" style="margin-bottom:6px">外部实例（不是工作台起的）</div>' +

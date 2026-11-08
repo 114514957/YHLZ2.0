@@ -317,7 +317,8 @@ async function loadDashboard() {
     const m = await (await fetch("/monitor", { cache: "no-store" })).json();
     if (m.gpu) {
       $("m-gpu").textContent = m.gpu.util + "%";
-      $("m-vram").textContent = m.gpu.used_gb + " / " + m.gpu.total_gb + " GB";
+      $("m-vram").textContent = m.gpu.used_gb + " / " + m.gpu.total_gb + " GB"
+        + (m.gpu.free_gb != null ? "（空闲 " + m.gpu.free_gb + "）" : "");
       bar("m-gpub", m.gpu.util);
       bar("m-vramb", m.gpu.used_gb / m.gpu.total_gb * 100);
     } else { $("m-gpu").textContent = "n/a"; }

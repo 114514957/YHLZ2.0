@@ -1466,14 +1466,15 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             try:
                 g = subprocess.run(
                     ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,"
-                                    "memory.total",
+                                    "memory.total,memory.free",
                      "--format=csv,noheader,nounits"],
                     capture_output=True, text=True, timeout=8)
                 parts = g.stdout.strip().split(",")
-                if len(parts) == 3:
+                if len(parts) == 4:
                     out["gpu"] = {"util": float(parts[0]),
                                   "used_gb": round(float(parts[1]) / 1024, 1),
-                                  "total_gb": round(float(parts[2]) / 1024, 1)}
+                                  "total_gb": round(float(parts[2]) / 1024, 1),
+                                  "free_gb": round(float(parts[3]) / 1024, 1)}
             except Exception:
                 out["gpu"] = None
             out["services"] = self._state()

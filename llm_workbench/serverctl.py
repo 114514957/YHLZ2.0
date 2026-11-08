@@ -128,14 +128,27 @@ def start_async(version_id: str, gguf_path: str, base: str, mmproj: str,
     return {"ok": True, "starting": True, "version": version_id, "port": port}
 
 
-def gpu_free_mb() -> int | None:
+MIN_FREE_MB = 5000  # 老爹 2026-11-08：模型按 5 GB 显存预算（本机 8 GB）
+
+
+def gpu_mem() -> dict | None:
+    """总/已用/空闲（MB），给工作台显示；拿不到就 None。"""
     try:
         out = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
+            ["nvidia-smi", "--query-gpu=memory.total,memory.used,memory.free",
+             "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=10).stdout.strip().splitlines()
-        return int(out[0].strip()) if out else None
+        if not out:
+            return None
+        total, used, free = [int(x.strip()) for x in out[0].split(",")]
+        return {"total_mb": total, "used_mb": used, "free_mb": free}
     except Exception:  # noqa: BLE001
         return None
+
+
+def gpu_free_mb() -> int | None:
+    m = gpu_mem()
+    return m["free_mb"] if m else None
 
 
 def probe_port(port: int) -> dict | None:
@@ -230,6 +243,7 @@ def status(debug: bool = False) -> dict:
         "own": own,
         "starting": starting,
         "externals": ext,
+        "gpu": gpu_mem(),
         "gpu_free_mb": free,
         "log_tail": _log_tail(st.get("log", ""), 6000) if alive else "",
     }
@@ -259,12 +273,13 @@ def start(version_id: str, gguf_path: str, base: str, mmproj: str,
 
     free = gpu_free_mb()
     externals = discover_externals()
-    if ngl > 0 and free is not None and free < 4000 and not force:
+    if ngl > 0 and free is not None and free < MIN_FREE_MB and not force:
         names = "、".join("%s(:%d pid %s)" % (e["alias"] or "?", e["port"], e["pid"])
                          for e in externals) or "无"
         return {"ok": False, "error":
-                "显存只剩 %d MB，起不来（加载约需 4.5 GB）。"
-                "当前占着的实例：%s。先停一个，或加 force 硬起（可能 OOM）。" % (free, names)}
+                "显存只剩 %d MB，起不来（模型预算 %d MB）。"
+                "当前占着的实例：%s。先停一个，或加 force 硬起（可能 OOM）。"
+                % (free, MIN_FREE_MB, names)}
 
     os.makedirs(LOG_DIR, exist_ok=True)
     log = os.path.join(LOG_DIR, "llama_%s_%d.log"
