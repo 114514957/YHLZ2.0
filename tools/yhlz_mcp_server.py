@@ -27,6 +27,21 @@ if str(_ROOT) not in sys.path:
 # 只影响本 MCP 进程，不碰元亨的 daemon。
 os.environ.setdefault("YHLZ_MEMORY_SEMANTIC_MODE", "on")
 
+# 2026-11-13：台账混合检索也在本进程后台预热，避免第一次搜索等模型加载。
+import threading  # noqa: E402
+
+
+def _warm_ledger_embed() -> None:
+    try:
+        from backend.ledger_embed import warm
+
+        warm()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+threading.Thread(target=_warm_ledger_embed, daemon=True).start()
+
 
 def _log_to_file(name: str) -> None:
     """stdio 传输下 stdout 只承载 JSON-RPC，stderr 会被宿主当成故障输出。
@@ -82,16 +97,17 @@ async def _call_async(name: str, params: dict) -> str:
 
 @mcp.tool()
 async def ledger_search(query: str, limit: int = 5, since: str = "",
-                        until: str = "", kind: str = "", tags: str = "") -> str:
-    """Search the YHLZ project ledger (record-level FTS5 since 2026-11-13).
+                        until: str = "", kind: str = "", tags: str = "",
+                        mode: str = "hybrid") -> str:
+    """Search the YHLZ project ledger (record-level FTS5 + semantic since 2026-11-13).
 
     Use for project history, decisions, record numbers, plans. Query in
     1-3 keywords (Chinese ok); returns matching RECORDS with record ids,
     title, date and a snippet. Optional filters: since/until (YYYY-MM-DD),
-    kind (决策/结论/踩坑/状态), tags."""
+    kind (决策/结论/踩坑/状态), tags; mode=hybrid (default) or bm25."""
     return await _call_async("ledger_search", {
         "query": query, "limit": limit, "since": since, "until": until,
-        "kind": kind, "tags": tags,
+        "kind": kind, "tags": tags, "mode": mode,
     })
 
 

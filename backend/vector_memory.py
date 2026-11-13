@@ -97,6 +97,38 @@ def embed(texts: list[str]) -> np.ndarray:
     return pooled.cpu().numpy().astype("float32")
 
 
+def embed_cls(texts: list[str], max_length: int = 512) -> np.ndarray:
+    """CLS-pooled, L2-normalised embeddings（BGE 检索用法；台账用，和记忆的 mean 池分开）。
+
+    共享同一个模型实例，避免进程里加载两份 92MB 权重。
+    """
+    if not texts:
+        return np.zeros((0, DIM), dtype="float32")
+    model, tok = _load_model(force=True)
+    import torch
+    out = []
+    with torch.no_grad():
+        for i in range(0, len(texts), 16):
+            chunk = texts[i:i + 16]
+            enc = tok(chunk, padding=True, truncation=True,
+                      max_length=max_length, return_tensors="pt")
+            cls = model(**enc).last_hidden_state[:, 0]
+            cls = torch.nn.functional.normalize(cls, p=2, dim=1)
+            out.append(cls.cpu().numpy().astype("float32"))
+    return np.vstack(out)
+
+
+def ensure_model() -> bool:
+    """同步加载模型（给非记忆的调用方：台账语义检索预热）。"""
+    global _ready
+    try:
+        _load_model(force=True)
+        _ready = True
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _migrate_pk(con: sqlite3.Connection) -> None:
     """向量表主键 id → (id, scope)（0499）。
 

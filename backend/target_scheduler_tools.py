@@ -74,7 +74,7 @@ QQOPS_RETIRED = (
 
 def ledger_search(query: str, limit: int = 8, *, since: str | None = None,
                   until: str | None = None, kind: str | None = None,
-                  tags: str | None = None, mode: str = "bm25") -> str:
+                  tags: str | None = None, mode: str = "hybrid") -> str:
     """查台账：v2 记录级 FTS5（2026-11-13 P0），支持过滤；异常回退 v1。
 
     `YHLZ_LEDGER_INDEX=v1` 可一键回滚到旧的逐行索引。
@@ -577,7 +577,7 @@ def _ledger_search_handler(params: dict[str, Any]) -> Any:
         until=str(params.get("until", "") or "") or None,
         kind=str(params.get("kind", "") or "") or None,
         tags=str(params.get("tags", "") or "") or None,
-        mode=str(params.get("mode", "bm25") or "bm25"),
+        mode=str(params.get("mode", "hybrid") or "hybrid"),
     )
 
 
@@ -594,7 +594,7 @@ class _LedgerSearchArgs(_QueryArgs):
     kind: Literal["", "决策", "结论", "踩坑", "状态", "note"] = Field(
         "", description="记录类型（可选）")
     tags: str = Field("", description="标签包含（可选）")
-    mode: Literal["bm25"] = Field("bm25", description="检索模式（当前只有 bm25）")
+    mode: Literal["bm25", "hybrid"] = Field("hybrid", description="检索模式（默认 hybrid）")
 
 
 class _TaskArgs(BaseModel):

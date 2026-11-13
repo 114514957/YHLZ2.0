@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import sqlite3
 import time
@@ -182,23 +183,25 @@ class LedgerV2:
     def search(self, query: str, limit: int = 5, *, since: str | None = None,
                until: str | None = None, kind: str | None = None,
                tags: str | None = None, status: str | None = None,
-               ledger: Path = LEDGER) -> list[dict]:
+               ledger: Path = LEDGER, mode: str = "hybrid") -> list[dict]:
         q = str(query or "").strip()
         if not q:
             return []
         self.ensure_fresh(ledger)
-        terms = [t for t in tokens(q).split() if len(t) >= 2]
-        if not terms:
-            terms = [q]
-        # 去重并限制项数，避免长查询把 AND 卡死
-        seen: list[str] = []
-        for t in terms:
-            if t not in seen:
-                seen.append(t)
-        match = " ".join('"' + t.replace('"', "") + '"' for t in seen[:16])
+        terms = _terms(q)
+        if mode == "hybrid" and os.getenv("YHLZ_LEDGER_EMBED", "1") != "0":
+            try:
+                hits = self._search_hybrid(q, terms, limit, since, until,
+                                           kind, tags, status)
+                if hits:
+                    return hits
+            except Exception:  # noqa: BLE001
+                pass
+        return self._search_bm25(q, terms, limit, since, until, kind, tags, status)
 
-        where = ["rec_fts MATCH ?"]
-        args: list[object] = [match]
+    def _filter_clauses(self, since, until, kind, tags, status) -> tuple[list[str], list[object]]:
+        where: list[str] = []
+        args: list[object] = []
         if since:
             where.append("r.ts >= ?")
             args.append(since)
@@ -214,30 +217,118 @@ class LedgerV2:
         if status:
             where.append("r.status = ?")
             args.append(status)
+        return where, args
 
+    def _bm25_rows(self, q: str, terms: list[str], top: int, since, until,
+                   kind, tags, status) -> list[dict]:
+        match = " ".join('"' + t.replace('"', "") + '"' for t in terms[:16])
+        where, args = self._filter_clauses(since, until, kind, tags, status)
         sql = (
-            "SELECT r.rec, r.title, r.body, r.ts, r.kind, r.status, r.tags, "
-            "r.start_line, r.end_line, bm25(rec_fts) AS score "
+            "SELECT r.rec, r.hash, r.title, r.body, r.ts, r.kind, r.status, "
+            "r.tags, r.start_line, r.end_line, bm25(rec_fts) AS score "
             "FROM rec_fts JOIN records r ON r.id = rec_fts.rid "
-            "WHERE " + " AND ".join(where) +
+            "WHERE rec_fts MATCH ?" +
+            ("" if not where else " AND " + " AND ".join(where)) +
             " ORDER BY score LIMIT ?")
-        args.append(max(1, min(int(limit), 20)) * 3)
         con = self._connect()
         try:
-            rows = con.execute(sql, args).fetchall()
+            rows = con.execute(sql, [match] + args + [top]).fetchall()
         finally:
             con.close()
-        out = []
+        return [{"rec": rec, "hash": h, "title": title, "body": body,
+                 "ts": ts, "kind": kind, "status": status, "tags": tags,
+                 "start": start, "end": end, "score": float(score)}
+                for (rec, h, title, body, ts, kind, status, tags, start, end,
+                     score) in rows]
+
+    def _search_bm25(self, q, terms, limit, since, until, kind, tags,
+                     status) -> list[dict]:
+        rows = self._bm25_rows(q, terms, max(1, min(int(limit), 20)) * 3,
+                               since, until, kind, tags, status)
+        out: list[dict] = []
         seen_rec: set[int] = set()
-        for (rec, title, body, ts, kind, status, tags, start, end, score) in rows:
-            if rec in seen_rec:
+        for r in rows:
+            if r["rec"] in seen_rec:
                 continue
-            seen_rec.add(rec)
-            out.append({"rec": rec, "title": title, "ts": ts, "kind": kind,
-                        "status": status, "tags": tags,
-                        "score": round(float(score), 3),
-                        "start": start, "end": end,
-                        "snippet": _snippet(body, seen)})
+            seen_rec.add(r["rec"])
+            out.append({"rec": r["rec"], "title": r["title"], "ts": r["ts"],
+                        "kind": r["kind"], "status": r["status"],
+                        "tags": r["tags"], "score": round(r["score"], 3),
+                        "start": r["start"], "end": r["end"],
+                        "snippet": _snippet(r["body"], terms)})
+            if len(out) >= max(1, min(int(limit), 20)):
+                break
+        return out
+
+    def _search_hybrid(self, q, terms, limit, since, until, kind, tags,
+                       status) -> list[dict]:
+        """BM25 与向量 RRF 融合（k=60）；向量不可用时返回空，由上层回退 BM25。"""
+        from backend.ledger_embed import (ensure_vec, is_ready, semantic_search,
+                                         warm)
+
+        top = max(20, min(60, int(limit) * 8))
+        bm = self._bm25_rows(q, terms, top, since, until, kind, tags, status)
+
+        if not is_ready():
+            # 首次调用：模型加载要 ~10s，别卡住检索；后台预热并最多等 10s，
+            # 等到了就用混合，等不到这次先回 BM25。
+            import threading
+            import time
+
+            threading.Thread(target=warm, daemon=True).start()
+            for _ in range(20):
+                if is_ready():
+                    break
+                time.sleep(0.5)
+            if not is_ready():
+                return []
+
+        ensure_vec(self.db_path, limit_missing=64)
+        sem = semantic_search(q, self.db_path, top=top * 2)
+        if not sem:
+            return []
+
+        where, args = self._filter_clauses(since, until, kind, tags, status)
+        sql = ("SELECT rec, hash, title, body, ts, kind, status, tags, "
+               "start_line, end_line FROM records r" +
+               ("" if not where else " WHERE " + " AND ".join(where)))
+        con = self._connect()
+        try:
+            meta_rows = con.execute(sql, args).fetchall()
+        finally:
+            con.close()
+        by_hash = {}
+        for row in meta_rows:
+            by_hash[row[1]] = row
+
+        fused: dict[int, dict] = {}
+        for rank, r in enumerate(bm, start=1):
+            fused.setdefault(r["rec"], {"row": None, "rrf": 0.0})["rrf"] += 1.0 / (60 + rank)
+            fused[r["rec"]]["row"] = r
+        for rank, (h, _score) in enumerate(sem, start=1):
+            row = by_hash.get(h)
+            if not row:
+                continue
+            rec = row[0]
+            item = fused.setdefault(rec, {"row": None, "rrf": 0.0})
+            item["rrf"] += 1.0 / (60 + rank)
+            if item["row"] is None:
+                item["row"] = {"rec": rec, "hash": h, "title": row[2],
+                               "body": row[3], "ts": row[4], "kind": row[5],
+                               "status": row[6], "tags": row[7],
+                               "start": row[8], "end": row[9]}
+
+        ranked = sorted(fused.values(), key=lambda x: -x["rrf"])
+        out = []
+        for item in ranked:
+            r = item["row"]
+            if not r:
+                continue
+            out.append({"rec": r["rec"], "title": r["title"], "ts": r["ts"],
+                        "kind": r["kind"], "status": r["status"],
+                        "tags": r["tags"], "score": round(item["rrf"], 5),
+                        "start": r["start"], "end": r["end"],
+                        "snippet": _snippet(r["body"], terms)})
             if len(out) >= max(1, min(int(limit), 20)):
                 break
         return out
@@ -255,6 +346,17 @@ class LedgerV2:
                 if self.db_path.exists() else 0,
                 "ledger_mtime": built.get("ledger_mtime"),
                 "balance": built.get("records")}
+
+
+def _terms(query: str) -> list[str]:
+    terms = [t for t in tokens(query).split() if len(t) >= 2]
+    if not terms:
+        terms = [str(query or "").strip()]
+    seen: list[str] = []
+    for t in terms:
+        if t and t not in seen:
+            seen.append(t)
+    return seen
 
 
 def _snippet(body: str, terms: list[str], width: int = 60) -> str:

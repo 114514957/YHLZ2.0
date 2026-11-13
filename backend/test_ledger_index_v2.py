@@ -1,6 +1,8 @@
 """Ledger v2（记录级 FTS5）测试：2026-11-13 P0。"""
+import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from backend.ledger_index_v2 import LedgerV2, parse_records, tokens
@@ -56,7 +58,7 @@ class LedgerV2Tests(unittest.TestCase):
     def test_search_record_level(self):
         lv = LedgerV2(self.db)
         lv.rebuild(self.ledger)
-        hits = lv.search("黄金样本", limit=3, ledger=self.ledger)
+        hits = lv.search("黄金样本", limit=3, ledger=self.ledger, mode="bm25")
         self.assertTrue(hits)
         self.assertEqual(hits[0]["rec"], 1)
         self.assertIn("黄金", hits[0]["snippet"])
@@ -64,7 +66,7 @@ class LedgerV2Tests(unittest.TestCase):
     def test_search_dedupes_record_number(self):
         lv = LedgerV2(self.db)
         lv.rebuild(self.ledger)
-        hits = lv.search("翻唱投产", limit=5, ledger=self.ledger)
+        hits = lv.search("翻唱投产", limit=5, ledger=self.ledger, mode="bm25")
         recs = [h["rec"] for h in hits]
         self.assertEqual(recs.count(2), 1)
 
@@ -73,11 +75,25 @@ class LedgerV2Tests(unittest.TestCase):
         lv.rebuild(self.ledger)
         hits = lv.search("", limit=5)  # 空查询直接返回 []
         self.assertEqual(hits, [])
-        hits = lv.search("时间", limit=5, since="2026-11-07", ledger=self.ledger)
+        hits = lv.search("时间", limit=5, since="2026-11-07", ledger=self.ledger, mode="bm25")
         # 只有 0003 的日期在 11-07 之后
         self.assertTrue(all(h["ts"] >= "2026-11-07" for h in hits))
-        hits = lv.search("翻唱", limit=5, kind="结论", ledger=self.ledger)
+        hits = lv.search("翻唱", limit=5, kind="结论", ledger=self.ledger, mode="bm25")
         self.assertTrue(all(h["kind"] == "结论" for h in hits))
+
+    def test_hybrid_uses_semantic_candidates(self):
+        lv = LedgerV2(self.db)
+        lv.rebuild(self.ledger)
+        con = sqlite3.connect(str(self.db))
+        h = con.execute("SELECT hash FROM records WHERE rec=1").fetchone()[0]
+        con.close()
+        with patch("backend.ledger_embed.is_ready", return_value=True), \
+                patch("backend.ledger_embed.ensure_vec", return_value={}), \
+                patch("backend.ledger_embed.semantic_search",
+                      return_value=[(h, 0.9)]):
+            hits = lv.search("完全无关的词", limit=3, mode="hybrid",
+                             ledger=self.ledger)
+        self.assertEqual(hits[0]["rec"], 1)
 
     def test_ensure_fresh_rebuilds_on_change(self):
         lv = LedgerV2(self.db)
@@ -87,7 +103,7 @@ class LedgerV2Tests(unittest.TestCase):
             f.write("\n## 记录 0004：新记录\n\n- 时间：2026-11-09\n- 结论：新增。\n")
         info = lv.ensure_fresh(self.ledger)
         self.assertIsNotNone(info)
-        hits = lv.search("新增", limit=3, ledger=self.ledger)
+        hits = lv.search("新增", limit=3, ledger=self.ledger, mode="bm25")
         self.assertTrue(hits)
 
 
