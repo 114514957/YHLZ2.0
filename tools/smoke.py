@@ -102,7 +102,11 @@ def check_daemon() -> tuple[str, str, str]:
 def check_worker() -> tuple[str, str, str]:
     ok, body = _http("http://127.0.0.1:8347/health")
     if not ok:
-        return FAIL, "worker 8347", str(body)
+        # 8347 是「按需起」的 dev 派单 worker（STRUCTURE / 台账 0938），
+        # 没在跑不等于元亨坏了；只有显式要求时才当 FAIL。
+        if str(os.getenv("YHLZ_EXPECT_WORKER", "")).lower() in ("1", "true", "yes", "on"):
+            return FAIL, "worker 8347", str(body)
+        return WARN, "worker 8347", "on-demand dev worker not running（派单时再起，不影响元亨）"
     return OK, "worker 8347", json.dumps(body, ensure_ascii=False)[:160] if isinstance(body, dict) else str(body)[:160]
 
 
