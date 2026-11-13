@@ -985,11 +985,12 @@ GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/ui.js",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
           "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html",
           "/emotion", "/qq-qrcode", "/growth", "/devmode",
+          "/qq/groups",
           "/official-ui/status"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session",
-           "/tap", "/devmode"}
+           "/tap", "/devmode", "/qq/whitelist"}
 
 
 class ConsoleHandler(BaseHTTPRequestHandler):
@@ -1175,7 +1176,8 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         p = self.path.split("?", 1)[0]
         # 训练工作台已并入 8321（2026-11-08）：/train 页面 + /static + /api 同源代理
         if p == "/train" or p.startswith("/static/") or p.startswith("/api/"):
-            self._proxy_to(8090, "/" if p == "/train" else p)
+            # 注意用 self.path：带 query string（/api/ledger/search?q=… 全靠它）
+            self._proxy_to(8090, "/" if p == "/train" else self.path)
             return
         if p == "/talk_result":
             # 段5（0635）：断连后按 request_id **取结果**（不重放副作用）
@@ -1209,6 +1211,14 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             self._serve_file("favicon.png")
         elif p == "/qq-qrcode":
             self._qq_qrcode()
+        elif p == "/qq/groups":
+            # 工作台「群聊白名单」：列出元亨号加入的群 + 当前白名单（2026-11-13）
+            try:
+                from backend import qq_group_admin as _ga
+                self._send_json(200, _ga.snapshot())
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"ok": False,
+                                      "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])})
         elif p == "/loading.webp":
             self._serve_file("loading.webp")
         elif p == "/console.css":
@@ -1321,7 +1331,19 @@ class ConsoleHandler(BaseHTTPRequestHandler):
     def console_do_POST(self):
         p = self.path.split("?", 1)[0]
         if p.startswith("/api/"):
-            self._proxy_to(8090, p)
+            self._proxy_to(8090, self.path)
+            return
+        if p == "/qq/whitelist":
+            # 保存群聊白名单（空列表＝不限制）。桥每处理一条消息都会重读，立即生效。
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+                from backend import qq_group_admin as _ga
+                r = _ga.set_whitelist(body.get("groups") or [])
+                self._send_json(200, r)
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"ok": False,
+                                      "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])})
             return
         if p == "/talk":
             from backend import gpu_lock

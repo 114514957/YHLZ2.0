@@ -63,6 +63,7 @@
       <div class="tab" data-tab="chat">对话测试</div>
       <div class="tab" data-tab="eval">评测</div>
       <div class="tab" data-tab="materials">素材</div>
+      <div class="tab" data-tab="ledger">台账</div>
       <div class="tab" data-tab="runs">记录</div>
     </div>
 
@@ -157,6 +158,46 @@
           <h3>训练包（dist/retrain_pkg_*）</h3>
           <div id="matPkgs" class="muted">加载中…</div>
         </div>
+      </div>
+
+      <!-- 台账 -->
+      <div class="page" id="pg-ledger">
+        <div class="card">
+          <h3>台账检索（记录级 + 混合）</h3>
+          <div class="row">
+            <input id="lq" placeholder="关键词（中文 ok）" style="flex:1;min-width:180px">
+            <input id="lqSince" placeholder="起 YYYY-MM-DD" style="width:130px">
+            <input id="lqUntil" placeholder="止 YYYY-MM-DD" style="width:130px">
+            <select id="lqKind">
+              <option value="">全部类型</option>
+              <option>决策</option><option>结论</option><option>踩坑</option><option>状态</option>
+            </select>
+            <input id="lqTags" placeholder="标签" style="width:110px">
+            <button class="primary" id="btnLedgerSearch">查</button>
+          </div>
+          <div id="ledgerResults" class="muted" style="margin-top:10px">输入关键词查询</div>
+        </div>
+        <div class="card">
+          <h3>写一条</h3>
+          <div class="row" style="margin-bottom:8px">
+            <input id="lt" placeholder="标题（必填）" style="flex:1;min-width:220px">
+          </div>
+          <textarea id="lb" rows="4" placeholder="正文（可空，\\n 换行）"
+                    style="width:100%;margin-bottom:8px"></textarea>
+          <div class="row">
+            <input id="ltags" placeholder="tags：台账,检索" style="width:170px">
+            <select id="lkind">
+              <option value="">类型…</option>
+              <option>决策</option><option>结论</option><option>踩坑</option><option>状态</option>
+            </select>
+            <input id="llinks" placeholder="links：1168,1170" style="width:160px">
+            <input id="lstatus" placeholder="status：active" style="width:140px">
+            <label class="muted"><input type="checkbox" id="lconfirm"> 允许重复</label>
+            <button class="primary" id="btnLedgerAdd">写入台账</button>
+          </div>
+          <div class="hint" id="ledgerMsg"></div>
+        </div>
+        <div id="ledgerDetail"></div>
       </div>
 
       <!-- 记录 -->

@@ -620,8 +620,87 @@ function renderMaterials() {
   });
 }
 
+/* ---------------------------------------------------------------- 台账 */
+let ledgerBound = false;
+
+function renderLedger() {
+  if (ledgerBound) return;
+  ledgerBound = true;
+  $('btnLedgerSearch').addEventListener('click', doLedgerSearch);
+  $('btnLedgerAdd').addEventListener('click', doLedgerAdd);
+  $('lq').addEventListener('keydown', e => { if (e.key === 'Enter') doLedgerSearch(); });
+}
+
+async function doLedgerSearch() {
+  const box = $('ledgerResults');
+  box.textContent = '查询中…';
+  const p = new URLSearchParams({ q: $('lq').value.trim(), limit: '10' });
+  for (const [k, id] of [['since', 'lqSince'], ['until', 'lqUntil'],
+                         ['kind', 'lqKind'], ['tags', 'lqTags']]) {
+    if ($(id).value.trim()) p.set(k, $(id).value.trim());
+  }
+  try {
+    const r = await api('/api/ledger/search?' + p.toString());
+    const items = r.items || [];
+    if (!items.length) { box.textContent = '无匹配'; return; }
+    box.innerHTML = items.map(it => `
+      <div class="ver" data-no="${it.rec}">
+        <span class="nm">${esc(it.title)}</span>
+        <span class="tag">${esc(it.kind || '')}</span>
+        <span class="sz">${esc(it.ts || '')}${it.tags ? ' · ' + esc(it.tags) : ''}</span>
+      </div>
+      <div class="hint" style="margin:-4px 0 8px 6px">${esc(it.snippet || '')}</div>`).join('');
+    box.querySelectorAll('.ver').forEach(el => {
+      el.onclick = () => showLedgerRecord(el.dataset.no);
+    });
+  } catch (e) {
+    box.textContent = '查询失败：' + e.message;
+  }
+}
+
+async function showLedgerRecord(no) {
+  const box = $('ledgerDetail');
+  try {
+    const r = await api('/api/ledger/get?no=' + encodeURIComponent(no));
+    const rec = r.record || {};
+    box.innerHTML = `<div class="card"><h3>记录 ${Number(no).toString().padStart(4, '0')} · ${esc(rec.title || '')}</h3>
+      <pre class="log">${esc(rec.text || rec.body || '')}</pre></div>`;
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (e) {
+    box.innerHTML = '<div class="card"><span class="bad">读取失败：' + esc(e.message) + '</span></div>';
+  }
+}
+
+async function doLedgerAdd() {
+  const msg = $('ledgerMsg');
+  msg.className = 'hint';
+  msg.textContent = '写入中…';
+  const body = {
+    title: $('lt').value.trim(), body: $('lb').value,
+    tags: $('ltags').value.trim(), kind: $('lkind').value,
+    links: $('llinks').value.trim(), status: $('lstatus').value.trim(),
+    confirm_duplicate: $('lconfirm').checked,
+  };
+  try {
+    const r = await fetch('/api/ledger/add', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    msg.textContent = j.message || '完成';
+    msg.className = 'hint ' + (j.ok ? 'ok' : 'bad');
+    if (j.ok) {
+      $('lt').value = ''; $('lb').value = ''; $('ltags').value = '';
+      $('llinks').value = ''; $('lstatus').value = ''; $('lconfirm').checked = false;
+    }
+  } catch (e) {
+    msg.textContent = '写入失败：' + e.message;
+    msg.className = 'hint bad';
+  }
+}
+
 /* ---------------------------------------------------------------- 深链 */
-const TABS = ['overview', 'chat', 'eval', 'materials', 'runs'];
+const TABS = ['overview', 'chat', 'eval', 'materials', 'ledger', 'runs'];
 function activate(tab) {
   document.querySelectorAll('.tab').forEach(x =>
     x.classList.toggle('on', x.dataset.tab === tab));
@@ -632,6 +711,7 @@ function activate(tab) {
     if (v) $('evalTag').value = v.version;
   }
   if (tab === 'materials') renderMaterials();
+  if (tab === 'ledger') renderLedger();
   if (tab === 'runs' && S.runs.length && !$('runDetail').innerHTML) {
     api('/api/runs/' + encodeURIComponent(S.runs[0].file))
       .then(d => renderEvalResult(d, 'runDetail')).catch(() => {});

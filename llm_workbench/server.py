@@ -22,6 +22,9 @@ from pydantic import BaseModel, Field
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+_ROOT_DIR = os.path.dirname(HERE)
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
 
 import evals  # noqa: E402
 import convert  # noqa: E402
@@ -60,6 +63,50 @@ def api_state(debug: int = 0):
                             "runs": round((t3 - t2) * 1000),
                             "total": round((time.time() - t0) * 1000)}
     return out
+
+
+class LedgerAddReq(BaseModel):
+    title: str
+    body: str = ""
+    tags: str = ""
+    kind: str = ""
+    links: str = ""
+    status: str = ""
+    confirm_duplicate: bool = False
+
+
+@app.get("/api/ledger/search")
+def api_ledger_search(q: str, limit: int = 10, since: str = "", until: str = "",
+                      kind: str = "", tags: str = "", mode: str = "hybrid"):
+    """台账检索（记录级 FTS5 + 向量混合），2026-11-13。"""
+    from backend.ledger_index_v2 import LedgerV2
+
+    hits = LedgerV2().search(
+        q, limit=max(1, min(int(limit), 20)), since=since or None,
+        until=until or None, kind=kind or None, tags=tags or None,
+        mode=mode if mode in ("bm25", "hybrid") else "hybrid")
+    return {"ok": True, "items": hits}
+
+
+@app.get("/api/ledger/get")
+def api_ledger_get(no: int):
+    from backend import ledger_store
+
+    rec = ledger_store.get_record(int(no))
+    if not rec:
+        raise HTTPException(404, "没有这条记录")
+    return {"ok": True, "record": rec}
+
+
+@app.post("/api/ledger/add")
+def api_ledger_add(req: LedgerAddReq):
+    """写台账（带元数据 + 标题查重）；查重时 ok=false 且不写入。"""
+    from backend.target_scheduler_tools import ledger_add
+
+    msg = ledger_add(req.title, req.body, tags=req.tags, kind=req.kind,
+                     links=req.links, status=req.status,
+                     confirm_duplicate=bool(req.confirm_duplicate))
+    return {"ok": not str(msg).startswith("疑似重复"), "message": msg}
 
 
 @app.get("/api/materials")
