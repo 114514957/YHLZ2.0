@@ -59,7 +59,9 @@ def _read_text(args) -> str:
 def cmd_add(args) -> int:
     body = _read_text(args)
     res = ls.add_record(args.title, body, no=args.no, path=args.ledger,
-                        stamp_time=not args.no_stamp)
+                        stamp_time=not args.no_stamp,
+                        tags=args.tags, kind=args.kind,
+                        links=args.links, status=args.status)
     if args.json:
         return _emit(res, True, "")
     rec = res["record"]
@@ -219,6 +221,10 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--file", default=None, help="从文件读取正文")
     a.add_argument("--no", type=int, default=None, help="指定记录号（默认自动）")
     a.add_argument("--no-stamp", action="store_true", help="不自动加「时间：」行")
+    a.add_argument("--tags", default="", help="标签，逗号分隔")
+    a.add_argument("--kind", default="", help="类型：决策/结论/踩坑/状态")
+    a.add_argument("--links", default="", help="关联记录号，逗号分隔")
+    a.add_argument("--status", default="", help="状态：active/superseded")
     a.set_defaults(func=cmd_add)
 
     g = sub.add_parser("get", help="查：读单条记录全文")

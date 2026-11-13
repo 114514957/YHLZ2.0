@@ -66,6 +66,20 @@ def _tags_of(title: str, body: str) -> str:
     return ",".join(found[:20])
 
 
+_META = re.compile(r"^-\s*元数据[：:]\s*(.+)$", re.M)
+
+
+def _meta_of(body: str) -> dict:
+    """解析写入口写入的 `- 元数据：kind=…；tags=…；links=…；status=…`。"""
+    out: dict = {}
+    for m in _META.finditer(body or ""):
+        for part in re.split(r"[；;]", m.group(1)):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                out[k.strip()] = v.strip()
+    return out
+
+
 def parse_records(ledger: Path = LEDGER) -> list[dict]:
     text = Path(ledger).read_text(encoding="utf-8")
     records: list[dict] = []
@@ -85,12 +99,14 @@ def parse_records(ledger: Path = LEDGER) -> list[dict]:
     for r in records:
         body = "\n".join(r["body"]).strip()
         m = _TS.search(body)
+        meta = _meta_of(body)
         r["body"] = body
         r["end"] = r["start"] + len(r["body"].splitlines())
         r["ts"] = m.group(1) if m else ""
-        r["kind"] = _kind_of(r["title"], body)
-        r["tags"] = _tags_of(r["title"], body)
-        r["status"] = "active"
+        r["kind"] = meta.get("kind") or _kind_of(r["title"], body)
+        r["tags"] = meta.get("tags") or _tags_of(r["title"], body)
+        r["status"] = meta.get("status") or "active"
+        r["links"] = meta.get("links", "")
         r["hash"] = hashlib.sha256(
             (r["title"] + "\n" + body).encode("utf-8")).hexdigest()[:16]
     return records
@@ -118,6 +134,7 @@ class LedgerV2:
               kind TEXT,
               status TEXT DEFAULT 'active',
               tags TEXT,
+              links TEXT,
               hash TEXT,
               start_line INTEGER,
               end_line INTEGER
@@ -138,10 +155,11 @@ class LedgerV2:
             con.execute("DROP TABLE IF EXISTS records")
             self._init(con)
             con.executemany(
-                "INSERT INTO records(id,rec,title,body,ts,kind,status,tags,hash,"
-                "start_line,end_line) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO records(id,rec,title,body,ts,kind,status,tags,links,hash,"
+                "start_line,end_line) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 [(i, r["rec"], r["title"], r["body"], r["ts"], r["kind"],
-                  r["status"], r["tags"], r["hash"], r["start"], r["end"])
+                  r["status"], r["tags"], r.get("links", ""), r["hash"],
+                  r["start"], r["end"])
                  for i, r in enumerate(records, start=1)])
             con.executemany(
                 "INSERT INTO rec_fts(rid,tokens) VALUES (?,?)",
@@ -154,6 +172,7 @@ class LedgerV2:
                 [("built_at", str(time.time())),
                  ("ledger_mtime", str(st.st_mtime)),
                  ("ledger_size", str(st.st_size)),
+                 ("schema", "2"),
                  ("records", str(len(records)))])
             con.commit()
         finally:
@@ -174,6 +193,7 @@ class LedgerV2:
         finally:
             con.close()
         if (not rows
+                or rows.get("schema") != "2"
                 or abs(float(rows.get("ledger_mtime", 0)) - st.st_mtime) > 0.5
                 or str(rows.get("ledger_size", "")) != str(st.st_size)):
             return self.rebuild(ledger)
@@ -225,7 +245,7 @@ class LedgerV2:
         where, args = self._filter_clauses(since, until, kind, tags, status)
         sql = (
             "SELECT r.rec, r.hash, r.title, r.body, r.ts, r.kind, r.status, "
-            "r.tags, r.start_line, r.end_line, bm25(rec_fts) AS score "
+            "r.tags, r.links, r.start_line, r.end_line, bm25(rec_fts) AS score "
             "FROM rec_fts JOIN records r ON r.id = rec_fts.rid "
             "WHERE rec_fts MATCH ?" +
             ("" if not where else " AND " + " AND ".join(where)) +
@@ -237,9 +257,10 @@ class LedgerV2:
             con.close()
         return [{"rec": rec, "hash": h, "title": title, "body": body,
                  "ts": ts, "kind": kind, "status": status, "tags": tags,
-                 "start": start, "end": end, "score": float(score)}
-                for (rec, h, title, body, ts, kind, status, tags, start, end,
-                     score) in rows]
+                 "links": links, "start": start, "end": end,
+                 "score": float(score)}
+                for (rec, h, title, body, ts, kind, status, tags, links,
+                     start, end, score) in rows]
 
     def _search_bm25(self, q, terms, limit, since, until, kind, tags,
                      status) -> list[dict]:
@@ -253,7 +274,8 @@ class LedgerV2:
             seen_rec.add(r["rec"])
             out.append({"rec": r["rec"], "title": r["title"], "ts": r["ts"],
                         "kind": r["kind"], "status": r["status"],
-                        "tags": r["tags"], "score": round(r["score"], 3),
+                        "tags": r["tags"], "links": r.get("links", ""),
+                        "score": round(r["score"], 3),
                         "start": r["start"], "end": r["end"],
                         "snippet": _snippet(r["body"], terms)})
             if len(out) >= max(1, min(int(limit), 20)):
@@ -289,7 +311,7 @@ class LedgerV2:
             return []
 
         where, args = self._filter_clauses(since, until, kind, tags, status)
-        sql = ("SELECT rec, hash, title, body, ts, kind, status, tags, "
+        sql = ("SELECT rec, hash, title, body, ts, kind, status, tags, links, "
                "start_line, end_line FROM records r" +
                ("" if not where else " WHERE " + " AND ".join(where)))
         con = self._connect()
@@ -316,7 +338,7 @@ class LedgerV2:
                 item["row"] = {"rec": rec, "hash": h, "title": row[2],
                                "body": row[3], "ts": row[4], "kind": row[5],
                                "status": row[6], "tags": row[7],
-                               "start": row[8], "end": row[9]}
+                               "links": row[8], "start": row[9], "end": row[10]}
 
         ranked = sorted(fused.values(), key=lambda x: -x["rrf"])
         out = []
@@ -326,7 +348,8 @@ class LedgerV2:
                 continue
             out.append({"rec": r["rec"], "title": r["title"], "ts": r["ts"],
                         "kind": r["kind"], "status": r["status"],
-                        "tags": r["tags"], "score": round(item["rrf"], 5),
+                        "tags": r["tags"], "links": r.get("links", ""),
+                        "score": round(item["rrf"], 5),
                         "start": r["start"], "end": r["end"],
                         "snippet": _snippet(r["body"], terms)})
             if len(out) >= max(1, min(int(limit), 20)):

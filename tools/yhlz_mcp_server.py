@@ -126,11 +126,19 @@ async def ledger_list(limit: int = 10, keyword: str = "") -> str:
 
 
 @mcp.tool()
-async def ledger_add(title: str, body: str = "") -> str:
+async def ledger_add(title: str, body: str = "", tags: str = "",
+                     kind: str = "", links: str = "", status: str = "",
+                     confirm_duplicate: bool = False) -> str:
     """WRITE: append a new record to the YHLZ project ledger (single source of
     truth). Atomic write, auto-numbered, auto-backed-up. `body` is plain text
-    (\\n for line breaks)."""
-    return await _call_async("ledger_add", {"title": title, "body": body})
+    (\\n for line breaks). Optional structured metadata: tags (comma),
+    kind (决策/结论/踩坑/状态), links (record numbers), status. A similar title is
+    refused unless confirm_duplicate=True."""
+    return await _call_async("ledger_add", {
+        "title": title, "body": body, "tags": tags, "kind": kind,
+        "links": links, "status": status,
+        "confirm_duplicate": confirm_duplicate,
+    })
 
 
 @mcp.tool()

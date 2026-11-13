@@ -8,6 +8,7 @@ Model: BAAI/bge-small-zh-v1.5 (CPU, local). Store: cache/embvec.db
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import sqlite3
@@ -190,6 +191,58 @@ def vec_add(scope: str, item_id: str, text: str) -> bool:
         return False
 
 
+def _threshold_method() -> str:
+    """W1 (ledger 1174): relative | percentile | fixed (env YHLZ_VEC_THRESHOLD)."""
+    method = str(os.getenv("YHLZ_VEC_THRESHOLD", "relative")).strip().lower()
+    return method if method in ("relative", "percentile", "fixed") else "relative"
+
+
+def pick_threshold(scores, *, top1: float | None = None, method: str | None = None,
+                   lo: float = 0.29, hi: float = 0.95,
+                   floor: float = 0.0) -> float:
+    """Per-query score cutoff, clamped — borrowed from A_memorix's threshold.
+
+    relative (default): ``max(top1 - 0.08, mean + 1σ)`` — 0983 D4, calibrated to
+    our bge-small corpus (pairwise mean cos ≈ 0.50, so a fixed 0.42 barely
+    filters: measured 2–179 hits).
+    percentile: 75th percentile of this result set (A_memorix's default).
+    fixed: the caller's own constant (previous behaviour).
+
+    Every mode is clamped into ``[lo, hi]`` (A_memorix's 0.29/0.95), and
+    ``floor`` keeps a caller's stricter minimum when it has one.
+    """
+    vals = [float(s) for s in scores if s is not None]
+    if not vals:
+        return float(hi)
+    method = method or _threshold_method()
+    if method == "fixed":
+        return float(floor) if floor else float(lo)
+    if method == "percentile":
+        thr = float(np.percentile(vals, 75))
+    else:
+        top = float(top1 if top1 is not None else max(vals))
+        thr = max(top - 0.08, float(np.mean(vals)) + float(np.std(vals)), float(floor))
+    return float(min(hi, max(lo, thr)))
+
+
+def select_hits(scored: list[tuple[str, float]], top: int,
+                min_score: float = 0.0, *, min_results: int = 4,
+                method: str | None = None) -> list[tuple[str, float]]:
+    """Rank, cut by the dynamic threshold, then keep at least ``min_results``."""
+    if not scored:
+        return []
+    ranked = sorted(scored, key=lambda x: float(x[1]), reverse=True)
+    if _threshold_method() == "fixed" or method == "fixed":
+        cut = float(min_score or 0.0)
+    else:
+        cut = pick_threshold([s for _, s in ranked], top1=float(ranked[0][1]),
+                             floor=float(min_score or 0.0), method=method)
+    hits = [x for x in ranked if float(x[1]) >= cut][:max(1, top)]
+    if len(hits) < min_results:
+        hits = ranked[: max(1, min(top, min_results))]
+    return hits
+
+
 def semantic_any(query: str, scopes: list[str] | None = None,
                  top: int = 6, min_score: float = 0.42) -> list[dict]:
     """Generic semantic search across scopes (text returned from the vec table,
@@ -227,13 +280,9 @@ def semantic_any(query: str, scopes: list[str] | None = None,
         finally:
             con.close()
     out = []
-    for iid, s in sorted(best.items(), key=lambda x: x[1], reverse=True):
-        if s < min_score:
-            continue
-        it = dict(rows_by_id[iid]); it["score"] = round(s, 3)
+    for iid, s in select_hits(list(best.items()), top, min_score):
+        it = dict(rows_by_id[iid]); it["score"] = round(float(s), 3)
         out.append(it)
-        if len(out) >= top:
-            break
     return out
 
 
@@ -390,7 +439,7 @@ def semantic_l2(query: str, top: int = 8,
         for iid, sc in vec_search(scope, v, top=top * 2):
             if sc > best.get(iid, -1.0):
                 best[iid] = sc
-    hits = sorted(best.items(), key=lambda x: x[1], reverse=True)[: top * 2]
+    hits = select_hits(list(best.items()), top, min_score)
     if not hits:
         return []
     ids = [i for i, _ in hits]
@@ -412,12 +461,12 @@ def semantic_l2(query: str, top: int = 8,
     for i in ids:
         if i not in byid:
             continue
+        # W1: threshold (dynamic or fixed) was already applied by select_hits;
+        # re-checking against the caller's constant would undo the dynamic cut.
         s = score[i]
-        if s < min_score:
-            continue
         r = byid[i]
         out.append({"id": i, "type": r[1], "importance": r[2],
-                    "status": r[3], "summary": r[4], "score": round(s, 3),
+                    "status": r[3], "summary": r[4], "score": round(float(s), 3),
                     "date": _date_str(r[5])})
         if len(out) >= top:
             break

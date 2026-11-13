@@ -194,10 +194,56 @@ def ledger_list(limit: int = 10, keyword: str = "") -> str:
     return "\n".join(f"{r['no']:04d} | {r['title']}" for r in rows)
 
 
-def ledger_add(title: str, body: str = "") -> str:
-    """Append a new ledger record (atomic write + auto backup)."""
-    res = _ledger_store().add_record(str(title or ""), str(body or ""))
-    return f"已追加 记录 {res['no']:04d}：{res['title']}"
+def _norm_title(t: str) -> str:
+    import re
+
+    return re.sub(r"[\s\W_]+", "", str(t or "").lower())
+
+
+def _duplicate_titles(title: str, *, threshold: float = 0.92,
+                      path: Any = None) -> list[dict]:
+    """标题查重（2026-11-13 写入结构化）：完全相同或相似度 ≥0.92 就提示。"""
+    import difflib
+
+    base = _norm_title(title)
+    if len(base) < 4:
+        return []
+    recs = (_ledger_store().parse_records(path=path) if path
+            else _ledger_store().parse_records())
+    out: list[dict] = []
+    for rec in recs:
+        other = _norm_title(rec.title)
+        if not other:
+            continue
+        ratio = difflib.SequenceMatcher(None, base, other).ratio()
+        contained = len(base) >= 4 and (base in other or other in base)
+        if other == base or contained or ratio >= threshold:
+            out.append({"no": rec.no, "title": rec.title,
+                        "ratio": 1.0 if contained else round(ratio, 3)})
+    out.sort(key=lambda x: -x["ratio"])
+    return out[:3]
+
+
+def ledger_add(title: str, body: str = "", tags: str = "", kind: str = "",
+               links: str = "", status: str = "",
+               confirm_duplicate: bool = False) -> str:
+    """Append a new ledger record (atomic write + auto backup).
+
+    写入时可带 tags/kind/links/status（落成一行可解析的「元数据：」）；
+    默认先按标题查重，疑似重复不写入，需显式 confirm_duplicate=True。
+    """
+    if not confirm_duplicate:
+        dups = _duplicate_titles(title)
+        if dups:
+            shown = "；".join(f"{d['no']:04d}「{d['title'][:40]}」({d['ratio']})"
+                              for d in dups)
+            return (f"疑似重复，未写入：{shown}。若确认要再写一条，请带 "
+                    f"confirm_duplicate=True 重试；或改用 ledger_update 追加。")
+    res = _ledger_store().add_record(
+        str(title or ""), str(body or ""), tags=str(tags or ""),
+        kind=str(kind or ""), links=str(links or ""), status=str(status or ""))
+    extra = "（含元数据）" if any((tags, kind, links, status)) else ""
+    return f"已追加 记录 {res['no']:04d}：{res['title']}{extra}"
 
 
 def ledger_update(no: int, title: str = "", append: str = "",
@@ -218,12 +264,37 @@ def ledger_delete(no: int) -> str:
     return f"已删除 记录 {res['no']:04d}"
 
 
-def recall_memory(query: str, limit: int = 5, *, service: Any = None) -> str:
+def _parse_day(value: Any, *, end: bool) -> float:
+    """W3 (ledger 1174): YYYY-MM-DD or ISO datetime -> epoch seconds.
+
+    Raises ValueError on anything else so the tool returns an explicit parameter
+    error instead of a silent empty result.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return 0.0
+    try:
+        if len(text) == 10:
+            day = datetime.date.fromisoformat(text)
+            moment = (datetime.datetime(day.year, day.month, day.day, 23, 59, 59)
+                      if end else datetime.datetime(day.year, day.month, day.day))
+        else:
+            moment = datetime.datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return float(moment.timestamp())
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(
+            f"时间参数需要 YYYY-MM-DD 或 ISO 时间，收到 {text!r}") from exc
+
+
+def recall_memory(query: str, limit: int = 5, *, service: Any = None,
+                  time_start: float = 0.0, time_end: float = 0.0) -> str:
     """Recall project/user memory items from L2 store (read-only; never deletes)."""
     q = str(query or "").strip()
     # A bound session must never fall back to a different (owner/default) DB.
     svc = service if service is not None else TargetMemoryService()
-    rows = svc.recall(q, limit=max(1, min(int(limit), 10)))
+    rows = svc.recall(q, limit=max(1, min(int(limit), 10)),
+                      time_start=float(time_start or 0.0),
+                      time_end=float(time_end or 0.0))
     if not rows:
         try:
             for sub in _split_query(q):
@@ -232,6 +303,9 @@ def recall_memory(query: str, limit: int = 5, *, service: Any = None) -> str:
                     break
         except Exception:
             rows = []
+        if rows and (time_start or time_end):
+            rows = svc._filter_time_range(rows, float(time_start or 0.0),
+                                          float(time_end or 0.0))
     if not rows:
         return "记忆库无匹配"
     # B3 (ledger 0451): carry the date — time questions need it
@@ -568,6 +642,29 @@ def _queries_handler(func: Any) -> Any:
     return _h
 
 
+def _recall_handler(params: dict[str, Any]) -> Any:
+    """回忆：query/limit + 可选时间窗（格式错直接报错，不静默返回空）。"""
+    start = _parse_day(params.get("time_start"), end=False)
+    end = _parse_day(params.get("time_end"), end=True)
+    if start and end and start > end:
+        raise ValueError("time_start 晚于 time_end")
+    return recall_memory(str(params.get("query", "")),
+                         int(params.get("limit", 8) or 8),
+                         service=params.get("_service"),
+                         time_start=start, time_end=end)
+
+
+def _ledger_add_handler(params: dict[str, Any]) -> Any:
+    return ledger_add(
+        str(params.get("title", "")), str(params.get("body", "")),
+        tags=str(params.get("tags", "") or ""),
+        kind=str(params.get("kind", "") or ""),
+        links=str(params.get("links", "") or ""),
+        status=str(params.get("status", "") or ""),
+        confirm_duplicate=bool(params.get("confirm_duplicate", False)),
+    )
+
+
 def _ledger_search_handler(params: dict[str, Any]) -> Any:
     """台账检索 v2 的过滤参数 + 旧 query/limit。"""
     return ledger_search(
@@ -584,6 +681,13 @@ def _ledger_search_handler(params: dict[str, Any]) -> Any:
 class _QueryArgs(BaseModel):
     query: str = Field(..., min_length=1, max_length=80, description="检索关键词，1-3 个词")
     limit: int = Field(5, ge=1, le=500, description="返回条数上限")
+
+
+class _RecallArgs(_QueryArgs):
+    """W3：记忆召回的时间窗（都可选，YYYY-MM-DD 或 ISO 时间）。"""
+
+    time_start: str = Field("", description="起始日期 YYYY-MM-DD（可选）")
+    time_end: str = Field("", description="结束日期 YYYY-MM-DD（可选）")
 
 
 class _LedgerSearchArgs(_QueryArgs):
@@ -621,6 +725,12 @@ class _LedgerGetArgs(BaseModel):
 class _LedgerAddArgs(BaseModel):
     title: str = Field(..., min_length=1, max_length=200, description="记录标题")
     body: str = Field("", max_length=8000, description="正文（\\n 分隔）")
+    tags: str = Field("", max_length=200, description="标签，逗号分隔（可选）")
+    kind: str = Field("", max_length=16, description="类型：决策/结论/踩坑/状态（可选）")
+    links: str = Field("", max_length=100, description="关联记录号，逗号分隔（可选）")
+    status: str = Field("", max_length=16, description="状态：active/superseded（可选）")
+    confirm_duplicate: bool = Field(
+        False, description="标题疑似重复时，确认仍要写入则置 true")
 
 
 class _LedgerUpdateArgs(BaseModel):
@@ -777,10 +887,12 @@ def bind_memory_recall_service(registry: CapabilityRegistry, service: Any) -> No
     from dataclasses import replace
     cap = registry.get("memory.recall")
     if cap is not None:
-        registry.register_capability(replace(
-            cap, handler=lambda p, _s=service: recall_memory(
-                str(p.get("query", "")), int(p.get("limit", 5)), service=_s)),
-            override=True)
+        def _bound(params: dict[str, Any], _s: Any = service) -> Any:
+            merged = dict(params)
+            merged["_service"] = _s
+            return _recall_handler(merged)
+
+        registry.register_capability(replace(cap, handler=_bound), override=True)
 
 
 def _file_share_unbound(path: str = "") -> str:
@@ -918,10 +1030,10 @@ def scheduler_capabilities() -> list[Capability]:
         Capability(
             name="ledger.add",
             description="往项目台账追加一条新记录（台账是唯一事实源；自动编号、原子写、自动备份、自动刷新检索索引）。",
-            handler=lambda p: ledger_add(str(p.get("title", "")),
-                                         str(p.get("body", ""))),
+            handler=_ledger_add_handler,
             input=("title",),
-            optional_input=("body",),
+            optional_input=("body", "tags", "kind", "links", "status",
+                            "confirm_duplicate"),
             requires=(LEDGER_WRITE_POLICY,),
             side_effect=True,
             risk="medium",
@@ -956,15 +1068,18 @@ def scheduler_capabilities() -> list[Capability]:
         ),
         Capability(
             name="memory.recall",
-            description="回忆你自己（元亨）长期记忆里的事：经历、与老爹的相处、偏好。不管台账。",
-            handler=_queries_handler(recall_memory),
+            description=(
+                "回忆你自己（元亨）长期记忆里的事：经历、与老爹的相处、偏好。不管台账。"
+                "可以给 time_start/time_end（YYYY-MM-DD）只找某段时间的；"
+                "格式不对会报错，不会悄悄返回空。"),
+            handler=_recall_handler,
             input=("query",),
-            optional_input=("limit",),
+            optional_input=("limit", "time_start", "time_end"),
             requires=(SCHEDULER_POLICY,),
             side_effect=False,
             risk="low",
             verify=_verify_nonempty,
-            input_model=_QueryArgs,
+            input_model=_RecallArgs,
         ),
         Capability(
             name="system.time",

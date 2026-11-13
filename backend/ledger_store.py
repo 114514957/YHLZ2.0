@@ -314,8 +314,33 @@ def _block(header: str, body: list[str]) -> list[str]:
 
 
 # ---------------------------------------------------------------- CRUD
+def _meta_line(*, tags: str = "", kind: str = "", links: str = "",
+               status: str = "") -> str:
+    """结构化元数据行（2026-11-13）：只写入非空字段，人可读、机器可解析。"""
+    import re as _re
+
+    parts = []
+    kind = str(kind or "").strip()
+    if kind:
+        parts.append("kind=" + kind[:12])
+    if tags:
+        clean = [t for t in _re.split(r"[,，、\s]+", str(tags)) if t][:12]
+        if clean:
+            parts.append("tags=" + ",".join(clean))
+    if links:
+        nums = _re.findall(r"\d{1,4}", str(links))
+        if nums:
+            parts.append("links=" + ",".join(dict.fromkeys(nums)))
+    status = str(status or "").strip()
+    if status:
+        parts.append("status=" + status[:16])
+    return "- 元数据：" + "；".join(parts) if parts else ""
+
+
 def add_record(title: str, body: Iterable[str] | str = (), *,
                no: Optional[int] = None, stamp_time: bool = True,
+               tags: str = "", kind: str = "", links: str = "",
+               status: str = "",
                path: Path = LEDGER, sync_index: bool = True) -> dict:
     """Append a new record.  ``body`` is a list of lines or a text block."""
     title = str(title or "").strip()
@@ -326,6 +351,9 @@ def add_record(title: str, body: Iterable[str] | str = (), *,
     lines = _normalise_body(body)
     if stamp_time and not any(l.lstrip("- ").startswith("时间：") for l in lines):
         lines = [f"- 时间：{_today()}", *lines]
+    meta = _meta_line(tags=tags, kind=kind, links=links, status=status)
+    if meta:
+        lines.append(meta)
     _assert_clean(title + "\n" + "\n".join(lines))
 
     timestamp = time.time()
