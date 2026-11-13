@@ -13,12 +13,19 @@ Run (stdio):  python -B tools/yhlz_mcp_server.py
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+
+# 利贞 2026-11-12：语义记忆随 MCP 进程后台预热。用 on 而不是 auto——auto 在
+# 构造时 _semantic_enabled 还是 False（预热没完成），长命进程会一直走词面。
+# 代价：进程内首次召回可能要等模型加载（约 1 分钟，toolCallTimeout 120s 内）。
+# 只影响本 MCP 进程，不碰元亨的 daemon。
+os.environ.setdefault("YHLZ_MEMORY_SEMANTIC_MODE", "on")
 
 
 def _log_to_file(name: str) -> None:
@@ -74,11 +81,18 @@ async def _call_async(name: str, params: dict) -> str:
 
 
 @mcp.tool()
-async def ledger_search(query: str, limit: int = 5) -> str:
-    """Search the YHLZ project ledger (docs/上下文台账.md keyword index).
+async def ledger_search(query: str, limit: int = 5, since: str = "",
+                        until: str = "", kind: str = "", tags: str = "") -> str:
+    """Search the YHLZ project ledger (record-level FTS5 since 2026-11-13).
+
     Use for project history, decisions, record numbers, plans. Query in
-    1-3 keywords (Chinese ok); returns matching lines with record ids."""
-    return await _call_async("ledger_search", {"query": query, "limit": limit})
+    1-3 keywords (Chinese ok); returns matching RECORDS with record ids,
+    title, date and a snippet. Optional filters: since/until (YYYY-MM-DD),
+    kind (决策/结论/踩坑/状态), tags."""
+    return await _call_async("ledger_search", {
+        "query": query, "limit": limit, "since": since, "until": until,
+        "kind": kind, "tags": tags,
+    })
 
 
 @mcp.tool()

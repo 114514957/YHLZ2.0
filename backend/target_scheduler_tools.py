@@ -72,17 +72,38 @@ QQOPS_RETIRED = (
 )
 
 
-def ledger_search(query: str, limit: int = 8) -> str:
-    """Search the project ledger without making a request wait for a rebuild.
+def ledger_search(query: str, limit: int = 8, *, since: str | None = None,
+                  until: str | None = None, kind: str | None = None,
+                  tags: str | None = None, mode: str = "bm25") -> str:
+    """查台账：v2 记录级 FTS5（2026-11-13 P0），支持过滤；异常回退 v1。
 
-    The SQLite catalog is an optimization. If its build marker is behind the
-    ledger, use the bounded text fallback immediately; a stale catalog must
-    never make MCP appear hung or return old records as current results.
+    `YHLZ_LEDGER_INDEX=v1` 可一键回滚到旧的逐行索引。
     """
     q = str(query or "").strip()
     if not q:
         return "未找到台账或无查询"
     safe_limit = max(1, min(int(limit), 10))
+    if os.getenv("YHLZ_LEDGER_INDEX", "v2").strip().lower() == "v2":
+        try:
+            from backend.ledger_index_v2 import LedgerV2
+
+            hits = LedgerV2().search(
+                q, limit=safe_limit, since=since or None, until=until or None,
+                kind=kind or None, tags=tags or None)
+            if hits:
+                parts = []
+                for h in hits:
+                    parts.append(
+                        f"[记录 {h['rec']:04d}｜{h['ts'] or '—'}｜{h['kind']}] "
+                        f"{h['title'][:60]}\n  {h['snippet']}")
+                return "\n".join(parts)[:4000]
+        except Exception:  # noqa: BLE001
+            pass
+    return _ledger_search_v1(q, safe_limit)
+
+
+def _ledger_search_v1(q: str, safe_limit: int) -> str:
+    """旧路径（逐行 kw_index + grep 兜底），仅回滚用。"""
     try:
         if not _ledger_index_fresh():
             return _ledger_grep_fallback(q, safe_limit)
@@ -547,9 +568,33 @@ def _queries_handler(func: Any) -> Any:
     return _h
 
 
+def _ledger_search_handler(params: dict[str, Any]) -> Any:
+    """台账检索 v2 的过滤参数 + 旧 query/limit。"""
+    return ledger_search(
+        str(params.get("query", "")),
+        int(params.get("limit", 8) or 8),
+        since=str(params.get("since", "") or "") or None,
+        until=str(params.get("until", "") or "") or None,
+        kind=str(params.get("kind", "") or "") or None,
+        tags=str(params.get("tags", "") or "") or None,
+        mode=str(params.get("mode", "bm25") or "bm25"),
+    )
+
+
 class _QueryArgs(BaseModel):
     query: str = Field(..., min_length=1, max_length=80, description="检索关键词，1-3 个词")
     limit: int = Field(5, ge=1, le=500, description="返回条数上限")
+
+
+class _LedgerSearchArgs(_QueryArgs):
+    """v2 台账检索：在 query/limit 之外支持时间/类型/标签过滤（都可选）。"""
+
+    since: str = Field("", description="起始日期 YYYY-MM-DD（可选）")
+    until: str = Field("", description="结束日期 YYYY-MM-DD（可选）")
+    kind: Literal["", "决策", "结论", "踩坑", "状态", "note"] = Field(
+        "", description="记录类型（可选）")
+    tags: str = Field("", description="标签包含（可选）")
+    mode: Literal["bm25"] = Field("bm25", description="检索模式（当前只有 bm25）")
 
 
 class _TaskArgs(BaseModel):
@@ -837,15 +882,15 @@ def scheduler_capabilities() -> list[Capability]:
         *_see_now_caps(),
         Capability(
             name="ledger.search",
-            description="查项目台账：历史决策、编号、计划、经验教训。回答项目史类问题先用它。",
-            handler=_queries_handler(ledger_search),
+            description="查项目台账：历史决策、编号、计划、经验教训。回答项目史类问题先用它。可按时间/类型/标签过滤。",
+            handler=_ledger_search_handler,
             input=("query",),
-            optional_input=("limit",),
+            optional_input=("limit", "since", "until", "kind", "tags", "mode"),
             requires=(SCHEDULER_POLICY,),
             side_effect=False,
             risk="low",
             verify=_verify_nonempty,
-            input_model=_QueryArgs,
+            input_model=_LedgerSearchArgs,
         ),
         Capability(
             name="ledger.get",
