@@ -98,6 +98,15 @@ def status() -> dict:
     return {"ok": True, "blocks": out, "file": CONFIG, "count_changed": sum(1 for b in out if b["changed"])}
 
 
+
+def _snapshot_before(key: str = "", note: str = "") -> None:
+    """保存前留一份快照（台账 1256：改坏了要能回去）。"""
+    try:
+        from backend import prompt_versions as _pv
+        _pv.snapshot(key=key, note=note)
+    except Exception:
+        pass
+
 def set_block(key: str, text: str = "") -> dict:
     if key not in EDITABLE:
         return {"ok": False, "error": "不允许改这个块：%s" % key}
@@ -111,6 +120,9 @@ def set_block(key: str, text: str = "") -> dict:
         d[key] = t
         d["_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
     _save(d)
+    # 2026-11-15（台账 1256）：改后存快照——这才是「可以回去的状态」。
+    # 改前存的话，回滚等于回滚成「还没改」，对排查没有意义。
+    _snapshot_before(key, "after-set")
     return {"ok": True, "key": key, "reset": not t.strip(),
             "changed": sum(1 for k in d if k in EDITABLE)}
 

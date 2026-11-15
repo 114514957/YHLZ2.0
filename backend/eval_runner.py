@@ -124,6 +124,8 @@ def history(limit: int = 6) -> list[dict]:
                     key=lambda x: x.stat().st_mtime, reverse=True)[:limit]:
         try:
             d = json.loads(p.read_text(encoding="utf-8"))
+            if not isinstance(d.get("detail"), dict):
+                continue
             per = d.get("detail", {}).get("persona", [])
             grp = d.get("detail", {}).get("group", [])
             rows.append({"tag": p.stem.replace("eval_", ""),

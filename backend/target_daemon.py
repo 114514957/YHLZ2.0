@@ -1036,6 +1036,18 @@ class _Handler(ConsoleHandler):
         p = self.path.split("?", 1)[0]
         # 2026-11-15（台账 1252）：工作台「链路状态」卡。**在 daemon 侧直接拦**——
         # 放进 console_server 的分发里会被前面的分支吃掉成 404（实测）。
+        if method == "GET" and p.startswith("/api/prompt_versions"):
+            # 提示词历史（台账 1256）
+            try:
+                from backend import prompt_versions as _pv
+                key = ""
+                if "?" in self.path:
+                    import urllib.parse as _up
+                    key = (_up.parse_qs(self.path.split("?", 1)[1]).get("key") or [""])[0]
+                self._send(200, {"ok": True, "versions": _pv.versions(40, key)})
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": str(exc)[:140]})
+            return True
         if method == "GET" and p == "/api/eval_status":
             # 工作台「一键评测」卡（2026-11-15 台账 1255）：状态 + 最近几轮结果。
             try:
@@ -1045,6 +1057,47 @@ class _Handler(ConsoleHandler):
             except Exception as exc:  # noqa: BLE001
                 self._send(500, {"ok": False, "error": "%s: %s"
                                  % (type(exc).__name__, str(exc)[:120])})
+            return True
+        if method == "GET" and p.startswith("/api/ledger_"):
+            # 台账分家（台账 1258）：元亨 / 项目 / 日记，三本分开、不混排。
+            try:
+                from backend import ledger_views as _lv
+                import urllib.parse as _up
+                qs = _up.parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
+                g = lambda k, dv: (qs.get(k) or [dv])[0]  # noqa: E731
+                if p == "/api/ledger_her":
+                    self._send(200, {"ok": True, **_lv.her_ledger(int(g("limit", "6")))})
+                elif p == "/api/ledger_diary":
+                    self._send(200, {"ok": True, **_lv.diary(int(g("limit", "8")))})
+                elif p == "/api/ledger_project":
+                    self._send(200, {"ok": True, **_lv.project_ledger(
+                        int(g("limit", "8")), int(g("offset", "0")),
+                        g("only_her", "0") in ("1", "true", "yes"))})
+                else:
+                    self._send(404, {"ok": False, "error": "未知台账视图"})
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:140])})
+            return True
+        if method == "GET" and p.startswith("/api/eval_compare"):
+            # 逐题对拍（台账 1257）：A=旧、B=新，列出修好/新挂与题目原文。
+            try:
+                from backend import eval_compare as _ec
+                import urllib.parse as _up
+                qs = _up.parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
+                a = (qs.get("a") or [""])[0]
+                b = (qs.get("b") or [""])[0]
+                ts = _ec.tags(12)
+                if not (a and b):
+                    if len(ts) < 2:
+                        self._send(200, {"ok": False, "error": "至少要有两版评测"})
+                        return True
+                    a, b = ts[1]["tag"], ts[0]["tag"]
+                self._send(200, {"ok": True, **{"compare": _ec.compare(a, b)},
+                                 "tags": ts})
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:140])})
             return True
         if method == "GET" and p.startswith("/api/recent_turns"):
             # 工作台「最近回合」卡（2026-11-15 台账 1254）：问句/注入/费用一屏。
@@ -1178,7 +1231,8 @@ class _Handler(ConsoleHandler):
         if self._ui_route("POST"):
             return
         if self.path.startswith("/api/") and not self.path.startswith(
-                ("/api/try_turn", "/api/eval_run")):
+                ("/api/try_turn", "/api/eval_run", "/api/prompt_restore",
+                 "/api/prompt_snapshot")):
             # 2026-11-15（台账 1253）：`/api/try_turn` 由 daemon 自己处理（在下面读 body 后），
             # 其余 /api/* 仍交给 console_server。
             self.console_do_POST()
@@ -1206,6 +1260,28 @@ class _Handler(ConsoleHandler):
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
             self._send(400, {"error": "bad json"})
+            return
+        if self.path == "/api/prompt_restore":
+            # 回滚某块（或整份）。台账 1256。
+            try:
+                from backend import prompt_versions as _pv
+                key = str(payload.get("key") or "")
+                ts = str(payload.get("ts") or "")
+                if not ts:
+                    self._send(400, {"ok": False, "error": "缺 ts"})
+                    return
+                res = _pv.restore_all(ts) if key in ("", "*") else _pv.restore_block(key, ts)
+                self._send(200 if res.get("ok") else 400, res)
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": str(exc)[:140]})
+            return
+        if self.path == "/api/prompt_snapshot":
+            try:
+                from backend import prompt_versions as _pv
+                ts = _pv.snapshot(key=str(payload.get("key") or ""), note="manual")
+                self._send(200, {"ok": bool(ts), "ts": ts})
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": str(exc)[:140]})
             return
         if self.path == "/api/eval_run":
             # 起一轮云端评测（152+75，约 4 分钟，约 ¥2.5）。
