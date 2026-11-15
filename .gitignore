@@ -156,3 +156,18 @@ experiments/runs/server_*.log
 experiments/runs/probe_*.log
 dist/v9t7_产物/
 dist/v9t8_产物/
+# ── 2026-11-15 封存小模型 / 转向大模型（台账 1227/1231/1238）──────────
+# 根目录 /data/ 整体被忽略；但「扩题库」「黄金样本」必须入库。
+# 注意：git 不允许在被排除的目录里再放行文件 → 必须先放行 /data/ 本身，
+# 再忽略其全部内容，最后逐个放行子目录（顺序不能反）。
+!/data/
+/data/*
+!/data/eval/
+!/data/golden/
+# 训练产物目录（含 adapter / optimizer.pt，约 1.7GB）一律不入库
+docs/训练产物/
+# 评测产物包（含 adapter 与 zip）
+dist/v13_产出_*/
+dist/v14_产物/*.safetensors
+# 云端分块中转、下载缓存
+/cache_chunks/
