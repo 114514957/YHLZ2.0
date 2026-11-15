@@ -1,0 +1,238 @@
+{
+ "built_at": "2026-11-14",
+ "base": "dist\\retrain_pkg_gemma_v9t10\\sft_persona_v9t10_train.jsonl",
+ "added": {
+  "v11_dad_story": {
+   "rows": 488,
+   "weight": 2.0
+  }
+ },
+ "excluded": {
+  "lccc": "证据：7.3% 权重换来 -4 分（44 vs 48）",
+  "persona_gen / revised / other": "合成或来路不明，留待单独实验"
+ },
+ "filters": {
+  "max_chars": 1400,
+  "max_msgs": 10,
+  "drop": {
+   "禁令:认领式": 29,
+   "禁令:阴阳收尾": 48,
+   "禁令:评价对方的话（最该减）": 12,
+   "禁令:对称句（不是A而是B）": 250,
+   "禁令:陪伴式（我守着那套）": 43,
+   "禁令:万能开头「行」": 97,
+   "禁令:拿姿态当挡箭牌": 19,
+   "答案过短": 67,
+   "末条不是 assistant": 36,
+   "坏自称": 1,
+   "超长": 11,
+   "禁令:表态冒充内容": 24,
+   "禁令:掂量式": 2,
+   "禁令:放哪都成立的评价（空泛）": 9,
+   "轮数过多": 3,
+   "禁令:元话语（说自己的话本身）": 1,
+   "禁令:记账式（我记下了那套）": 8,
+   "重复": 2,
+   "禁令:汇报式开头": 1
+  },
+  "dedup": "sha1(角色+内容+tool_calls)",
+  "bans": "config/style_bans.json 全组（破折号除外）命中即丢；破折号改为换句号，不丢样本",
+  "dash_fixed": 507
+ },
+ "bans_hit": {
+  "认领式": 29,
+  "阴阳收尾": 48,
+  "评价对方的话（最该减）": 12,
+  "对称句（不是A而是B）": 250,
+  "陪伴式（我守着那套）": 43,
+  "万能开头「行」": 97,
+  "拿姿态当挡箭牌": 19,
+  "表态冒充内容": 24,
+  "掂量式": 2,
+  "放哪都成立的评价（空泛）": 9,
+  "元话语（说自己的话本身）": 1,
+  "记账式（我记下了那套）": 8,
+  "汇报式开头": 1
+ },
+ "max_source_share": 0.3,
+ "n_train": 5641,
+ "n_val": 115,
+ "sum_weight": 3653.8,
+ "by_source": {
+  "v11_dad_story": {
+   "n": 477,
+   "share_rows": 8.5,
+   "w": 954.0,
+   "share_w": 26.1,
+   "avg_chars": 38
+  },
+  "personality": {
+   "n": 937,
+   "share_rows": 16.6,
+   "w": 937.0,
+   "share_w": 25.6,
+   "avg_chars": 847
+  },
+  "scene": {
+   "n": 1179,
+   "share_rows": 20.9,
+   "w": 353.7,
+   "share_w": 9.7,
+   "avg_chars": 1105
+  },
+  "memory": {
+   "n": 463,
+   "share_rows": 8.2,
+   "w": 277.8,
+   "share_w": 7.6,
+   "avg_chars": 824
+  },
+  "discipline": {
+   "n": 907,
+   "share_rows": 16.1,
+   "w": 272.1,
+   "share_w": 7.4,
+   "avg_chars": 145
+  },
+  "honesty": {
+   "n": 154,
+   "share_rows": 2.7,
+   "w": 154.0,
+   "share_w": 4.2,
+   "avg_chars": 924
+  },
+  "opendialogue": {
+   "n": 479,
+   "share_rows": 8.5,
+   "w": 143.7,
+   "share_w": 3.9,
+   "avg_chars": 834
+  },
+  "material_full": {
+   "n": 242,
+   "share_rows": 4.3,
+   "w": 96.8,
+   "share_w": 2.6,
+   "avg_chars": 840
+  },
+  "uncertain": {
+   "n": 121,
+   "share_rows": 2.1,
+   "w": 72.6,
+   "share_w": 2.0,
+   "avg_chars": 828
+  },
+  "refusal": {
+   "n": 71,
+   "share_rows": 1.3,
+   "w": 71.0,
+   "share_w": 1.9,
+   "avg_chars": 856
+  },
+  "golden": {
+   "n": 50,
+   "share_rows": 0.9,
+   "w": 50.0,
+   "share_w": 1.4,
+   "avg_chars": 856
+  },
+  "philo": {
+   "n": 45,
+   "share_rows": 0.8,
+   "w": 45.0,
+   "share_w": 1.2,
+   "avg_chars": 1224
+  },
+  "qq_short": {
+   "n": 56,
+   "share_rows": 1.0,
+   "w": 44.8,
+   "share_w": 1.2,
+   "avg_chars": 794
+  },
+  "identity": {
+   "n": 101,
+   "share_rows": 1.8,
+   "w": 30.3,
+   "share_w": 0.8,
+   "avg_chars": 798
+  },
+  "cot": {
+   "n": 79,
+   "share_rows": 1.4,
+   "w": 23.7,
+   "share_w": 0.6,
+   "avg_chars": 139
+  },
+  "harden": {
+   "n": 78,
+   "share_rows": 1.4,
+   "w": 23.4,
+   "share_w": 0.6,
+   "avg_chars": 793
+  },
+  "metaphor": {
+   "n": 22,
+   "share_rows": 0.4,
+   "w": 22.0,
+   "share_w": 0.6,
+   "avg_chars": 1146
+  },
+  "cotdeep": {
+   "n": 64,
+   "share_rows": 1.1,
+   "w": 19.2,
+   "share_w": 0.5,
+   "avg_chars": 168
+  },
+  "identity_ai": {
+   "n": 13,
+   "share_rows": 0.2,
+   "w": 13.0,
+   "share_w": 0.4,
+   "avg_chars": 800
+  },
+  "real": {
+   "n": 20,
+   "share_rows": 0.4,
+   "w": 12.0,
+   "share_w": 0.3,
+   "avg_chars": 1000
+  },
+  "relation": {
+   "n": 35,
+   "share_rows": 0.6,
+   "w": 10.5,
+   "share_w": 0.3,
+   "avg_chars": 818
+  },
+  "emotional": {
+   "n": 17,
+   "share_rows": 0.3,
+   "w": 10.2,
+   "share_w": 0.3,
+   "avg_chars": 836
+  },
+  "teaching": {
+   "n": 8,
+   "share_rows": 0.1,
+   "w": 8.0,
+   "share_w": 0.2,
+   "avg_chars": 852
+  },
+  "realtask": {
+   "n": 20,
+   "share_rows": 0.4,
+   "w": 6.0,
+   "share_w": 0.2,
+   "avg_chars": 780
+  },
+  "internal_refusal": {
+   "n": 3,
+   "share_rows": 0.1,
+   "w": 3.0,
+   "share_w": 0.1,
+   "avg_chars": 847
+  }
+ }
+}

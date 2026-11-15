@@ -104,7 +104,9 @@ def build_cmd(cfg: dict) -> list[str]:
     g = cfg.get("grammar")
     if g:
         if g.get("file"):
-            cmd += ["--grammar-file", abspath(g["file"])]
+            # 和 lora-scaled 同一个道理：路径里带中文（ACE_WAN——PROJECT）llama.cpp 打不开，
+            # 统一用相对 YH 的路径（子进程 cwd=YH）
+            cmd += ["--grammar-file", rel(g["file"])]
         elif g.get("inline"):
             cmd += ["--grammar", g["inline"]]
 

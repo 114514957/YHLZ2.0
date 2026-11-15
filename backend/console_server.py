@@ -399,15 +399,57 @@ def _job_produce(tgt: Path, voice: str) -> None:
             "HF_ENDPOINT": "https://hf-mirror.com",
             "NO_PROXY": "localhost,127.0.0.1,::1,.maas.aliyuncs.com",
         })
-        r = subprocess.run(
-            [str(_py if _py.exists() else sys.executable),
-             str(_PROJECT_ROOT / "tools" / "cover_produce.py"),
-             str(tgt), "--voice", voice, "--presets", "e",
-             "--out-dir", str(job_dir)],
-            capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=7200, env=env,
-            creationflags=0x08000000)
-        tail = (r.stdout or "")[-1500:] + (r.stderr or "")[-600:]
+        # 2026-11-13：原来用 subprocess.run(capture_output=True)——**跑完才拿到输出**，
+        # 于是 6–7 分钟里 SING_STATE["log"] 一直是空的，页面显示「还没有任务」，
+        # 那个 03:55 只是计时器不是进度（老爹截图就是这情况）。
+        # 改成 Popen + 输出流式落 release.log，边跑边把尾巴写进 SING_STATE。
+        _runlog = job_dir / "release.log"
+        # 2026-11-13：除了流式读文件，还必须让**子进程本身不缓冲**——
+        # stdout 被重定向到文件时 Python 默认块缓冲（8KB），小段 JSON 攒不满就一直空着，
+        # 表现为"改了流式日志，页面还是没日志"。所以 -u + PYTHONUNBUFFERED=1 双保险。
+        env["PYTHONUNBUFFERED"] = "1"
+        _argv = [str(_py if _py.exists() else sys.executable), "-u",
+                 str(_PROJECT_ROOT / "tools" / "cover_produce.py"),
+                 str(tgt), "--voice", voice, "--presets", "e",
+                 "--out-dir", str(job_dir)]
+        with open(_runlog, "w", encoding="utf-8", errors="replace") as _lf:
+            _proc = subprocess.Popen(_argv, stdout=_lf, stderr=subprocess.STDOUT,
+                                     text=True, encoding="utf-8", errors="replace",
+                                     env=env, creationflags=0x08000000)
+            _t0 = time.time()
+            _last_tail = ""
+            while _proc.poll() is None:
+                if time.time() - _t0 > 7200:
+                    _proc.kill()
+                    raise RuntimeError("投产链路超时（2 小时）")
+                try:
+                    _txt = _runlog.read_text(encoding="utf-8", errors="replace")
+                except Exception:  # noqa: BLE001
+                    _txt = ""
+                _tail_now = _txt[-900:]
+                if _tail_now != _last_tail:
+                    _last_tail = _tail_now
+                    SING_STATE["log"] = _tail_now
+                    # 从落盘日志里认出当前阶段，让页面的 step 真的会走
+                    for _mark, _label in (
+                        ("S1", "S1 规范化 44.1k"),
+                        ("S2", "S2 Kim 人声分离"),
+                        ("S3", "S3 MDX 卡拉OK"),
+                        ("S4", "S4 Seed-VC 换声"),
+                        ("S5", "S5 柔化 e"),
+                        ("S6", "S6 三轨混回"),
+                        ("S7", "S7 归档入库"),
+                    ):
+                        if _mark in _txt:
+                            SING_STATE["step"] = "翻唱中｜已完成到 " + _label
+                time.sleep(1.5)
+        _rc = _proc.returncode
+        try:
+            _out = _runlog.read_text(encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            _out = ""
+        r = type("R", (), {"returncode": _rc, "stdout": _out, "stderr": ""})()
+        tail = (r.stdout or "")[-1500:]
         SING_STATE["log"] = tail[-900:]
         info = None
         for line in reversed((r.stdout or "").splitlines()):
@@ -985,12 +1027,13 @@ GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/ui.js",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
           "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html",
           "/emotion", "/qq-qrcode", "/growth", "/devmode",
-          "/qq/groups",
+          "/qq/groups", "/prompt/blocks", "/prompt/preview",
           "/official-ui/status"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
 POST_UI = {"/talk", "/voice", "/reset", "/settings", "/control", "/session",
-           "/tap", "/devmode", "/qq/whitelist"}
+           "/tap", "/devmode", "/qq/whitelist", "/mem/lifecycle",
+           "/prompt/set", "/prompt/reset"}
 
 
 class ConsoleHandler(BaseHTTPRequestHandler):
@@ -1219,6 +1262,24 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             except Exception as exc:  # noqa: BLE001
                 self._send_json(500, {"ok": False,
                                       "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])})
+        elif p == "/prompt/blocks":
+            # 工作台「提示词」模块：分块现状（2026-11-13）
+            try:
+                from backend import prompt_overrides as _po
+                self._send_json(200, _po.status())
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"ok": False, "error": "%s: %s"
+                                      % (type(exc).__name__, str(exc)[:120])})
+        elif p == "/prompt/preview":
+            try:
+                import urllib.parse as _up
+                q = _up.parse_qs(_up.urlparse(self.path).query)
+                pub = (q.get("public") or ["0"])[0] in ("1", "true", "yes")
+                from backend import prompt_overrides as _po
+                self._send_json(200, _po.preview(pub))
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"ok": False, "error": "%s: %s"
+                                      % (type(exc).__name__, str(exc)[:120])})
         elif p == "/loading.webp":
             self._serve_file("loading.webp")
         elif p == "/console.css":
@@ -1344,6 +1405,29 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             except Exception as exc:  # noqa: BLE001
                 self._send_json(500, {"ok": False,
                                       "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])})
+            return
+        if p == "/prompt/set":
+            # 提示词分块保存（空文本＝恢复该块默认）。渲染每轮现取，下一句即生效。
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+                from backend import prompt_overrides as _po
+                self._send_json(200, _po.set_block(str(body.get("key") or ""),
+                                                   str(body.get("text") or "")))
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"ok": False,
+                                      "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])})
+            return
+        if p == "/prompt/reset":
+            try:
+                from backend import prompt_overrides as _po
+                self._send_json(200, _po.reset_all())
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"ok": False,
+                                      "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])})
+            return
+        if p == "/mem/lifecycle":
+            self._do_mem_lifecycle()
             return
         if p == "/talk":
             from backend import gpu_lock
@@ -2331,24 +2415,72 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         return {"ok": True, "query": q, "items": out}
 
     def _mem(self) -> dict:
+        """记忆检索（工作台）：支持时间窗 + 生命周期状态。
+
+        W1-W4（台账 1174-1181）：time_start/time_end 走 target_memory 的时间过滤，
+        格式错直接报错（与 memory.recall 工具同一口径，不静默返回空）。
+        """
         from urllib.parse import parse_qs, urlparse
 
-        q = (parse_qs(urlparse(self.path).query).get("q", [""])[0]).strip()
-        limit = int(parse_qs(urlparse(self.path).query).get("limit", ["8"])[0])
-        if not q:
-            return {"ok": True, "query": q, "items": []}
+        qs = parse_qs(urlparse(self.path).query)
+        q = (qs.get("q", [""])[0]).strip()
+        try:
+            limit = int(qs.get("limit", ["8"])[0])
+        except Exception:
+            limit = 8
+        start_s = (qs.get("time_start", [""])[0]).strip()
+        end_s = (qs.get("time_end", [""])[0]).strip()
+        out = {"ok": True, "query": q, "items": [],
+               "window": {"start": start_s, "end": end_s}}
         try:
             s = self.runtime._session("console")
-            hits = s.memory.recall(q, limit=min(limit, 20))
-            items = [{"id": h.get("id"), "type": h.get("type"),
-                      "importance": h.get("importance"),
-                      "status": h.get("status"),
-                      "summary": str(h.get("summary", ""))[:180]}
-                     for h in (hits or [])]
-            return {"ok": True, "query": q, "items": items}
+            try:
+                h = s.memory.health()
+                out["lifecycle"] = {
+                    "items": int(h.get("l2_items", 0)),
+                    "active": int(h.get("l2_active", 0)),
+                    "frozen": int(h.get("l2_frozen", 0)),
+                }
+            except Exception:
+                out["lifecycle"] = None
+            if not q:
+                return out
+            try:
+                from backend.target_scheduler_tools import _parse_day
+
+                start = _parse_day(start_s, end=False)
+                end = _parse_day(end_s, end=True)
+            except ValueError as exc:
+                out.update({"ok": False, "items": [], "error": str(exc)})
+                return out
+            if start and end and start > end:
+                out.update({"ok": False, "items": [],
+                            "error": "time_start 晚于 time_end"})
+                return out
+            hits = s.memory.recall(q, limit=min(limit, 20),
+                                   time_start=start, time_end=end)
+            out["items"] = [{"id": h.get("id"), "type": h.get("type"),
+                             "importance": h.get("importance"),
+                             "status": h.get("status"),
+                             "score": h.get("score"),
+                             "channels": h.get("_channels") or [],
+                             "summary": str(h.get("summary", ""))[:180]}
+                            for h in (hits or [])]
+            return out
         except Exception as exc:
-            return {"ok": False, "query": q,
-                    "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+            out.update({"ok": False,
+                        "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
+            return out
+
+    def _do_mem_lifecycle(self) -> None:
+        """工作台「冻结维护」：按当前 belief 重新判定冻结/复活（只翻状态，不删）。"""
+        try:
+            s = self.runtime._session("console")
+            res = s.memory.apply_lifecycle()
+            self._send_json(200, {"ok": True, **(res or {})})
+        except Exception as exc:
+            self._send_json(500, {"ok": False,
+                                  "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
 
     def _state(self) -> dict:
         out = {"ok": True, "now": time.time()}

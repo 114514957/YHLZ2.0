@@ -1,5 +1,8 @@
 # dsh-see-now：让 AI 实时看见屏幕
 
+> ⚠️ **本文已被取代**（2026-11-11 复核）：快照过期——Linux 已接、npm 到 0.2.2、★586、测试 494。
+> 现状以 [dsh-see-now_调研_20261111.md](./dsh-see-now_调研_20261111.md) 为准；本文只作 11-04 那一刻的历史记录。
+
 > 2026-11-04 · 利贞
 > 来源：GitHub API / raw.githubusercontent 直读（README、CHANGELOG、package.json、dsh.plugin.json、目录树、issue 列表、commit 列表、npm registry）。**未克隆、未安装、未运行。**
 > 关联：同作者 `SAOS-3624/dsh-video-storyboard` 在台账 1022 记过（★148，看视频）；本文这个是**看屏幕**，同一套取舍。

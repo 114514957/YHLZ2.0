@@ -182,9 +182,13 @@ def _compact_for_local(messages: list[dict[str, Any]],
 
 def build_openai_compatible_llm_turn(
     *,
-    base_url: str = "https://api.deepseek.com/v1/chat/completions",
+    # 2026-11-13（ledger 1195）：默认值原先是 DeepSeek 云端——只要哪个调用点忘了传
+    # base_url，就悄悄换成云端模型，而 health 里还写着"本地"。实测踩过：
+    # QQ 群/私聊各一轮，本地 llama 日志增长 0 字节。默认值改成本地 dpo2，
+    # 想用云端必须**显式**传 base_url + api_key。
+    base_url: str = "http://127.0.0.1:8081/v1/chat/completions",
     api_key: Optional[str] = None,
-    model: str = "deepseek-chat",
+    model: str = "gemma-4-e4b",
     client: Any = None,
     temperature: float = 0.1,
     max_tokens: int = 500,
@@ -412,6 +416,14 @@ class TurnOrchestrator:
 
         trace_id = turn_evidence.new_id("tr")
         frame = PromptFrame(system_prompt, str(early_context or "")[:1500])
+        # 2026-11-14：**每轮锚点**。Gemma-4 有 35/42 层是 512 滑窗，系统提示在对话开头，
+        # 一旦历史超过 512 token，这些层就完全看不见人设/认主/隐私条款。
+        # 把最短硬约束贴在当前轮末尾 → 它必然在窗口内（第一轮之后仍然有效）。
+        try:
+            from backend import turn_anchor as _ta
+            turn_text = _ta.apply(str(turn_text), system_prompt)
+        except Exception:  # noqa: BLE001
+            pass
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": frame.render()},
         ]

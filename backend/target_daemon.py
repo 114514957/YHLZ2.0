@@ -381,8 +381,18 @@ class DaemonRuntime:
         from backend.target_entry import ConversationSession, is_owner_channel
         from backend.target_orchestrator import build_openai_compatible_llm_turn
 
+        # 2026-11-13（ledger 1195）：老爹「全部用咱们训练的模型」。
+        # 原来这里不传 base_url → build_openai_compatible_llm_turn 的默认主链路是
+        # **DeepSeek 云端**（api_key 取 DEEPSEEK_API_KEY），本地 gemma+dpo2 只是兜底。
+        # 实测证据：QQ 群/QQ 私聊各发一轮，本地 llama-server 日志增长 0 字节；
+        #          而 console 走默认工厂（本地）日志增长 1084 字节。
+        # 现在改成**主链路指向本地 8081（dpo2）**，不再挂云端兜底——
+        # 宁可本地挂了当场报错，也不要悄悄换成别的模型（换了她就不是我们调的那一个）。
         llm = build_openai_compatible_llm_turn(
-            fallback_base_url=LOCAL_BASE, fallback_model=LOCAL_MODEL)
+            base_url=LOCAL_BASE, api_key="", model=LOCAL_MODEL,
+            temperature=0.2, max_tokens=800,
+            reasoning_effort="none",
+        )
         if str(channel) == "console":
             # workbench: default (non-injected) llm so run_turn can rebuild a
             # streaming turn on on_delta (0222); shared L2 db via TargetMemory
@@ -430,9 +440,11 @@ class DaemonRuntime:
                       for k in self._sessions}
         except Exception as exc:
             return {"status": "degraded", "detail": type(exc).__name__}
-        return {"status": "ok", "provider": "dual-rail",
+        return {"status": "ok", "provider": "local-single-rail",
                 "sessions": len(self._sessions), "turns": counts,
-                "llm": "deepseek->gemma",
+                # 2026-11-13：原来这里写死 "deepseek->gemma"，是**假信息**——
+                # 它不反映任何实测路由，还让我误以为她在用云端。现在如实写本地模型。
+                "llm": "local:" + LOCAL_MODEL + " (" + LOCAL_BASE + ")",
                 "uptime_s": round(
                     time.time() - getattr(self, "_started_at", time.time()), 1),
                 "active_turns": _gpu_chat_active(),

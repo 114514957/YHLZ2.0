@@ -1642,11 +1642,12 @@ def cli_main() -> int:
                 import os, json as _j
 
                 ensure_env_loaded()
+                # 2026-11-13（ledger 1195）：老爹「全部用咱们训练的模型」→ /suggest 也走本地。
                 llm = build_openai_compatible_llm_turn(
-                    api_key=os.getenv("DEEPSEEK_API_KEY", ""), model="deepseek-chat",
+                    base_url="http://127.0.0.1:8081/v1/chat/completions",
+                    api_key="", model="gemma-4-e4b",
                     temperature=0.2, max_tokens=900,
-                    fallback_base_url="http://127.0.0.1:11434/v1/chat/completions",
-                    fallback_model="qwen2.5:3b")
+                    reasoning_effort="none")
                 out = loop.run_until_complete(_sugg(llm))
                 print(_j.dumps(out, ensure_ascii=False, indent=1))
                 continue

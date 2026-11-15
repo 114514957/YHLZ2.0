@@ -1,0 +1,73 @@
+# V9 训练摘要
+
+- base_model: /root/autodl-tmp/models/gemma-4-e4b-it
+- train_file: /root/yh/material_v14/train.jsonl
+- n_train: 5641
+- n_val: 115
+- epochs: 1.0
+- batch_size: 4
+- grad_accum: 2
+- effective_batch: 8
+- lr: 0.0002
+- lr_scheduler_type: cosine
+- warmup_ratio: 0.03
+- lora_r: 16
+- lora_alpha: 32
+- max_seq_len: 1536
+- load_in_4bit: True
+- full_finetune: False
+- total_steps: 706
+- elapsed_sec: 1894.5
+- loss_first: 4.522068977355957
+- loss_last: 1.616976547241211
+- loss_min: 1.5115802764892579
+- loss_reduction_pct: 64.24
+- eval_loss_first: 2.5669033527374268
+- eval_loss_last: 2.4499309062957764
+- eval_loss_min: 2.4499309062957764
+- lr_first: 0.0
+- lr_last: 5.152848640218588e-08
+- n_log_points: 41
+
+## loss 采样（每 20 步）
+
+- step 1｜epoch 0.001417434443656981｜loss 4.522069｜lr 0.000e+00
+- step 20｜epoch 0.028348688873139617｜loss 4.270775｜lr 1.810e-04
+- step 40｜epoch 0.05669737774627923｜loss 2.976113｜lr 1.997e-04
+- step 60｜epoch 0.08504606661941885｜loss 2.780129｜lr 1.985e-04
+- step 80｜epoch 0.11339475549255847｜loss 2.685598｜lr 1.965e-04
+- step 100｜epoch 0.14174344436569808｜loss 2.544869｜lr 1.937e-04
+- step 120｜epoch 0.1700921332388377｜loss 2.468850｜lr 1.901e-04
+- step 140｜epoch 0.19844082211197733｜loss 2.376596｜lr 1.857e-04
+- step 160｜epoch 0.22678951098511693｜loss 2.242924｜lr 1.806e-04
+- step 180｜epoch 0.25513819985825653｜loss 2.352439｜lr 1.749e-04
+- step 200｜epoch 0.28348688873139616｜loss 2.223437｜lr 1.685e-04
+- step 200｜**eval_loss 2.566903**
+- step 220｜epoch 0.3118355776045358｜loss 2.085288｜lr 1.615e-04
+- step 240｜epoch 0.3401842664776754｜loss 2.259598｜lr 1.540e-04
+- step 260｜epoch 0.36853295535081504｜loss 2.122362｜lr 1.461e-04
+- step 280｜epoch 0.39688164422395467｜loss 1.992869｜lr 1.378e-04
+- step 300｜epoch 0.42523033309709424｜loss 1.978826｜lr 1.292e-04
+- step 320｜epoch 0.45357902197023386｜loss 1.899799｜lr 1.203e-04
+- step 340｜epoch 0.4819277108433735｜loss 1.986891｜lr 1.112e-04
+- step 360｜epoch 0.5102763997165131｜loss 1.916903｜lr 1.021e-04
+- step 380｜epoch 0.5386250885896527｜loss 1.841019｜lr 9.290e-05
+- step 400｜epoch 0.5669737774627923｜loss 2.010843｜lr 8.379e-05
+- step 400｜**eval_loss 2.477632**
+- step 420｜epoch 0.595322466335932｜loss 1.868964｜lr 7.482e-05
+- step 440｜epoch 0.6236711552090716｜loss 1.752797｜lr 6.606e-05
+- step 460｜epoch 0.6520198440822113｜loss 1.610643｜lr 5.759e-05
+- step 480｜epoch 0.6803685329553508｜loss 1.769411｜lr 4.947e-05
+- step 500｜epoch 0.7087172218284904｜loss 1.835952｜lr 4.178e-05
+- step 520｜epoch 0.7370659107016301｜loss 1.902345｜lr 3.458e-05
+- step 540｜epoch 0.7654145995747696｜loss 1.738325｜lr 2.792e-05
+- step 560｜epoch 0.7937632884479093｜loss 1.741558｜lr 2.188e-05
+- step 580｜epoch 0.8221119773210489｜loss 1.511580｜lr 1.649e-05
+- step 600｜epoch 0.8504606661941885｜loss 1.785028｜lr 1.180e-05
+- step 600｜**eval_loss 2.458204**
+- step 620｜epoch 0.8788093550673282｜loss 1.741487｜lr 7.855e-06
+- step 640｜epoch 0.9071580439404677｜loss 1.734583｜lr 4.684e-06
+- step 660｜epoch 0.9355067328136074｜loss 1.658608｜lr 2.314e-06
+- step 680｜epoch 0.963855421686747｜loss 1.616076｜lr 7.657e-07
+- step 700｜epoch 0.9922041105598866｜loss 1.616977｜lr 5.153e-08
+- step 706｜**eval_loss 2.449931**

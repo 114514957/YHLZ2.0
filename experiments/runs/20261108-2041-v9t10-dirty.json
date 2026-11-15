@@ -1,0 +1,68 @@
+{
+ "exp_id": "v9t10-dirty",
+ "name": "v9t10 + 放开的群聊提示词（测脏话）",
+ "config_hash": "ba79c70a8fcc259c",
+ "started_at": "2026-11-08T20:39:52",
+ "backend": "cpu",
+ "judge_version": 6,
+ "server_cmd": [
+  "C:\\Users\\ACE_WAN——PROJECT\\YHLZ\\YH\\models\\llama-cuda\\llama-server.exe",
+  "-m",
+  "models/gemma4-gguf/gemma-4-E4B_q4_0-it.gguf",
+  "--mmproj",
+  "models/gemma4-gguf/gemma-4-E4B-it-mmproj.gguf",
+  "--no-mmproj-offload",
+  "--lora",
+  "models/gguf-lora/yuanheng-v9t10-lora.gguf",
+  "-ngl",
+  "0",
+  "-c",
+  "8192",
+  "--parallel",
+  "1",
+  "-rea",
+  "off",
+  "--jinja",
+  "--alias",
+  "v9t10-dirty",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "8093",
+  "--temp",
+  "0.0",
+  "--top-p",
+  "0.95",
+  "--repeat-penalty",
+  "1.0"
+ ],
+ "cold": true,
+ "repeats": [
+  {
+   "run": 1,
+   "results": [
+    {
+     "suite": "group",
+     "ok": 25,
+     "total": 28,
+     "by_cat": {
+      "群聊": [
+       25,
+       28
+      ]
+     },
+     "gate_ok": false,
+     "gate_fail": [
+      "g14"
+     ],
+     "failed_ids": [
+      "g11",
+      "g13",
+      "g14"
+     ],
+     "elapsed": 69.2
+    }
+   ]
+  }
+ ]
+}

@@ -223,6 +223,9 @@ body {
 .ql li { padding: 7px 9px; border-radius: 9px; background: var(--panel-2); border: 1px solid transparent; }
 .ql li:hover { border-color: var(--line); }
 .ql.logs li { font-family: Consolas, monospace; font-size: 11px; }
+.memstat { margin: 2px 0 0; font-size: 11px; color: var(--dim); min-height: 14px; }
+.memstat b { color: var(--text); font-weight: 600; }
+.memstat .warn { color: var(--gold); }
 
 /* 桌面端收起面板 */
 body.drawer-hidden .stage { grid-template-columns: minmax(0, 1fr) 0; }

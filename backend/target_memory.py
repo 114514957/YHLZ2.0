@@ -55,6 +55,20 @@ def _rerank_in_recall_enabled() -> bool:
     }
 
 
+def _rrf_enabled() -> bool:
+    """W2 (ledger 1174): fuse the recall channels by rank instead of by score.
+
+    Off restores the pre-1178 behaviour (per-channel scores, constant 0.45 on
+    literal/BM25 hits). See backend/rank_fusion.py.
+    """
+    try:
+        from backend.rank_fusion import enabled
+
+        return enabled()
+    except Exception:
+        return False
+
+
 def _fingerprint(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
@@ -346,6 +360,8 @@ class TargetMemoryService:
                 ("confidence", "REAL NOT NULL DEFAULT 0.5"),
                 # TCM v1 (ledger 0438): source grading (A1)
                 ("stance", "TEXT NOT NULL DEFAULT ''"),
+                # W4 (ledger 1174): freeze/revive hysteresis state ('' or 'frozen')
+                ("lifecycle", "TEXT NOT NULL DEFAULT ''"),
             ):
                 if name not in cols:
                     con.execute(f"ALTER TABLE l2_items ADD COLUMN {name} {decl}")
@@ -725,8 +741,20 @@ class TargetMemoryService:
                     con.close()
         except Exception:
             return []
-        good = []
-        seen: set[str] = set()
+        # W2 (ledger 1174): keep per-channel rankings; the fusion step needs
+        # ranks, not scores — the old code pasted a constant 0.45 on literal and
+        # BM25 hits and then sorted everything together, which collapsed order.
+        found: dict[str, dict] = {}
+        chan: dict[str, list[str]] = {}
+
+        def add(channel: str, item: dict) -> None:
+            iid = str(item.get("id") or "")
+            if not iid:
+                return
+            bucket = chan.setdefault(channel, [])
+            if iid not in bucket:
+                bucket.append(iid)
+            found.setdefault(iid, item)
         # 1) semantic candidates (换说法, higher confidence)
         try:
             if not self._semantic_enabled:
@@ -739,14 +767,13 @@ class TargetMemoryService:
                     continue
                 if it.get("status") not in (None, "", "active"):
                     continue
-                good.append({"id": it["id"], "tier": "L2",
-                             "type": it.get("type", "fact"),
-                             "importance": it.get("importance", 5),
-                             "status": "active",
-                             "summary": it.get("summary", ""),
-                             "date": it.get("date", ""),
-                             "_score": float(it.get("score", 0.0))})
-                seen.add(it["id"])
+                add("semantic", {"id": it["id"], "tier": "L2",
+                                 "type": it.get("type", "fact"),
+                                 "importance": it.get("importance", 5),
+                                 "status": "active",
+                                 "summary": it.get("summary", ""),
+                                 "date": it.get("date", ""),
+                                 "_score": float(it.get("score", 0.0))})
         except Exception:
             pass
         # 2) literal 2-gram candidates (baseline below semantic)
@@ -766,12 +793,11 @@ class TargetMemoryService:
                 s = str(r[5] or "").strip()
             except Exception:
                 continue
-            if s and len(s) >= 4 and r[0] not in seen:
-                good.append({"id": r[0], "tier": "L2", "type": r[1],
-                             "importance": r[2], "status": r[3],
-                             "summary": s, "_score": 0.45,
-                             "date": _date_str(r[6] if len(r) > 6 else 0)})
-                seen.add(r[0])
+            if s and len(s) >= 4:
+                add("literal", {"id": r[0], "tier": "L2", "type": r[1],
+                                "importance": r[2], "status": r[3],
+                                "summary": s, "_score": 0.45,
+                                "date": _date_str(r[6] if len(r) > 6 else 0)})
         # 3) diary semantic (own words can also be recalled in chat)
         try:
             if not self._semantic_enabled:
@@ -780,33 +806,41 @@ class TargetMemoryService:
 
             for d in semantic_any(q, ["diary"], top=limit, min_score=0.48):
                 did = d.get("id", "")
-                if not did or did in seen:
+                if not did:
                     continue
-                good.append({"id": did, "tier": "diary", "type": "diary",
-                             "importance": 6, "status": "active",
-                             "summary": str(d.get("text", ""))[:120],
-                             "_score": float(d.get("score", 0.0))})
-                seen.add(did)
+                add("diary", {"id": did, "tier": "diary", "type": "diary",
+                              "importance": 6, "status": "active",
+                              "summary": str(d.get("text", ""))[:120],
+                              "_score": float(d.get("score", 0.0))})
         except Exception:
             pass
         # 4) BM25 candidates (lexical strength) then cross-encoder rerank
         try:
             for b in self.bm25_search(q, limit=limit * 4):
-                if b["id"] in seen:
-                    continue
                 if b.get("type") not in _INJECT_TYPES:
                     continue
                 if int(b.get("importance", 0) or 0) < 5:
                     continue
                 if b.get("status") not in (None, "", "active"):
                     continue
-                good.append({"id": b["id"], "tier": "L2", "type": b["type"],
+                add("bm25", {"id": b["id"], "tier": "L2", "type": b["type"],
                              "importance": b["importance"],
                              "status": b["status"],
                              "summary": b["summary"], "_score": 0.45})
-                seen.add(b["id"])
         except Exception:
             pass
+        good = list(found.values())
+        if len(chan) > 1 and _rrf_enabled():
+            try:
+                from backend.rank_fusion import fuse
+
+                fused = fuse(chan)
+                for g in good:
+                    gid = str(g.get("id") or "")
+                    g["_score"] = float(fused.get(gid, 0.0))
+                    g["_channels"] = [name for name, ids in chan.items() if gid in ids]
+            except Exception:
+                pass
         current_ids = {it["id"] for it in self._filter_current(
             [it for it in good if it.get("tier") == "L2"])}
         good = [it for it in good if it.get("tier") != "L2" or it["id"] in current_ids]
@@ -820,6 +854,21 @@ class TargetMemoryService:
             except Exception:
                 # fail closed: keep the channel scores instead of zeroing them
                 self._rerank_failures += 1
+        # W4 (ledger 1174): frozen items sink in the ranking but stay recallable
+        # (factor 0.5 — never filtered out, same rule as A_memorix).
+        if good:
+            try:
+                states = self._lifecycle_states([str(g.get("id") or "") for g in good])
+                if states:
+                    from backend.memory_lifecycle import rank_factor
+
+                    for g in good:
+                        factor = rank_factor(states.get(str(g.get("id") or ""), ""))
+                        if factor != 1.0:
+                            g["_score"] = float(g.get("_score", 0.0)) * factor
+                            g["_frozen"] = True
+            except Exception:
+                pass
         good.sort(key=lambda x: x.get("_score", 0.0), reverse=True)
         # de-dup by text (diary/l2 may hold the same sentence)
         uniq: list[dict] = []
@@ -1067,6 +1116,59 @@ class TargetMemoryService:
     def observe_contradiction(self, item_id: str) -> Optional[float]:
         """Negative evidence (user disagreement / contradiction)."""
         return self._belief_apply(item_id, -0.5)
+
+    def _lifecycle_states(self, ids: list[str]) -> dict[str, str]:
+        """W4: id -> lifecycle state ('', 'frozen'); {} when disabled/on error."""
+        try:
+            from backend import memory_lifecycle as lc
+
+            if not lc.enabled() or not ids:
+                return {}
+            marks = ",".join("?" for _ in ids)
+            con = sqlite3.connect(str(self.db_path), timeout=0.05)
+            try:
+                rows = con.execute(
+                    f"SELECT id, COALESCE(lifecycle,'') FROM l2_items WHERE id IN ({marks})",
+                    [str(i) for i in ids]).fetchall()
+            finally:
+                con.close()
+            return {str(r[0]): str(r[1] or "") for r in rows}
+        except Exception:
+            return {}
+
+    def apply_lifecycle(self, now: Optional[float] = None) -> dict:
+        """W4: re-evaluate freeze/revive state from current belief (hysteresis).
+
+        Only flips the persisted state; nothing is deleted and belief is not
+        touched here. Protected/profile rows are skipped (same rule as decay).
+        """
+        from backend import memory_lifecycle as lc
+
+        if not lc.enabled():
+            return {"enabled": False, "frozen": 0, "revived": 0, "checked": 0}
+        con = sqlite3.connect(str(self.db_path))
+        try:
+            rows = con.execute(
+                "SELECT id, belief, COALESCE(lifecycle,'') FROM l2_items "
+                "WHERE status='active' AND COALESCE(protected,0)=0 "
+                "AND COALESCE(kind,'episodic')!='profile'"
+            ).fetchall()
+            frozen = revived = 0
+            for iid, belief, state in rows:
+                target = lc.next_state(state, belief)
+                if target == (state or ""):
+                    continue
+                con.execute("UPDATE l2_items SET lifecycle=? WHERE id=?",
+                            (target, iid))
+                if target == lc.FROZEN:
+                    frozen += 1
+                else:
+                    revived += 1
+            con.commit()
+            return {"enabled": True, "frozen": frozen, "revived": revived,
+                    "checked": len(rows)}
+        finally:
+            con.close()
 
     def apply_belief_decay(self, now: Optional[float] = None) -> int:
         """Time-decay all items; returns count updated (never deletes)."""
@@ -1625,7 +1727,8 @@ class TargetMemoryService:
                 "downgraded": downgraded}
 
     def recall(self, query: str, limit: int = 5, as_of: float = 0.0,
-               spread: bool = True) -> list[dict]:
+               spread: bool = True, time_start: float = 0.0,
+               time_end: float = 0.0) -> list[dict]:
         """Tool-type recall; never auto-injected.
 
         Ledger 0148: keyword-index (mini inverted catalog) is the primary
@@ -1650,7 +1753,17 @@ class TargetMemoryService:
         _t1 = time.perf_counter()
         self._last_recall_timing["keyword_ms"] = round((_t1 - _t0) * 1000, 2)
         self._last_recall_timing["keyword_hits"] = len(ranked) if ranked else 0
-        filter_rows = (lambda rows: self._filter_as_of(rows, float(as_of))) if as_of else self._filter_current
+        base_filter = ((lambda rows: self._filter_as_of(rows, float(as_of)))
+                       if as_of else self._filter_current)
+
+        def filter_rows(rows: list[dict]) -> list[dict]:
+            # W3 (ledger 1174): optional [time_start, time_end] window, applied
+            # after the current/as_of state filter.
+            kept = base_filter(rows)
+            if time_start or time_end:
+                kept = self._filter_time_range(kept, float(time_start or 0.0),
+                                              float(time_end or 0.0))
+            return kept
         out = filter_rows(ranked or [])[:limit]
         # A rebuildable keyword mirror may lag an approved transaction. Fill
         # thin results from authoritative L2/FTS before invoking any model.
@@ -2243,6 +2356,36 @@ class TargetMemoryService:
             con.close()
         return out
 
+    def _filter_time_range(self, items: list[dict], start: float,
+                           end: float) -> list[dict]:
+        """W3: keep items whose effective timestamp falls inside the window.
+
+        Effective ts = COALESCE(NULLIF(valid_at,0), created_at). Either end may
+        be 0 (open). Missing rows are dropped (fail closed, same as _filter_current).
+        """
+        out: list[dict] = []
+        try:
+            con = sqlite3.connect(str(self.db_path), timeout=0.05)
+            try:
+                for it in items or []:
+                    row = con.execute(
+                        "SELECT COALESCE(NULLIF(valid_at,0), created_at)"
+                        " FROM l2_items WHERE id=?",
+                        (str(it.get("id", "")),)).fetchone()
+                    if row is None:
+                        continue
+                    ts = float(row[0] or 0)
+                    if start and ts < start:
+                        continue
+                    if end and ts > end:
+                        continue
+                    out.append(it)
+            finally:
+                con.close()
+        except Exception:
+            return []
+        return out
+
     def _filter_as_of(self, items: list[dict], ts: float) -> list[dict]:
         """Time-travel filter: keep items valid at `ts` (valid_at<=ts<invalid)."""
         out: list[dict] = []
@@ -2281,6 +2424,14 @@ class TargetMemoryService:
             ).fetchone()[0]
         except Exception:
             episodes = causal_active = causal_pending = 0
+        # W4 (ledger 1174): lifecycle visibility — frozen rows are still stored,
+        # just ranked lower; count them so upkeep can be watched.
+        try:
+            frozen = con.execute(
+                "SELECT COUNT(*) FROM l2_items WHERE COALESCE(lifecycle,'')='frozen'"
+            ).fetchone()[0]
+        except Exception:
+            frozen = 0
         con.close()
         return {
             "provider": "target-memory-v1",
@@ -2310,5 +2461,6 @@ class TargetMemoryService:
             "episodes": int(episodes),
             "causal_active": int(causal_active),
             "causal_pending": int(causal_pending),
+            "l2_frozen": int(frozen),
             "db": str(self.db_path),
         }

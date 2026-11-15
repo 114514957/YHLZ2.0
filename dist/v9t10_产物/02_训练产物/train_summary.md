@@ -1,0 +1,75 @@
+# V9 训练摘要
+
+- base_model: /root/autodl-tmp/models/gemma-4-e4b-it
+- train_file: /root/yh/retrain_pkg_gemma_v9t10/sft_persona_v9t10_train.jsonl
+- n_train: 5931
+- n_val: 978
+- epochs: 1.0
+- batch_size: 4
+- grad_accum: 2
+- effective_batch: 8
+- lr: 0.0002
+- lr_scheduler_type: cosine
+- warmup_ratio: 0.03
+- lora_r: 16
+- lora_alpha: 32
+- max_seq_len: 1536
+- load_in_4bit: True
+- full_finetune: False
+- total_steps: 742
+- elapsed_sec: 2639.8
+- loss_first: 4.405002117156982
+- loss_last: 2.2573951721191405
+- loss_min: 2.0547313690185547
+- loss_reduction_pct: 48.75
+- eval_loss_first: nan
+- eval_loss_last: nan
+- eval_loss_min: nan
+- lr_first: 0.0
+- lr_last: 8.567242599299973e-09
+- n_log_points: 43
+
+## loss 采样（每 20 步）
+
+- step 1｜epoch 0.0013486176668914363｜loss 4.405002｜lr 0.000e+00
+- step 20｜epoch 0.026972353337828724｜loss 4.110940｜lr 1.727e-04
+- step 40｜epoch 0.05394470667565745｜loss 2.963486｜lr 1.997e-04
+- step 60｜epoch 0.08091706001348618｜loss 2.732994｜lr 1.987e-04
+- step 80｜epoch 0.1078894133513149｜loss 2.583392｜lr 1.969e-04
+- step 100｜epoch 0.13486176668914363｜loss 2.591833｜lr 1.944e-04
+- step 120｜epoch 0.16183412002697237｜loss 2.487166｜lr 1.912e-04
+- step 140｜epoch 0.18880647336480108｜loss 2.525655｜lr 1.872e-04
+- step 160｜epoch 0.2157788267026298｜loss 2.503792｜lr 1.827e-04
+- step 180｜epoch 0.24275118004045854｜loss 2.503994｜lr 1.774e-04
+- step 200｜epoch 0.26972353337828725｜loss 2.457599｜lr 1.716e-04
+- step 200｜**eval_loss nan**
+- step 220｜epoch 0.29669588671611596｜loss 2.429320｜lr 1.653e-04
+- step 240｜epoch 0.32366824005394473｜loss 2.448935｜lr 1.584e-04
+- step 260｜epoch 0.35064059339177345｜loss 2.344815｜lr 1.511e-04
+- step 280｜epoch 0.37761294672960216｜loss 2.317023｜lr 1.434e-04
+- step 300｜epoch 0.4045853000674309｜loss 2.421775｜lr 1.354e-04
+- step 320｜epoch 0.4315576534052596｜loss 2.407642｜lr 1.271e-04
+- step 340｜epoch 0.45853000674308836｜loss 2.309456｜lr 1.187e-04
+- step 360｜epoch 0.4855023600809171｜loss 2.295834｜lr 1.100e-04
+- step 380｜epoch 0.5124747134187457｜loss 2.196112｜lr 1.013e-04
+- step 400｜epoch 0.5394470667565745｜loss 2.216564｜lr 9.259e-05
+- step 400｜**eval_loss nan**
+- step 420｜epoch 0.5664194200944033｜loss 2.267115｜lr 8.393e-05
+- step 440｜epoch 0.5933917734322319｜loss 2.318108｜lr 7.538e-05
+- step 460｜epoch 0.6203641267700607｜loss 2.283829｜lr 6.703e-05
+- step 480｜epoch 0.6473364801078895｜loss 2.146368｜lr 5.893e-05
+- step 500｜epoch 0.6743088334457181｜loss 2.131210｜lr 5.114e-05
+- step 520｜epoch 0.7012811867835469｜loss 2.286168｜lr 4.372e-05
+- step 540｜epoch 0.7282535401213756｜loss 2.198244｜lr 3.673e-05
+- step 560｜epoch 0.7552258934592043｜loss 2.252195｜lr 3.022e-05
+- step 580｜epoch 0.7821982467970331｜loss 2.158152｜lr 2.424e-05
+- step 600｜epoch 0.8091706001348618｜loss 2.203986｜lr 1.884e-05
+- step 600｜**eval_loss nan**
+- step 620｜epoch 0.8361429534726905｜loss 2.326887｜lr 1.406e-05
+- step 640｜epoch 0.8631153068105192｜loss 2.105417｜lr 9.930e-06
+- step 660｜epoch 0.890087660148348｜loss 2.266214｜lr 6.486e-06
+- step 680｜epoch 0.9170600134861767｜loss 2.054731｜lr 3.754e-06
+- step 700｜epoch 0.9440323668240054｜loss 2.158394｜lr 1.755e-06
+- step 720｜epoch 0.9710047201618341｜loss 2.162821｜lr 5.031e-07
+- step 740｜epoch 0.9979770734996628｜loss 2.257395｜lr 8.567e-09
+- step 742｜**eval_loss nan**

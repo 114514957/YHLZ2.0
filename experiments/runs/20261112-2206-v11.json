@@ -1,0 +1,112 @@
+{
+ "exp_id": "v11",
+ "name": "v11 全素材版（口述故事3.5·LCCC0.15·闸门2.0·工具1.5）",
+ "config_hash": "4a93793a48a2801c",
+ "started_at": "2026-11-12T21:59:21",
+ "backend": "cpu",
+ "judge_version": 6,
+ "server_cmd": [
+  "C:\\Users\\ACE_WAN——PROJECT\\YHLZ\\YH\\models\\llama-cuda\\llama-server.exe",
+  "-m",
+  "models/gemma4-gguf/gemma-4-E4B_q4_0-it.gguf",
+  "--mmproj",
+  "models/gemma4-gguf/gemma-4-E4B-it-mmproj.gguf",
+  "--no-mmproj-offload",
+  "--lora",
+  "models/gguf-lora/yuanheng-v11-lora.gguf",
+  "-ngl",
+  "0",
+  "-c",
+  "8192",
+  "--parallel",
+  "1",
+  "-rea",
+  "off",
+  "--jinja",
+  "--alias",
+  "v11",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "8093",
+  "--temp",
+  "0.0",
+  "--top-p",
+  "0.95",
+  "--repeat-penalty",
+  "1.0"
+ ],
+ "cold": true,
+ "repeats": [
+  {
+   "run": 1,
+   "results": [
+    {
+     "suite": "persona56",
+     "ok": 44,
+     "total": 56,
+     "by_cat": {
+      "人格": [
+       16,
+       20
+      ],
+      "关系": [
+       7,
+       12
+      ],
+      "工具遵循": [
+       15,
+       16
+      ],
+      "风格": [
+       6,
+       8
+      ]
+     },
+     "gate_ok": false,
+     "gate_fail": [
+      "r07"
+     ],
+     "failed_ids": [
+      "p02",
+      "p03",
+      "p06",
+      "p10",
+      "r02",
+      "r03",
+      "r04",
+      "r07",
+      "r10",
+      "t13",
+      "st02",
+      "st03"
+     ],
+     "elapsed": 272.2
+    },
+    {
+     "suite": "group",
+     "ok": 23,
+     "total": 28,
+     "by_cat": {
+      "群聊": [
+       23,
+       28
+      ]
+     },
+     "gate_ok": false,
+     "gate_fail": [
+      "g14"
+     ],
+     "failed_ids": [
+      "g12",
+      "g13",
+      "g14",
+      "g21",
+      "g23"
+     ],
+     "elapsed": 118.2
+    }
+   ]
+  }
+ ]
+}

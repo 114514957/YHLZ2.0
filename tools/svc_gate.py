@@ -26,12 +26,34 @@ SR_ANALYSIS = 22050
 HOP = 256
 
 
-def voiced_mask(src: Path, sr_out: int, total: int) -> np.ndarray:
-    y, sr = librosa.load(str(src), sr=SR_ANALYSIS, mono=True)
-    f0, voiced, prob = librosa.pyin(y, fmin=70, fmax=1000, sr=SR_ANALYSIS,
-                                    frame_length=1024, hop_length=HOP, fill_na=np.nan)
+def voiced_mask(src: Path, sr_out: int, total: int,
+                fast: bool = True) -> np.ndarray:
+    """取源人声的有声掩码。
+
+    2026-11-13 提速（老爹「动」）：pyin 原来跑 22050/256 跳（≈11.6ms/帧），
+    一首 2 分钟的歌要 58 秒单线程 CPU，是整条链路最慢的一环。
+    **实测选型**（140s 人声，以原参数为基准比"有声占比"与掩码一致度）：
+
+        配置                    耗时    有声%   一致度
+        22050/256/1024/100      58.1s   27.1%   基准
+        22050/512/1024/100      24.6s   27.0%   95.7%   ← 采用
+        11025/256/1024/100      24.3s   21.0%   89.2%   ← 采样率一降就丢 6 个点，不能用
+        8000/128/512/100        34.6s   24.3%   91.4%
+        11025/256/2048/60       24.3s   17.8%   82.3%
+
+    结论：**只把 hop 加粗到 512（46ms/帧），采样率、帧长、阈值都不动**——
+    快 2.4 倍，掩码边界差 4.3%（都在几十毫秒的边界上），听感无差。
+    """
+    if fast:
+        sr_a, hop, flen, nthr = 22050, 512, 1024, 100
+    else:
+        sr_a, hop, flen, nthr = SR_ANALYSIS, HOP, 1024, 100
+    y, sr = librosa.load(str(src), sr=sr_a, mono=True)
+    f0, voiced, prob = librosa.pyin(y, fmin=70, fmax=1000, sr=sr_a,
+                                    frame_length=flen, hop_length=hop,
+                                    n_thresholds=nthr, fill_na=np.nan)
     mask = (voiced & np.isfinite(f0) & (prob > 0.5)).astype(np.uint8)
-    frame_s = HOP / SR_ANALYSIS
+    frame_s = hop / sr_a
 
     # 闭运算：补小于 60ms 的洞
     gap = max(1, int(round(0.060 / frame_s)))
@@ -63,7 +85,11 @@ def voiced_mask(src: Path, sr_out: int, total: int) -> np.ndarray:
             i += 1
 
     # 上采样到输出采样率，边界做 30ms 淡入淡出
-    idx = np.repeat(filled.astype(np.float32), int(round(HOP * sr_out / SR_ANALYSIS)))
+    # 2026-11-13 修 bug：这里原来写死 `HOP * sr_out / SR_ANALYSIS`（256/22050），
+    # 一旦换了 hop（提速时 hop=512），掩码会被压成一半长度、后半首歌全被静音。
+    # 必须用**本次实际用的** hop / sr_a。
+    step = max(1, int(round(hop * sr_out / sr_a)))
+    idx = np.repeat(filled.astype(np.float32), step)
     if idx.size < total:
         idx = np.pad(idx, (0, total - idx.size), mode="edge")
     idx = idx[:total]

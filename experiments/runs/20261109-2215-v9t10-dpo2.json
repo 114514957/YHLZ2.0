@@ -1,0 +1,103 @@
+{
+ "exp_id": "v9t10-dpo2",
+ "name": "v9t10 + 风格DPO v2（剔工具样本）",
+ "config_hash": "266db3a18986cbbd",
+ "started_at": "2026-11-09T22:10:14",
+ "backend": "cpu",
+ "judge_version": 6,
+ "server_cmd": [
+  "C:\\Users\\ACE_WAN——PROJECT\\YHLZ\\YH\\models\\llama-cuda\\llama-server.exe",
+  "-m",
+  "models/gemma4-gguf/gemma-4-E4B_q4_0-it.gguf",
+  "--mmproj",
+  "models/gemma4-gguf/gemma-4-E4B-it-mmproj.gguf",
+  "--no-mmproj-offload",
+  "--lora",
+  "models/gguf-lora/yuanheng-v9t10-dpo2-lora.gguf",
+  "-ngl",
+  "0",
+  "-c",
+  "8192",
+  "--parallel",
+  "1",
+  "-rea",
+  "off",
+  "--jinja",
+  "--alias",
+  "v9t10-dpo2",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "8093",
+  "--temp",
+  "0.0",
+  "--top-p",
+  "0.95",
+  "--repeat-penalty",
+  "1.0"
+ ],
+ "cold": true,
+ "repeats": [
+  {
+   "run": 1,
+   "results": [
+    {
+     "suite": "persona56",
+     "ok": 45,
+     "total": 56,
+     "by_cat": {
+      "人格": [
+       17,
+       20
+      ],
+      "关系": [
+       10,
+       12
+      ],
+      "工具遵循": [
+       13,
+       16
+      ],
+      "风格": [
+       5,
+       8
+      ]
+     },
+     "gate_ok": true,
+     "gate_fail": [],
+     "failed_ids": [
+      "p06",
+      "p10",
+      "p12",
+      "r02",
+      "r03",
+      "t05",
+      "t13",
+      "t15",
+      "st02",
+      "st03",
+      "st05"
+     ],
+     "elapsed": 242.2
+    },
+    {
+     "suite": "group",
+     "ok": 27,
+     "total": 28,
+     "by_cat": {
+      "群聊": [
+       27,
+       28
+      ]
+     },
+     "gate_ok": true,
+     "gate_fail": [],
+     "failed_ids": [
+      "g13"
+     ],
+     "elapsed": 89.2
+    }
+   ]
+  }
+ ]
+}

@@ -47,8 +47,11 @@ YH_LLAMA_EXE = LOCAL_MODELS / "llama-cuda" / "llama-server.exe"
 YH_BASE_GGUF = LOCAL_MODELS / "gemma4-gguf" / "gemma-4-E4B_q4_0-it.gguf"
 YH_MMPROJ_GGUF = LOCAL_MODELS / "gemma4-gguf" / "gemma-4-E4B-it-mmproj.gguf"
 # 生产 LoRA（记录 0432）：v7b = v6-dpo + 语音(真实域ASR+应答+rehearsal)
-# 历史：v6(0398) -> v7b；回滚可指回 yuanheng-v6-lora.gguf
-YH_LORA_GGUF = LOCAL_MODELS / "gguf-lora" / "yuanheng-v7b-lora.gguf"
+# 历史：v6(0398) -> v7b
+# 2026-11-13（ledger 1169/1170）：老爹定案「丙」= v9t10-dpo2，生产切到此版。
+#   依据：56 题 49/56、群聊 27/28、闸门全过、风格题 7/8（历史最好）。
+#   回滚：改回 yuanheng-v7b-lora.gguf（v7b）或 yuanheng-v9t10-lora.gguf（v9t10 基座 LoRA）
+YH_LORA_GGUF = LOCAL_MODELS / "gguf-lora" / "yuanheng-v9t10-dpo2-lora.gguf"
 
 BOT_UIN = str(_env("YH_QQ_BOT_UIN", "YHLZ_QQ_BOT_UIN", "3655185302"))
 MASTER_UIN = str(_env("YH_QQ_MASTER_UIN", "YHLZ_QQ_MASTER_UIN", "2258374446"))

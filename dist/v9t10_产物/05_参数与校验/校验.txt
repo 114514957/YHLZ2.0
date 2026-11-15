@@ -1,0 +1,11 @@
+adapter_model.safetensors
+  bytes 139602808
+  tensors 516（含 MLP，attention-only 版是 264）
+  header 76656
+  自洽 8+header+max(offset+len)==filesize  ✅
+
+yuanheng-v9t10-lora.gguf
+  bytes 69798944
+  sha256 764036f58ccab3dca3527054d6d1435173671b572a63000837bc0f82dce7cec2
+
+训练：742 步 / 2639.8 秒 / loss 4.405002117156982 → 2.2573951721191405

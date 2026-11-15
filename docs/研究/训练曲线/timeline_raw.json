@@ -1,0 +1,121 @@
+{
+ "bundles": {
+  "v3": {
+   "cloud": {
+    "lr": 0.0002,
+    "epochs": 3,
+    "batch_size": 4,
+    "grad_accum": 4,
+    "max_seq_len": 2048,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "optim": null,
+    "base_model": "models/gemma4-hf/gemma-4-e4b-it",
+    "full_finetune": null,
+    "load_in_4bit": false,
+    "train_file": "data/finetune/sft_persona_v3_train.jsonl"
+   },
+   "local": {
+    "lr": 0.0002,
+    "epochs": 3,
+    "batch_size": 1,
+    "grad_accum": 4,
+    "max_seq_len": 1024,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "optim": null,
+    "base_model": "models/gemma4-hf/gemma-4-e4b-it",
+    "full_finetune": null,
+    "load_in_4bit": true,
+    "train_file": "data/finetune/sft_persona_train.jsonl"
+   }
+  },
+  "v4": {
+   "cloud": {
+    "lr": 0.0002,
+    "epochs": 3,
+    "batch_size": 4,
+    "grad_accum": 4,
+    "max_seq_len": 2048,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "optim": null,
+    "base_model": "models/gemma4-hf/gemma-4-e4b-it",
+    "full_finetune": null,
+    "load_in_4bit": false,
+    "train_file": "data/finetune/sft_persona_v3_train.jsonl"
+   },
+   "local": {
+    "lr": 0.0002,
+    "epochs": 3,
+    "batch_size": 1,
+    "grad_accum": 4,
+    "max_seq_len": 1024,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "optim": null,
+    "base_model": "models/gemma4-hf/gemma-4-e4b-it",
+    "full_finetune": null,
+    "load_in_4bit": true,
+    "train_file": "data/finetune/sft_persona_train.jsonl"
+   }
+  },
+  "v6": {
+   "cloud": {
+    "lr": 0.0002,
+    "epochs": 3,
+    "batch_size": 4,
+    "grad_accum": 4,
+    "max_seq_len": 2048,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "optim": null,
+    "base_model": "models/gemma4-hf/gemma-4-e4b-it",
+    "full_finetune": null,
+    "load_in_4bit": false,
+    "train_file": "data/finetune/sft_persona_v3_train.jsonl"
+   },
+   "local": {
+    "lr": 0.0002,
+    "epochs": 3,
+    "batch_size": 1,
+    "grad_accum": 4,
+    "max_seq_len": 1024,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "optim": null,
+    "base_model": "models/gemma4-hf/gemma-4-e4b-it",
+    "full_finetune": null,
+    "load_in_4bit": true,
+    "train_file": "data/finetune/sft_persona_train.jsonl"
+   }
+  }
+ },
+ "v8": {
+  "r": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "target_modules": "model\\.language_model\\..*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)",
+  "base_model_name_or_path": "/root/autodl-tmp/models/gemma4-qat/gemma-4-E4B-it-qat-unquantized",
+  "task_type": "CAUSAL_LM"
+ },
+ "eval_scores": {
+  "v8": [
+   {
+    "file": "人格回归明细_v8_20261005T124722291810Z-321d29790033.md",
+    "score": 19,
+    "total": 20
+   },
+   {
+    "file": "人格回归明细_v8_20261005T125008850865Z-aeb7cc9c18aa.md",
+    "score": 18,
+    "total": 20
+   },
+   {
+    "file": "人格回归明细_v8_20261005T125242235384Z-e6682c89ad3c.md",
+    "score": 17,
+    "total": 20
+   }
+  ]
+ }
+}

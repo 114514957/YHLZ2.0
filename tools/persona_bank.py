@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Sequence
 
 # 助手腔 / 撇清式 / 待命式收尾——台账 0216 记录过模型逐字照抄的失败模式
@@ -453,3 +454,28 @@ def verify(entry: dict, answer: str, tools: Sequence[str] = ()) -> tuple[bool, s
     if bad:
         detail += " ｜ " + "；".join(bad)
     return (not bad), detail
+
+
+# ── 扩容题库（2026-11-14，台账 1226）───────────────────────────────────
+# 56 题下 1 题 = 1.79 分、1σ ≈ ±2.7 分，45 与 43 分不出差别。
+# 新题放在 data/eval/bench_extra_persona.json（由 tools/build_bench_extra.py 生成并校验），
+# 这里**只追加**，原 56 题一字不动 → 历史分数仍可比。
+def _load_extra(path) -> list[dict]:
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+        p = _Path(path)
+        if not p.is_file():
+            return []
+        data = _json.loads(p.read_text(encoding="utf-8"))
+        return [e for e in data if isinstance(e, dict) and e.get("id")]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+_EXTRA_PATH = (Path(__file__).resolve().parent.parent / "data" / "eval"
+               / "bench_extra_persona.json")
+_EXTRA = _load_extra(_EXTRA_PATH)
+if _EXTRA:
+    _have = {e["id"] for e in PERSONA_BANK}
+    PERSONA_BANK.extend(e for e in _EXTRA if e["id"] not in _have)

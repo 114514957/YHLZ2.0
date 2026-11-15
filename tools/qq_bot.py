@@ -176,12 +176,29 @@ def _silence_enabled() -> bool:
 
 
 def _allowed_groups():
-    """群白名单（YHLZ_QQ_GROUPS，逗号分隔）；空 = 不限制。"""
+    """群白名单：环境变量 YHLZ_QQ_GROUPS 优先，其次 config/qq_groups_whitelist.json。
+
+    空/缺省 = 不限制（所有群）。
+    2026-11-13：加文件来源——工作台「群聊白名单」写的就是那份 JSON，
+    这样老爹在页面上勾完**下一句就生效**（本函数每个事件都调一次），不用重启桥。
+    """
     raw = os.getenv("YHLZ_QQ_GROUPS", "").strip()
-    if not raw:
-        return None
-    out = {p.strip() for p in re.split(r"[,，;；\s]+", raw) if p.strip()}
-    return frozenset(out) if out else None
+    if raw:
+        out = {p.strip() for p in re.split(r"[,，;；\s]+", raw) if p.strip()}
+        return frozenset(out) if out else None
+    try:
+        import json as _json  # noqa: PLC0415
+
+        from backend.yhlz_paths import ROOT as _ROOT  # noqa: PLC0415
+
+        p = _ROOT / "config" / "qq_groups_whitelist.json"
+        if p.is_file():
+            d = _json.loads(p.read_text(encoding="utf-8-sig"))
+            groups = {str(x).strip() for x in (d.get("groups") or []) if str(x).strip()}
+            return frozenset(groups) if groups else None
+    except Exception:  # noqa: BLE001
+        pass
+    return None
 
 
 _SILENCE_RE = re.compile(r"\[\[(?:silence|沉默)\]\][。.!！?？～~\s]*", re.I)
@@ -691,7 +708,9 @@ class QQBridge:
         if self._group_store is None:
             from backend.qq_group_store import GroupHistoryStore
 
-            default_turns = "20" if _bridge_profile() == "full" else "50"
+            # 2026-11-14：**上下文也会挤窗口**。Gemma-4 的 35/42 层只有 512 token 视野，
+            # 群聊历史越长，人设与隐私条款越早掉出可见区。50 条 → 15 条。
+            default_turns = "12" if _bridge_profile() == "full" else "15"
             turns = int(os.getenv("YHLZ_QQ_GROUP_TURNS", default_turns))
             self._group_store = GroupHistoryStore(
                 _bridge_path("group_history.db",
@@ -2040,6 +2059,13 @@ class QQBridge:
             ans = _SILENCE_RE.sub("", ans).strip()
             if not ans and not out_attach:
                 return
+        # 2026-11-14 老爹：「破折号一个都不许用」——这条 100% 可机械判定，
+        # 不靠模型自觉，出口处直接清洗（只换标点，不删词、不改内容）。
+        try:
+            from backend.text_scrub import scrub as _scrub_text
+            ans = _scrub_text(ans)
+        except Exception:  # noqa: BLE001
+            pass
         # Defense in depth for old/custom daemon responses. Pure-text generated
         # dev markers are not owner authorization. Keep record/audio route frozen.
         if not any(segment.get("type") == "record" for segment in msg):

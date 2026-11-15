@@ -1,0 +1,42 @@
+{
+ "L12": {
+  "proj_max": 0.207363098859787,
+  "proj_mean": 0.018469709903001785,
+  "top200_share": 0.07857339829206467,
+  "corr_proj_vs_wnorm": 0.051264660849111354,
+  "corr_proj_vs_lora_delta": 0.016571680204204194,
+  "corr_wnorm_vs_lora_delta": 0.0003678842204787421
+ },
+ "L16": {
+  "proj_max": 0.19953379034996033,
+  "proj_mean": 0.01390355546027422,
+  "top200_share": 0.07810065150260925,
+  "corr_proj_vs_wnorm": 0.128219139994427,
+  "corr_proj_vs_lora_delta": 0.010988488399556226,
+  "corr_wnorm_vs_lora_delta": 0.034216105259536785
+ },
+ "L20": {
+  "proj_max": 0.10573077201843262,
+  "proj_mean": 0.016073953360319138,
+  "top200_share": 0.0774712786078453,
+  "corr_proj_vs_wnorm": 0.14127524070510283,
+  "corr_proj_vs_lora_delta": -0.02568294343819931,
+  "corr_wnorm_vs_lora_delta": 0.017778141423926086
+ },
+ "L24": {
+  "proj_max": 0.1495589017868042,
+  "proj_mean": 0.013701548799872398,
+  "top200_share": 0.07310424000024796,
+  "corr_proj_vs_wnorm": 0.13483356153002207,
+  "corr_proj_vs_lora_delta": -0.0006142215062142398,
+  "corr_wnorm_vs_lora_delta": -0.004154636061317942
+ },
+ "L28": {
+  "proj_max": 0.10327711701393127,
+  "proj_mean": 0.012531926855444908,
+  "top200_share": 0.06965465098619461,
+  "corr_proj_vs_wnorm": 0.15765187615660997,
+  "corr_proj_vs_lora_delta": 0.010144759175965795,
+  "corr_wnorm_vs_lora_delta": 0.021935793575556674
+ }
+}

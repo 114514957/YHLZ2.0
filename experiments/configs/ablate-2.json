@@ -1,0 +1,42 @@
+{
+ "id": "ablate-2",
+ "name": "v9t10 + 拒绝向量 x-2.0",
+ "factor": "F0",
+ "model": {
+  "base": "models/gemma4-gguf/gemma-4-E4B_q4_0-it.gguf",
+  "mmproj": "models/gemma4-gguf/gemma-4-E4B-it-mmproj.gguf",
+  "lora": [
+   {
+    "path": "models/gguf-lora/yuanheng-v9t10-lora.gguf",
+    "scale": 1.0
+   }
+  ],
+  "control_vector": [
+   {
+    "path": "llm_workbench/steer/cvec_refuse_mean.gguf",
+    "scale": -2.0
+   }
+  ],
+  "ngl": 0,
+  "ctx": 8192
+ },
+ "prompt": {
+  "kind": "private"
+ },
+ "sampling": {
+  "temperature": 0.0,
+  "top_p": 0.95,
+  "repeat_penalty": 1.0,
+  "dry_multiplier": 0.0
+ },
+ "grammar": null,
+ "logit_bias": [],
+ "tests": [
+  {
+   "suite": "group"
+  }
+ ],
+ "cold": true,
+ "repeats": 1,
+ "notes": "其余实验都以它为底，只改一个因子"
+}

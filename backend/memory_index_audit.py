@@ -227,7 +227,7 @@ def rebuild_vector(
         con.execute("DELETE FROM vec WHERE scope=?", (scope,))
         con.executemany(
             "INSERT OR REPLACE INTO vec(id,scope,vec,text) VALUES (?,?,?,?)",
-            [(iid, scope, v.tobytes(), texts[i]) for i, (iid, _) in enumerate(rows.items())],
+            [(iid, scope, vectors[i].tobytes(), texts[i]) for i, (iid, _) in enumerate(rows.items())],
         )
         con.commit()
     except BaseException:

@@ -1,0 +1,17 @@
+﻿pkg,tag,lr,epochs,batch,accum,eff_batch,seq,r,alpha,mods,4bit,full,mask,warmup,sched,optim
+retrain_pkg_gemma_v10u,gemma4.v10u,0.0002,1.0,4,2,8,1536,16.0,32.0,7,True,False,True,0.03,cosine,paged_adamw_8bit
+retrain_pkg_gemma_v11,gemma4.v11,0.00015,1.0,8,1,8,1536,16.0,32.0,7,True,False,True,0.03,cosine,paged_adamw_8bit
+retrain_pkg_gemma_v9f1,gemma4.v9f1full,1e-05,1.0,8,1,8,1536,16.0,32.0,7,False,True,True,0.03,cosine,paged_adamw_8bit
+retrain_pkg_gemma_v9t10,gemma4.v9t10lora,0.0002,1.0,4,2,8,1536,16.0,32.0,7,True,False,True,0.03,,
+retrain_pkg_gemma_v9t11,gemma4.v9t11lora,0.0002,1.0,4,2,8,1536,16.0,32.0,7,True,False,True,0.03,cosine,paged_adamw_8bit
+retrain_pkg_gemma_v9t5,gemma4.v9t5lora,0.0002,3.0,1,8,8,1536,16.0,32.0,4,True,False,True,0.03,,
+retrain_pkg_gemma_v9t6,gemma4.v9t6lora,0.0002,1.0,4,2,8,1536,16.0,32.0,0,True,False,True,0.03,,
+retrain_pkg_gemma_v9t7,gemma4.v9t7lora,0.0002,1.0,4,2,8,1536,16.0,32.0,0,True,False,True,0.03,,
+retrain_pkg_gemma_v9t8,gemma4.v9t8lora,0.0002,1.0,4,2,8,1536,16.0,32.0,0,True,False,True,0.03,,
+retrain_pkg_gemma_v9t9,gemma4.v9t9lora,0.0002,1.0,4,2,8,1536,16.0,32.0,7,True,False,True,0.03,,
+retrain_pkg_stylepatch,stylepatch,3e-05,2.0,1,8,8,640,16.0,32.0,7,True,False,True,0.05,cosine,adamw_torch
+retrain_pkg_v9t2,qwen3-4b.v9t2t.1ep,2e-05,1.0,8,2,16,2048,,,0,False,True,True,0.03,cosine,
+retrain_pkg_v9t3,qwen3-4b.v9t3t.1ep,2e-05,1.0,8,2,16,2048,,,0,False,True,True,0.03,cosine,
+retrain_pkg_v9t4,qwen3-4b.v9t4t.1ep,2e-05,1.0,8,2,16,2048,,,0,False,True,True,0.03,cosine,
+retrain_pkg_v9t5,qwen3-4b.v9t5t.1ep,2e-05,1.0,8,2,16,2048,,,0,False,True,True,0.03,cosine,
+retrain_pkg_v9t6,qwen3-4b.v9t6t.1ep,2e-05,1.0,8,2,16,2048,,,0,False,True,True,0.03,cosine,

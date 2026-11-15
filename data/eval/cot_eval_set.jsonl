@@ -1,0 +1,60 @@
+{"family": "arith", "prompt": "一批 38 件，先留 14 件备用，剩下的平均分成 6 份，每份多少件？", "expected": 4}
+{"family": "arith", "prompt": "一批 46 件，先留 2 件备用，剩下的平均分成 4 份，每份多少件？", "expected": 11}
+{"family": "arith", "prompt": "一盒笔 61 支，我买了 12 盒，用掉 72 支，还剩多少？", "expected": 660}
+{"family": "arith", "prompt": "一批 24 件，先留 6 件备用，剩下的平均分成 6 份，每份多少件？", "expected": 3}
+{"family": "arith", "prompt": "一批 14 件，先留 12 件备用，剩下的平均分成 2 份，每份多少件？", "expected": 1}
+{"family": "arith", "prompt": "一批 42 件，先留 12 件备用，剩下的平均分成 6 份，每份多少件？", "expected": 5}
+{"family": "logic", "prompt": "小丁比老周高，老周比阿青高，三个人谁最高？", "expected": "小丁"}
+{"family": "logic", "prompt": "苏苏比阿柚高，阿柚比十一高，三个人谁最高？", "expected": "苏苏"}
+{"family": "logic", "prompt": "十一比老秦高，老秦比老周高，三个人谁最高？", "expected": "十一"}
+{"family": "logic", "prompt": "小丁比林一高，林一比小满高，三个人谁最高？", "expected": "小丁"}
+{"family": "logic", "prompt": "小丁比十一高，十一比小满高，三个人谁最高？", "expected": "小丁"}
+{"family": "logic", "prompt": "林一比老周高，老周比小满高，三个人谁最高？", "expected": "林一"}
+{"family": "multihop", "prompt": "利贞在工作台提过工具轨迹的事，第一次说了 45 条，后来又补了 2 条，一共几条？", "expected": 47}
+{"family": "multihop", "prompt": "群主在工作台提过素材清单的事，第一次说了 74 条，后来又补了 26 条，一共几条？", "expected": 100}
+{"family": "multihop", "prompt": "群主在群里提过记忆样本的事，第一次说了 65 份，后来又补了 27 份，一共几份？", "expected": 92}
+{"family": "multihop", "prompt": "利贞在工作台提过工具轨迹的事，第一次说了 80 条，后来又补了 34 条，一共几条？", "expected": 114}
+{"family": "multihop", "prompt": "群主在群里提过素材清单的事，第一次说了 47 个，后来又补了 34 个，一共几个？", "expected": 81}
+{"family": "multihop", "prompt": "利贞在工作台提过派单的事，第一次说了 47 个，后来又补了 33 个，一共几个？", "expected": 80}
+{"family": "finderr", "prompt": "有人算 9×10 得 91，还说'先加后乘也对'。他错在哪？", "expected": 90}
+{"family": "finderr", "prompt": "有人算 9×8 得 71，还说'先加后乘也对'。他错在哪？", "expected": 72}
+{"family": "finderr", "prompt": "有人算 5×12 得 59，还说'先加后乘也对'。他错在哪？", "expected": 60}
+{"family": "finderr", "prompt": "有人算 4×6 得 27，还说'先加后乘也对'。他错在哪？", "expected": 24}
+{"family": "finderr", "prompt": "有人算 3×8 得 27，还说'先加后乘也对'。他错在哪？", "expected": 24}
+{"family": "finderr", "prompt": "有人算 5×10 得 52，还说'先加后乘也对'。他错在哪？", "expected": 50}
+{"family": "shop", "prompt": "去超市，苹果 25 块一斤买 5 斤，牛奶 10 块一盒买 1 盒，结账满 100 减 15，我给了 300，该找我多少？", "expected": "180"}
+{"family": "shop", "prompt": "去超市，苹果 10 块一斤买 4 斤，牛奶 8 块一盒买 4 盒，结账满 100 减 20，我给了 300，该找我多少？", "expected": "248"}
+{"family": "shop", "prompt": "去超市，苹果 27 块一斤买 3 斤，牛奶 9 块一盒买 1 盒，结账满 100 减 20，我给了 300，该找我多少？", "expected": "230"}
+{"family": "shop", "prompt": "去超市，苹果 17 块一斤买 5 斤，牛奶 18 块一盒买 4 盒，结账满 100 减 10，我给了 300，该找我多少？", "expected": "153"}
+{"family": "shop", "prompt": "去超市，苹果 8 块一斤买 3 斤，牛奶 16 块一盒买 2 盒，结账满 100 减 10，我给了 300，该找我多少？", "expected": "254"}
+{"family": "shop", "prompt": "去超市，苹果 21 块一斤买 5 斤，牛奶 16 块一盒买 3 盒，结账满 100 减 20，我给了 300，该找我多少？", "expected": "167"}
+{"family": "schedule", "prompt": "会议 6 点30 分开，路上要 65 分钟，进楼安检排队约 15 分钟，我还想提前 5 分钟到，那我最晚几点出门？", "expected": "5:05"}
+{"family": "schedule", "prompt": "会议 8 点00 分开，路上要 75 分钟，进楼安检排队约 15 分钟，我还想提前 15 分钟到，那我最晚几点出门？", "expected": "6:15"}
+{"family": "schedule", "prompt": "会议 6 点10 分开，路上要 74 分钟，进楼安检排队约 10 分钟，我还想提前 5 分钟到，那我最晚几点出门？", "expected": "4:41"}
+{"family": "schedule", "prompt": "会议 7 点30 分开，路上要 54 分钟，进楼安检排队约 10 分钟，我还想提前 10 分钟到，那我最晚几点出门？", "expected": "6:16"}
+{"family": "schedule", "prompt": "会议 9 点00 分开，路上要 79 分钟，进楼安检排队约 20 分钟，我还想提前 10 分钟到，那我最晚几点出门？", "expected": "7:11"}
+{"family": "schedule", "prompt": "会议 7 点30 分开，路上要 50 分钟，进楼安检排队约 20 分钟，我还想提前 10 分钟到，那我最晚几点出门？", "expected": "6:10"}
+{"family": "table", "prompt": "三个人这周交的素材条数：阿禾 20 条、小满 27 条、阿青 19 条。交得最多的比最少的多几条？", "expected": "8"}
+{"family": "table", "prompt": "三个人这周交的素材条数：林一 30 条、阿禾 16 条、老周 12 条。交得最多的比最少的多几条？", "expected": "18"}
+{"family": "table", "prompt": "三个人这周交的素材条数：阿青 36 条、阿禾 13 条、小满 33 条。交得最多的比最少的多几条？", "expected": "23"}
+{"family": "table", "prompt": "三个人这周交的素材条数：林一 7 条、苏苏 31 条、阿禾 33 条。交得最多的比最少的多几条？", "expected": "26"}
+{"family": "table", "prompt": "三个人这周交的素材条数：老周 15 条、阿青 38 条、阿禾 29 条。交得最多的比最少的多几条？", "expected": "23"}
+{"family": "table", "prompt": "三个人这周交的素材条数：林一 32 条、阿禾 5 条、苏苏 35 条。交得最多的比最少的多几条？", "expected": "30"}
+{"family": "selfcheck", "prompt": "有个数乘以 4 得 204，我怀疑原来那个数算错了。你先把它反推出来，再验一遍，最后告诉我结果。", "expected": "51"}
+{"family": "selfcheck", "prompt": "有个数乘以 5 得 260，我怀疑原来那个数算错了。你先把它反推出来，再验一遍，最后告诉我结果。", "expected": "52"}
+{"family": "selfcheck", "prompt": "有个数乘以 8 得 240，我怀疑原来那个数算错了。你先把它反推出来，再验一遍，最后告诉我结果。", "expected": "30"}
+{"family": "selfcheck", "prompt": "有个数乘以 6 得 342，我怀疑原来那个数算错了。你先把它反推出来，再验一遍，最后告诉我结果。", "expected": "57"}
+{"family": "selfcheck", "prompt": "有个数乘以 5 得 165，我怀疑原来那个数算错了。你先把它反推出来，再验一遍，最后告诉我结果。", "expected": "33"}
+{"family": "selfcheck", "prompt": "有个数乘以 4 得 128，我怀疑原来那个数算错了。你先把它反推出来，再验一遍，最后告诉我结果。", "expected": "32"}
+{"family": "switch", "prompt": "我兜里 200，本来打算买 85 块的那个，后来换成 103 块的，又顺手拿了 35 块的配件，最后还剩多少？", "expected": "62"}
+{"family": "switch", "prompt": "我兜里 300，本来打算买 71 块的那个，后来换成 139 块的，又顺手拿了 21 块的配件，最后还剩多少？", "expected": "140"}
+{"family": "switch", "prompt": "我兜里 200，本来打算买 46 块的那个，后来换成 149 块的，又顺手拿了 24 块的配件，最后还剩多少？", "expected": "27"}
+{"family": "switch", "prompt": "我兜里 300，本来打算买 89 块的那个，后来换成 131 块的，又顺手拿了 13 块的配件，最后还剩多少？", "expected": "156"}
+{"family": "switch", "prompt": "我兜里 300，本来打算买 38 块的那个，后来换成 156 块的，又顺手拿了 14 块的配件，最后还剩多少？", "expected": "130"}
+{"family": "switch", "prompt": "我兜里 300，本来打算买 80 块的那个，后来换成 152 块的，又顺手拿了 35 块的配件，最后还剩多少？", "expected": "113"}
+{"family": "drill", "prompt": "会议 9 点50 分开，路上 95 分钟，安检 20 分钟，还要提前 5 分钟到，最晚几点出门？", "expected": "7:50"}
+{"family": "drill", "prompt": "会议 9 点00 分开，路上 68 分钟，安检 25 分钟，还要提前 5 分钟到，最晚几点出门？", "expected": "7:22"}
+{"family": "drill", "prompt": "会议 7 点15 分开，路上 58 分钟，安检 20 分钟，还要提前 10 分钟到，最晚几点出门？", "expected": "5:47"}
+{"family": "drill", "prompt": "会议 8 点50 分开，路上 115 分钟，安检 10 分钟，还要提前 10 分钟到，最晚几点出门？", "expected": "6:35"}
+{"family": "drill", "prompt": "会议 6 点55 分开，路上 96 分钟，安检 15 分钟，还要提前 5 分钟到，最晚几点出门？", "expected": "4:59"}
+{"family": "drill", "prompt": "会议 9 点50 分开，路上 91 分钟，安检 10 分钟，还要提前 10 分钟到，最晚几点出门？", "expected": "7:59"}

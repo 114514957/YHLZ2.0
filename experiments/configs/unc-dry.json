@@ -1,0 +1,24 @@
+{
+  "id": "unc-dry",
+  "name": "破限基座 Q4_K_M + v9t10 LoRA + DRY 采样（GPU）",
+  "factor": "F8",
+  "model": {
+    "base": "models/gemma4-gguf/gemma-4-E4B-Uncensored-Q4_K_M.gguf",
+    "mmproj": "",
+    "lora": [
+      {"path": "models/gguf-lora/yuanheng-v9t10-lora.gguf", "scale": 1.0}
+    ],
+    "control_vector": [],
+    "ngl": 99,
+    "ctx": 4096
+  },
+  "prompt": {"kind": "private"},
+  "sampling": {"temperature": 0.75, "top_p": 0.95, "repeat_penalty": 1.12,
+               "dry_multiplier": 0.8, "dry_base": 1.75},
+  "grammar": null,
+  "logit_bias": [],
+  "tests": [{"suite": "persona56"}, {"suite": "group"}],
+  "cold": true,
+  "repeats": 1,
+  "notes": "第一次把「破限基座」接进实验站：只换基座 + 采样，LoRA 不动"
+}

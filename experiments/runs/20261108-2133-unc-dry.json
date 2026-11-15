@@ -1,0 +1,134 @@
+{
+ "exp_id": "unc-dry",
+ "name": "破限基座 Q4_K_M + v9t10 LoRA + DRY 采样（GPU）",
+ "config_hash": "d513b856587c88ac",
+ "started_at": "2026-11-08T21:31:14",
+ "backend": "gpu",
+ "judge_version": 6,
+ "server_cmd": [
+  "C:\\Users\\ACE_WAN——PROJECT\\YHLZ\\YH\\models\\llama-cuda\\llama-server.exe",
+  "-m",
+  "models/gemma4-gguf/gemma-4-E4B-Uncensored-Q4_K_M.gguf",
+  "--lora",
+  "models/gguf-lora/yuanheng-v9t10-lora.gguf",
+  "-ngl",
+  "99",
+  "-c",
+  "4096",
+  "--parallel",
+  "1",
+  "-rea",
+  "off",
+  "--jinja",
+  "--alias",
+  "unc-dry",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "8093",
+  "--temp",
+  "0.75",
+  "--top-p",
+  "0.95",
+  "--repeat-penalty",
+  "1.12",
+  "--dry-multiplier",
+  "0.8",
+  "--dry-base",
+  "1.75"
+ ],
+ "cold": true,
+ "repeats": [
+  {
+   "run": 1,
+   "results": [
+    {
+     "suite": "persona56",
+     "ok": 35,
+     "total": 56,
+     "by_cat": {
+      "人格": [
+       10,
+       20
+      ],
+      "关系": [
+       5,
+       12
+      ],
+      "工具遵循": [
+       15,
+       16
+      ],
+      "风格": [
+       5,
+       8
+      ]
+     },
+     "gate_ok": false,
+     "gate_fail": [
+      "r07",
+      "r08"
+     ],
+     "failed_ids": [
+      "p02",
+      "p04",
+      "p06",
+      "p07",
+      "p10",
+      "r02",
+      "r03",
+      "r05",
+      "r07",
+      "r08",
+      "r09",
+      "t13",
+      "s01",
+      "s02",
+      "s04",
+      "s07",
+      "s08",
+      "s10",
+      "st02",
+      "st05",
+      "st08"
+     ],
+     "elapsed": 93.1
+    },
+    {
+     "suite": "group",
+     "ok": 14,
+     "total": 28,
+     "by_cat": {
+      "群聊": [
+       14,
+       28
+      ]
+     },
+     "gate_ok": false,
+     "gate_fail": [
+      "g04",
+      "g09",
+      "g14"
+     ],
+     "failed_ids": [
+      "g02",
+      "g04",
+      "g05",
+      "g09",
+      "g12",
+      "g13",
+      "g14",
+      "g15",
+      "g16",
+      "g17",
+      "g18",
+      "g27",
+      "g24",
+      "g25"
+     ],
+     "elapsed": 32.5
+    }
+   ]
+  }
+ ]
+}

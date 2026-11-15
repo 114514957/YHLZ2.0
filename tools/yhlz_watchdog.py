@@ -232,6 +232,24 @@ def tick() -> dict:
         time.sleep(3)
     after = status()
 
+    # --- 旁路任务托管（2026-11-14）------------------------------------------
+    # 采集器（QQ 每日对话→带时间戳落盘）与记忆桥（QQ 原话→本体 L2）以前是
+    # "谁跑 launcher 谁顺手拉起"，结果：跑一轮就随父进程一起被回收，
+    # 或者在没人跑 launcher 的时段彻底没人管（2026-11-14 实测：桥 4 次启动、
+    # 每次只写一轮就消失；报告因此漏跑）。改由**常驻的看门狗**每分钟补一次。
+    try:
+        from yhlz_launcher import (_proc_alive as _pa, _spawn_allowed as _sa,
+                                   _spawn_daily_log as _sdl,
+                                   _spawn_memory_bridge as _smb)
+        for _name, _script, _fn in (
+                ("采集器", "qq_daily_log.py", _sdl),
+                ("记忆桥", "qq_memory_bridge.py", _smb)):
+            if not _pa(_script) and _sa("wd_" + _script, 300):
+                _fn()
+                _log(f"旁路任务补起：{_name}（{_script}）")
+    except Exception as exc:  # noqa: BLE001
+        _log(f"旁路任务补起失败：{type(exc).__name__}: {exc}")
+
     # --- NapCat / 元亨 online watchdog ---
     # 2026-10-07: qq_management=external — QQ 由独立 Lite 链负责，
     # Full 看门狗不再启动/重启 NapCat、QQ 桥或发送 QQ 通知。

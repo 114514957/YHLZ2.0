@@ -137,6 +137,16 @@
             </div>
           </div>
           <div class="card">
+            <h3>群聊白名单</h3>
+            <p class="kv"><span>说明</span><b id="g-note">全不勾＝不限制</b></p>
+            <ul id="qqGroups" class="ql" style="max-height:220px;overflow:auto;margin:6px 0"></ul>
+            <div class="qrow">
+              <button id="g-refresh" class="btn-mini" type="button" title="向 NapCat 拉取元亨号加入的群">刷新群列表</button>
+              <button id="g-save" class="btn-mini" type="button" title="保存勾选并立即生效">保存白名单</button>
+            </div>
+            <p class="kv" style="font-size:11px;opacity:.8"><span>状态</span><b id="g-status">-</b></p>
+          </div>
+          <div class="card">
             <h3>内在因（驱动力）</h3>
             <ul id="drivesList" class="ql"></ul>
             <div class="qrow"><input id="driveName" placeholder="新增内在因（如：好奇量子计算）"><button id="driveAdd" class="btn-mini" type="button">加</button></div>
@@ -148,6 +158,12 @@
           <div class="card">
             <h3>记忆检索</h3>
             <div class="qrow"><input id="memQ" placeholder="查记忆（如：用户偏好）"><button id="memBtn" class="btn-mini" type="button">查</button></div>
+            <div class="qrow">
+              <input id="memFrom" placeholder="起 YYYY-MM-DD">
+              <input id="memTo" placeholder="止 YYYY-MM-DD">
+              <button id="memMaint" class="btn-mini" type="button" title="按 belief 重新判定冻结/复活（只降权，不删数据）">冻结维护</button>
+            </div>
+            <div id="memStat" class="memstat"></div>
             <ul id="memList" class="ql"></ul>
           </div>
           <div class="card">
@@ -207,6 +223,24 @@
         <!-- 设置 -->
         <section class="panel" data-panel="settings">
           <div class="card">
+            <h3>提示词</h3>
+            <p class="kv" style="font-size:11px;opacity:.75">分块调，保存后**下一句就生效**（渲染每轮现做，不用重启服务）。留空＝恢复该块默认。</p>
+            <div class="qrow">
+              <select id="pt-block" style="flex:1;min-width:180px"></select>
+              <button id="pt-reload" class="btn-mini" type="button">读当前</button>
+              <button id="pt-save" class="btn-mini" type="button">保存</button>
+              <button id="pt-revert" class="btn-mini" type="button" title="把这个块恢复成代码默认">该块还原</button>
+            </div>
+            <textarea id="pt-text" spellcheck="false" style="width:100%;height:150px;margin-top:6px;font:12px/1.5 Consolas,monospace;background:#11151c;color:#d8e0ea;border:1px solid #2a3140;border-radius:6px;padding:6px"></textarea>
+            <div class="qrow">
+              <span class="kv" id="pt-info" style="font-size:11px;flex:1">-</span>
+              <button id="pt-prev-priv" class="btn-mini" type="button">预览私聊</button>
+              <button id="pt-prev-pub" class="btn-mini" type="button">预览群聊</button>
+              <button id="pt-reset" class="btn-mini" type="button" title="清掉所有覆盖，回到代码默认">全部还原</button>
+            </div>
+            <pre id="pt-preview" style="display:none;max-height:260px;overflow:auto;white-space:pre-wrap;font:11px/1.45 Consolas,monospace;background:#0d1117;border:1px solid #2a3140;border-radius:6px;padding:6px;margin-top:6px"></pre>
+          </div>
+          <div class="card">
             <h3>对话模式</h3>
             <div class="qrow">
               <button id="modeText" class="btn-mini" type="button">文本模式</button>
@@ -237,7 +271,7 @@
     <div class="drawer-scrim" id="drawerScrim"></div>
   </main>
 </div>
-<script src="/console.js"></script>
+<script src="/console.js?v=20261113c"></script>
 <script src="/ui.js"></script>
 </body>
 </html>

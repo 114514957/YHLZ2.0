@@ -1,0 +1,3 @@
+root  ::= piece* tail
+piece ::= [^?？\n]
+tail  ::= [^?？\n]

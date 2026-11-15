@@ -95,23 +95,70 @@ async function qLedger() {
     if (!(r.items || []).length) ul.innerHTML = "<li>（台账查无）</li>";
   } catch (e) { ul.innerHTML = "<li>查询失败</li>"; }
 }
+function memStatText(lc) {
+  if (!lc) return "";
+  const bits = ["总 <b>" + lc.items + "</b>", "活跃 <b>" + lc.active + "</b>"];
+  if (lc.frozen > 0) bits.push('冻结 <b class="warn">' + lc.frozen + "</b>");
+  return "记忆：" + bits.join(" · ");
+}
+function renderMemStat(r) {
+  const el = $("memStat");
+  if (!el) return;
+  let text = memStatText(r.lifecycle);
+  if (r.window && (r.window.start || r.window.end)) {
+    text += " · 时间窗 " + (r.window.start || "…") + " ~ " + (r.window.end || "…");
+  }
+  el.innerHTML = text;
+}
 async function qMem() {
   const q = $("memQ").value.trim();
   const ul = $("memList");
+  const from = ($("memFrom") && $("memFrom").value.trim()) || "";
+  const to = ($("memTo") && $("memTo").value.trim()) || "";
   ul.innerHTML = "<li>…</li>";
-  if (!q) { ul.innerHTML = ""; return; }
   try {
-    const r = await (await fetch("/mem?q=" + encodeURIComponent(q))).json();
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (from) params.set("time_start", from);
+    if (to) params.set("time_end", to);
+    const r = await (await fetch("/mem?" + params.toString(), { cache: "no-store" })).json();
+    renderMemStat(r);
     ul.innerHTML = "";
+    if (r.ok === false) {
+      const li = document.createElement("li");
+      li.className = "warn";
+      li.textContent = "参数不对：" + (r.error || "未知错误");
+      ul.appendChild(li);
+      return;
+    }
     for (const it of (r.items || [])) {
       const li = document.createElement("li");
       const _ty = ({ fact: "事实", preference: "偏好", event: "事件",
         decision: "决定" })[it.type] || (it.type ?? "");
-      li.textContent = "[" + (it.importance ?? "?") + "|" + _ty + "] " + it.summary;
+      let head = "[" + (it.importance ?? "?") + "|" + _ty + "] ";
+      if (it.score != null) head = "[" + Number(it.score).toFixed(3) + " " + (it.importance ?? "?") + "|" + _ty + "] ";
+      li.textContent = head + it.summary;
+      if (it.channels && it.channels.length > 1) {
+        const tag = document.createElement("em");
+        tag.style.opacity = "0.65";
+        tag.textContent = "  ← " + it.channels.join(" + ");
+        li.appendChild(tag);
+      }
       ul.appendChild(li);
     }
-    if (!(r.items || []).length) ul.innerHTML = "<li>（记忆查无）</li>";
+    if (!(r.items || []).length) ul.innerHTML = q ? "<li>（记忆查无）</li>" : "";
   } catch (e) { ul.innerHTML = "<li>查询失败</li>"; }
+}
+async function memLifecycle() {
+  const ul = $("memList");
+  try {
+    const r = await (await fetch("/mem/lifecycle", { method: "POST" })).json();
+    if (r.ok === false) { ul.innerHTML = "<li>维护失败：" + (r.error || "") + "</li>"; return; }
+    if (r.enabled === false) { ul.innerHTML = "<li>生命周期维护已关闭（YHLZ_L2_STRENGTH=off）</li>"; return; }
+    ul.innerHTML = "<li>维护完成：新冻结 " + (r.frozen ?? 0) + " 条，复活 " + (r.revived ?? 0) +
+      " 条，检查 " + (r.checked ?? 0) + " 条</li>";
+    await qMem();
+  } catch (e) { ul.innerHTML = "<li>维护失败</li>"; }
 }
 async function loadLogs() {
   try {
@@ -131,6 +178,9 @@ $("ledgerBtn").addEventListener("click", qLedger);
 $("ledgerQ").addEventListener("keydown", (e) => { if (e.key === "Enter") qLedger(); });
 $("memBtn").addEventListener("click", qMem);
 $("memQ").addEventListener("keydown", (e) => { if (e.key === "Enter") qMem(); });
+if ($("memMaint")) $("memMaint").addEventListener("click", memLifecycle);
+if ($("memFrom")) $("memFrom").addEventListener("keydown", (e) => { if (e.key === "Enter") qMem(); });
+if ($("memTo")) $("memTo").addEventListener("keydown", (e) => { if (e.key === "Enter") qMem(); });
 
 async function loadSessions() {
   try {
@@ -239,6 +289,181 @@ async function bridgeAct(action, okMsg) {
 $("q-start").addEventListener("click", () => bridgeAct("qq_bridge_start", "QQ 桥启动中"));
 $("q-restart").addEventListener("click", () => bridgeAct("qq_bridge_restart", "QQ 桥重启中"));
 $("q-stop").addEventListener("click", () => bridgeAct("qq_bridge_stop", "QQ 桥已停止自动恢复"));
+
+/* ── 群聊白名单（2026-11-13）─────────────────────────────────
+   要求：元亨新加了群，这里要**及时出现**。所以
+   · 进页面拉一次，之后每 60 秒自动刷新一次（页面隐藏时暂停）
+   · 新出现的群标「新」，并在状态行提示
+   · 刷新**不冲掉**你正在勾但还没保存的选择（dirty 时以你的勾选为准）
+*/
+let qqGroupsCache = [];
+let qqKnownIds = null;      // 已知群号集合；null=首次
+let qqDirty = false;        // 有未保存的勾选
+let qqNewIds = new Set();
+function gStatus(t) { const e = $("g-status"); if (e) e.textContent = t; }
+function gNote(t) { const e = $("g-note"); if (e) e.textContent = t; }
+
+function gCurrentSel() {
+  return new Set(Array.from(document.querySelectorAll('#qqGroups input[type=checkbox]'))
+    .filter(c => c.checked).map(c => c.dataset.gid));
+}
+
+async function loadQQGroups(opts) {
+  const silent = !!(opts && opts.silent);
+  if (!silent) gStatus("拉取中…");
+  let r;
+  try {
+    r = await (await fetch("/qq/groups", { cache: "no-store" })).json();
+  } catch (e) { gStatus("拉取失败：" + e); return; }
+  if (!r.ok) { gStatus("失败：" + (r.error || "未知")); return; }
+
+  const groups = r.groups || [];
+  const serverOn = new Set((r.whitelist && r.whitelist.groups) || []);
+  const sel = qqDirty ? gCurrentSel() : serverOn;
+
+  // 新群判定（首次不算"新"，只记录）
+  qqNewIds = new Set();
+  if (qqKnownIds) {
+    for (const g of groups) if (!qqKnownIds.has(g.id)) qqNewIds.add(g.id);
+  }
+  qqKnownIds = new Set(groups.map(g => g.id));
+
+  qqGroupsCache = groups;
+  const ul = $("qqGroups");
+  ul.innerHTML = "";
+  if (!groups.length) ul.innerHTML = '<li style="opacity:.7">没拉到群（可能没登录）</li>';
+  for (const g of groups) {
+    const li = document.createElement("li");
+    li.style.cssText = "display:flex;gap:6px;align-items:center;font-size:12px;padding:2px 0";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.dataset.gid = g.id; cb.checked = sel.has(g.id);
+    cb.addEventListener("change", () => { qqDirty = true; });
+    const sp = document.createElement("span");
+    sp.textContent = g.name + " · " + g.id + " · " + g.count + "人";
+    li.appendChild(cb); li.appendChild(sp);
+    if (qqNewIds.has(g.id)) {
+      const tag = document.createElement("b");
+      tag.textContent = "新";
+      tag.style.cssText = "color:#ffcf5c;font-size:11px;border:1px solid #ffcf5c;border-radius:4px;padding:0 3px";
+      li.appendChild(tag);
+    }
+    ul.appendChild(li);
+  }
+
+  gNote(serverOn.size ? ("已启用 " + serverOn.size + " 群（其余群不读不回）")
+                      : "全不勾＝不限制（所有群都读）");
+  const t = new Date().toLocaleTimeString();
+  let s = "共 " + groups.length + " 群｜来源 " + ((r.whitelist && r.whitelist.source) || "-") + "｜" + t;
+  if (qqNewIds.size) {
+    s += "｜⚠ 新加 " + qqNewIds.size + " 群（未在白名单内，她不会读）";
+  }
+  if (qqDirty) s += "｜有未保存的勾选";
+  gStatus(s);
+}
+
+async function saveQQWhitelist() {
+  const ids = Array.from(gCurrentSel());
+  gStatus("保存中…");
+  try {
+    const r = await (await fetch("/qq/whitelist", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groups: ids }) })).json();
+    if (r.ok) {
+      qqDirty = false;
+      qqNewIds = new Set();
+      gNote((r.groups || []).length
+        ? ("已启用 " + r.groups.length + " 群（其余群不读不回）")
+        : "全不勾＝不限制（所有群都读）");
+      gStatus("已保存 " + (r.groups || []).length + " 群，下一句生效");
+      loadQQGroups({ silent: true });
+    } else { gStatus("保存失败：" + (r.error || "未知")); }
+  } catch (e) { gStatus("保存失败：" + e); }
+}
+
+if ($("g-refresh")) $("g-refresh").addEventListener("click", () => loadQQGroups());
+if ($("g-save")) $("g-save").addEventListener("click", saveQQWhitelist);
+// 自动刷新：60 秒一次；标签页隐藏时不跑，切回来立刻补一次
+setInterval(() => { if (!document.hidden && $("qqGroups")) loadQQGroups({ silent: true }); }, 60000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && $("qqGroups")) loadQQGroups({ silent: true });
+});
+
+/* ── 提示词分块（2026-11-13）────────────────────────────────
+   后端：GET /prompt/blocks、GET /prompt/preview、POST /prompt/set、POST /prompt/reset
+   渲染每轮现做，所以保存后下一句生效，不用重启任何服务。
+*/
+let ptBlocks = [];
+function ptInfo(t) { const e = $("pt-info"); if (e) e.textContent = t; }
+
+async function ptLoad(keepKey) {
+  try {
+    const r = await (await fetch("/prompt/blocks", { cache: "no-store" })).json();
+    if (!r.ok) { ptInfo("读取失败：" + (r.error || "")); return; }
+    ptBlocks = r.blocks || [];
+    const sel = $("pt-block");
+    const prev = keepKey || sel.value;
+    sel.innerHTML = "";
+    for (const b of ptBlocks) {
+      const o = document.createElement("option");
+      o.value = b.key;
+      o.textContent = (b.changed ? "✎ " : "") + b.title + "（" + b.len + "字）";
+      sel.appendChild(o);
+    }
+    if (prev && ptBlocks.some(b => b.key === prev)) sel.value = prev;
+    ptInfo("共 " + ptBlocks.length + " 块｜已改 " + (r.count_changed || 0) + " 块");
+    ptShow();
+  } catch (e) { ptInfo("读取失败：" + e); }
+}
+
+function ptShow() {
+  const key = $("pt-block").value;
+  const b = ptBlocks.find(x => x.key === key);
+  if (!b) return;
+  $("pt-text").value = b.current || "";
+  ptInfo(b.title + "｜" + (b.current || "").length + " 字"
+         + (b.changed ? "｜已改（原 " + b.default.length + " 字）" : "｜默认"));
+}
+
+async function ptSave(text) {
+  const key = $("pt-block").value;
+  try {
+    const r = await (await fetch("/prompt/set", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, text }) })).json();
+    if (!r.ok) { ptInfo("保存失败：" + (r.error || "")); return; }
+    ptInfo(r.reset ? ("已恢复默认：" + key) : ("已保存：" + key + "（下一句生效）"));
+    await ptLoad(key);
+  } catch (e) { ptInfo("保存失败：" + e); }
+}
+
+async function ptPreview(pub) {
+  try {
+    const r = await (await fetch("/prompt/preview?public=" + (pub ? 1 : 0),
+                                 { cache: "no-store" })).json();
+    if (!r.ok) { ptInfo("预览失败：" + (r.error || "")); return; }
+    const pre = $("pt-preview");
+    pre.style.display = "block";
+    pre.textContent = r.text;
+    ptInfo((pub ? "群聊" : "私聊") + "渲染： " + r.chars + " 字｜约 " + r.approx_tokens + " token");
+  } catch (e) { ptInfo("预览失败：" + e); }
+}
+
+if ($("pt-block")) {
+  $("pt-block").addEventListener("change", ptShow);
+  $("pt-reload").addEventListener("click", () => ptLoad());
+  $("pt-save").addEventListener("click", () => ptSave($("pt-text").value));
+  $("pt-revert").addEventListener("click", () => ptSave(""));
+  $("pt-prev-priv").addEventListener("click", () => ptPreview(false));
+  $("pt-prev-pub").addEventListener("click", () => ptPreview(true));
+  $("pt-reset").addEventListener("click", async () => {
+    if (!confirm("清掉所有提示词覆盖，恢复代码默认？")) return;
+    const r = await (await fetch("/prompt/reset", { method: "POST" })).json();
+    ptInfo(r.ok ? "已全部还原" : ("失败：" + (r.error || "")));
+    ptLoad();
+  });
+  ptLoad();
+}
+
 async function launch(action, okMsg) {
   const r = await (await fetch("/control", { method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -512,6 +737,8 @@ loadSettings();
 loadSessions();
 loadDashboard();
 loadLogs();
+qMem();           // 记忆页进来先拉一次状态（总/活跃/冻结），不等查询
+loadQQGroups();   // 群聊白名单：进页面拉一次，之后手动刷新
 setInterval(() => { loadDashboard(); loadLogs(); loadGrowth(); }, 3000);
 window.addEventListener("load", () => {
   setTimeout(() => {

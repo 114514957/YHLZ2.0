@@ -117,6 +117,9 @@ QQBOT_LOCK = _ROOT / "cache" / "tmp" / "qqbot.lock"
 NAPCAT_WATCH_LOCK = _ROOT / "cache" / "tmp" / "napcat_watch.lock"
 QQ_MANAGEMENT_FILE = _ROOT / "config" / "qq_management.json"
 
+# QQ 每日对话采集器（2026-11-13）：到点自动出风格日报。空字符串＝只采集不自动复盘。
+DAILY_REVIEW_AT = os.getenv("YHLZ_DAILY_REVIEW_AT", "23:50").strip()
+
 
 _QQ_MGMT_WARNED = False
 
@@ -273,6 +276,44 @@ def _spawn_qqbot():
     subprocess.Popen([str(pyw), "-B", str(_ROOT / "tools" / "qq_bot.py"),
                       "--uin", QQBOT_UIN, "--master", QQBOT_MASTER],
                      cwd=str(_ROOT), close_fds=True)
+
+
+def _spawn_memory_bridge():
+    """QQ→本体记忆桥（2026-11-13，ledger 1177）。
+
+    老爹的原话：「qq 里的记忆实际上就是要她学习的内容，所以记忆必要」「还要完整」。
+    它把群/私聊里的**原话**（别人的发言 + 她的回复）按消息 id 去重后写进本体 L2，
+    这样私聊回忆能带出 QQ 里发生过的事。旁路任务，挂了不影响聊天。
+    """
+    log = _ROOT / "cache" / "logs" / "qq_memory_bridge.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | \
+        getattr(subprocess, "DETACHED_PROCESS", 0)
+    # -u 必须带：否则 print 被块缓冲，日志文件长期是空的（2026-11-14 排查时踩过）
+    subprocess.Popen([str(PY), "-u", "-B", str(_ROOT / "tools" / "qq_memory_bridge.py"),
+                      "--loop", "300"],
+                     cwd=str(_ROOT), stdout=_open_log(log, 4 * 1024 * 1024),
+                     stderr=subprocess.STDOUT, creationflags=flags, close_fds=True)
+
+
+def _spawn_daily_log():
+    """QQ 每日对话采集器（2026-11-13，ledger 1171）。
+
+    它每 10 分钟把 sessions 里的**新增轮次**带时间戳落到
+    `cache/qq_daily/<YYYYMMDD>.jsonl`（sessions 本身没有时间戳，没法按天复盘），
+    并在每天 REVIEW_AT 自动出一份风格日报。
+    它是**旁路观测**：挂了不影响聊天，所以不进 CRITICAL_SERVICES，只做自动补起。
+    """
+    log = _ROOT / "cache" / "logs" / "qq_daily_log.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    argv = [str(PY), "-u", "-B", str(_ROOT / "tools" / "qq_daily_log.py"),
+            "--loop", "600"]
+    if DAILY_REVIEW_AT:
+        argv += ["--review-at", DAILY_REVIEW_AT]
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | \
+        getattr(subprocess, "DETACHED_PROCESS", 0)
+    subprocess.Popen(argv, cwd=str(_ROOT), stdout=_open_log(log, 4 * 1024 * 1024),
+                     stderr=subprocess.STDOUT, creationflags=flags, close_fds=True)
 
 
 NAPCAT_BAT = NAPCAT_LAUNCHER
@@ -544,6 +585,16 @@ def ensure_stack() -> dict:
         reaped = _reap_legacy_qq()
         if reaped:
             print(f"[launcher] external: 收掉旧 QQ 链残留 {reaped}", flush=True)
+
+    # QQ 每日对话采集器（2026-11-13）：旁路观测，挂了不影响聊天，只自动补起。
+    # 它替 sessions 补上时间戳，并在 DAILY_REVIEW_AT 出风格日报。
+    if not _proc_alive("qq_daily_log.py") and _spawn_allowed("daily_log", 300):
+        _try_spawn("daily_log", _spawn_daily_log)
+
+    # QQ→本体记忆桥（2026-11-13）：把 QQ 原话写进她的记忆，旁路，挂了不影响聊天。
+    if not _proc_alive("qq_memory_bridge.py") and _spawn_allowed("memory_bridge", 300):
+        _try_spawn("memory_bridge", _spawn_memory_bridge)
+
     time.sleep(1)
     return status()
 

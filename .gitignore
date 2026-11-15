@@ -171,3 +171,7 @@ dist/v13_产出_*/
 dist/v14_产物/*.safetensors
 # 云端分块中转、下载缓存
 /cache_chunks/
+
+# 2026-11-15：临时打包/未压缩 tar 不入库（v13_pack.tar 10.8MB、_v13_pack 是 material_v13 的副本）
+*.tar
+dist/_v13_pack/

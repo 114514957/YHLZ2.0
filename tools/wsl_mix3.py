@@ -26,6 +26,10 @@ def main() -> int:
     ap.add_argument("--bgm-gain", type=float, default=0.8)
     ap.add_argument("--peak", type=float, default=0.99)
     ap.add_argument("--target-sr", type=int, default=44100)
+    ap.add_argument("--normalize", dest="normalize", action="store_true",
+                    default=True,
+                    help="末级按 --peak 归一（默认开）；关掉用 --no-normalize")
+    ap.add_argument("--no-normalize", dest="normalize", action="store_false")
     args = ap.parse_args()
 
     import librosa
@@ -52,8 +56,17 @@ def main() -> int:
         mix[:len(track)] += track
     peak = float(np.max(np.abs(mix)) + 1e-9)
     info = {"peak_before": round(peak, 3), "peak_after": args.peak}
-    if peak > args.peak:
+    # 2026-11-13：上游分轨统一压到 -3 dBFS（svc_stage_level），这里若只"限不归一"，
+    # 成品会比以前小 3dB。改成**按 --peak 归一（上下都调）**，响度稳定；再兜底限幅。
+    if args.normalize:
         mix *= args.peak / peak
+    elif peak > args.peak:
+        mix *= args.peak / peak
+    fp = float(np.max(np.abs(mix)) + 1e-9)
+    if fp > 1.0:
+        mix *= 1.0 / fp
+    info["normalized"] = bool(args.normalize)
+    info["peak_final"] = round(float(np.max(np.abs(mix))), 3)
     sf.write(args.out, mix, sr, subtype="PCM_16")
     info.update({"out": args.out, "duration_s": round(n / sr, 2), "sr": sr})
     print(json.dumps(info, ensure_ascii=False))

@@ -146,21 +146,23 @@ def store_items(items: list[dict], *, group_id: str = "", ts: int = 0,
 
 
 def build_llm_turn(max_tokens: int = 1200):
-    """Cloud-only (no local fallback) DeepSeek turn for extraction."""
-    import os
+    """QQ 历史批量抽取用的 LLM。
 
-    from backend.env_loader import ensure_env_loaded
+    2026-11-13（ledger 1195）：老爹「全部用咱们训练的模型」→ 从 DeepSeek 云端
+    改成**本地 8081（gemma+dpo2）**。代价：批量抽取会慢一个量级（CPU 推理），
+    但这是一次性离线活，不占聊天时延。
+    """
     from backend.target_orchestrator import build_openai_compatible_llm_turn
 
-    ensure_env_loaded()
-    key = os.getenv("DEEPSEEK_API_KEY", "")
     provider = build_openai_compatible_llm_turn(
-        api_key=key, model="deepseek-chat", temperature=0.1,
-        max_tokens=int(max_tokens), fallback_base_url=None,
+        base_url="http://127.0.0.1:8081/v1/chat/completions",
+        api_key="", model="gemma-4-e4b",
+        temperature=0.1, max_tokens=int(max_tokens),
+        reasoning_effort="none",
     )
     from backend.bg_scheduler import wrap_llm_turn
 
-    return wrap_llm_turn(provider, kind="qqextract", endpoint="deepseek")
+    return wrap_llm_turn(provider, kind="qqextract", endpoint="local")
 
 
 async def run_batch(max_items: int = 12, dry: bool = False,
