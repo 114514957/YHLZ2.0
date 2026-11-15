@@ -481,6 +481,20 @@ class TurnOrchestrator:
         if allowed_tools is not None:
             tools = [t for t in tools
                      if t.get("function", {}).get("name") in allowed_tools]
+        # 2026-11-15（台账 1257）：**工具按需加载**。这里是真正的 `tools=` 传参点
+        # （之前一直没找到，靠"数数量"定位）。默认关闭，`YHLZ_TOOL_BUDGET=1` 才生效。
+        # 依据：全量 43 个 schema ≈ 2933 token，而一句闲聊实测总输入 6800 token，
+        # 工具占四成；casual 档只要 6 个（452 token）。
+        try:
+            from backend import tool_budget as _tb
+            if _tb.enabled() and tools:
+                _n0 = len(tools)
+                tools = _tb.select(tools, str(turn_text), allowed_tools)
+                if len(tools) != _n0:
+                    print("[tool-budget] %d → %d（%s）"
+                          % (_n0, len(tools), _tb.level_of(str(turn_text))), flush=True)
+        except Exception:  # noqa: BLE001
+            pass
         if text_contract is not None and not tools:
             return TurnResult(answer=text_contract.failure_reply("unavailable"))
         tool_uses: list[ToolUse] = []

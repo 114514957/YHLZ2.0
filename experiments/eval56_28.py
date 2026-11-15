@@ -43,6 +43,17 @@ def call(port: int, system: str, user: str, max_tokens: int = 300,
         "messages": msgs,
         "temperature": 0.0, "max_tokens": max_tokens, "stream": False,
     }
+    if tools and (os.getenv("YHLZ_TOOL_BUDGET") or "").strip() in ("1", "true", "on"):
+        # 2026-11-15（台账 1257）：评测也按预算收窄工具，才能测到"少给工具"的影响。
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from backend import tool_budget as _tb
+            _n0 = len(tools)
+            tools = _tb.select(tools, user, None)
+            if len(tools) != _n0:
+                print("   [budget] %d→%d（%s）" % (_n0, len(tools), _tb.level_of(user)))
+        except Exception:  # noqa: BLE001
+            pass
     if tools:
         body["tools"] = tools
         body["tool_choice"] = "auto"
