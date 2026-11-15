@@ -1036,6 +1036,16 @@ class _Handler(ConsoleHandler):
         p = self.path.split("?", 1)[0]
         # 2026-11-15（台账 1252）：工作台「链路状态」卡。**在 daemon 侧直接拦**——
         # 放进 console_server 的分发里会被前面的分支吃掉成 404（实测）。
+        if method == "GET" and p == "/api/eval_status":
+            # 工作台「一键评测」卡（2026-11-15 台账 1255）：状态 + 最近几轮结果。
+            try:
+                from backend import eval_runner as _er
+                st = _er.status()
+                self._send(200, {"ok": True, **st, "history": _er.history(6)})
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:120])})
+            return True
         if method == "GET" and p.startswith("/api/recent_turns"):
             # 工作台「最近回合」卡（2026-11-15 台账 1254）：问句/注入/费用一屏。
             try:
@@ -1168,7 +1178,7 @@ class _Handler(ConsoleHandler):
         if self._ui_route("POST"):
             return
         if self.path.startswith("/api/") and not self.path.startswith(
-                "/api/try_turn"):
+                ("/api/try_turn", "/api/eval_run")):
             # 2026-11-15（台账 1253）：`/api/try_turn` 由 daemon 自己处理（在下面读 body 后），
             # 其余 /api/* 仍交给 console_server。
             self.console_do_POST()
@@ -1196,6 +1206,16 @@ class _Handler(ConsoleHandler):
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
             self._send(400, {"error": "bad json"})
+            return
+        if self.path == "/api/eval_run":
+            # 起一轮云端评测（152+75，约 4 分钟，约 ¥2.5）。
+            try:
+                from backend import eval_runner as _er
+                res = _er.start(str(payload.get("tag") or ""))
+                self._send(200 if res.get("ok") else 409, res)
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:120])})
             return
         if self.path == "/api/try_turn":
             # 工作台「试一句话」卡（2026-11-15 台账 1253）：页面里直接跑一轮，

@@ -98,7 +98,17 @@
           
           
           
-          <div class="card" id="turns-card">
+          
+          <div class="card" id="eval-card">
+            <h3>一键评测 <small style="font-weight:400;opacity:.6">152+75 · 云端 · 约4分钟</small></h3>
+            <div style="margin-bottom:8px">
+              <button id="eval-go" type="button" style="padding:6px 12px;border-radius:6px;cursor:pointer">跑一轮</button>
+              <span id="eval-state" style="font-size:12px;opacity:.75;margin-left:8px"></span>
+            </div>
+            <div id="eval-result" style="font-size:12px;line-height:1.7"></div>
+            <div id="eval-history" style="font-size:12px;line-height:1.7;margin-top:8px;opacity:.9"></div>
+          </div>
+<div class="card" id="turns-card">
             <h3>最近回合 <small style="font-weight:400;opacity:.6">问句／注入／费用</small></h3>
             <div id="turns-body" style="font-size:12px;line-height:1.6">加载中…</div>
           </div>
@@ -463,6 +473,59 @@
   }
   document.addEventListener("DOMContentLoaded", function () {
     load(); setInterval(load, 20000);
+  });
+})();
+</script>
+
+<script>
+/* 一键评测（台账 1255） */
+(function () {
+  function paint(d) {
+    var st = document.getElementById("eval-state");
+    var rs = document.getElementById("eval-result");
+    var hs = document.getElementById("eval-history");
+    if (!st) return;
+    var cur = d.state || {};
+    st.textContent = d.running
+      ? ("跑着：" + (cur.tag || "") + "（pid " + cur.pid + "）")
+      : ((cur.tag ? ("上一轮：" + cur.tag) : "还没跑过"));
+    rs.innerHTML = "";
+    if (d.result) {
+      var r = d.result;
+      rs.innerHTML = "<b>人格 " + r.persona + "　群聊 " + r.group + "</b>"
+        + (r.persona_failed && r.persona_failed.length
+            ? "<br><span style='opacity:.7'>人格挂：" + r.persona_failed.slice(0, 8).join(",") + "</span>" : "")
+        + (r.group_failed && r.group_failed.length
+            ? "<br><span style='opacity:.7'>群聊挂：" + r.group_failed.join(",") + "</span>" : "");
+    }
+    if (hs && d.history) {
+      hs.innerHTML = "<div style='opacity:.6'>最近几轮</div>" + d.history.map(function (h) {
+        return "<div>" + h.tag + "　人格 " + h.persona + "/" + h.persona_n
+          + "　群聊 " + h.group + "/" + h.group_n + "</div>";
+      }).join("");
+    }
+  }
+  function load() {
+    fetch("/api/eval_status", {cache: "no-store"}).then(function (r) { return r.json(); })
+      .then(paint).catch(function () {});
+  }
+  function go() {
+    var btn = document.getElementById("eval-go");
+    if (btn) { btn.disabled = true; btn.textContent = "起…"; }
+    fetch("/api/eval_run", {method: "POST", headers: {"Content-Type": "application/json"},
+                            body: JSON.stringify({})})
+      .then(function (r) { return r.json(); })
+      .catch(function () { return {}; })
+      .then(function () {
+        if (btn) { btn.disabled = false; btn.textContent = "跑一轮"; }
+        load();
+        setTimeout(load, 20000); setTimeout(load, 60000);
+      });
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    var b = document.getElementById("eval-go");
+    if (b) b.addEventListener("click", go);
+    load(); setInterval(load, 30000);
   });
 })();
 </script>
