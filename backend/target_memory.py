@@ -14,6 +14,7 @@ Implements the agreed baseline with hard invariants:
 """
 
 from __future__ import annotations
+from backend.llm_endpoint import endpoint as _llm_endpoint
 
 import hashlib
 import inspect
@@ -1700,7 +1701,7 @@ class TargetMemoryService:
                 "reasoning_effort": "none",
             }).encode()
             req = urllib.request.Request(
-                "http://127.0.0.1:8081/v1/chat/completions", data=body,
+                _llm_endpoint()["base_url"], data=body,
                 headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=120) as r:
                 d = _json.loads(r.read().decode("utf-8", "replace"))

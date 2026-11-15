@@ -6,6 +6,7 @@ tool view is CapabilityRegistry.export_openai_tools().
 """
 
 from __future__ import annotations
+from backend.llm_endpoint import endpoint as _llm_endpoint
 from typing import Literal
 from pydantic import model_validator
 
@@ -338,13 +339,13 @@ def runtime_status() -> str:
         "training": "unknown", "stale": False,
     }
     try:
-        with _url.urlopen("http://127.0.0.1:8081/health", timeout=2) as r:
+        with _url.urlopen(_llm_endpoint()["base_url"].replace("/v1/chat/completions", "/health"), timeout=3) as r:
             out["server"] = "ok" if "ok" in r.read().decode("utf-8", "replace").lower() else "reachable"
     except Exception:
         out["server"] = "unreachable"
     if out["server"] == "ok":
         try:
-            with _url.urlopen("http://127.0.0.1:8081/props", timeout=2) as r:
+            with _url.urlopen(_llm_endpoint()["base_url"].replace("/v1/chat/completions", "/props"), timeout=3) as r:
                 props = _json.load(r)
             out["model"] = str(props.get("model_alias") or "unknown")
         except Exception:
@@ -2255,7 +2256,7 @@ def qq_weekly_report(days: int = 7) -> str:
             "reasoning_effort": "none",
         }).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:8081/v1/chat/completions", data=body,
+            _llm_endpoint()["base_url"], data=body,
             headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=180) as r:
             d = _json.loads(r.read().decode("utf-8", "replace"))

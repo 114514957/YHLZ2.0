@@ -97,8 +97,11 @@ class FactoryStreamBindingTest(unittest.IsolatedAsyncioTestCase):
             session._transcribe_audio_turn = AsyncMock()
             got = []
             async def stream(**options):
-                self.assertEqual(options["model"], "gemma-4-e4b")
-                self.assertEqual(options["base_url"], "http://127.0.0.1:8081/v1/chat/completions")
+                # 2026-11-15（ledger 1240）：端点改成由 llm_endpoint 解析（云端主轨），
+                # 断言"与解析结果一致"而不是写死本地 8081。
+                from backend.llm_endpoint import endpoint as _ep
+                self.assertEqual(options["model"], _ep()["model"])
+                self.assertEqual(options["base_url"], _ep()["base_url"])
                 self.assertEqual(options["max_tokens"], 220)
                 await options["on_event"]({"kind": "delta", "stage": "content", "delta": "你好呀"})
                 self.assertEqual(got, ["你好呀"])

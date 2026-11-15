@@ -7,6 +7,7 @@ Set ``YHLZ_MEMORY_LLM_MODE=local`` explicitly after a fine-tune window to opt
 in to an already-running OpenAI-compatible endpoint.
 """
 from __future__ import annotations
+from backend.llm_endpoint import endpoint as _llm_endpoint
 
 import os
 import re
@@ -18,7 +19,7 @@ from typing import Any
 @dataclass(frozen=True)
 class MemoryResourcePolicy:
     mode: str = "disabled"  # disabled | local
-    base_url: str = "http://127.0.0.1:8081/v1/chat/completions"
+    base_url: str = ""   # 2026-11-15：空 = 由 llm_endpoint 解析
     model: str = "gemma-4-e4b"
     request_timeout_s: float = 45.0
     max_tokens: int = 256
@@ -65,7 +66,7 @@ def load_memory_resource_policy(env: dict[str, str] | None = None) -> MemoryReso
                     == "local")
     return MemoryResourcePolicy(
         mode=requested,
-        base_url=str(e.get("YHLZ_MEMORY_LLM_BASE_URL", "http://127.0.0.1:8081/v1/chat/completions")).strip(),
+        base_url=str(e.get("YHLZ_MEMORY_LLM_BASE_URL", _llm_endpoint()["base_url"])).strip(),
         model=str(e.get("YHLZ_MEMORY_LLM_MODEL", "gemma-4-e4b")).strip() or "gemma-4-e4b",
         request_timeout_s=timeout,
         max_tokens=tokens,

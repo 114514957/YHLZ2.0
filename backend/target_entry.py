@@ -6,6 +6,7 @@ CLI approver for side-effect capabilities (memory.save etc).
 """
 
 from __future__ import annotations
+from backend.llm_endpoint import endpoint as _llm_endpoint
 
 import asyncio
 import json
@@ -194,8 +195,8 @@ class ConversationSession:
         ensure_env_loaded()
         self._llm_injected = llm_turn is not None
         self.llm_turn = llm_turn or build_openai_compatible_llm_turn(
-            base_url="http://127.0.0.1:8081/v1/chat/completions",
-            api_key="", model="gemma-4-e4b",
+            base_url=_llm_endpoint()["base_url"],
+            api_key="", model=_llm_endpoint()["model"],
             temperature=0.2, max_tokens=800,
             fallback_base_url=LOCAL_BASE,
             fallback_model=LOCAL_MODEL,
@@ -632,8 +633,8 @@ class ConversationSession:
             # Daemon injects a factory-created callable. Bind a new voice turn,
             # not mutable callbacks on the shared session/model.
             llm_turn = llm_turn.with_stream(
-                base_url="http://127.0.0.1:8081/v1/chat/completions",
-                api_key="", model="gemma-4-e4b", temperature=0.2,
+                base_url=_llm_endpoint()["base_url"],
+                api_key="", model=_llm_endpoint()["model"], temperature=0.2,
                 max_tokens=220, reasoning_effort="none",
                 on_delta=stream_on_delta, should_stop=_stop,
                 fallback_base_url=None, fallback_model=None,
@@ -653,8 +654,8 @@ class ConversationSession:
             )
 
             llm_turn = build_openai_compatible_llm_turn(
-                base_url="http://127.0.0.1:8081/v1/chat/completions",
-                api_key="", model="gemma-4-e4b",
+                base_url=_llm_endpoint()["base_url"],
+                api_key="", model=_llm_endpoint()["model"],
                 temperature=0.2,
                 max_tokens=3000,
                 fallback_base_url=LOCAL_BASE,
@@ -673,8 +674,8 @@ class ConversationSession:
             )
 
             llm_turn = build_openai_compatible_llm_turn(
-                base_url="http://127.0.0.1:8081/v1/chat/completions",
-                api_key="", model="gemma-4-e4b",
+                base_url=_llm_endpoint()["base_url"],
+                api_key="", model=_llm_endpoint()["model"],
                 temperature=0.2, max_tokens=220,
                 defer_tool_content=True,
                 fallback_base_url=LOCAL_BASE,
@@ -690,8 +691,8 @@ class ConversationSession:
             )
 
             llm_turn = build_openai_compatible_llm_turn(
-                base_url="http://127.0.0.1:8081/v1/chat/completions",
-                api_key="", model="gemma-4-e4b",
+                base_url=_llm_endpoint()["base_url"],
+                api_key="", model=_llm_endpoint()["model"],
                 temperature=0.2, max_tokens=800,
                 fallback_base_url=LOCAL_BASE,
                 fallback_model=LOCAL_MODEL,
@@ -977,8 +978,8 @@ class ConversationSession:
             transcriber = self.llm_turn
             if callable(getattr(transcriber, "with_stream", None)):
                 transcriber = transcriber.with_stream(
-                    base_url="http://127.0.0.1:8081/v1/chat/completions",
-                    api_key="", model="gemma-4-e4b", temperature=0.0,
+                    base_url=_llm_endpoint()["base_url"],
+                    api_key="", model=_llm_endpoint()["model"], temperature=0.0,
                     max_tokens=256, reasoning_effort="none", on_delta=None,
                     fallback_base_url=None, fallback_model=None)
             msg = await transcriber(messages, [])
@@ -1688,8 +1689,8 @@ def cli_main() -> int:
                 ensure_env_loaded()
                 # 2026-11-13（ledger 1195）：老爹「全部用咱们训练的模型」→ /suggest 也走本地。
                 llm = build_openai_compatible_llm_turn(
-                    base_url="http://127.0.0.1:8081/v1/chat/completions",
-                    api_key="", model="gemma-4-e4b",
+                    base_url=_llm_endpoint()["base_url"],
+                    api_key="", model=_llm_endpoint()["model"],
                     temperature=0.2, max_tokens=900,
                     reasoning_effort="none")
                 out = loop.run_until_complete(_sugg(llm))

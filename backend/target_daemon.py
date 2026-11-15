@@ -12,6 +12,7 @@ PUBLIC_CONVERGENCE_CLAUSE (privacy guard).  Dual-rail LLM (cloud -> local).
 """
 
 from __future__ import annotations
+from backend.llm_endpoint import endpoint as _llm_endpoint
 
 import argparse
 import asyncio
@@ -33,8 +34,8 @@ if str(_PROJECT) not in sys.path:
 # qwen2.5:3b on 11434, but this machine's Ollama cannot create its model
 # manifest dir (HTTP 500 on every chat), so when DeepSeek was briefly
 # unavailable every autonomous turn died with RuntimeError.
-LOCAL_BASE = "http://127.0.0.1:8081/v1/chat/completions"
-LOCAL_MODEL = "gemma-4-e4b"
+LOCAL_BASE = _llm_endpoint()["base_url"]
+LOCAL_MODEL = _llm_endpoint()["model"]
 # 2026-10-21 老爹要求「元亨自主的任务全部停掉」：一个持久开关，
 # 同时挡住定时/内因自主和到点计划；删除 flag 即恢复。
 AUTONOMY_FLAG = _PROJECT / "cache" / "autonomy_disabled.flag"
@@ -972,7 +973,7 @@ class DaemonRuntime:
             )
 
         async def _try_cloud():
-            await _stream_to("http://127.0.0.1:8081/v1/chat/completions",
+            await _stream_to(_llm_endpoint()["base_url"],
                               key, "gemma-4-e4b")
 
         try:

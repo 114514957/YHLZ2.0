@@ -5,6 +5,7 @@ Cursor-based: processed candidate lines are tracked, failures leave the cursor
 untouched so batches retry.
 """
 from __future__ import annotations
+from backend.llm_endpoint import endpoint as _llm_endpoint
 
 import asyncio
 import json
@@ -155,7 +156,7 @@ def build_llm_turn(max_tokens: int = 1200):
     from backend.target_orchestrator import build_openai_compatible_llm_turn
 
     provider = build_openai_compatible_llm_turn(
-        base_url="http://127.0.0.1:8081/v1/chat/completions",
+        base_url=_llm_endpoint()["base_url"],
         api_key="", model="gemma-4-e4b",
         temperature=0.1, max_tokens=int(max_tokens),
         reasoning_effort="none",

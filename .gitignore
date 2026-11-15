@@ -175,3 +175,7 @@ dist/v14_产物/*.safetensors
 # 2026-11-15：临时打包/未压缩 tar 不入库（v13_pack.tar 10.8MB、_v13_pack 是 material_v13 的副本）
 *.tar
 dist/_v13_pack/
+
+# 2026-11-15：大模型密钥（只在本机，绝不入库）
+config/llm.local.json
+config/llm.local.*.json

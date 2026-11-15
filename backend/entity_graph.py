@@ -9,6 +9,7 @@ Design: lightweight, accumulating counters, substring entity matching (no NER
 model needed), used to build an early-context hint block.
 """
 from __future__ import annotations
+from backend.llm_endpoint import endpoint as _llm_endpoint
 
 import json
 import pathlib
@@ -69,7 +70,7 @@ def _local_llm():
         from backend.target_orchestrator import build_openai_compatible_llm_turn
 
         _LLM = build_openai_compatible_llm_turn(
-            base_url="http://127.0.0.1:8081/v1/chat/completions",
+            base_url=_llm_endpoint()["base_url"],
             api_key="", model="gemma-4-e4b", temperature=0.1, max_tokens=500,
             reasoning_effort="none")
     return _LLM

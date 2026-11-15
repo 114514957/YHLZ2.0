@@ -182,13 +182,12 @@ def _compact_for_local(messages: list[dict[str, Any]],
 
 def build_openai_compatible_llm_turn(
     *,
-    # 2026-11-13（ledger 1195）：默认值原先是 DeepSeek 云端——只要哪个调用点忘了传
-    # base_url，就悄悄换成云端模型，而 health 里还写着"本地"。实测踩过：
-    # QQ 群/私聊各一轮，本地 llama 日志增长 0 字节。默认值改成本地 dpo2，
-    # 想用云端必须**显式**传 base_url + api_key。
-    base_url: str = "http://127.0.0.1:8081/v1/chat/completions",
+    # 2026-11-15（ledger 1239/1240）：端点不再写死。默认 None → 由 `llm_endpoint` 解析
+    # （云端 DeepSeek 主轨，配置在 config/llm.local.json，该文件不入 git）。
+    # 1195 的教训保留：**只有显式传了 base_url 才覆盖**，不再"忘了传就悄悄换模型"。
+    base_url: Optional[str] = None,
     api_key: Optional[str] = None,
-    model: str = "gemma-4-e4b",
+    model: Optional[str] = None,
     client: Any = None,
     temperature: float = 0.1,
     max_tokens: int = 500,
@@ -219,6 +218,13 @@ def build_openai_compatible_llm_turn(
     knows none/low/medium/high); stripped on fallback so Qwen/Ollama never see
     it. ``"none"`` = 极速 (no thinking, fast TTFT), ``"medium"`` = 思考模式.
     """
+    if base_url is None or model is None:
+        from backend.llm_endpoint import endpoint as _ep
+        _resolved = _ep()
+        base_url = base_url or _resolved["base_url"]
+        model = model or _resolved["model"]
+        if api_key is None:
+            api_key = _resolved["api_key"]
     if api_key is None:
         api_key = os.getenv("DEEPSEEK_API_KEY", "")
     fallback_url = fallback_base_url
@@ -290,11 +296,24 @@ def build_openai_compatible_llm_turn(
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
         async def _post(c: Any, url: str, hdrs: dict, body: dict) -> dict[str, Any]:
+            _t0 = time.time()
             r = await c.post(url, headers=hdrs, json=body)
             r.raise_for_status()
             out = r.json()
             if "choices" not in out:
                 raise RuntimeError(json.dumps(out, ensure_ascii=False)[:200])
+            # 2026-11-15（ledger 1240）：记账。老爹定论"费用不设限但要有账"，
+            # 而这条工厂路径（工作台/QQ 都走它）原先不经 router，所以漏记。
+            try:
+                from backend.llm_usage import record as _rec
+                _u = out.get("usage") or {}
+                _rec(channel="factory", model=str(body.get("model") or ""),
+                     provider=str("cloud" if "deepseek" in str(url) else "local"),
+                     prompt_tokens=int(_u.get("prompt_tokens") or 0),
+                     completion_tokens=int(_u.get("completion_tokens") or 0),
+                     seconds=time.time() - _t0, ok=True)
+            except Exception:  # noqa: BLE001
+                pass
             return out["choices"][0]["message"]
 
         import httpx

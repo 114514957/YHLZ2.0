@@ -9,6 +9,7 @@ Serves assets/webui/* on port 8321 and streams Yuanheng turns back as SSE:
     POST /v1/chat/completions (stream) | /turn | /voice
 """
 from __future__ import annotations
+from backend.llm_endpoint import endpoint as _llm_endpoint
 
 import json
 import os
@@ -2496,7 +2497,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
 
             try:
                 g = json.loads(urllib.request.urlopen(
-                    "http://127.0.0.1:8081/health", timeout=3).read())
+                    (_llm_endpoint()["base_url"].replace("/v1/chat/completions", "/health")), timeout=3).read())
                 out["gemma"] = "ok" if g.get("status") == "ok" else "down"
             except Exception:
                 out["gemma"] = "down"
