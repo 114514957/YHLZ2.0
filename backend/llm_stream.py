@@ -70,6 +70,17 @@ async def stream_openai_compatible(
     finish = "stop"
     usage: dict = {}
     tool_calls: dict[int, dict] = {}
+
+    import time as _time
+
+    class _T:
+        _t0 = _time.time()
+
+        @classmethod
+        def elapsed(cls) -> float:
+            return _time.time() - cls._t0
+
+    _t_stream = _T()
     async with httpx.AsyncClient(timeout=300) as client:
         async with client.stream("POST", base_url, json=payload,
                                  headers=headers) as resp:
@@ -118,6 +129,17 @@ async def stream_openai_compatible(
                     await on_event({"kind": "delta", "stage": "reasoning",
                                     "delta": r_txt, "text": reasoning})
     calls = [tool_calls[i] for i in sorted(tool_calls)] if tool_calls else None
+    # 2026-11-15（ledger 1241）：流式也要记账——老爹定论"费用不设限但要有账"，
+    # 而工作台/QQ 的真实对话几乎全走这条流式路，不记就会把大头漏掉。
+    try:
+        from backend.llm_usage import record as _rec
+        _rec(channel="stream", model=str(payload.get("model") or ""),
+             provider=("cloud" if "deepseek" in str(base_url) else "local"),
+             prompt_tokens=int(usage.get("prompt_tokens", 0) or 0),
+             completion_tokens=int(usage.get("completion_tokens", 0) or 0),
+             seconds=_t_stream.elapsed(), ok=True)
+    except Exception:  # noqa: BLE001
+        pass
     await on_event({
         "kind": "done", "text": text, "reasoning": reasoning,
         "tool_calls": calls,
