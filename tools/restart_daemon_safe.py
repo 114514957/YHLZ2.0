@@ -88,13 +88,72 @@ def main() -> int:
     subprocess.Popen([PY, "-B", "-m", "backend.target_daemon", "--port", "8321"],
                      cwd=ROOT, creationflags=0x08000000, close_fds=True)
     print("   已杀 %d 个旧 daemon，新 daemon 启动中…" % killed)
+
+    def _daemons() -> list[tuple[int, str]]:
+        """所有 target_daemon 进程：(pid, 解释器类型)。"""
+        out = []
+        try:
+            for p in psutil.process_iter(["pid", "cmdline"]):
+                cl = " ".join(str(x) for x in (p.info.get("cmdline") or []))
+                if "target_daemon" in cl and "restart_daemon" not in cl:
+                    kind = "venv" if ".venv" in cl else "系统"
+                    out.append((int(p.info["pid"]), kind))
+        except Exception:  # noqa: BLE001
+            pass
+        return out
+
+    def _heal() -> list[tuple[int, str]]:
+        """复查实例。**只报告，不再杀**（2026-11-15 台账 1251）。
+
+        上一版把"父进程是 daemon 的子进程"当成野实例杀掉，结果把服务搞停。
+        根因：daemon 会用 venv 的 base 解释器 re-exec 一个子进程（`pyvenv.cfg`
+        里 home=Python312），它是**正常的**，不是双实例。
+        现在只统计父进程不是 daemon 的"根实例"，非根的一律不算。
+        """
+        try:
+            procs = {}
+            for p in psutil.process_iter(["pid", "ppid", "cmdline"]):
+                cl = " ".join(str(x) for x in (p.info.get("cmdline") or []))
+                if "target_daemon" in cl and "restart_daemon" not in cl:
+                    procs[int(p.info["pid"])] = {
+                        "ppid": int(p.info.get("ppid") or 0),
+                        "venv": ".venv" in cl,
+                    }
+            roots = [(pid, "venv" if v["venv"] else "base")
+                     for pid, v in procs.items() if v["ppid"] not in procs]
+            kids = [pid for pid, v in procs.items() if v["ppid"] in procs]
+            if kids:
+                print("   （子进程 %s 属正常 re-exec，不当作双实例）"
+                      % ", ".join(str(k) for k in kids))
+            return roots
+        except Exception:  # noqa: BLE001
+            return []
+
     for _ in range(30):
         time.sleep(1)
         try:
             with OPENER.open("http://127.0.0.1:8321/health", timeout=3) as r:
                 d = json.loads(r.read().decode())
             print("   /health：%s｜llm=%s" % (d.get("status"), d.get("llm")))
-            return 0
+            pods = _heal()
+            if not pods:
+                # 2026-11-15：清完非 venv 实例后可能一个不剩（我的 spawn 曾因端口被占而绑定失败）。
+                # 这时**补起一个 venv 实例**，再等它健康。
+                print("   ↻ 清理后无实例，补起一个 venv daemon…")
+                subprocess.Popen([PY, "-B", "-m", "backend.target_daemon", "--port", "8321"],
+                                 cwd=ROOT, creationflags=0x08000000, close_fds=True)
+                for _ in range(20):
+                    time.sleep(1)
+                    try:
+                        with OPENER.open("http://127.0.0.1:8321/health", timeout=3) as r2:
+                            json.loads(r2.read().decode())
+                        break
+                    except Exception:  # noqa: BLE001
+                        continue
+                pods = _heal()
+            print("   最终 daemon 实例：%s"
+                  % ("、".join("%d(%s)" % (pid, kind) for pid, kind in pods) or "无"))
+            return 0 if len(pods) == 1 else 3
         except Exception:  # noqa: BLE001
             continue
     print("   ⚠ 30 秒内没起来，去看 cache/logs/")

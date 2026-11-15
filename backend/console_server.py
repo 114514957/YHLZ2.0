@@ -1028,7 +1028,7 @@ GET_UI = {"/", "/index.html", "/console.css", "/console.js", "/ui.js",
           "/ledger", "/mem", "/favicon.png", "/loading.webp", "/sessions",
           "/avatar.html", "/avatar.js", "/avatar-models", "/chat_popup.html",
           "/emotion", "/qq-qrcode", "/growth", "/devmode",
-          "/qq/groups", "/prompt/blocks", "/prompt/preview",
+          "/qq/groups", "/prompt/blocks", "/prompt/preview", "/api/stack_status",
           "/official-ui/status"}
 MODEL_DIR = _PROJECT_ROOT / "角色皮套"
 VENDOR_DIR = _PROJECT_ROOT / "assets" / "vendor" / "live2d"
@@ -1263,6 +1263,17 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             except Exception as exc:  # noqa: BLE001
                 self._send_json(500, {"ok": False,
                                       "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])})
+        elif p == "/api/stack_status":
+            # 工作台「链路状态」卡（2026-11-15 台账 1251）：四个灯 + 告警。
+            # 纯只读；任一探测失败只标 False，不抛 500。
+            try:
+                from backend import stack_status as _ss
+                snap = _ss.snapshot()
+                self._send_json(200, {"ok": True, "snapshot": snap,
+                                      "warnings": _ss.warnings(snap)})
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"ok": False, "error": "%s: %s"
+                                      % (type(exc).__name__, str(exc)[:120])})
         elif p == "/prompt/blocks":
             # 工作台「提示词」模块：分块现状（2026-11-13）
             try:

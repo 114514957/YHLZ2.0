@@ -1034,6 +1034,18 @@ class _Handler(ConsoleHandler):
         from backend.console_server import GET_UI, POST_UI
 
         p = self.path.split("?", 1)[0]
+        # 2026-11-15（台账 1252）：工作台「链路状态」卡。**在 daemon 侧直接拦**——
+        # 放进 console_server 的分发里会被前面的分支吃掉成 404（实测）。
+        if method == "GET" and p == "/api/stack_status":
+            try:
+                from backend import stack_status as _ss
+                snap = _ss.snapshot()
+                self._send(200, {"ok": True, "snapshot": snap,
+                                 "warnings": _ss.warnings(snap)})
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:120])})
+            return True
         if method == "GET":
             if p in GET_UI or p.startswith(("/live2d/", "/live2d-models/")):
                 self.console_do_GET()
@@ -1130,7 +1142,10 @@ class _Handler(ConsoleHandler):
     def do_POST(self):
         if self._ui_route("POST"):
             return
-        if self.path.startswith("/api/"):
+        if self.path.startswith("/api/") and not self.path.startswith(
+                "/api/try_turn"):
+            # 2026-11-15（台账 1253）：`/api/try_turn` 由 daemon 自己处理（在下面读 body 后），
+            # 其余 /api/* 仍交给 console_server。
             self.console_do_POST()
             return
         if self.path.startswith(("/sing", "/songs")):
@@ -1156,6 +1171,67 @@ class _Handler(ConsoleHandler):
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
             self._send(400, {"error": "bad json"})
+            return
+        if self.path == "/api/try_turn":
+            # 工作台「试一句话」卡（2026-11-15 台账 1253）：页面里直接跑一轮，
+            # 返回 回复 + token + 费用，验证链路/提示词不再依赖命令行。
+            text = str(payload.get("text", "")).strip()
+            if not text:
+                self._send(400, {"ok": False, "error": "empty text"})
+                return
+            import time as _t2
+
+            try:
+                from backend.llm_endpoint import endpoint as _ep2
+                from backend.llm_usage import summary as _sum2
+                before = _sum2()
+                _epx = _ep2()
+                t0 = _t2.time()
+                # 2026-11-15（台账 1254）：**走生产同款路径**——内部打自己的 /talk（SSE 流式），
+                # 而不是 runtime.openai_chat（那条路会被 DeepSeek 的 EdgeOne 重置成 550，实测）。
+                import urllib.request as _ur
+                import json as _js
+                _body = _js.dumps({"text": text, "channel": "workbench"},
+                                  ensure_ascii=False).encode()
+                _req = _ur.Request(
+                    "http://127.0.0.1:%d/talk" % self.server.server_address[1],
+                    data=_body, headers={"Content-Type": "application/json"})
+                reply_parts: list[str] = []
+                tools_used: list[str] = []
+                with _ur.urlopen(_req, timeout=180) as _resp:
+                    for _raw in _resp:
+                        _ln = _raw.decode("utf-8", "replace").strip()
+                        if not _ln.startswith("data:"):
+                            continue
+                        try:
+                            _ev = _js.loads(_ln[5:].strip())
+                        except Exception:  # noqa: BLE001
+                            continue
+                        if _ev.get("type") == "delta" and _ev.get("delta"):
+                            reply_parts.append(str(_ev["delta"]))
+                        elif _ev.get("type") == "turn_done":
+                            if _ev.get("text"):
+                                reply_parts = [str(_ev["text"])]
+                            for _tu in (_ev.get("tool_uses") or []):
+                                tools_used.append(str(_tu)[:40])
+                        elif _ev.get("type") == "error":
+                            raise RuntimeError(str(_ev.get("message"))[:160])
+                ms = (_t2.time() - t0) * 1000.0
+                after = _sum2()
+                self._send(200, {
+                    "ok": True,
+                    "reply": "".join(reply_parts),
+                    "tools": tools_used,
+                    "ms": round(ms, 1),
+                    "tokens_in": after["in"] - before["in"],
+                    "tokens_out": after["out"] - before["out"],
+                    "cost": round(after["cost"] - before["cost"], 6),
+                    "model": _epx["model"],
+                    "provider": _epx["provider"],
+                })
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:160])})
             return
         if self.path.startswith("/voice/"):
             from backend.target_voice_api import handle_post

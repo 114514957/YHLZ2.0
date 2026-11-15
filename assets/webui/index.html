@@ -95,6 +95,28 @@
               <li><span class="dot" id="s-qq"></span>元亨 QQ</li>
             </ul>
           </div>
+          
+          <div class="card" id="try-card">
+            <h3>试一句话 <small style="font-weight:400;opacity:.6">走生产同款路径</small></h3>
+            <div style="display:flex;gap:6px;margin-bottom:6px">
+              <input id="try-in" type="text" placeholder="比如：你还记得我不吃香菜吗"
+                     style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#1b1b1b;color:#eee">
+              <button id="try-go" type="button" style="padding:6px 12px;border-radius:6px;cursor:pointer">发</button>
+            </div>
+            <div id="try-meta" style="font-size:12px;opacity:.75;margin-bottom:4px"></div>
+            <div id="try-out" style="font-size:13px;line-height:1.6;white-space:pre-wrap;min-height:20px"></div>
+          </div>
+<div class="card" id="stack-card">
+            <h3>链路状态 <small id="st-ts" style="font-weight:400;opacity:.6"></small></h3>
+            <ul class="svc">
+              <li><span class="dot" id="st-daemon"></span>daemon 8321 <small id="st-daemon-n"></small></li>
+              <li><span class="dot" id="st-napcat"></span>NapCat 3001</li>
+              <li><span class="dot" id="st-cloud"></span>云端 <small id="st-cloud-m"></small></li>
+              <li><span class="dot" id="st-llama"></span>llama 8081</li>
+            </ul>
+            <p class="kv"><span>今日 / 累计</span><b id="st-cost">—</b></p>
+            <div id="st-warn" style="margin-top:6px;font-size:12px;line-height:1.6"></div>
+          </div>
           <div class="card">
             <h3>元亨状态</h3>
             <p class="kv"><span>当前阶段</span><b id="m-stage">空闲</b></p>
@@ -273,5 +295,101 @@
 </div>
 <script src="/console.js?v=20261113c"></script>
 <script src="/ui.js"></script>
+
+<script>
+/* 链路状态卡（2026-11-15 台账 1251/1252）：四灯 + 费用 + 告警，15 秒轮询。 */
+(function () {
+  var on = "#2ecc71", off = "#e74c3c", warn = "#f39c12";
+  function setDot(id, ok, extra) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.style.background = ok ? on : off;
+    el.style.boxShadow = ok ? "0 0 6px " + on : "none";
+    if (extra !== undefined) {
+      var n = document.getElementById(id + "-n") || document.getElementById(id + "-m");
+      if (n) n.textContent = extra || "";
+    }
+  }
+  function refresh() {
+    fetch("/api/stack_status", {cache: "no-store"})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) return;
+        var s = d.snapshot || {};
+        setDot("st-daemon", !!(s.daemon && s.daemon.ok),
+               s.daemon && s.daemon.instances > 1 ? "×" + s.daemon.instances : "");
+        setDot("st-napcat", !!(s.napcat && s.napcat.ok));
+        setDot("st-cloud", !!(s.cloud && s.cloud.ok), (s.cloud && s.cloud.model) || "");
+        setDot("st-llama", !!(s.llama && s.llama.ok));
+        var u = s.usage || {};
+        var c = document.getElementById("st-cost");
+        if (c) {
+          c.textContent = "¥" + (u.today_cost != null ? u.today_cost : "—")
+            + " / ¥" + (u.cost != null ? u.cost : "—")
+            + "（" + (u.calls || 0) + " 次）";
+        }
+        var w = document.getElementById("st-warn");
+        if (w) {
+          var list = d.warnings || [];
+          w.innerHTML = list.length
+            ? list.map(function (x) { return "<div style='color:" + warn + "'>" + x + "</div>"; }).join("")
+            : "<div style='color:" + on + "'>链路正常</div>";
+        }
+        var ts = document.getElementById("st-ts");
+        if (ts) ts.textContent = new Date().toLocaleTimeString();
+      })
+      .catch(function () {});
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    refresh();
+    setInterval(refresh, 15000);
+  });
+})();
+</script>
+
+<script>
+/* 「试一句话」（台账 1250/1254）：POST /api/try_turn，显示回复与 token/费用。 */
+(function () {
+  function run() {
+    var inp = document.getElementById("try-in");
+    var out = document.getElementById("try-out");
+    var meta = document.getElementById("try-meta");
+    var btn = document.getElementById("try-go");
+    var text = (inp && inp.value || "").trim();
+    if (!text) return;
+    btn.disabled = true; btn.textContent = "…";
+    out.textContent = ""; meta.textContent = "发送中（大模型约 3–15 秒）";
+    fetch("/api/try_turn", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({text: text})
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || !d.ok) {
+        out.textContent = "❌ " + ((d && d.error) || "失败");
+        meta.textContent = "";
+        return;
+      }
+      out.textContent = d.reply || "（空回复）";
+      meta.textContent = [
+        (d.model || "") + "｜" + Math.round(d.ms || 0) + " ms",
+        "in " + (d.tokens_in || 0) + " / out " + (d.tokens_out || 0),
+        "¥" + (d.cost || 0),
+        (d.tools && d.tools.length) ? ("工具:" + d.tools.join(",")) : ""
+      ].filter(Boolean).join("｜");
+    }).catch(function (e) {
+      out.textContent = "❌ " + e;
+    }).then(function () {
+      btn.disabled = false; btn.textContent = "发";
+    });
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    var btn = document.getElementById("try-go");
+    var inp = document.getElementById("try-in");
+    if (btn) btn.addEventListener("click", run);
+    if (inp) inp.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") run();
+    });
+  });
+})();
+</script>
 </body>
 </html>
