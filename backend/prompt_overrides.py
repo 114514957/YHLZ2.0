@@ -31,6 +31,7 @@ EDITABLE = {
     # 2026-11-14：渲染时用的是 VOICE_HARD_RULES 这个键，但只登记了旧的 CRUTCH_BAN_CLAUSE，
     # 导致工作台改不了它（实测报「不允许改这个块」）。两个都登记，渲染/编辑都对得上。
     "VOICE_HARD_RULES": "说话硬规则（同 CRUTCH_BAN_CLAUSE，渲染用这个键）",
+    "GROUP_HARD_RULES": "群聊硬规则（≤60字／不反问／禁Markdown／不说配置）",
     "STYLE_HABIT_CLAUSE": "口吻习惯（示例：问候叫老爹 / 被冲用本小姐）",
     "VOICE_ANCHOR": "语气锚（示范台词，学味道）",
     "CONCISE_CLAUSE": "简洁度",

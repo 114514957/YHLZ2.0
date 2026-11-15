@@ -557,6 +557,6 @@ def render_system_prompt(
         blocks.append(render_capabilities_tools_block(tools))
     # 2026-11-15（台账 1246）：群聊硬约束，只在公开分支加
     if public:
-        blocks.append(GROUP_HARD_RULES)
+        blocks.append(_ov("GROUP_HARD_RULES", GROUP_HARD_RULES))
 
     return "\n".join(blocks).strip() + "\n"

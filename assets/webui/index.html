@@ -97,7 +97,12 @@
           </div>
           
           
-          <div class="card" id="intel-card">
+          
+          <div class="card" id="turns-card">
+            <h3>最近回合 <small style="font-weight:400;opacity:.6">问句／注入／费用</small></h3>
+            <div id="turns-body" style="font-size:12px;line-height:1.6">加载中…</div>
+          </div>
+<div class="card" id="intel-card">
             <h3>群情报 <small style="font-weight:400;opacity:.6">人多，活跃的少</small></h3>
             <div id="intel-body" style="font-size:12px;line-height:1.7">加载中…</div>
           </div>
@@ -427,6 +432,37 @@
   document.addEventListener("DOMContentLoaded", function () {
     load();
     setInterval(load, 60000);
+  });
+})();
+</script>
+
+<script>
+/* 最近回合（台账 1254）：GET /api/recent_turns */
+(function () {
+  function render(d) {
+    var box = document.getElementById("turns-body");
+    if (!box) return;
+    if (!d || !d.ok || !(d.rows || []).length) { box.textContent = "还没有回合记录"; return; }
+    box.innerHTML = d.rows.slice().reverse().map(function (r) {
+      var hit = r.n > 0
+        ? "<span style='color:#2ecc71'>注入" + r.n + " " + (r.ids || []).join(",") + "</span>"
+        : "<span style='opacity:.5'>无注入</span>";
+      return "<div style='margin-bottom:6px'>"
+        + "<span style='opacity:.65'>" + r.time + "</span>　"
+        + "<b>" + (r.q || "") + "</b><br>"
+        + hit
+        + (r.tokens_in != null ? "　in " + r.tokens_in + " / out " + r.tokens_out : "")
+        + (r.cost != null ? "　¥" + r.cost : "")
+        + "</div>";
+    }).join("");
+  }
+  function load() {
+    fetch("/api/recent_turns?limit=20", {cache: "no-store"})
+      .then(function (r) { return r.json(); })
+      .then(render).catch(function () {});
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    load(); setInterval(load, 20000);
   });
 })();
 </script>
