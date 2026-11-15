@@ -260,10 +260,19 @@ class ConversationSession:
         return out
 
     def render_system(self, *, allowed_tools: frozenset | None = None,
-                      text_turn: bool = False) -> str:
+                      text_turn: bool = False, text: str = "") -> str:
         tools = self.registry.export_openai_tools()
         if allowed_tools is not None:
             tools = [t for t in tools if t.get("function", {}).get("name") in allowed_tools]
+        # 2026-11-15（台账 1243）：工具按需加载。**默认关闭**，只有
+        # YHLZ_TOOL_BUDGET=1 才生效；casual 档 6 个（452 token）、work 档全量（2933）。
+        # 这里收窄的是"渲染进系统提示的工具说明"，真正传给模型的 tools 参数见 next-step。
+        try:
+            from backend import tool_budget as _tb
+            if _tb.enabled():
+                tools = _tb.select(tools, text or "", None)
+        except Exception:  # noqa: BLE001
+            pass
         # Public replies use the curated public persona, not private owner
         # foundation/preferences followed by a request to "please not leak".
         draft = ""
