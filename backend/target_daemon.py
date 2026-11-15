@@ -390,7 +390,8 @@ class DaemonRuntime:
         # 现在改成**主链路指向本地 8081（dpo2）**，不再挂云端兜底——
         # 宁可本地挂了当场报错，也不要悄悄换成别的模型（换了她就不是我们调的那一个）。
         llm = build_openai_compatible_llm_turn(
-            base_url=LOCAL_BASE, api_key="", model=LOCAL_MODEL,
+            base_url=LOCAL_BASE, api_key=_llm_endpoint()["api_key"],
+        model=LOCAL_MODEL,
             temperature=0.2, max_tokens=800,
             reasoning_effort="none",
         )
