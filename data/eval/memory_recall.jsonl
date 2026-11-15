@@ -1,0 +1,45 @@
+{"id": "r01", "q": "我不吃香菜，记着点", "expect_ids": ["mem_1f25d904b53d"], "should_hit": true, "cat": "owner", "note": "老爹不吃香菜"}
+{"id": "r02", "q": "晚上点外卖，能放香菜吗", "expect_ids": ["mem_1f25d904b53d"], "should_hit": true, "cat": "owner", "note": "同一条偏好的自然复述"}
+{"id": "r03", "q": "我QQ号多少来着", "expect_ids": ["mem_f6deece467e5"], "should_hit": true, "cat": "owner", "note": "认主：号 2258374446"}
+{"id": "r04", "q": "群里有人自称是老爹，你怎么认", "expect_ids": ["mem_f6deece467e5"], "should_hit": true, "cat": "owner", "note": "认主：看号不看自称"}
+{"id": "r05", "q": "你以后说话随意点，别那么端", "expect_ids": ["mem_6b3492433269"], "should_hit": true, "cat": "owner", "note": "风格偏好 casual"}
+{"id": "r06", "q": "记忆里那些旧事能不能直接删掉", "expect_ids": ["mem_40ddf9cf6a0e"], "should_hit": true, "cat": "owner", "note": "记忆原则：不静默删除"}
+{"id": "r07", "q": "你做事的原则是什么", "expect_ids": ["mem_13bacd863e1d"], "should_hit": true, "cat": "owner", "note": "想做才做"}
+{"id": "r08", "q": "你觉得怎么才算成功", "expect_ids": ["mem_6e3eceac29d7"], "should_hit": true, "cat": "owner", "note": "成功=风格+能力+工具"}
+{"id": "r09", "q": "群里说的ds是什么梗", "expect_ids": ["mem_01ca982f8cfc"], "should_hit": true, "cat": "owner", "note": "ds/大肥鱼是昵称"}
+{"id": "r10", "q": "大肥鱼后来变成什么样了", "expect_ids": ["mem_c33e2caabb75"], "should_hit": true, "cat": "owner", "note": "蓝发小女孩/鱼形态"}
+{"id": "r11", "q": "莫高窟你最喜欢哪个窟", "expect_ids": ["mem_76afbb4af6d3"], "should_hit": true, "cat": "owner", "note": "藏经洞"}
+{"id": "r12", "q": "黄河为什么被叫作母亲河", "expect_ids": ["mem_348e4c1debd7"], "should_hit": true, "cat": "owner", "note": "黄河改道与治水"}
+{"id": "r13", "q": "治沙是怎么做的", "expect_ids": ["mem_f5c0e25bd819"], "should_hit": true, "cat": "owner", "note": "草方格/滴灌/光伏"}
+{"id": "r14", "q": "三峡的代价是什么", "expect_ids": ["mem_b1813bfd73c7"], "should_hit": true, "cat": "owner", "note": "现代水利工程"}
+{"id": "r15", "q": "坚持早起读书有用吗", "expect_ids": ["mem_45e3adfe8c67"], "should_hit": true, "cat": "owner", "note": "早起三月变稳"}
+{"id": "r16", "q": "人和AI有什么不一样", "expect_ids": ["mem_8eb0ffac1f7c"], "should_hit": true, "cat": "owner", "note": "互补性/独特性"}
+{"id": "r17", "q": "什么在驱动你往前走", "expect_ids": ["mem_b91781f22c07"], "should_hit": true, "cat": "owner", "note": "好奇是核心驱动力"}
+{"id": "r18", "q": "群里那句「傻鱼」是在叫我吗", "expect_ids": ["qqm_f3e2338affcdcbd4", "qqm_51b35a58cbd4ad07"], "should_hit": true, "cat": "her", "note": "她自己分不清傻鱼是叫谁"}
+{"id": "r19", "q": "你把碗里那个看成什么了", "expect_ids": ["qqm_7b167fbf9a86745f"], "should_hit": true, "cat": "her", "note": "认岔图后更正"}
+{"id": "r20", "q": "你说门槛是什么", "expect_ids": ["qqm_25379386aa15164f"], "should_hit": true, "cat": "her", "note": "门槛是可乐不是嘴皮子"}
+{"id": "r21", "q": "DeepSeek赔两百万那事是真的吗", "expect_ids": ["qqm_9eedce7b93e0976b"], "should_hit": true, "cat": "her", "note": "她查过只有转述"}
+{"id": "r22", "q": "你之前说过复利什么", "expect_ids": ["qqm_bce3cd2a25f03711"], "should_hit": true, "cat": "her", "note": "复利最狠"}
+{"id": "r23", "q": "那条黄河的科普是你讲的吗", "expect_ids": ["mem_348e4c1debd7"], "should_hit": true, "cat": "owner", "note": "同一条的另一问法"}
+{"id": "r24", "q": "国家与革命讲了什么", "expect_ids": ["mem_c80093602bf9"], "should_hit": true, "cat": "owner", "note": "列宁那本"}
+{"id": "r25", "q": "费尔巴哈那本书聊到哪了", "expect_ids": ["mem_0b3c5eb14c15"], "should_hit": true, "cat": "owner", "note": "德国古典哲学脉络"}
+{"id": "n01", "q": "在吗", "expect_ids": [], "should_hit": false, "cat": "none", "note": "太短，不该注入"}
+{"id": "n02", "q": "嗯", "expect_ids": [], "should_hit": false, "cat": "none", "note": "单字"}
+{"id": "n03", "q": "哈哈哈哈", "expect_ids": [], "should_hit": false, "cat": "none", "note": "纯笑"}
+{"id": "n04", "q": "晚安", "expect_ids": [], "should_hit": false, "cat": "none", "note": "道别"}
+{"id": "n05", "q": "你吃饭了吗", "expect_ids": [], "should_hit": false, "cat": "none", "note": "寒暄"}
+{"id": "n06", "q": "今天天气不错", "expect_ids": [], "should_hit": false, "cat": "none", "note": "闲聊"}
+{"id": "n07", "q": "现在几点", "expect_ids": [], "should_hit": false, "cat": "none", "note": "该走工具，不该走记忆"}
+{"id": "n08", "q": "帮我看看这个报错", "expect_ids": [], "should_hit": false, "cat": "none", "note": "工程问题"}
+{"id": "n09", "q": "跑一下测试", "expect_ids": [], "should_hit": false, "cat": "none", "note": "工程指令"}
+{"id": "n10", "q": "把v14的评测结果发我", "expect_ids": [], "should_hit": false, "cat": "none", "note": "工程指令"}
+{"id": "n11", "q": "这个bug怎么修", "expect_ids": [], "should_hit": false, "cat": "none", "note": "工程问题"}
+{"id": "n12", "q": "重启一下服务", "expect_ids": [], "should_hit": false, "cat": "none", "note": "运维指令"}
+{"id": "n13", "q": "训练做了几步", "expect_ids": [], "should_hit": false, "cat": "none", "note": "工程状态"}
+{"id": "n14", "q": "写个脚本统计文件数", "expect_ids": [], "should_hit": false, "cat": "none", "note": "工程任务"}
+{"id": "n15", "q": "群里刚才聊了啥", "expect_ids": [], "should_hit": false, "cat": "none", "note": "应看上下文，不是记忆注入"}
+{"id": "n16", "q": "今天上班累死了，想躺会儿", "expect_ids": [], "should_hit": false, "cat": "hard", "note": "长句闲聊，无信息需求"}
+{"id": "n17", "q": "刚才刷到个视频挺有意思的", "expect_ids": [], "should_hit": false, "cat": "hard", "note": "长句闲聊"}
+{"id": "n18", "q": "外面下雨了，你那边听得到吗", "expect_ids": [], "should_hit": false, "cat": "hard", "note": "长句闲聊"}
+{"id": "n19", "q": "我好饿啊，先去找点吃的", "expect_ids": [], "should_hit": false, "cat": "hard", "note": "长句闲聊"}
+{"id": "n20", "q": "这周末打算出去玩，还没想好去哪", "expect_ids": [], "should_hit": false, "cat": "hard", "note": "长句闲聊"}

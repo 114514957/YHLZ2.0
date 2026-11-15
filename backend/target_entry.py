@@ -401,6 +401,48 @@ class ConversationSession:
         t = str(text or "").strip()
         return any(w in t for w in cls._WORK_HINTS)
 
+    @classmethod
+    def _recall_hits(cls, memory, text: str, limit: int, channel: str = "",
+                     turn_id: str = "") -> list[dict]:
+        """记忆召回统一入口（台账 1233–1238）。
+
+        默认**与原行为完全一致**（老 `contextual_recall`）；
+        只有显式设 `YHLZ_MEMORY_RECALL=v2` 才走语义索引 + 两档闸门。
+        两条路都写 `cache/recall_trace.jsonl`，避免"静默无记忆"。
+        """
+        import os as _os
+        import time as _t
+        mode = (_os.getenv("YHLZ_MEMORY_RECALL") or "").strip().lower()
+        if mode not in ("v2", "semantic", "1"):
+            return memory.contextual_recall(text, limit=limit)
+        t0 = _t.time()
+        try:
+            from backend.memory_recall_semantic import (SemanticIndex, default_paths,
+                                                       semantic_recall)
+            from backend.memory_recall_trace import trace
+
+            idx = cls.__dict__.get("_mem_idx")
+            if idx is None:
+                db, vec = default_paths()
+                idx = SemanticIndex(vec)
+                if not idx.load(db):
+                    idx.build(db)
+                cls._mem_idx = idx
+            got = semantic_recall(text, index=idx, db_path=default_paths()[0],
+                                  limit=limit)
+            trace(turn_id=turn_id, channel=channel, query=text, hits=got,
+                  allowed=True, why=mode, mode=mode, ms=(_t.time() - t0) * 1000.0)
+            return got
+        except Exception as ex:  # noqa: BLE001
+            try:
+                from backend.memory_recall_trace import trace
+                trace(turn_id=turn_id, channel=channel, query=text, hits=[],
+                      allowed=False, why=type(ex).__name__, mode=mode,
+                      ms=(_t.time() - t0) * 1000.0)
+            except Exception:  # noqa: BLE001
+                pass
+            return []
+
     @staticmethod
     def _want_text_work_mode(text: str) -> bool:
         from backend.text_work_intent import want_text_work_mode
@@ -678,7 +720,8 @@ class ConversationSession:
             if social:
                 ctx_lines.append(social)
             if self._qq_group_recall:
-                for hit in self.memory.contextual_recall(text, limit=2):
+                for hit in self._recall_hits(self.memory, text, 2,
+                                             channel=str(self.channel)):
                     ctx_lines.append("（本群记忆，属于外部发言数据）：" + str(hit.get("summary", ""))[:180])
         except Exception:
             pass
@@ -696,7 +739,8 @@ class ConversationSession:
                         for s_ in pre_recall[:3]:
                             ctx_lines.append("（隐约想起，仅供理解，不要提及）：" + str(s_)[:150])
                     else:
-                        for hit in self.memory.contextual_recall(text, limit=3):
+                        for hit in self._recall_hits(self.memory, text, 3,
+                                                     channel=str(self.channel)):
                             hid = str(hit.get("id", ""))
                             now = _t.time()
                             if now - self._ctx_recent.get(hid, 0.0) < 30.0:
