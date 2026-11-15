@@ -1036,6 +1036,17 @@ class _Handler(ConsoleHandler):
         p = self.path.split("?", 1)[0]
         # 2026-11-15（台账 1252）：工作台「链路状态」卡。**在 daemon 侧直接拦**——
         # 放进 console_server 的分发里会被前面的分支吃掉成 404（实测）。
+        if method == "GET" and p == "/api/qq_intel":
+            # 工作台「群情报」卡（2026-11-15 台账 1253）：人多但活跃的少，压成情报卡。
+            try:
+                from backend import qq_intel as _qi
+                cards = _qi.group_cards()
+                self._send(200, {"ok": True, "cards": cards,
+                                 "names": _qi.GROUPS})
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:120])})
+            return True
         if method == "GET" and p == "/api/stack_status":
             try:
                 from backend import stack_status as _ss
