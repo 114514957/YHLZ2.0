@@ -204,29 +204,67 @@ class SemanticIndex:
     # ── 查询 ───────────────────────────────────────────────────────
     def search(self, query: str, *, sim_min: float | None = None,
                limit: int = MAX_RESULTS) -> list[dict[str, Any]]:
+        """**分流召回**（台账 1252）：事实走触发、故事走向量，统一过意图闸门。
+
+        为什么要分流（老爹问"触发好还是向量好"）：
+          · 禁忌/偏好/身份/号码这类**事实**，错一次就出事 → 必须实体/关键词命中才算，
+            不交给相似度去蒙（实测「不吃鱼腥草」会把「不吃香菜」以 0.517 拉进来）。
+          · 故事/经历/黄金样本这类**叙述**，字面永远对不上 → 只有向量救得回来。
+        """
         ok, _why = gate_allows(query)
         if not ok or self._matrix is None or not len(self._ids):
             return []
         floor, _reason = similarity_floor(query)
-        th = floor if sim_min is None else max(float(sim_min), 0.0)
+        if sim_min is not None:
+            floor = max(float(sim_min), 0.0)
         np = self._ensure_np()
         q = np.asarray(self._embed([query]), dtype=np.float32)[0]
         q /= (np.linalg.norm(q) + 1e-9)
         sims = self._matrix @ q
-        order = np.argsort(-sims)[:max(limit, 1) * 3]
         by_id = {it["id"]: it for it in self._pool}
-        out = []
-        for j in order:
-            if sims[j] < th:
+
+        out: list[dict[str, Any]] = []
+        taken: set[str] = set()
+
+        # ① 触发层：**有 keywords 的**事实类（preference/fact/decision）必须关键词/实体命中。
+        #    没有 keywords 的事实（历史数据很多是空的）不算"可触发"，放给向量层——
+        #    否则它们永远召不回来（实测：这样会掉 4 个点）。
+        qn = _NONWORD.sub("", query)
+        for pos, iid in enumerate(self._ids):
+            it = by_id.get(iid)
+            if not it or (it.get("type") or "") not in ("preference", "fact", "decision"):
+                continue
+            kws = [k.strip() for k in re.split(r"[,，、;；|/\s]+",
+                                               str(it.get("keywords") or "")) if len(k.strip()) >= 2]
+            if not kws:
+                continue
+            hit = [k for k in kws if k in qn]
+            if not hit:
+                continue
+            out.append({"id": iid, "summary": it["text"], "score": 1.0,
+                        "role": it["role"], "type": it.get("type"),
+                        "via": "trigger", "matched": hit[:3]})
+            taken.add(iid)
+            # 触发层**最多占 1 个位置**：实测（台账 1252）它会把"关键词命中但语义很弱"的条目
+            # 顶到前面，把真正对的那条挤出 limit。剩下的位置让给向量层。
+            break
+
+        # ② 向量层：其余（故事/经历/无关键词的事实）按相似度
+        order = np.argsort(-sims)
+        for pos in order:
+            if len(out) >= limit:
                 break
-            iid = self._ids[int(j)]
+            if sims[pos] < floor:
+                break
+            iid = self._ids[int(pos)]
+            if iid in taken:
+                continue
             it = by_id.get(iid)
             if not it:
                 continue
-            out.append({"id": iid, "summary": it["text"], "score": float(sims[j]),
-                        "role": it["role"], "type": it.get("type")})
-            if len(out) >= limit:
-                break
+            out.append({"id": iid, "summary": it["text"], "score": float(sims[pos]),
+                        "role": it["role"], "type": it.get("type"), "via": "vector"})
+            taken.add(iid)
         return out
 
 

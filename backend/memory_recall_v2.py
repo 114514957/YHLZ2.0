@@ -81,6 +81,7 @@ def load_pool(db_path: os.PathLike | str,
             continue
         pool.append({"id": d["id"], "text": body, "role": role,
                      "type": d.get("type"), "importance": d.get("importance"),
+                     "keywords": str(d.get("keywords") or ""),
                      "grams": _grams(body), "_loaded_at": ts})
     return pool
 
