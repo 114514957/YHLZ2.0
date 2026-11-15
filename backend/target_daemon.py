@@ -951,7 +951,11 @@ class DaemonRuntime:
         ensure_env_loaded()
         import os
 
-        key = os.getenv("DEEPSEEK_API_KEY", "")
+        # 2026-11-15（ledger 1241）：密钥/模型**统一由 llm_endpoint 解析**。
+        # 原先只读 DEEPSEEK_API_KEY 环境变量，而密钥在 config/llm.local.json，
+        # 于是 daemon 这条流式路直接 401 Authorization Required（实测踩到）。
+        _ep = _llm_endpoint()
+        key = _ep["api_key"] or os.getenv("DEEPSEEK_API_KEY", "")
 
         async def _stream_to(base_url, api_key, model):
             from backend.llm_stream import stream_openai_compatible
@@ -973,13 +977,12 @@ class DaemonRuntime:
             )
 
         async def _try_cloud():
-            await _stream_to(_llm_endpoint()["base_url"],
-                              key, "gemma-4-e4b")
+            await _stream_to(_ep["base_url"], key, _ep["model"])
 
         try:
             fut = asyncio.run_coroutine_threadsafe(_try_cloud(), self._loop)
             fut.result(timeout=300)
-            return "gemma-4-e4b"
+            return _ep["model"]
         except Exception:
             async def _try_local():
                 await _stream_to(LOCAL_BASE, "", LOCAL_MODEL)

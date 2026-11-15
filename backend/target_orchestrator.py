@@ -218,13 +218,23 @@ def build_openai_compatible_llm_turn(
     knows none/low/medium/high); stripped on fallback so Qwen/Ollama never see
     it. ``"none"`` = 极速 (no thinking, fast TTFT), ``"medium"`` = 思考模式.
     """
-    if base_url is None or model is None:
+    # 2026-11-15（ledger 1241）：**密钥必须无条件解析**。
+    # 上一版只在 base_url/model 都为 None 时才取 key，而 daemon 传了显式 base_url
+    # （现在解析成云端地址）→ key 为空 → 401 Authorization Required。实测踩到。
+    try:
         from backend.llm_endpoint import endpoint as _ep
         _resolved = _ep()
-        base_url = base_url or _resolved["base_url"]
-        model = model or _resolved["model"]
-        if api_key is None:
+        if base_url is None:
+            base_url = _resolved["base_url"]
+        if model is None:
+            model = _resolved["model"]
+        if api_key is None and str(base_url) == str(_resolved["base_url"]):
             api_key = _resolved["api_key"]
+    except Exception:  # noqa: BLE001
+        if base_url is None:
+            base_url = "http://127.0.0.1:8081/v1/chat/completions"
+        if model is None:
+            model = "gemma-4-e4b"
     if api_key is None:
         api_key = os.getenv("DEEPSEEK_API_KEY", "")
     fallback_url = fallback_base_url
