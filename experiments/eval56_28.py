@@ -46,11 +46,18 @@ def call(port: int, system: str, user: str, max_tokens: int = 300,
     if tools:
         body["tools"] = tools
         body["tool_choice"] = "auto"
-    req = urllib.request.Request("http://127.0.0.1:%d/v1/chat/completions" % port,
-                                 data=json.dumps(body, ensure_ascii=False).encode(),
-                                 headers={"Content-Type": "application/json"})
-    with OPENER.open(req, timeout=300) as r:
-        d = json.loads(r.read().decode())
+    # 2026-11-15（台账 1245）：本地 llama 已下线，评测必须能打云端。
+    # `port == 0` 表示走 llm_router（cloud）；否则仍打本地 OpenAI 兼容端点。
+    if port == 0:
+        from backend import llm_router as _R
+        d = _R.chat(msgs, tools=tools or None, temperature=0.0,
+                    max_tokens=max_tokens, channel="eval", retries=3)
+    else:
+        req = urllib.request.Request("http://127.0.0.1:%d/v1/chat/completions" % port,
+                                     data=json.dumps(body, ensure_ascii=False).encode(),
+                                     headers={"Content-Type": "application/json"})
+        with OPENER.open(req, timeout=300) as r:
+            d = json.loads(r.read().decode())
     msg = (d.get("choices") or [{}])[0].get("message") or {}
     raw = str(msg.get("content") or "")
     used = [str((c.get("function") or {}).get("name") or "")
@@ -127,14 +134,19 @@ def main() -> int:
     ap.add_argument("--tag", required=True)
     ap.add_argument("--anchor", action="store_true")
     ap.add_argument("--anchor-mode", default="system", choices=["system", "user"])
-    ap.add_argument("--port", type=int, default=8081)
+    ap.add_argument("--port", type=int, default=8081,
+                    help="0 = 走 llm_router（云端）")
+    ap.add_argument("--provider", default="",
+                    help="cloud / local；给 cloud 等价于 --port 0")
     ap.add_argument("--max-tokens", type=int, default=300)
     a = ap.parse_args()
 
     t0 = time.time()
-    print("评测 tag=%s｜锚点=%s(%s)｜port=%d"
-          % (a.tag, "开" if a.anchor else "关", a.anchor_mode, a.port))
-    res = run(a.port, a.anchor, a.max_tokens, a.anchor_mode)
+    port = 0 if str(a.provider).lower() == "cloud" else a.port
+    print("评测 tag=%s｜锚点=%s(%s)｜port=%d%s"
+          % (a.tag, "开" if a.anchor else "关", a.anchor_mode, port,
+             "（云端 llm_router）" if port == 0 else ""))
+    res = run(port, a.anchor, a.max_tokens, a.anchor_mode)
     s = summary(res)
     print("\n56 题：%s（闸门 %s）｜失败 %s"
           % (s["persona"], s["persona_gate"], "、".join(s["persona_fail"]) or "无"))
