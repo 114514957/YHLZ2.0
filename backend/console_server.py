@@ -1309,7 +1309,11 @@ class ConsoleHandler(BaseHTTPRequestHandler):
         elif p == "/state":
             self._send_json(200, self._state())
         elif p == "/history":
-            self._send_json(200, self._history())
+            _sess = ""
+            if "?" in self.path:
+                import urllib.parse as _up
+                _sess = (_up.parse_qs(self.path.split("?", 1)[1]).get("session") or [""])[0]
+            self._send_json(200, self._history(_sess))
         elif p == "/monitor":
             self._send_json(200, self._monitor())
         elif p == "/ledger":
@@ -2330,11 +2334,11 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 continue
 
     # ---------- logic ----------
-    def _history(self) -> dict:
-        """Console session dialogue history (persisted per turn in cache/sessions/
-        console.json) so a page refresh restores the conversation."""
+    def _history(self, name: str = "") -> dict:
+        """某会话的对话历史。2026-11-15（台账 1260）：支持 ?session= 切换，
+        之前写死 "console"，导致对话台切会话看到的永远是 console 的记录。"""
         try:
-            s = self.runtime._session("console")
+            s = self.runtime._session(str(name or "console"))
             msgs = [
                 {"role": m.get("role"), "content": str(m.get("content", ""))}
                 for m in (s.history or [])

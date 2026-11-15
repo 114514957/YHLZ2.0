@@ -86,6 +86,24 @@
 
         <!-- 状态 -->
         <section class="panel on" data-panel="status">
+          <div class="card" id="avatar-card">
+            <h3>形象 <small style="font-weight:400;opacity:.6">2D 皮套（独立窗口照旧）</small></h3>
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <iframe src="/avatar.html" title="元亨形象" loading="lazy"
+                      style="width:320px;height:220px;border:1px solid #333;border-radius:8px;background:#111"></iframe>
+              <div style="font-size:12px;line-height:1.8;opacity:.85">
+                <div>这里嵌的是同一份 Live2D 页面。</div>
+                <div style="margin-top:6px">
+                  <a href="/avatar.html" target="_blank" rel="noopener"
+                     style="color:#3498db">在新窗口打开 ↗</a>
+                </div>
+                <div style="margin-top:6px;opacity:.65">
+                  模型/背景沿用原设置，不在工作站里改。
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="card">
             <h3>后台情况</h3>
             <ul class="svc">
@@ -208,6 +226,40 @@
 
         <!-- 记忆 -->
         <section class="panel" data-panel="memory">
+          
+          
+          <div class="card" id="chat-card">
+            <h3>对话台 <small style="font-weight:400;opacity:.6">多会话 · 与 QQ 同一条链路</small></h3>
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <div id="ch-list" style="width:180px;max-height:300px;overflow:auto;font-size:12px;line-height:1.7"></div>
+              <div style="flex:1">
+                <div id="ch-body" style="font-size:13px;line-height:1.65;max-height:260px;overflow:auto;white-space:pre-wrap;border:1px solid #333;border-radius:8px;padding:8px"></div>
+                <div style="display:flex;gap:6px;margin-top:6px">
+                  <input id="ch-in" type="text" placeholder="说点什么…"
+                         style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#1b1b1b;color:#eee">
+                  <button id="ch-send" type="button" style="padding:6px 12px;border-radius:6px;cursor:pointer">发</button>
+                  <button id="ch-new" type="button" style="padding:6px 12px;border-radius:6px;cursor:pointer">新会话</button>
+                </div>
+                <div id="ch-meta" style="font-size:12px;opacity:.65;margin-top:4px"></div>
+              </div>
+            </div>
+          </div>
+<div class="card" id="mg-card">
+            <h3>记忆星图 <small style="font-weight:400;opacity:.6">全量 · 点节点看原文</small></h3>
+            <div style="margin-bottom:6px;font-size:12px">
+              <input id="mg-q" type="text" placeholder="搜内容（回车高亮）"
+                     style="padding:4px 8px;border-radius:6px;border:1px solid #444;background:#1b1b1b;color:#eee;width:180px">
+              <label style="margin-left:8px"><input type="checkbox" class="mg-role" value="her" checked> 她说的</label>
+              <label style="margin-left:6px"><input type="checkbox" class="mg-role" value="owner" checked> 老爹</label>
+              <label style="margin-left:6px"><input type="checkbox" class="mg-role" value="unknown"> 未知</label>
+              <label style="margin-left:6px"><input type="checkbox" class="mg-role" value="engineering"> 工程</label>
+              <span id="mg-stat" style="opacity:.6;margin-left:8px"></span>
+            </div>
+            <canvas id="mg-canvas" width="900" height="460"
+                    style="width:100%;height:auto;background:#121212;border-radius:8px"></canvas>
+            <div id="mg-detail" style="font-size:12px;line-height:1.6;margin-top:6px;opacity:.9"></div>
+          </div>
+
           <div class="card">
             <h3>记忆检索</h3>
             <div class="qrow"><input id="memQ" placeholder="查记忆（如：用户偏好）"><button id="memBtn" class="btn-mini" type="button">查</button></div>
@@ -711,6 +763,220 @@
     var only = document.getElementById("l3-onlyher");
     if (only) only.addEventListener("change", function () { if (cur === "project") load("project"); });
     load("her");
+  });
+})();
+</script>
+
+<script>
+/* 记忆星图（台账 1259）：简易力导向，无外部依赖 */
+(function () {
+  var nodes = [], links = [], sel = null, xf = {x: 0, y: 0, k: 1};
+  function canvas() { return document.getElementById("mg-canvas"); }
+  function want() {
+    var out = {};
+    Array.prototype.forEach.call(document.querySelectorAll(".mg-role"), function (c) {
+      out[c.value] = c.checked;
+    });
+    return out;
+  }
+  function layout() {
+    var w = 900, h = 460, i, j, n = nodes.length;
+    for (i = 0; i < n; i++) {
+      var a = nodes[i];
+      if (a.x == null) { a.x = w / 2 + (Math.random() - 0.5) * 300; a.y = h / 2 + (Math.random() - 0.5) * 300; }
+      a.vx = a.vy = 0;
+    }
+    for (var it = 0; it < 120; it++) {
+      for (i = 0; i < n; i++) {
+        var p = nodes[i];
+        for (j = i + 1; j < n; j++) {
+          var q = nodes[j], dx = p.x - q.x, dy = p.y - q.y;
+          var d2 = dx * dx + dy * dy + 0.01, f = 900 / d2;
+          var d = Math.sqrt(d2);
+          p.vx += dx / d * f; p.vy += dy / d * f;
+          q.vx -= dx / d * f; q.vy -= dy / d * f;
+        }
+        p.vx += (w / 2 - p.x) * 0.002; p.vy += (h / 2 - p.y) * 0.002;
+      }
+      links.forEach(function (l) {
+        var a = nodes[l.si], b = nodes[l.ti];
+        if (!a || !b) return;
+        var dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) + 0.01;
+        var f = (d - 60) * 0.02;
+        a.vx += dx / d * f; a.vy += dy / d * f;
+        b.vx -= dx / d * f; b.vy -= dy / d * f;
+      });
+      for (i = 0; i < n; i++) {
+        var s = nodes[i];
+        s.x += Math.max(-8, Math.min(8, s.vx)); s.y += Math.max(-8, Math.min(8, s.vy));
+        s.x = Math.max(12, Math.min(w - 12, s.x)); s.y = Math.max(12, Math.min(h - 12, s.y));
+        s.vx *= 0.6; s.vy *= 0.6;
+      }
+    }
+  }
+  function draw() {
+    var c = canvas(); if (!c) return;
+    var ctx = c.getContext("2d"), on = want();
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.strokeStyle = "rgba(255,255,255,.10)";
+    links.forEach(function (l) {
+      var a = nodes[l.si], b = nodes[l.ti];
+      if (!a || !b || !on[a.role] || !on[b.role]) return;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    });
+    nodes.forEach(function (n) {
+      if (!on[n.role]) return;
+      var r = 3 + Math.min(9, n.imp);
+      ctx.fillStyle = n.color;
+      ctx.globalAlpha = sel === n ? 1 : .85;
+      ctx.beginPath();
+      if (n.shape === "square") ctx.rect(n.x - r, n.y - r, r * 2, r * 2);
+      else if (n.shape === "triangle") { ctx.moveTo(n.x, n.y - r); ctx.lineTo(n.x + r, n.y + r); ctx.lineTo(n.x - r, n.y + r); }
+      else ctx.arc(n.x, n.y, r, 0, 6.284);
+      ctx.fill();
+      if (sel === n) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1; }
+      ctx.globalAlpha = 1;
+    });
+  }
+  function indexLinks() {
+    var idx = {}; nodes.forEach(function (n, i) { idx[n.id] = i; });
+    links.forEach(function (l) {
+      if (l.si == null) { l.si = idx[l.source]; l.ti = idx[l.target]; }
+    });
+  }
+  function load() {
+    fetch("/api/memory_graph?limit=400", {cache: "no-store"})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) return;
+        nodes = d.nodes || []; links = d.links || [];
+        indexLinks(); layout();
+        var st = d.stats || {};
+        var s = document.getElementById("mg-stat");
+        if (s) s.textContent = (st.nodes || 0) + " 节点 / " + (st.links || 0) + " 边";
+        draw();
+      }).catch(function () {});
+  }
+  function hit(ev) {
+    var c = canvas(); if (!c) return null;
+    var rect = c.getBoundingClientRect();
+    var x = (ev.clientX - rect.left) * (c.width / rect.width);
+    var y = (ev.clientY - rect.top) * (c.height / rect.height);
+    var best = null, bd = 1e9;
+    nodes.forEach(function (n) {
+      var d = (n.x - x) * (n.x - x) + (n.y - y) * (n.y - y);
+      if (d < bd) { bd = d; best = n; }
+    });
+    return (best && bd < 400) ? best : null;
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    var c = canvas(); if (!c) return;
+    c.addEventListener("click", function (ev) {
+      sel = hit(ev);
+      var det = document.getElementById("mg-detail");
+      if (sel) {
+        det.innerHTML = "<b>" + sel.id + "</b>　" + sel.type + " / " + sel.role
+          + " ｜重要度 " + sel.imp + "<br>" + (sel.text || "");
+      } else { det.textContent = ""; }
+      draw();
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".mg-role"), function (x) {
+      x.addEventListener("change", draw);
+    });
+    var q = document.getElementById("mg-q");
+    if (q) q.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter") return;
+      var kw = (q.value || "").trim();
+      var found = nodes.filter(function (n) { return kw && (n.text || "").indexOf(kw) >= 0; });
+      var det = document.getElementById("mg-detail");
+      if (!found.length) { det.textContent = "没找到"; return; }
+      sel = found[0];
+      det.innerHTML = "命中 " + found.length + " 条，第一条：<b>" + sel.id + "</b><br>" + (sel.text || "");
+      draw();
+    });
+    load();
+  });
+})();
+</script>
+
+<script>
+/* 对话台（台账 1260）：多会话复用 /sessions、/history、/talk */
+(function () {
+  var cur = "console";
+  function el(id) { return document.getElementById(id); }
+  function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+  function paint(msgs) {
+    var b = el("ch-body"); if (!b) return;
+    b.innerHTML = (msgs || []).map(function (m) {
+      var who = m.role === "user" ? "老爹" : "元亨";
+      var color = m.role === "user" ? "#3498db" : "#2ecc71";
+      return "<div style='margin-bottom:6px'><b style='color:" + color + "'>" + who + "：</b>"
+        + esc(m.content) + "</div>";
+    }).join("");
+    b.scrollTop = b.scrollHeight;
+  }
+  function listSessions() {
+    fetch("/sessions", {cache: "no-store"}).then(function (r) { return r.json(); })
+      .then(function (d) {
+        var box = el("ch-list"); if (!box) return;
+        var items = (d && d.items) || [];
+        box.innerHTML = items.map(function (s) {
+          var act = (s.name === cur) ? "background:#243;border-left:3px solid #2ecc71" : "border-left:3px solid transparent";
+          return "<div class='ch-item' data-n='" + s.name + "' style='cursor:pointer;padding:3px 6px;" + act + "'>"
+            + "<b>" + esc(s.name.replace(/^qq_/, "")) + "</b> <span style='opacity:.6'>(" + (s.turns || 0) + ")</span>"
+            + "<br><span style='opacity:.55'>" + esc(String(s.title || "").slice(0, 18)) + "</span></div>";
+        }).join("");
+        Array.prototype.forEach.call(box.querySelectorAll(".ch-item"), function (x) {
+          x.addEventListener("click", function () { cur = x.getAttribute("data-n"); load(); });
+        });
+      }).catch(function () {});
+  }
+  function load() {
+    var m = el("ch-meta"); if (m) m.textContent = "会话：" + cur;
+    fetch("/history?session=" + encodeURIComponent(cur), {cache: "no-store"})
+      .then(function (r) { return r.json(); })
+      .then(function (d) { paint((d && d.messages) || []); listSessions(); })
+      .catch(function () {});
+  }
+  function send() {
+    var inp = el("ch-in"); var text = (inp && inp.value || "").trim();
+    if (!text) return;
+    var btn = el("ch-send"); if (btn) { btn.disabled = true; btn.textContent = "…"; }
+    var meta = el("ch-meta"); if (meta) meta.textContent = "发送中（约 3–15 秒）…";
+    inp.value = "";
+    fetch("/talk", {method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({text: text, channel: cur})})
+      .then(function (r) { return r.text(); })
+      .then(function (raw) {
+        var out = [];
+        raw.split("\n").forEach(function (ln) {
+          ln = ln.trim();
+          if (!ln.startsWith("data:")) return;
+          try {
+            var ev = JSON.parse(ln.slice(5).trim());
+            if (ev.type === "delta" && ev.delta) out.push(ev.delta);
+            if (ev.type === "turn_done" && ev.text) out = [ev.text];
+            if (ev.type === "error") out = ["⚠ " + (ev.message || "出错")];
+          } catch (e) {}
+        });
+        if (meta) meta.textContent = "会话：" + cur + "（已回复）";
+        load();
+        var b = el("ch-body");
+        if (b && out.length) b.innerHTML += "<div style='margin-bottom:6px'><b style='color:#2ecc71'>元亨：</b>" + esc(out.join("")) + "</div>";
+      })
+      .catch(function (e) { if (meta) meta.textContent = "失败：" + e; })
+      .then(function () { if (btn) { btn.disabled = false; btn.textContent = "发"; } });
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    var s = el("ch-send"), n = el("ch-new"), i = el("ch-in");
+    if (s) s.addEventListener("click", send);
+    if (i) i.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
+    if (n) n.addEventListener("click", function () {
+      cur = "wb_" + Date.now().toString(36);
+      load();
+      var m = el("ch-meta"); if (m) m.textContent = "新会话：" + cur + "（发一句就会建起来）";
+    });
+    load();
   });
 })();
 </script>

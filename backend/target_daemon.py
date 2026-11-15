@@ -1058,6 +1058,19 @@ class _Handler(ConsoleHandler):
                 self._send(500, {"ok": False, "error": "%s: %s"
                                  % (type(exc).__name__, str(exc)[:120])})
             return True
+        if method == "GET" and p.startswith("/api/memory_graph"):
+            # 记忆星图（台账 1259）：全量记忆的节点与边。
+            try:
+                from backend import memory_graph as _mg
+                import urllib.parse as _up
+                qs = _up.parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
+                lim = int((qs.get("limit") or ["400"])[0])
+                mi = int((qs.get("min_importance") or ["0"])[0])
+                self._send(200, {"ok": True, **_mg.graph(lim, mi)})
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:140])})
+            return True
         if method == "GET" and p.startswith("/api/ledger_"):
             # 台账分家（台账 1258）：元亨 / 项目 / 日记，三本分开、不混排。
             try:
