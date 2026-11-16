@@ -772,20 +772,23 @@ class ConversationSession:
                         # speculative prefetch (ledger 0226): recall already ran
                         # while the user was still speaking — reuse it, no re-query
                         for s_ in pre_recall[:3]:
-                            ctx_lines.append("（隐约想起，仅供理解，不要提及）：" + str(s_)[:150])
+                            ctx_lines.append("（你想起来的事，可以自然地提起）：" + str(s_)[:260])
                     else:
                         for hit in self._recall_hits(self.memory, text, 3,
                                                      channel=str(self.channel)):
                             hid = str(hit.get("id", ""))
                             now = _t.time()
-                            if now - self._ctx_recent.get(hid, 0.0) < 30.0:
+                            if now - self._ctx_recent.get(hid, 0.0) < 8.0:
                                 continue
                             self._ctx_recent[hid] = now
                             _d = str(hit.get("date", "") or "")
+                            # 2026-11-16（台账 1271）：原来写"不要提及"，模型就真的
+                            # 一个字都不肯引（问"我上次怎么说的"也答"查不到原文"）。
+                            # 改成"可以自然提起"，并把单条上限提到 260 字。
                             ctx_lines.append(
-                                "（隐约想起，仅供理解，不要提及）：" +
+                                "（你想起来的事，可以自然地提起，不用说是记忆或记录）：" +
                                 (f"（{_d}）" if _d else "") +
-                                str(hit.get("summary", ""))[:150])
+                                str(hit.get("summary", ""))[:260])
             except Exception:
                 pass
         if self._is_owner():
