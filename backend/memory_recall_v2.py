@@ -60,7 +60,8 @@ def load_pool(db_path: os.PathLike | str,
     try:
         con.row_factory = sqlite3.Row
         rows = con.execute(
-            "select id,type,importance,summary,source,status,keywords from l2_items").fetchall()
+            "select id,type,importance,summary,source,status,keywords,role "
+            "from l2_items").fetchall()
     finally:
         con.close()
 
@@ -76,7 +77,11 @@ def load_pool(db_path: os.PathLike | str,
         body = _clean(d.get("summary") or "")
         if len(_NONWORD.sub("", body)) < MIN_BODY_CHARS:
             continue
-        role, _why = classify(d)
+        # 2026-11-16（台账 1285）：优先用**库里落好的** role（tools/memory_role_migrate.py）；
+        # 旧库没有该列/空值时，才现场跑规则分类。
+        role = str(d.get("role") or "").strip()
+        if not role:
+            role, _why = classify(d)
         if not is_injectable(role):
             continue
         pool.append({"id": d["id"], "text": body, "role": role,
