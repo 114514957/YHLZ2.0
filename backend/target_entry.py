@@ -737,6 +737,23 @@ class ConversationSession:
             social = QqMainMemory(self._qq_social_db).context(text, self.channel)
             if social:
                 ctx_lines.append(social)
+            # 2026-11-16（台账 1261）：**群情报**——让她在群里知道谁是谁、这群在聊什么。
+            # 数据来自 memstore 的 qq_social_*（人数/活跃/话题/Top成员/@她次数），≤300 字。
+            try:
+                import os
+                import re as _re2
+
+                from backend import qq_intel as _qi
+                _m2 = _re2.search(r"g(\d{5,15})", str(self.channel or ""))
+                if _m2:
+                    _card = _qi.card_text(_m2.group(1))
+                    if _card:
+                        ctx_lines.append(_card)
+                        if os.environ.get("YHLZ_QQ_INTEL_DEBUG"):
+                            print("[qq-intel] %s" % _card[:80], flush=True)
+            except Exception as _ex:  # noqa: BLE001
+                if os.environ.get("YHLZ_QQ_INTEL_DEBUG"):
+                    print("[qq-intel] 跳过：%s" % type(_ex).__name__, flush=True)
             if self._qq_group_recall:
                 for hit in self._recall_hits(self.memory, text, 2,
                                              channel=str(self.channel)):
