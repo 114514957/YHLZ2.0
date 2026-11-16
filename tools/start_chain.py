@@ -49,8 +49,21 @@ def main() -> int:
         return 2
     if lv == "Low":
         print()
-        print("⛔ 当前是 Low（低）完整性（常见于 AI 沙箱/受限进程）。")
-        print("   从这里启动会让整条链降级，QQ 注入必失败。请在你自己的普通终端里跑。")
+        print("⛔ 当前是 Low（低）完整性 —— **不是你的操作问题，是项目的目录标签**。")
+        # 2026-11-16（台账 1268）：实测 `…\YHLZ` 本身带着
+        #   Mandatory Label\Low Mandatory Level:(OI)(CI)(NW)
+        # 也就是说：**从这棵树里启动的任何 exe 都会以 Low 运行**，
+        # 包括 .venv 的 python。Low 无法注入 Medium 的 QQ、也无法写 Medium 目录
+        # （qqwatch\shell 写不进去就是这个原因）。
+        # 低权限进程只能降不能升，所以必须从**普通终端**改标签。
+        print()
+        print("   根因：目录 YHLZ 带 Low 强制标签，子文件全部继承 → exe 全以 Low 跑。")
+        print("   修复：在你的**普通终端**（不是管理员、不是 AI 窗口）里执行一次：")
+        print()
+        print('     icacls "C:\\Users\\ACE_WAN——PROJECT\\YHLZ" '
+              '/setintegritylevel (OI)(CI)Medium /T')
+        print()
+        print("   然后**重新双击** tools\\start_chain.bat（新开的进程才会是 Medium）。")
         return 3
 
     print("\n[1/3] 起 daemon（8321）…")
