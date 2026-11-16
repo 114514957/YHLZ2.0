@@ -2059,27 +2059,33 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         if action == "napcat_window":
-            # 2026-11-16（台账 1261）：打开**可见的** NapCat 登录窗口（可扫码）。
-            # 我们的 NapCat 是带窗口登录的，不会写 qrcode.png，所以二维码接口必然 404——
-            # 与其让老爹以为"唤起失败"，不如直接给他一个能扫码的窗口。
+            # 2026-11-16（台账 1266）：用 explorer 在**用户桌面会话**里打开 launcher，
+            # 等价于双击 —— daemon 是非交互进程，自己 start 出来的窗口没有真控制台，
+            # bat 会在 pause 处退出（实测 QQ 根本起不来）。
             try:
                 import subprocess as _sp
-                # YH → YHLZ → PROJECT（往上两级）；两条候选路径都试，避免再算错
-                _cands = [_PROJECT_ROOT.parent.parent / "qqwatch" / "shell",
-                          _PROJECT_ROOT.parent / "qqwatch" / "shell"]
-                shell = next((c for c in _cands
-                              if (c / "launcher-user.bat").exists()), _cands[0])
-                bat = shell / "launcher-user.bat"
-                if not bat.exists():
-                    return {"ok": False, "error": "找不到 %s" % bat}
+                shell = None
+                for c in (_PROJECT_ROOT.parent.parent / "qqwatch" / "shell",
+                          _PROJECT_ROOT.parent / "qqwatch" / "shell"):
+                    if (c / "launcher-user.bat").exists():
+                        shell = c
+                        break
+                if shell is None:
+                    return {"ok": False, "error": "找不到 launcher-user.bat"}
                 uin = str(body.get("uin", "") or BOT_UIN)
-                _sp.Popen(
-                    ["cmd", "/c", "start", "", "launcher-user.bat", uin],
-                    cwd=str(shell), close_fds=True,
-                    creationflags=getattr(_sp, "CREATE_NEW_CONSOLE", 0))
-                _log("control", "napcat_window %s" % uin)
+                # 包装一层：把 uin 传进去（explorer 不能带参数）
+                wrap_dir = _PROJECT_ROOT / "cache" / "tmp"
+                wrap_dir.mkdir(parents=True, exist_ok=True)
+                wrap = wrap_dir / ("_login_%s.bat" % uin)
+                wrap.write_text(
+                    '@echo off\r\nchcp 65001 >nul\r\ncd /d "%s"\r\n'
+                    'call launcher-user.bat %s\r\n' % (shell, uin),
+                    encoding="gbk", errors="replace")
+                _sp.Popen(["explorer.exe", str(wrap)], close_fds=True)
+                _log("control", "napcat_window %s (explorer)" % uin)
                 return {"ok": True,
-                        "note": "已打开 NapCat 登录窗口（元亨号 %s）：在窗口里扫码登录" % uin}
+                        "note": "已在桌面打开登录窗口（元亨号 %s）；窗口里扫码登录，"
+                                "登录后再点「检查登录状态」" % uin}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": "%s: %s"
                         % (type(exc).__name__, str(exc)[:120])}

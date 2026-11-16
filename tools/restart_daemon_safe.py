@@ -53,6 +53,36 @@ def cover_procs() -> list[str]:
     return out
 
 
+def _integrity_guard() -> None:
+    """Low 完整性下不要重启生产链（会把整条链降级，QQ 就注入不了）。
+
+    2026-11-16（台账 1267）：实测沙箱是 Low；QQ/NapCat 是 Medium。
+    设 YHLZ_ALLOW_LOW_INTEGRITY=1 可强行跳过（不建议）。
+    """
+    if (os.getenv("YHLZ_ALLOW_LOW_INTEGRITY") or "").strip() in ("1", "true", "yes"):
+        return
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from tools.integrity import level
+        lv = level()
+        if lv == "Low":
+            print("⛔ 拒绝重启：当前进程是 Low 完整性，重启会把整条链降级，"
+                  "QQ 将无法注入。\n"
+                  "   请在**普通终端（非管理员、非 AI 沙箱）**里运行：\n"
+                  "     python tools\\restart_daemon_safe.py\n"
+                  "   或设 YHLZ_ALLOW_LOW_INTEGRITY=1 强行继续（不建议）。")
+            raise SystemExit(3)
+        print("完整性级别：%s（允许重启）" % lv)
+    except SystemExit:
+        raise
+    except (ImportError, OSError, AttributeError):
+        return            # 取不到级别就不拦，避免误伤
+    except Exception as exc:  # noqa: BLE001
+        print("⚠ 完整性自检异常（%s: %s），按放行处理"
+              % (type(exc).__name__, str(exc)[:80]))
+        return
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--force", action="store_true")
@@ -161,4 +191,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    _integrity_guard()
     raise SystemExit(main())
