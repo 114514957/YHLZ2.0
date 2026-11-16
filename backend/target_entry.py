@@ -772,7 +772,7 @@ class ConversationSession:
                         # speculative prefetch (ledger 0226): recall already ran
                         # while the user was still speaking — reuse it, no re-query
                         for s_ in pre_recall[:3]:
-                            ctx_lines.append("（你想起来的事，可以自然地提起）：" + str(s_)[:260])
+                            ctx_lines.append("（你的回忆，含当时的原话，可以直接引用）：" + str(s_)[:260])
                     else:
                         for hit in self._recall_hits(self.memory, text, 3,
                                                      channel=str(self.channel)):
@@ -786,7 +786,7 @@ class ConversationSession:
                             # 一个字都不肯引（问"我上次怎么说的"也答"查不到原文"）。
                             # 改成"可以自然提起"，并把单条上限提到 260 字。
                             ctx_lines.append(
-                                "（你想起来的事，可以自然地提起，不用说是记忆或记录）：" +
+                                "（你的回忆，下面是当时的原话，可以直接引用；不必声明是记忆）：" +
                                 (f"（{_d}）" if _d else "") +
                                 str(hit.get("summary", ""))[:260])
             except Exception:
