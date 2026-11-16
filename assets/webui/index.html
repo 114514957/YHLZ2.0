@@ -1118,8 +1118,20 @@
     }
   }
   function load() {
-    fetch("/api/sustain_status", {cache: "no-store"}).then(function (r) { return r.json(); })
-      .then(function (d) { if (d && d.ok) render(d); }).catch(function () {});
+    // 2026-11-16：QQ/桥的真实状态一律以 /state 为准（sustain 心跳是快照，会过时误报）
+    Promise.all([
+      fetch("/api/sustain_status", {cache: "no-store"}).then(function (r) { return r.json(); }),
+      fetch("/state", {cache: "no-store"}).then(function (r) { return r.json(); })
+        .catch(function () { return {}; })
+    ]).then(function (a) {
+      var d = a[0] || {}, st = a[1] || {}, q = st.qq || {};
+      if (q && q.online !== undefined) {
+        d.qq_online = !!q.online;
+        d.ws = !!q.ws;
+        d.needs_scan = d.supervisor_alive && !q.ws;
+      }
+      if (d && d.ok) render(d);
+    }).catch(function () {});
   }
   function act(action, label) {
     var m = el("sus-msg"); if (m) m.textContent = label + "…";
