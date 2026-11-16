@@ -444,7 +444,16 @@ class TurnOrchestrator:
         from backend import turn_evidence
 
         trace_id = turn_evidence.new_id("tr")
-        frame = PromptFrame(system_prompt, str(early_context or "")[:1500])
+        # 2026-11-16（台账 1271）：**上下文预算**。原来硬截 1500 字，而记忆召回是
+        # 最后追加的 → 前面画像/摘要一长，召回就被切掉（实测 gld_9 命中却答"查不到"）。
+        # 改：上限提到 2600 字；超限时打一行日志，便于发现再次截断。
+        _ctx = str(early_context or "")
+        _CAP = 2600
+        if len(_ctx) > _CAP:
+            print("[ctx-budget] early_context %d 字 > %d，尾部被截（召回可能在其中）"
+                  % (len(_ctx), _CAP), flush=True)
+            _ctx = _ctx[:_CAP]
+        frame = PromptFrame(system_prompt, _ctx)
         # 2026-11-14：**每轮锚点**。Gemma-4 有 35/42 层是 512 滑窗，系统提示在对话开头，
         # 一旦历史超过 512 token，这些层就完全看不见人设/认主/隐私条款。
         # 把最短硬约束贴在当前轮末尾 → 它必然在窗口内（第一轮之后仍然有效）。
