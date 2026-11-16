@@ -59,28 +59,28 @@ def qq_state() -> dict:
         return {}
 
 
+def _via_explorer(bat: str) -> None:
+    """经 explorer 启动：脱离任务作业，进程能活过本次任务。"""
+    path = os.path.join(ROOT, "tools", bat)
+    subprocess.Popen(["explorer.exe", path], close_fds=True)
+
+
 def start_daemon() -> None:
-    log("daemon 不在 → 拉起")
-    subprocess.Popen([PY, "-B", "-m", "backend.target_daemon", "--port", "8321"],
-                     cwd=ROOT, close_fds=True,
-                     stdin=subprocess.DEVNULL,
-                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     creationflags=DETACHED)
-    for _ in range(15):
+    log("daemon 不在 → 经 explorer 拉起")
+    _via_explorer("start_daemon.cmd")
+    for _ in range(18):
         time.sleep(2)
         if port_open(8321):
             log("daemon 就绪 8321")
             return
-    log("⚠ daemon 拉起失败")
+    log("⚠ daemon 拉起后仍未监听")
 
 
 def start_bridge() -> None:
-    log("QQ 桥 → 拉起")
+    log("QQ 桥 → 经 explorer 拉起")
     try:
-        subprocess.run([PY, "-X", "utf8", os.path.join("tools", "qq_bridge_control.py"),
-                        "start", "--profile", "lite",
-                        "--config", os.path.join("config", "qq_bridge_lite.json")],
-                       cwd=ROOT, timeout=200, capture_output=True)
+        _via_explorer("start_bridge.cmd")
+        time.sleep(12)
     except Exception as ex:  # noqa: BLE001
         log("桥启动异常 %s" % type(ex).__name__)
 

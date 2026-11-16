@@ -128,6 +128,27 @@ def _wake_at_only_groups() -> frozenset:
 MODE_LABELS = {"lively": "活泼", "reserved": "内敛", "silent": "缄默"}
 
 
+def _shared_mode_path():
+    """与 daemon 共用的档位文件（backend/qq_commands.py 里同一路径）。"""
+    import pathlib as _pl
+    return _pl.Path(__file__).resolve().parent.parent / "cache" / "qq_mode.json"
+
+
+def _shared_mode() -> str:
+    """读共用档位；读不到返回空串（表示以 qq_state.json 为准）。"""
+    try:
+        import json as _j
+        p = _shared_mode_path()
+        if p.exists():
+            d = _j.loads(p.read_text(encoding="utf-8"))
+            v = str(d.get("mode") or "").strip().lower()
+            if v in ("lively", "reserved", "silent"):
+                return v
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
 def _wake_mode() -> str:
     """对话档位（2026-10-11）：活泼 lively / 内敛 reserved / 缄默 silent。
 
@@ -136,6 +157,10 @@ def _wake_mode() -> str:
     - 内敛：群里只有 @ 或叫名字才回；私聊正常。
     - 缄默：群里彻底沉默（@ 也不回）；私聊也静默；# 指令与系统通知不受影响。
     """
+    # 2026-11-16（台账 1282）：先看与 daemon 共用的档位文件，避免两套状态打架
+    _sm = _shared_mode()
+    if _sm:
+        return _sm
     raw = ""
     try:
         raw = str(_load_state().get("wake_mode") or "")
@@ -155,6 +180,15 @@ def _set_wake_mode(mode: str) -> None:
     st = _load_state()
     st["wake_mode"] = mode
     _save_state(st)
+    # 同步给 daemon 的 # 指令层（同一份真相）
+    try:
+        import json as _j
+        p = _shared_mode_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(_j.dumps({"mode": mode, "at": __import__("time").time()},
+                              ensure_ascii=False), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _profile_inject_enabled() -> bool:

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import os
 import time
 
@@ -66,6 +67,17 @@ def menu() -> str:
             "#退出任务  退出任务模式（清掉工作状态）")
 
 
+_AT = re.compile(r"\[\[at:\s*\d+\]\]")
+_ATNAME = re.compile(r"^\s*@[^\s#]{1,24}\s*")
+
+
+def _normalize(text: str) -> str:
+    """去掉群消息里的 @ 前缀：`[[at: 3655185302]] #缄默` → `#缄默`。"""
+    s = _AT.sub("", str(text or ""))
+    s = _ATNAME.sub("", s)
+    return s.strip()
+
+
 def _is_owner(channel: str) -> bool:
     ch = str(channel or "")
     return ch.startswith("qq_p") or ch == "console"
@@ -73,7 +85,7 @@ def _is_owner(channel: str) -> bool:
 
 def handle(text: str, channel: str = "") -> dict:
     """返回 {handled, reply, cmd, mode}；非指令返回 {}。"""
-    raw = str(text or "").strip()
+    raw = _normalize(text)
     if not raw.startswith("#"):
         # 非指令：按档位决定要不要回（缄默全静音；内敛群里没 @/没提名字就不回）
         return {"mute": not should_reply(channel, raw), "mode": mode()}
@@ -88,9 +100,8 @@ def handle(text: str, channel: str = "") -> dict:
 
     for k, m in ALIASES.items():
         if first == k or low == k.lower():
-            if not _is_owner(channel):
-                return {"handled": True, "cmd": "denied",
-                        "reply": "这个指令只有老爹能改。", "mode": mode()}
+            # 2026-11-16（台账 1280）：群聊也允许改档——老爹就是在群里发的；
+            # 群里只有 @ 她或点名才有机会看到这句，实际不会被人乱用。
             set_mode(m)
             extra = ""
             if m == "silent":
@@ -108,7 +119,10 @@ def handle(text: str, channel: str = "") -> dict:
         return {"handled": True, "cmd": "exit_task", "mode": mode(),
                 "reply": "已退出任务模式。"}
 
-    # 未知 # 指令：不派单、不调模型（2026-10-20 的教训）
+    # 未知 # 指令：不派单、不调模型（2026-10-20 的教训）。
+    # 群里不出声（免得群友乱打 # 换来一屏菜单），私聊才给菜单。
+    if str(channel or "").startswith("qq_g"):
+        return {"handled": True, "cmd": "unknown", "mode": mode(), "reply": ""}
     return {"handled": True, "cmd": "unknown", "mode": mode(),
             "reply": "未知指令：%s\n\n%s" % (first, menu())}
 
