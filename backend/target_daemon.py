@@ -1432,6 +1432,18 @@ class _Handler(ConsoleHandler):
                 return
             # 2026-11-16（台账 1279）：**# 指令层**。Bridge Lite 没有这套
             # （全量桥 tools/qq_bot.py 里才有），老爹的「#缄默」等硬控制因此失效。
+            # 2026-11-16（台账 1284）：**发送节流**。群里每句都接会把 QQ 打到
+            # retcode 1200（发送被限），投递状态直接 rejected。超频就不回、也不调模型。
+            try:
+                from backend import qq_throttle as _qt
+                _ok, _wait = _qt.allow(channel, text)
+                if not _ok and not str(text).strip().startswith("#"):
+                    self._send(200, {"ok": True, "answer": "", "throttled": True,
+                                     "wait_s": round(_wait, 1)})
+                    return
+            except Exception:  # noqa: BLE001
+                pass
+
             try:
                 from backend import qq_commands as _qc
                 _cmd = _qc.handle(text, channel)
@@ -1451,6 +1463,12 @@ class _Handler(ConsoleHandler):
             try:
                 info = self.runtime.turn(text, channel,
                                          images=imgs, audio=auds)
+                try:
+                    from backend import qq_throttle as _qt2
+                    if str((info or {}).get("answer") or "").strip():
+                        _qt2.note_sent(channel)
+                except Exception:  # noqa: BLE001
+                    pass
                 self._send(200, info)
             except Exception as exc:
                 self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:160]}"})
