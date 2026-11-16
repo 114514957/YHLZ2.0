@@ -2059,33 +2059,32 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         if action == "napcat_window":
-            # 2026-11-16（台账 1266）：用 explorer 在**用户桌面会话**里打开 launcher，
-            # 等价于双击 —— daemon 是非交互进程，自己 start 出来的窗口没有真控制台，
-            # bat 会在 pause 处退出（实测 QQ 根本起不来）。
+            # 2026-11-16（台账 1269）：**只保留一条启动路径** —— tools/qq_login_terminal.py。
+            # 之前试过 explorer 开 bat / cmd start / 包装 bat，全部失败且有三个后遗症：
+            #   · bat 末尾 pause 在非交互环境必退（Input redirection is not supported）
+            #   · 注入器等 stdin，必须 stdin=DEVNULL
+            #   · 目录带 Low 标签时所有子进程都 Low（改标签前怎么启动都没用）
+            # 现在：统一调那个 python 脚本，让它自己处理；失败原因直接回给前端。
             try:
                 import subprocess as _sp
-                shell = None
-                for c in (_PROJECT_ROOT.parent.parent / "qqwatch" / "shell",
-                          _PROJECT_ROOT.parent / "qqwatch" / "shell"):
-                    if (c / "launcher-user.bat").exists():
-                        shell = c
-                        break
-                if shell is None:
-                    return {"ok": False, "error": "找不到 launcher-user.bat"}
+
+                import sys as _sys
                 uin = str(body.get("uin", "") or BOT_UIN)
-                # 包装一层：把 uin 传进去（explorer 不能带参数）
-                wrap_dir = _PROJECT_ROOT / "cache" / "tmp"
-                wrap_dir.mkdir(parents=True, exist_ok=True)
-                wrap = wrap_dir / ("_login_%s.bat" % uin)
-                wrap.write_text(
-                    '@echo off\r\nchcp 65001 >nul\r\ncd /d "%s"\r\n'
-                    'call launcher-user.bat %s\r\n' % (shell, uin),
-                    encoding="gbk", errors="replace")
-                _sp.Popen(["explorer.exe", str(wrap)], close_fds=True)
-                _log("control", "napcat_window %s (explorer)" % uin)
+                script = _PROJECT_ROOT / "tools" / "qq_login_terminal.py"
+                if not script.exists():
+                    return {"ok": False, "error": "缺少 tools/qq_login_terminal.py"}
+                py = _PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+                log = _PROJECT_ROOT / "cache" / "logs" / "qq_login.log"
+                log.parent.mkdir(parents=True, exist_ok=True)
+                fh = open(log, "a", encoding="utf-8", errors="replace")
+                _sp.Popen([str(py if py.exists() else _sys.executable), "-X", "utf8",
+                           str(script), "--uin", uin, "--wait", "90"],
+                          cwd=str(_PROJECT_ROOT), stdout=fh, stderr=_sp.STDOUT,
+                          close_fds=True)
+                _log("control", "napcat_window %s → qq_login_terminal.py" % uin)
                 return {"ok": True,
-                        "note": "已在桌面打开登录窗口（元亨号 %s）；窗口里扫码登录，"
-                                "登录后再点「检查登录状态」" % uin}
+                        "note": "已启动 QQ 登录流程（元亨号 %s）：看 cache/logs/qq_login.log，"
+                                "窗口出来就扫码；若日志说 Low 完整性，先按提示改目录标签" % uin}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": "%s: %s"
                         % (type(exc).__name__, str(exc)[:120])}

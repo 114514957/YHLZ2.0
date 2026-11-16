@@ -25,7 +25,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-PY = os.path.join(ROOT, ".venv", "Scripts", "python.exe")
+# 2026-11-16（台账 1270）：**用当前解释器**，不要写死 .venv 的 python.exe。
+# 原因：`.venv\Scripts\python.exe` 带着 Low 强制标签，由它启动的子进程会一路 Low；
+# 而系统 Python（`…\Programs\Python\Python312\python.exe`）没有标签，
+# 从普通终端启动就是 Medium —— 这才是能注入 QQ 的级别。
+# 依赖仍然来自 .venv\Lib\site-packages（由 start_chain_outside.bat 设 PYTHONPATH）。
+PY = sys.executable
 
 
 def _level() -> str:

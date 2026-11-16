@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""普通终端一键启动元亨 QQ（2026-11-16）。
+r"""普通终端一键启动元亨 QQ（2026-11-16）。
 
 为什么要有这个：
   · `launcher-user.bat` 末尾有 `pause`，在**非交互/重定向**环境下必然报
@@ -30,7 +30,7 @@ QQ_CANDIDATES = (
     r"C:\Program Files\Tencent\QQNT\QQ.exe",
     r"C:\Program Files (x86)\Tencent\QQNT\QQ.exe",
 )
-UIN = "3655185302"
+UIN = "3655185302"  # 默认值；--uin 可覆盖
 WORK = r"C:\Users\ACE_WAN——PROJECT\YHLZ\YH\cache\tmp"
 
 
@@ -76,6 +76,7 @@ def pids(name: str) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--wait", type=int, default=150, help="等登录的秒数")
+    ap.add_argument("--uin", default=UIN, help="QQ 号")
     a = ap.parse_args()
 
     qq = find_qq()
