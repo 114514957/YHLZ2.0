@@ -1430,6 +1430,24 @@ class _Handler(ConsoleHandler):
             except ChannelAuthError as exc:
                 self._send(403, {"error": f"{exc.code}: {exc.detail}"})
                 return
+            # 2026-11-16（台账 1279）：**# 指令层**。Bridge Lite 没有这套
+            # （全量桥 tools/qq_bot.py 里才有），老爹的「#缄默」等硬控制因此失效。
+            try:
+                from backend import qq_commands as _qc
+                _cmd = _qc.handle(text, channel)
+                if _cmd.get("handled"):
+                    self._send(200, {"ok": True, "answer": _cmd.get("reply", ""),
+                                     "command": _cmd.get("cmd", ""),
+                                     "mode": _cmd.get("mode", "")})
+                    return
+                if _cmd.get("mute"):
+                    # 缄默/内敛：本轮不产生回复（也不调模型，省钱）
+                    self._send(200, {"ok": True, "answer": "", "muted": True,
+                                     "mode": _cmd.get("mode", "")})
+                    return
+            except Exception as _cex:  # noqa: BLE001
+                print("[qq-commands] 跳过：%s" % type(_cex).__name__, flush=True)
+
             try:
                 info = self.runtime.turn(text, channel,
                                          images=imgs, audio=auds)
