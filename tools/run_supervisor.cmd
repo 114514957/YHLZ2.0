@@ -1,6 +1,6 @@
 @echo off
-REM Entry for supervisor. Absolute path on purpose:
-REM this file is COPIED into the Startup folder, where %~dp0.. would point
-REM to ...\Programs instead of the repo, so autostart did nothing.
-cd /d "C:\Users\ACE_WAN??PROJECT\YHLZ\YH"
-.venv\Scripts\python.exe -X utf8 tools\yh_supervisor.py %*
+REM Supervisor entry. pythonw = NO console window, so it cannot be
+REM closed by accident (console version died at 22:02 when window closed).
+REM This file is copied into the Startup folder, so the path is absolute.
+cd /d "C:\Users\ACE_WAN¡ª¡ªPROJECT\YHLZ\YH"
+".venv\Scripts\pythonw.exe" -X utf8 tools\yh_supervisor.py

@@ -1035,6 +1035,45 @@ class _Handler(ConsoleHandler):
         from backend.console_server import GET_UI, POST_UI
 
         p = self.path.split("?", 1)[0]
+        # 2026-11-16（台账 1274）：工作台「自持」卡。**必须在 daemon 侧拦**：
+        # console_do_GET 开头就把所有 /api/* 代理到 8090，写在那里会被吃掉成 404（实测）。
+        if method == "GET" and p == "/api/sustain_status":
+            try:
+                import json as _j
+                import time as _t
+                from pathlib import Path as _P
+
+                hb_path = (_P(__file__).resolve().parent.parent
+                           / "cache" / "sustain" / "heartbeat.json")
+                hb = {}
+                if hb_path.exists():
+                    try:
+                        hb = _j.loads(hb_path.read_text(encoding="utf-8"))
+                    except Exception:  # noqa: BLE001
+                        hb = {}
+                age = (_t.time() - float(hb.get("ts") or 0)) if hb else 9999.0
+                q = {}
+                try:
+                    q = (self.runtime.health() or {}).get("qq") or {}
+                except Exception:  # noqa: BLE001
+                    q = {}
+                self._send(200, {
+                    "ok": True,
+                    "supervisor_alive": bool(hb) and age < 90,
+                    "heartbeat_age_s": round(max(0.0, age), 1),
+                    "when": (_t.strftime("%H:%M:%S", _t.localtime(float(hb["ts"])))
+                             if hb.get("ts") else ""),
+                    "level": hb.get("level") or "",
+                    "daemon_ok": True,
+                    "qq_online": bool(q.get("online")),
+                    "ws": bool(q.get("ws")),
+                    "bridge": bool(q.get("bridge")),
+                    "needs_scan": bool(hb.get("needs_scan")) and not q.get("ws"),
+                })
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:120])})
+            return True
         # 2026-11-15（台账 1252）：工作台「链路状态」卡。**在 daemon 侧直接拦**——
         # 放进 console_server 的分发里会被前面的分支吃掉成 404（实测）。
         if method == "GET" and p.startswith("/api/prompt_versions"):

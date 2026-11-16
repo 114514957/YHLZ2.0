@@ -1263,6 +1263,41 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             except Exception as exc:  # noqa: BLE001
                 self._send_json(500, {"ok": False,
                                       "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])})
+        elif p == "/api/sustain_status":
+            # 2026-11-16（台账 1274）：工作台「自持」卡——supervisor 活没活、链条哪环断了。
+            try:
+                import json as _j
+                import os as _os
+                import time as _t
+                hb_path = _PROJECT_ROOT / "cache" / "sustain" / "heartbeat.json"
+                hb = {}
+                if hb_path.exists():
+                    try:
+                        hb = _j.loads(hb_path.read_text(encoding="utf-8"))
+                    except Exception:  # noqa: BLE001
+                        hb = {}
+                age = (_t.time() - float(hb.get("ts") or 0)) if hb else 9999
+                q = {}
+                try:
+                    q = (self.runtime.health() or {}).get("qq") or {}
+                except Exception:  # noqa: BLE001
+                    q = {}
+                self._send_json(200, {
+                    "ok": True,
+                    "supervisor_alive": bool(hb) and age < 90,
+                    "heartbeat_age_s": round(max(0.0, age), 1),
+                    "when": (hb.get("ts") and _t.strftime(
+                        "%H:%M:%S", _t.localtime(float(hb["ts"])))) or "",
+                    "level": hb.get("level") or "",
+                    "daemon_ok": bool(hb.get("daemon_ok")) or bool(q),
+                    "qq_online": bool(hb.get("qq_online")) or bool(q.get("online")),
+                    "ws": bool(hb.get("ws")) or bool(q.get("ws")),
+                    "bridge": bool(hb.get("bridge")) or bool(q.get("bridge")),
+                    "needs_scan": bool(hb.get("needs_scan")),
+                })
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"ok": False, "error": "%s: %s"
+                                      % (type(exc).__name__, str(exc)[:120])})
         elif p == "/api/stack_status":
             # 工作台「链路状态」卡（2026-11-15 台账 1251）：四个灯 + 告警。
             # 纯只读；任一探测失败只标 False，不抛 500。

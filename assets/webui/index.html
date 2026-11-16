@@ -87,6 +87,22 @@
 
         <!-- 状态 -->
         <section class="panel on" data-panel="status">
+          <div class="card" id="sustain-card">
+            <h3>自持 <small style="font-weight:400;opacity:.6">掉线会自动拉，扫码要人</small></h3>
+            <div id="sus-banner" style="display:none;padding:6px 10px;border-radius:6px;margin-bottom:6px;font-size:13px;font-weight:600"></div>
+            <div style="font-size:13px;line-height:1.9">
+              <div>supervisor：<span id="sus-sup" style="font-weight:600">—</span>
+                <span id="sus-when" style="opacity:.6;font-size:12px;margin-left:6px"></span></div>
+              <div>daemon 8321：<span id="sus-daemon">—</span>　QQ：<span id="sus-qq">—</span>　桥：<span id="sus-bridge">—</span></div>
+            </div>
+            <div style="margin-top:8px">
+              <button id="sus-login" type="button" style="padding:5px 12px;border-radius:6px;cursor:pointer">打开登录窗口</button>
+              <button id="sus-bridge" type="button" style="padding:5px 12px;border-radius:6px;cursor:pointer">启动 QQ 桥</button>
+              <button id="sus-refresh" type="button" style="padding:5px 12px;border-radius:6px;cursor:pointer">刷新</button>
+              <span id="sus-msg" style="font-size:12px;opacity:.7;margin-left:8px"></span>
+            </div>
+          </div>
+
           <div class="card" id="avatar-card">
             <h3>形象 <small style="font-weight:400;opacity:.6">2D 皮套（独立窗口照旧）</small></h3>
             <div style="display:flex;gap:10px;align-items:flex-start">
@@ -1052,6 +1068,66 @@
     }
     checkLogin();
     setInterval(checkLogin, 60000);
+  });
+})();
+</script>
+
+<script>
+/* 自持卡（台账 1274） */
+(function () {
+  function el(id) { return document.getElementById(id); }
+  function dot(ok, txt) {
+    return "<span style='color:" + (ok ? "#2ecc71" : "#e74c3c") + ";font-weight:600'>" +
+      (ok ? "在线" : "断开") + "</span>" + (txt ? "<span style='opacity:.55;font-size:12px'> " + txt + "</span>" : "");
+  }
+  function render(d) {
+    var sup = el("sus-sup"), ban = el("sus-banner");
+    if (sup) {
+      sup.innerHTML = d.supervisor_alive
+        ? "<span style='color:#2ecc71'>在跑</span>"
+        : "<span style='color:#e74c3c'>未运行</span>";
+    }
+    if (el("sus-when")) el("sus-when").textContent = d.when ? ("心跳 " + d.when) : "";
+    if (el("sus-daemon")) el("sus-daemon").innerHTML = dot(d.daemon_ok);
+    if (el("sus-qq")) el("sus-qq").innerHTML = dot(d.qq_online);
+    if (el("sus-bridge")) el("sus-bridge").innerHTML = dot(d.ws);
+    if (!ban) return;
+    if (d.needs_scan) {
+      ban.style.display = "block";
+      ban.style.background = "rgba(231,76,60,.18)";
+      ban.style.border = "1px solid #e74c3c";
+      ban.style.color = "#ff8b7b";
+      ban.textContent = "⚠ QQ 掉登录了：双击 qqwatch\\shell\\launcher-user.bat 扫码，扫完桥会自动连上";
+    } else if (!d.supervisor_alive) {
+      ban.style.display = "block";
+      ban.style.background = "rgba(243,156,18,.15)";
+      ban.style.border = "1px solid #f39c12";
+      ban.style.color = "#f0b34a";
+      ban.textContent = "⚠ supervisor 没在跑（心跳过期）：双击「启动」文件夹里的 YH-supervisor.cmd";
+    } else {
+      ban.style.display = "none";
+    }
+  }
+  function load() {
+    fetch("/api/sustain_status", {cache: "no-store"}).then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.ok) render(d); }).catch(function () {});
+  }
+  function act(action, label) {
+    var m = el("sus-msg"); if (m) m.textContent = label + "…";
+    fetch("/control", {method: "POST", headers: {"Content-Type": "application/json"},
+                       body: JSON.stringify({action: action})})
+      .then(function (r) { return r.json(); })
+      .then(function (x) {
+        if (m) m.textContent = x.ok ? (x.note || "已发送") : ("失败：" + (x.error || ""));
+        setTimeout(load, 3000); setTimeout(load, 10000);
+      }).catch(function (e) { if (m) m.textContent = "失败：" + e; });
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    if (el("sus-login")) el("sus-login").addEventListener("click", function () { act("napcat_window", "正在打开登录窗口"); });
+    if (el("sus-bridge")) el("sus-bridge").addEventListener("click", function () { act("qq_bridge_start", "正在启动桥"); });
+    if (el("sus-refresh")) el("sus-refresh").addEventListener("click", load);
+    load();
+    setInterval(load, 15000);
   });
 })();
 </script>

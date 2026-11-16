@@ -103,6 +103,8 @@ def start_bridge() -> None:
 
 def tick(fails: dict) -> None:
     lv = level()
+    # 心跳**先写**：即使后面因完整性/异常提前 return，工作台也知道 supervisor 活着
+    write_heartbeat({"level": lv, "daemon_ok": port_open(8321)})
     if lv not in ("Medium", "MediumPlus"):
         log("⛔ 当前完整性=%s，拒绝操作（管理员或低权限都会搞坏链）" % lv)
         return
@@ -122,6 +124,28 @@ def tick(fails: dict) -> None:
         else:
             log("桥在但未登录（online=%s ws=%s）→ 需要扫码"
                 % (q.get("online"), q.get("ws")))
+
+    # 心跳：工作台「自持」卡据此显示是否在跑（2026-11-16 老爹要求做进工作台）
+    write_heartbeat({
+        "daemon_ok": port_open(8321),
+        "qq_online": bool(q.get("online")),
+        "ws": bool(q.get("ws")),
+        "bridge": bool(q.get("bridge")),
+        "needs_scan": bool(q) and not q.get("ws"),
+    })
+
+
+def write_heartbeat(extra: dict) -> None:
+    """写心跳文件：工作台读它就知道 supervisor 活没活、链条哪一环断了。"""
+    try:
+        d = os.path.join(ROOT, "cache", "sustain")
+        os.makedirs(d, exist_ok=True)
+        payload = {"ts": time.time(), "level": level()}
+        payload.update(extra)
+        with open(os.path.join(d, "heartbeat.json"), "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def main() -> int:
