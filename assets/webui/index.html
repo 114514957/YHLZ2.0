@@ -76,7 +76,8 @@
 
       <nav class="drawer-tabs" id="drawerTabs">
         <button class="tab on" data-panel="status" type="button">状态</button>
-        <button class="tab" data-panel="memory" type="button">记忆</button>
+        <button class="tab" data-panel="qq" type="button">QQ</button>
+          <button class="tab" data-panel="memory" type="button">记忆</button>
         <button class="tab" data-panel="ledger" type="button">台账</button>
         <button class="tab" data-panel="media" type="button">翻唱</button>
         <button class="tab" data-panel="settings" type="button">设置</button>
@@ -225,7 +226,21 @@
         </section>
 
         <!-- 记忆 -->
-        <section class="panel" data-panel="memory">
+        <section class="panel" data-panel="qq">
+          <div class="card" id="qq-help-card">
+            <h3>QQ 登录 <small style="font-weight:400;opacity:.6">扫码窗口</small></h3>
+            <div style="margin-bottom:6px">
+              <button id="qq-win" type="button" style="padding:6px 12px;border-radius:6px;cursor:pointer">打开登录窗口</button>
+              <button id="qq-check" type="button" style="padding:6px 12px;border-radius:6px;cursor:pointer">检查登录状态</button>
+              <span id="qq-state" style="font-size:12px;opacity:.75;margin-left:8px"></span>
+            </div>
+            <div style="font-size:12px;line-height:1.7;opacity:.85">
+              NapCat 是<b>带窗口登录</b>的：点上面按钮会开一个登录窗口，用手机 QQ 扫码即可。<br>
+              工作台里的二维码只对<b>无头模式</b>有效，没有时不再显示破图。
+            </div>
+            <img id="qqQr" alt="" style="display:none;width:150px;height:150px;border-radius:8px;background:#fff">
+          </div>
+<section class="panel" data-panel="memory">
           
           
           <div class="card" id="chat-card">
@@ -977,6 +992,66 @@
       var m = el("ch-meta"); if (m) m.textContent = "新会话：" + cur + "（发一句就会建起来）";
     });
     load();
+  });
+})();
+</script>
+
+<script>
+/* QQ 独立菜单（台账 1261）：把三张 QQ 卡搬进「QQ」页；修登录引导 */
+(function () {
+  var NAMES = ["元亨 QQ", "群聊白名单", "群情报"];
+  function moveCards() {
+    var panel = document.querySelector('section.panel[data-panel="qq"]');
+    if (!panel) return;
+    var cards = Array.prototype.slice.call(document.querySelectorAll("div.card"));
+    cards.forEach(function (c) {
+      var h = c.querySelector("h3");
+      if (!h) return;
+      var name = (h.textContent || "").trim().split(/\s+/)[0];
+      if (NAMES.indexOf(name) >= 0 && c.parentNode !== panel) {
+        panel.appendChild(c);
+      }
+    });
+  }
+  function setState(s) {
+    var el = document.getElementById("qq-state");
+    if (el) el.textContent = s;
+  }
+  function checkLogin() {
+    setState("检查中…");
+    fetch("/state", {cache: "no-store"}).then(function (r) { return r.json(); })
+      .then(function (d) {
+        var q = (d && d.qq) || {};
+        var ok = !!(q.online && q.ws);
+        setState(ok ? ("已登录（" + (q.uin || "") + "，桥在线）") : "未登录 / 桥未连上");
+        var el = document.getElementById("qq-state");
+        if (el) el.style.color = ok ? "#2ecc71" : "#f39c12";
+      }).catch(function () { setState("检查失败"); });
+  }
+  function openWin() {
+    setState("正在打开登录窗口…");
+    fetch("/control", {method: "POST", headers: {"Content-Type": "application/json"},
+                       body: JSON.stringify({action: "napcat_window"})})
+      .then(function (r) { return r.json(); })
+      .then(function (x) {
+        setState(x.ok ? (x.note || "已打开，请在窗口里扫码") : ("失败：" + (x.error || "")));
+        setTimeout(checkLogin, 15000);
+        setTimeout(checkLogin, 40000);
+      }).catch(function (e) { setState("失败：" + e); });
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    moveCards();
+    var w = document.getElementById("qq-win"), c = document.getElementById("qq-check");
+    if (w) w.addEventListener("click", openWin);
+    if (c) c.addEventListener("click", checkLogin);
+    var img = document.getElementById("qqQr");
+    if (img) {
+      img.onload = function () { img.style.display = "block"; };
+      img.onerror = function () { img.style.display = "none"; };
+      img.src = "/qq-qrcode?t=" + Date.now();
+    }
+    checkLogin();
+    setInterval(checkLogin, 60000);
   });
 })();
 </script>

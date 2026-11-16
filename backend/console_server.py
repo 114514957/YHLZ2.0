@@ -2058,6 +2058,31 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": True, "drives": _drives_list()}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
+        if action == "napcat_window":
+            # 2026-11-16（台账 1261）：打开**可见的** NapCat 登录窗口（可扫码）。
+            # 我们的 NapCat 是带窗口登录的，不会写 qrcode.png，所以二维码接口必然 404——
+            # 与其让老爹以为"唤起失败"，不如直接给他一个能扫码的窗口。
+            try:
+                import subprocess as _sp
+                # YH → YHLZ → PROJECT（往上两级）；两条候选路径都试，避免再算错
+                _cands = [_PROJECT_ROOT.parent.parent / "qqwatch" / "shell",
+                          _PROJECT_ROOT.parent / "qqwatch" / "shell"]
+                shell = next((c for c in _cands
+                              if (c / "launcher-user.bat").exists()), _cands[0])
+                bat = shell / "launcher-user.bat"
+                if not bat.exists():
+                    return {"ok": False, "error": "找不到 %s" % bat}
+                uin = str(body.get("uin", "") or BOT_UIN)
+                _sp.Popen(
+                    ["cmd", "/c", "start", "", "launcher-user.bat", uin],
+                    cwd=str(shell), close_fds=True,
+                    creationflags=getattr(_sp, "CREATE_NEW_CONSOLE", 0))
+                _log("control", "napcat_window %s" % uin)
+                return {"ok": True,
+                        "note": "已打开 NapCat 登录窗口（元亨号 %s）：在窗口里扫码登录" % uin}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": "%s: %s"
+                        % (type(exc).__name__, str(exc)[:120])}
         if action in ("napcat_login", "qq_switch"):
             try:
                 from backend.napcat_launcher import launch_napcat
