@@ -1023,8 +1023,16 @@
     cards.forEach(function (c) {
       var h = c.querySelector("h3");
       if (!h) return;
-      var name = (h.textContent || "").trim().split(/\s+/)[0];
-      if (NAMES.indexOf(name) >= 0 && c.parentNode !== panel) {
+      // 2026-11-16（台账 1275）：原来用 textContent.split(/\s+/)[0] 取名，
+      // "元亨 QQ" 会被切成"元亨" → 永远匹配不上 → 卡片搬不进 QQ 页（老爹报的"控制失效"）。
+      // 改成：取 h3 的**第一个文本节点**（<small> 之前那段），再整体比较。
+      var first = "";
+      for (var i = 0; i < h.childNodes.length; i++) {
+        if (h.childNodes[i].nodeType === 3) { first += h.childNodes[i].textContent; }
+      }
+      var name = (first || h.textContent || "").trim();
+      var hit = NAMES.some(function (n) { return name.indexOf(n) === 0; });
+      if (hit && c.parentNode !== panel) {
         panel.appendChild(c);
       }
     });

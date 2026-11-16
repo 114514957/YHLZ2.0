@@ -28,7 +28,12 @@ import sys
 import time
 import urllib.request
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+# pythonw.exe 下 sys.stdout 是 None：不保护就会在 import 阶段直接崩（实测）。
+try:
+    if sys.stdout is not None:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # noqa: BLE001
+    pass
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = os.path.join(ROOT, ".venv", "Scripts", "python.exe")
 LOG = os.path.join(ROOT, "cache", "logs", "supervisor.log")
@@ -38,7 +43,12 @@ BACKOFF = [30, 60, 120, 300]
 
 def log(msg: str) -> None:
     line = "%s %s" % (time.strftime("%m-%d %H:%M:%S"), msg)
-    print(line, flush=True)
+    # pythonw.exe 下 sys.stdout 是 None，print 会抛异常 → supervisor 一启动就崩（实测）。
+    try:
+        if sys.stdout is not None:
+            print(line, flush=True)
+    except Exception:  # noqa: BLE001
+        pass
     try:
         os.makedirs(os.path.dirname(LOG), exist_ok=True)
         with open(LOG, "a", encoding="utf-8") as f:
