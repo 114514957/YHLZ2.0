@@ -13,3 +13,4 @@
 {"ts": "20261115_233410_485", "key": "*", "note": "restore-all-before", "blocks": ["ANTI_HALLUCINATION", "CRUTCH_BAN_CLAUSE", "SELF_MODEL_CLAUSE", "SOCIAL_POSTURE_CLAUSE", "VOICE_ANCHOR", "_updated"]}
 {"ts": "20261116_164543_486", "key": "SELFHOOD_CLAUSE", "note": "after-set", "blocks": ["SELFHOOD_CLAUSE", "_updated"]}
 {"ts": "20261116_164738_821", "key": "", "note": "manual", "blocks": ["SELFHOOD_CLAUSE", "_updated"]}
+{"ts": "20261116_211422_010", "key": "MEMORY_CLAIM_GUARD", "note": "after-set", "blocks": ["MEMORY_CLAIM_GUARD", "SELFHOOD_CLAUSE", "_updated"]}
