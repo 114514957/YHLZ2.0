@@ -41,7 +41,18 @@ TICK = 30
 BACKOFF = [30, 60, 120, 300]
 
 
-def log(msg: str) -> None:
+_LAST_LOG: dict[str, float] = {}
+
+
+def log(msg: str, *, repeat_after: float = 300.0) -> None:
+    """写日志。同一句话在 repeat_after 秒内只写一次（防止"需要扫码"每 30 秒刷屏）。
+
+    2026-11-16（台账 1276）：老爹贴的日志里「桥在但未登录」每 30 秒一行，灌满日志。
+    """
+    now = time.time()
+    if _LAST_LOG.get(msg, 0.0) and now - _LAST_LOG[msg] < repeat_after:
+        return
+    _LAST_LOG[msg] = now
     line = "%s %s" % (time.strftime("%m-%d %H:%M:%S"), msg)
     # pythonw.exe 下 sys.stdout 是 None，print 会抛异常 → supervisor 一启动就崩（实测）。
     try:
