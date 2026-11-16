@@ -30,6 +30,21 @@ from backend import turn_anchor as TA  # noqa: E402
 OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
+def _render(public: bool, text: str) -> str:
+    """按场景渲染（YHLZ_PROMPT_SCENE=1 时，闲聊不载入开发/工具类块）。"""
+    scene = ""
+    try:
+        from backend import prompt_scene as _psc
+        if _psc.enabled():
+            scene = _psc.classify(text)
+    except Exception:  # noqa: BLE001
+        scene = ""
+    try:
+        return TP.render_system_prompt(public=public, scene=scene)
+    except TypeError:
+        return TP.render_system_prompt(public=public)
+
+
 def call(port: int, system: str, user: str, max_tokens: int = 300,
          tools: list[dict] | None = None,
          anchor_msg: str = "") -> tuple[str, list[str]]:
@@ -89,10 +104,18 @@ def run(port: int, anchor: bool, max_tokens: int, mode: str = "system") -> dict:
     except Exception as ex:  # noqa: BLE001
         print("⚠ 工具清单加载失败（工具题会全灭）：%s" % type(ex).__name__)
 
-    sys_p = TP.render_system_prompt(public=False)
+    # 2026-11-16（台账 1259）：按场景选系统提示——闲聊只载必要块。
+    sys_p_casual = _render(False, "在吗")
+    sys_p_work = _render(False, "帮我查一下台账 1259")
+    sys_p = sys_p_casual
     anchor_p = TA.anchor_for(sys_p) if anchor else ""
     for e in PB.PERSONA_BANK:
         u = e["q"]
+        try:
+            from backend import prompt_scene as _psc
+            sys_p = sys_p_work if _psc.classify(u) == "work" else sys_p_casual
+        except Exception:  # noqa: BLE001
+            sys_p = sys_p_casual
         if anchor and mode == "user":
             u = TA.apply(u, sys_p)
         try:
@@ -105,7 +128,7 @@ def run(port: int, anchor: bool, max_tokens: int, mode: str = "system") -> dict:
         out["persona"].append({"id": e["id"], "cat": e.get("cat"), "gate": PB.is_gate(e),
                                "ok": ok, "why": why, "ans": ans})
 
-    sys_g = TP.render_system_prompt(public=True)
+    sys_g = _render(True, "在群里说一句")
     anchor_g = TA.anchor_for(sys_g) if anchor else ""
     for e in GB.GROUP_BANK:
         msgs = e.get("messages") or []

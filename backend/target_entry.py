@@ -297,10 +297,18 @@ class ConversationSession:
                 style_lines = active_style_lines(style_tendency()) or None
             except Exception:
                 style_lines = None
+        _scene = ""
+        try:
+            from backend import prompt_scene as _psc
+            if _psc.enabled():
+                _scene = _psc.classify(text or "")
+        except Exception:  # noqa: BLE001
+            _scene = ""
         rendered = render_system_prompt(
             persona=persona_arg, tools=tools,
             public=not self._is_owner(),
             style_lines=style_lines,
+            scene=_scene,
         )
         if text_turn:
             from backend.target_prompts import DEV_DISPATCH_CLAUSE

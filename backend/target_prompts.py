@@ -461,6 +461,7 @@ def render_system_prompt(
     tools: Optional[Sequence[dict]] = None,
     public: bool = False,
     style_lines: Optional[Sequence[str]] = None,
+    scene: str = "",
 ) -> str:
     if public:
         # Enforce the boundary even when a caller accidentally supplies owner
@@ -558,5 +559,27 @@ def render_system_prompt(
     # 2026-11-15（台账 1246）：群聊硬约束，只在公开分支加
     if public:
         blocks.append(_ov("GROUP_HARD_RULES", GROUP_HARD_RULES))
+
+    # 2026-11-16（台账 1259）：**场景裁剪**——闲聊只发必要块，人格块一字不改，
+    # 整块丢掉开发流程/工具协议/反幻觉/记忆边界等。默认关闭（YHLZ_PROMPT_SCENE=1）。
+    try:
+        from backend import prompt_scene as _ps
+        _names = _ps.droppable_names(str(scene or ""), bool(public))
+        if _names:
+            _vals = set()
+            for _n in _names:
+                _v = _ov(_n, globals().get(_n, ""))
+                if _v:
+                    _vals.add(str(_v))
+                    _vals.add(str(_v).strip())
+            _n0 = len(blocks)
+            blocks = [b for b in blocks
+                      if b is not None and str(b) not in _vals
+                      and str(b).strip() not in _vals]
+            if len(blocks) != _n0:
+                print("[prompt-scene] %s：块 %d → %d（丢 %d）"
+                      % (scene, _n0, len(blocks), _n0 - len(blocks)), flush=True)
+    except Exception:  # noqa: BLE001
+        pass
 
     return "\n".join(blocks).strip() + "\n"
