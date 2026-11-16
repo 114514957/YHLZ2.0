@@ -15,3 +15,4 @@
 {"ts": "20261116_164738_821", "key": "", "note": "manual", "blocks": ["SELFHOOD_CLAUSE", "_updated"]}
 {"ts": "20261116_211422_010", "key": "MEMORY_CLAIM_GUARD", "note": "after-set", "blocks": ["MEMORY_CLAIM_GUARD", "SELFHOOD_CLAUSE", "_updated"]}
 {"ts": "20261116_212037_028", "key": "MEMORY_CLAIM_GUARD", "note": "after-set", "blocks": ["MEMORY_CLAIM_GUARD", "SELFHOOD_CLAUSE", "_updated"]}
+{"ts": "20261116_221904_848", "key": "GROUP_HARD_RULES", "note": "after-set", "blocks": ["MEMORY_CLAIM_GUARD", "SELFHOOD_CLAUSE", "_updated"]}

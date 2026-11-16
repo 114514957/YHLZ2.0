@@ -72,6 +72,12 @@ def _save(d: dict) -> None:
     os.replace(tmp, CONFIG)
 
 
+# 2026-11-16（台账 1277）：键名与常量名不一致的块，用别名取默认值。
+# `VOICE_HARD_RULES` 只是**渲染用的键**，实际常量叫 CRUTCH_BAN_CLAUSE；
+# 少了这层，设置页打开该块是空白（老爹报的"硬控制失效"）。
+ALIAS = {"VOICE_HARD_RULES": "CRUTCH_BAN_CLAUSE"}
+
+
 def override(name: str, default: str) -> str:
     """渲染时的取用口：有覆盖用覆盖，否则默认值。未登记的块一律用默认值。"""
     if name not in EDITABLE:
@@ -88,6 +94,10 @@ def status() -> dict:
     out = []
     for key, title in EDITABLE.items():
         default = str(getattr(tp, key, "") or "")
+        if not default:
+            _alt = ALIAS.get(key, "")
+            if _alt:
+                default = str(getattr(tp, _alt, "") or "")
         cur = ov.get(key)
         changed = isinstance(cur, str) and cur.strip() and cur != default
         out.append({"key": key, "title": title,
