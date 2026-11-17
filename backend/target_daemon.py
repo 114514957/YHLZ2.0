@@ -1037,6 +1037,15 @@ class _Handler(ConsoleHandler):
         p = self.path.split("?", 1)[0]
         # 2026-11-16（台账 1274）：工作台「自持」卡。**必须在 daemon 侧拦**：
         # console_do_GET 开头就把所有 /api/* 代理到 8090，写在那里会被吃掉成 404（实测）。
+        if method == "GET" and p == "/api/sustain_autostart":
+            # 2026-11-17（台账 1286）：自持总开关的状态（工作台滑块用）
+            try:
+                from backend import sustain_switch as _sw
+                self._send(200, _sw.status())
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:120])})
+            return True
         if method == "GET" and p == "/api/sustain_status":
             try:
                 import json as _j

@@ -2143,6 +2143,19 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                 return {"ok": True, "note": f"{note}{_tag}"}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+        if action == "sustain_switch":
+            # 2026-11-17（台账 1286）：工作台滑块的开关动作
+            try:
+                from backend import sustain_switch as _sw
+                on = bool(body.get("enabled"))
+                st = _sw.set_enabled(on)
+                return {"ok": True, "enabled": st.get("enabled", on),
+                        "tasks": st.get("tasks"), "startup_file": st.get("startup_file"),
+                        "note": "自持已%s" % ("开启" if on else "关闭"),
+                        "log": st.get("log")}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": "%s: %s"
+                        % (type(exc).__name__, str(exc)[:120])}
         if action in ("qq_bridge_start", "qq_bridge_restart", "qq_bridge_stop"):
             # 工作台一键控制 QQ 桥 Lite（2026-10-09）：走官方 control 脚本。
             try:

@@ -91,6 +91,14 @@
             <h3>自持 <small style="font-weight:400;opacity:.6">掉线会自动拉，扫码要人</small></h3>
             <div id="sus-banner" style="display:none;padding:6px 10px;border-radius:6px;margin-bottom:6px;font-size:13px;font-weight:600"></div>
             <div style="font-size:13px;line-height:1.9">
+              <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px">
+                <label class="sus-switch" title="开启后：每分钟保活 + 每日学习 + 登录自启">
+                  <input type="checkbox" id="sus-auto">
+                  <span class="sus-slider"></span>
+                </label>
+                <span style="font-size:13px">自持启动</span>
+                <span id="sus-auto-msg" style="font-size:12px;opacity:.65"></span>
+              </div>
               <div>supervisor：<span id="sus-sup" style="font-weight:600">—</span>
                 <span id="sus-when" style="opacity:.6;font-size:12px;margin-left:6px"></span></div>
               <div>daemon 8321：<span id="sus-daemon">—</span>　QQ：<span id="sus-qq">—</span>　桥：<span id="sus-bridge">—</span></div>
@@ -1149,6 +1157,46 @@
     if (el("sus-refresh")) el("sus-refresh").addEventListener("click", load);
     load();
     setInterval(load, 15000);
+  });
+})();
+</script>
+
+<script>
+/* 自持总开关（台账 1286） */
+(function () {
+  function el(i) { return document.getElementById(i); }
+  function paint(d) {
+    var cb = el("sus-auto");
+    if (cb) cb.checked = !!d.enabled;
+    var m = el("sus-auto-msg");
+    if (!m) return;
+    var tasks = d.tasks || {};
+    var on = Object.keys(tasks).filter(function (k) { return tasks[k] === "enabled"; });
+    m.textContent = d.enabled
+      ? ("已开启（" + on.length + " 个任务 + 启动项" + (d.startup_file ? "✓" : "") + "）")
+      : "已关闭（全部停用）";
+  }
+  function loadAuto() {
+    fetch("/api/sustain_autostart", {cache: "no-store"})
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.ok) paint(d); }).catch(function () {});
+  }
+  function toggle(on) {
+    var m = el("sus-auto-msg");
+    if (m) m.textContent = on ? "开启中…" : "关闭中…";
+    fetch("/control", {method: "POST", headers: {"Content-Type": "application/json"},
+                       body: JSON.stringify({action: "sustain_switch", enabled: !!on})})
+      .then(function (r) { return r.json(); })
+      .then(function (x) {
+        if (x && x.ok) { loadAuto(); }
+        else if (m) { m.textContent = "失败：" + ((x && x.error) || ""); }
+      }).catch(function (e) { if (m) m.textContent = "失败：" + e; });
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    var cb = el("sus-auto");
+    if (cb) cb.addEventListener("change", function () { toggle(cb.checked); });
+    loadAuto();
+    setInterval(loadAuto, 30000);
   });
 })();
 </script>
