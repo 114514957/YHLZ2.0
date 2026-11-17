@@ -48,7 +48,7 @@ def build() -> list[dict]:
                        % (gname, gid, c["people"], c["active_people"],
                           c["messages"], c["messages_recent_7d"], alive),
             "detail": "话题：" + "/".join(c["topics"]),
-            "source": "qq_intel:%s" % gid,
+            "source": "qq_intel:obs:%s" % gid,
         })
         # 群话题
         if c["topics"]:
@@ -56,7 +56,7 @@ def build() -> list[dict]:
                 "category": "群话题",
                 "summary": "[群话题] %s 最近常聊：%s" % (gname, "、".join(c["topics"][:5])),
                 "detail": "共 %d 条消息，近7天 %d 条" % (c["messages"], c["messages_recent_7d"]),
-                "source": "qq_intel:%s" % gid,
+                "source": "qq_intel:topic:%s" % gid,
             })
         # 人物画像
         for m in c["members"][:6]:
@@ -69,7 +69,7 @@ def build() -> list[dict]:
                               "/".join(m["topics"][:3]) or "—"),
                 "detail": "QQ %s｜最近活跃 %s 天前｜占群 %s%%"
                           % (m["qq"], m["days_ago"], m["share"]),
-                "source": "qq_intel:%s:%s" % (gid, m["qq"]),
+                "source": "qq_intel:person:%s:%s" % (gid, m["qq"]),
             })
     return out
 
@@ -87,12 +87,12 @@ def main() -> int:
     if not a.apply:
         print("\n（干跑；加 --apply 写知识库）")
         return 0
-    from backend.yuanheng_kb import kb_add
+    from backend.yuanheng_kb import kb_replace
 
     ok = 0
     for i in items:
         try:
-            kb_add(i["summary"], category=i["category"],
+            kb_replace(i["summary"], category=i["category"],
                    source=i["source"], detail=i["detail"])
             ok += 1
         except Exception as ex:  # noqa: BLE001

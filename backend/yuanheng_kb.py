@@ -19,7 +19,8 @@ from contextlib import contextmanager
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_KB_DB = _PROJECT_ROOT / "data" / "yuanheng_kb.db"
 
-VALID_CATEGORIES = {"tech", "method", "idea", "fact", "skill", "resource", "word"}
+VALID_CATEGORIES = {"tech", "method", "idea", "fact", "skill", "resource", "word",
+    "群观察", "群话题", "群人物", "说话风格",}
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS kb_items (
     id TEXT PRIMARY KEY,
@@ -150,6 +151,23 @@ def kb_add(summary: str, category: str = "tech", source: str = "",
         )
         con.commit()
     return f"已入库：{iid} [{cat}]"
+
+
+def kb_replace(summary: str, category: str = "tech", source: str = "",
+                detail: str = "") -> str:
+    """按 source 覆盖写入：同一来源只保留最新一条（群观察/群话题/群人物用）。
+
+    2026-11-17：群观察的数字每天变，相似度去重拦不住，会堆出矛盾的旧条目。
+    """
+    _init()
+    src = str(source or "").strip()
+    if src:
+        try:
+            with _lock, _db() as con:
+                con.execute("DELETE FROM kb_items WHERE source = ?", (src,))
+        except Exception:  # noqa: BLE001
+            pass
+    return kb_add(summary, category=category, source=src, detail=detail)
 
 
 def kb_query(query: str, limit: int = 6, category: str = "") -> list[dict]:
