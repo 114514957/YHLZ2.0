@@ -55,7 +55,7 @@ def main() -> int:
         return 0
 
     log("=== 每日学习开始 ===")
-    ok1, out1 = run("style_learn.py", [])
+    ok1, out1 = run("style_learn.py", ["--apply"])
     log("风格学习：%s" % ("成功" if ok1 else "失败"))
     for ln in [x for x in out1.splitlines() if x.strip()][-6:]:
         log("  " + ln.strip()[:110])

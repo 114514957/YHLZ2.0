@@ -30,6 +30,8 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ROOT = Path(r"C:\Users\ACE_WAN——PROJECT\YHLZ\YH")
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 DB = ROOT / "cache" / "qq_bridge" / "lite" / "group_history.db"
 BOT_UINS = {"3655185302"}          # 元亨
 WINDOW = 180                        # 秒：多久内有人接话算"被回应"
