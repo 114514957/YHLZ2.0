@@ -2094,35 +2094,36 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:80]}"}
         if action == "napcat_window":
-            # 2026-11-16（台账 1269）：**只保留一条启动路径** —— tools/qq_login_terminal.py。
-            # 之前试过 explorer 开 bat / cmd start / 包装 bat，全部失败且有三个后遗症：
-            #   · bat 末尾 pause 在非交互环境必退（Input redirection is not supported）
-            #   · 注入器等 stdin，必须 stdin=DEVNULL
-            #   · 目录带 Low 标签时所有子进程都 Low（改标签前怎么启动都没用）
-            # 现在：统一调那个 python 脚本，让它自己处理；失败原因直接回给前端。
+            # 2026-11-17（台账 1288）：**通过计划任务唤起**。
+            # 实测：daemon 自己 start / explorer / stdin=DEVNULL 都起不来 NapCat；
+            # 只有「计划任务运行 wake_qq.cmd」能拿到真控制台 → QQ.exe + NapCat 都起来。
             try:
                 import subprocess as _sp
 
-                import sys as _sys
-                uin = str(body.get("uin", "") or BOT_UIN)
-                script = _PROJECT_ROOT / "tools" / "qq_login_terminal.py"
-                if not script.exists():
-                    return {"ok": False, "error": "缺少 tools/qq_login_terminal.py"}
-                py = _PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
-                log = _PROJECT_ROOT / "cache" / "logs" / "qq_login.log"
-                log.parent.mkdir(parents=True, exist_ok=True)
-                fh = open(log, "a", encoding="utf-8", errors="replace")
-                _sp.Popen([str(py if py.exists() else _sys.executable), "-X", "utf8",
-                           str(script), "--uin", uin, "--wait", "90"],
-                          cwd=str(_PROJECT_ROOT), stdout=fh, stderr=_sp.STDOUT,
-                          close_fds=True)
-                _log("control", "napcat_window %s → qq_login_terminal.py" % uin)
+                def _run(args):
+                    try:
+                        return _sp.run(args, capture_output=True, timeout=60).returncode
+                    except Exception:  # noqa: BLE001
+                        return 1
+
+                bat = str(_PROJECT_ROOT / "tools" / "wake_qq.cmd")
+                tname = "YH-WakeQQ"
+                chk = _run(["schtasks", "/query", "/tn", tname])
+                if chk != 0:
+                    _run(["schtasks", "/create", "/f", "/tn", tname,
+                          "/tr", '"%s"' % bat, "/sc", "once", "/st", "23:59"])
+                # 先结束上一次（bat 末尾有 pause，任务会一直 Running → 再 /run 无效）
+                _run(["schtasks", "/end", "/tn", tname])
+                rc = _run(["schtasks", "/run", "/tn", tname])
+                _log("control", "napcat_window → schtasks run %s rc=%s" % (tname, rc))
+                if rc != 0:
+                    return {"ok": False, "error": "计划任务唤起失败（rc=%s）" % rc}
                 return {"ok": True,
-                        "note": "已启动 QQ 登录流程（元亨号 %s）：看 cache/logs/qq_login.log，"
-                                "窗口出来就扫码；若日志说 Low 完整性，先按提示改目录标签" % uin}
+                        "note": "已唤起 QQ 登录窗口；窗口出来扫码，登录后桥会自动连上"
+                                "（若 3001 一直不监听，说明还没登录）"}
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": "%s: %s"
-                        % (type(exc).__name__, str(exc)[:120])}
+                        % (type(exc).__name__, str(exc)[:100])}
         if action in ("napcat_login", "qq_switch"):
             try:
                 from backend.napcat_launcher import launch_napcat
