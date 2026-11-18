@@ -25,7 +25,7 @@
     60
   ],
   "heartbeat_seconds": 10,
-  "pong_timeout_seconds": 5,
+  "pong_timeout_seconds": 20,
   "status_interval_seconds": 5,
   "bridge_start_timeout_seconds": 20,
   "owner_command_groups": [],
