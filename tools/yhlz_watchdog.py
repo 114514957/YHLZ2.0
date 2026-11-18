@@ -160,7 +160,15 @@ OPTIONAL_CHECKS = {"ollama"}
 
 
 def _down_keys(st: dict) -> list[str]:
-    return [k for k, v in st.items() if not v and k not in OPTIONAL_CHECKS]
+    keys = [k for k, v in st.items() if not v and k not in OPTIONAL_CHECKS]
+    try:
+        from backend.local_llm import sealed
+
+        if sealed() and "gemma" in keys:
+            keys.remove("gemma")  # 本地 LLM 封存：8081 不要求在线
+    except Exception:  # noqa: BLE001
+        pass
+    return keys
 
 
 def _healthy(st: dict) -> bool:

@@ -159,6 +159,13 @@ def _kg_llm_target() -> tuple[str, str, str]:
     否则维持本地 llama（8081, gemma-4-e4b），行为与之前完全一致。
     """
     mode = str(os.getenv("YHLZ_KG_LLM", "1")).strip().lower()
+    try:
+        from backend.local_llm import sealed
+
+        if sealed() and mode not in ("0", "false", "off", "no"):
+            mode = "cloud"  # 本地 LLM 封存：抽取改走云端，避免 8081 被拉起
+    except Exception:  # noqa: BLE001
+        pass
     if mode in ("cloud", "deepseek"):
         try:
             from backend.llm_endpoint import endpoint

@@ -169,8 +169,13 @@ def close_window() -> dict:
                 sys.path.insert(0, tools)
             import yhlz_launcher as yl
 
-            yl._spawn_llama()
-            out["llama"] = True
+            from backend.local_llm import sealed as _llm_sealed
+
+            if _llm_sealed():
+                out["llama"] = "sealed"
+            else:
+                yl._spawn_llama()
+                out["llama"] = True
     except Exception as exc:  # noqa: BLE001
         out["llama_error"] = type(exc).__name__
     try:

@@ -45,6 +45,17 @@ URLS = {
 # 2026-10-21 P0：Ollama 在本机长期 500，却仍被当必选服务每 60 秒等待/刷日志。
 # 只把 gemma/daemon 当关键服务；Ollama 要显式 YHLZ_START_OLLAMA=1 才尝试。
 CRITICAL_SERVICES = ("gemma", "daemon")
+
+
+def _local_llm_sealed() -> bool:
+    try:
+        from backend.local_llm import sealed
+
+        return sealed()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 GPU_WINDOW_FLAG = _ROOT / "cache" / "gpu_window.lock"
 GPU_WINDOW_MAX_AGE = 1200.0
 
@@ -221,6 +232,9 @@ def _spawn_llama():
     0831：v6 资产在、但 LoRA 缺失时不再静默起基座（人格消失但 /health 正常，
     排查成本极高）；默认拒绝启动，YHLZ_ALLOW_BASE_NO_LORA=1 才放行。
     """
+    if _local_llm_sealed():
+        _log("本地 LLM 已封存：跳过 8081 启动（聊天走云端，不受影响）")
+        return
     if YH_LLAMA_EXE.exists() and YH_BASE_GGUF.exists():
         if not YH_LORA_GGUF.exists() and not _allow_no_lora():
             _log(f"生产 LoRA 缺失：{YH_LORA_GGUF}；拒绝用无 LoRA 基座冒充元亨"
@@ -561,7 +575,8 @@ def ensure_stack() -> dict:
             _try_spawn("ollama", _spawn_ollama)
     # During a singing/Seed-VC window the watchdog stays alive but must not
     # bring llama back until the window closes.
-    if (not window and not st["gemma"] and not _port_open("127.0.0.1", 8081)
+    if (not window and not _local_llm_sealed()
+            and not st["gemma"] and not _port_open("127.0.0.1", 8081)
             and not _llama_port_alive(8081)
             and _spawn_allowed("llama", 180)):
         _try_spawn("llama", _spawn_llama)
