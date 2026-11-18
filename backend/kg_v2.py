@@ -90,7 +90,7 @@ def _conn():
         CREATE TABLE IF NOT EXISTS docs(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           hash TEXT UNIQUE, text TEXT NOT NULL, source TEXT DEFAULT '',
-          ts REAL NOT NULL, meta TEXT DEFAULT '');
+          ts REAL NOT NULL, meta TEXT DEFAULT '', emb BLOB);
         CREATE TABLE IF NOT EXISTS entities(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT UNIQUE NOT NULL, type TEXT DEFAULT '',
@@ -109,6 +109,11 @@ def _conn():
         CREATE INDEX IF NOT EXISTS idx_rel_src ON relations(src);
         CREATE INDEX IF NOT EXISTS idx_rel_dst ON relations(dst);
     """)
+    # 旧库迁移：docs 没有 emb 列时补上（只加列，不动数据）
+    try:
+        con.execute("ALTER TABLE docs ADD COLUMN emb BLOB")
+    except sqlite3.OperationalError:
+        pass
     try:
         yield con
         con.commit()
@@ -347,6 +352,75 @@ def facts_for(con: sqlite3.Connection, eid: int, limit: int = 8) -> list[dict]:
     return out
 
 
+def embed_docs(limit: int = 200) -> int:
+    """给还没有向量的段落补 embedding（共享 memory 的 BGE，CLS 池化）。"""
+    limit = max(1, min(int(limit), 2000))
+    with _conn() as con:
+        rows = con.execute("SELECT id,text FROM docs WHERE emb IS NULL LIMIT ?",
+                           (limit,)).fetchall()
+    if not rows:
+        return 0
+    try:
+        from backend.vector_memory import embed_cls
+
+        vecs = embed_cls([r[1][:1200] for r in rows])
+    except Exception:  # noqa: BLE001
+        return 0
+    with _conn() as con:
+        for (did, _text), vec in zip(rows, vecs):
+            con.execute("UPDATE docs SET emb=? WHERE id=?", (vec.tobytes(), did))
+    return len(rows)
+
+
+def semantic_docs(query: str, top: int = 6) -> list[dict]:
+    """段落向量召回（DPR 的本地版）；没有向量时尽力补一批。"""
+    if not str(query or "").strip():
+        return []
+    try:
+        from backend.vector_memory import semantic_ready
+    except Exception:  # noqa: BLE001
+        return []
+    if not semantic_ready():
+        return []
+    embed_docs(limit=200)
+    with _conn() as con:
+        rows = con.execute("SELECT id,text,emb FROM docs WHERE emb IS NOT NULL").fetchall()
+    if not rows:
+        return []
+    import numpy as np
+    from backend.vector_memory import embed_cls
+
+    try:
+        q = embed_cls([query])[0]
+    except Exception:  # noqa: BLE001
+        return []
+    scored = []
+    for did, text, blob in rows:
+        vec = np.frombuffer(blob, dtype=np.float32)
+        scored.append((float(np.dot(q, vec)), int(did), str(text)))
+    scored.sort(key=lambda x: -x[0])
+    return [{"doc_id": did, "score": round(score, 4), "text": text[:320]}
+            for score, did, text in scored[:max(1, int(top))]]
+
+
+def retrieve(query: str, top: int = 5) -> dict:
+    """双路召回：实体关系事实 + 段落向量，返回证据（供工具/调试）。"""
+    with _conn() as con:
+        seeds = _entities_in(con, query, limit=3)
+        facts, seen = [], set()
+        for eid, _name in seeds:
+            for f in facts_for(con, eid, limit=8):
+                key = (f["src"], f["rel"], f["dst"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                facts.append(f)
+    facts.sort(key=lambda x: -x["score"])
+    docs = semantic_docs(query, top=max(top, 6))
+    return {"query": str(query or ""), "seeds": [n for _, n in seeds],
+            "facts": facts[:max(top, 5)], "docs": docs, "mode": "hybrid"}
+
+
 def context_for(text: str, limit: int = 3) -> str:
     """给一轮对话的「已知事实」提示块；无命中返回空串。"""
     with _conn() as con:
@@ -363,7 +437,21 @@ def context_for(text: str, limit: int = 3) -> str:
                 facts.append(f)
         facts.sort(key=lambda x: -x["score"])
         if not facts:
-            return ""
+            # 没有实体命中时，才用段落向量补一条（且模型必须已在内存里热着，
+            # 不能在聊天回合里触发 10s+ 的冷加载）
+            try:
+                from backend.vector_memory import semantic_ready
+
+                if not semantic_ready():
+                    return ""
+            except Exception:  # noqa: BLE001
+                return ""
+            docs = semantic_docs(text, top=2)
+            lines = [f"- {d['text'][:90]}" for d in docs if d["score"] >= 0.45]
+            if not lines:
+                return ""
+            return ("（由记忆片段联想到的旧事，仅供理解，**不要提及或罗列**）：\n"
+                    + "\n".join(lines[: limit]))
         lines = []
         for f in facts[: max(1, int(limit)) * 2]:
             lines.append(f"- {f['src']} {f['rel']} {f['dst']}")
@@ -375,6 +463,8 @@ def stats() -> dict:
     with _conn() as con:
         out = {t: con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
                for t in ("docs", "entities", "relations", "mentions")}
+        out["docs_with_emb"] = con.execute(
+            "SELECT COUNT(*) FROM docs WHERE emb IS NOT NULL").fetchone()[0]
         out["top_entities"] = con.execute(
             "SELECT name,hits FROM entities ORDER BY hits DESC LIMIT 8").fetchall()
         out["recent_relations"] = con.execute(
@@ -400,6 +490,9 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if len(sys.argv) > 1 and sys.argv[1] == "context":
         print(context_for(" ".join(sys.argv[2:])) or "（无命中）")
+    elif len(sys.argv) > 1 and sys.argv[1] == "retrieve":
+        print(json.dumps(retrieve(" ".join(sys.argv[2:])), ensure_ascii=False,
+                         indent=1, default=str))
     else:
         s = stats()
         print(json.dumps(s, ensure_ascii=False, indent=1, default=str))

@@ -732,6 +732,32 @@ class QQBridge:
         label = "元亨" if str(user_id) == self.uin else f"user{user_id}"
         hist.append(f"{label}: {text}")
 
+    def _note_group_db(self, ev: dict, user_id: str, text: str,
+                       *, is_bot: bool = False) -> None:
+        """把一条群消息写进 group_messages（SQLite）。
+
+        2026-11-18：之前没有任何代码写这个表，时刻度/风格学习/群观察全都在读死数据。
+        """
+        try:
+            ev = ev or {}
+            gid = str(ev.get("group_id") or "")
+            if not gid:
+                return
+            mid = str(ev.get("message_id") or ev.get("id") or "")
+            if not mid:
+                mid = "local:%d:%s" % (int(time.time() * 1000), str(user_id)[:12])
+            sender = ev.get("sender") or {}
+            name = str(sender.get("card") or sender.get("nickname") or "") \
+                if isinstance(sender, dict) else ""
+            if is_bot:
+                name = "元亨"
+            self._group_db().add(
+                group_id=gid, message_id=mid, sender_id=str(user_id),
+                sender_name=name, text=str(text or ""), is_bot=bool(is_bot),
+                at=float(ev.get("time") or time.time()))
+        except Exception:  # noqa: BLE001
+            pass
+
     def _group_context(self, channel: str) -> str:
         hist = self._group_history.get(channel)
         if not hist:
@@ -2006,6 +2032,14 @@ class QQBridge:
                 group_ctx = self._group_context(channel)
                 self._note_group_history(channel, user_id, text)
             else:
+                # 2026-11-18（台账 1289）：**lite 也要写群历史**。
+                # 之前只在 full 分支写，导致 Lite 桥下 group_messages 一直是断的
+                # （时刻度/风格学习/群观察全都读它）。
+                try:
+                    self._note_group_history(channel, user_id, text)
+                    self._note_group_db(ev, user_id, text)
+                except Exception:  # noqa: BLE001
+                    pass
                 try:
                     block = self._group_db().context_block(
                         str(ev.get("group_id")), before_seq=before_seq)
