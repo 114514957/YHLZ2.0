@@ -1,0 +1,40 @@
+{
+ "ok": true,
+ "at": "2026-11-18 21:26:50",
+ "kg": {
+  "docs": 802,
+  "entities": 1762,
+  "relations": 1143,
+  "episodes": 799,
+  "profiles": 200,
+  "with_emb": 802
+ },
+ "recall": {
+  "at": 1795008200,
+  "mode": "semantic",
+  "limit": 1,
+  "precision": 0.846,
+  "recall": 0.88,
+  "fp_rate": 0.1,
+  "pool": 161,
+  "pass_precision": true,
+  "pass_recall": true
+ },
+ "sentinel": {
+  "ts": 1795001691.7126021,
+  "when": "2026-11-18 19:34:51",
+  "problems": [],
+  "metrics": {
+   "daemon_ok": true,
+   "qq_online": true,
+   "ws": true,
+   "bridge_instances": 1,
+   "napcat": true,
+   "history_age_min": 17.1,
+   "history_rows_1h": 10,
+   "send_ok": true,
+   "send_retcode": 0,
+   "send_error": ""
+  }
+ }
+}

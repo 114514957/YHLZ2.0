@@ -16,7 +16,7 @@ import time
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ROOT = r"C:\Users\ACE_WAN——PROJECT\YHLZ\YH"
-OUT = os.path.join(ROOT, "assets", "status_card.json")
+OUT = os.path.join(ROOT, "assets", "webui", "status_card.json")
 
 
 def kg() -> dict | None:

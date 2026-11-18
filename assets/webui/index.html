@@ -251,20 +251,9 @@
 
         <!-- 记忆 -->
         <section class="panel" id="runtime-panel">
-  <h2>运行态 <span class="muted" id="rt-when" style="font-size:12px;font-weight:400"></span></h2>
-  <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-    <div>
-      <div class="muted" style="font-size:12px;margin-bottom:4px">记忆图谱 v2</div>
-      <div id="rt-kg" style="font-size:13px;line-height:1.7">—</div>
-    </div>
-    <div>
-      <div class="muted" style="font-size:12px;margin-bottom:4px">召回评测（最近一次）</div>
-      <div id="rt-recall" style="font-size:13px;line-height:1.7">—</div>
-    </div>
-    <div>
-      <div class="muted" style="font-size:12px;margin-bottom:4px">链路哨兵</div>
-      <div id="rt-sentinel" style="font-size:13px;line-height:1.7">—</div>
-    </div>
+  <h2>运行态</h2>
+  <div id="runtime-body">
+<!--STATUS_CARD_START--><div class="muted" style="font-size:12px;margin-bottom:6px">更新于 2026-11-18 21:27:32</div><div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"><div><div class="muted" style="font-size:12px">记忆图谱 v2</div><div style="font-size:13px;line-height:1.7"><div>段落 docs：<b>802</b></div><div>实体：<b>1762</b></div><div>关系：<b>1143</b></div><div>Episode：<b>799</b></div><div>向量覆盖：<b style="color:#2ecc71">802/802</b></div></div></div><div><div class="muted" style="font-size:12px">召回评测（最近一次）</div><div style="font-size:13px;line-height:1.7"><div>精确率：<b style="color:#2ecc71">84.6%</b></div><div>命中率：<b style="color:#2ecc71">88.0%</b></div><div>池子：<b>161</b></div><div>口径：<b>top-1</b></div></div></div><div><div class="muted" style="font-size:12px">链路哨兵</div><div style="font-size:13px;line-height:1.7"><div>状态：<b style="color:#2ecc71">正常</b></div><div>QQ：<b style="color:#2ecc71">在线</b></div><div>能发消息：<b style="color:#2ecc71">是</b></div><div>群历史：<b>3 分钟前</b></div></div></div></div><!--STATUS_CARD_END-->
   </div>
 </section>
 <section class="panel" data-panel="qq">
@@ -1246,56 +1235,5 @@
 })();
 </script>
 
-<script>
-/* 运行态卡（2026-11-18，台账 1283） */
-(function () {
-  function el(i) { return document.getElementById(i); }
-  function row(k, v, ok) {
-    var c = ok === true ? "#2ecc71" : (ok === false ? "#e74c3c" : "inherit");
-    return '<div>' + k + '：<b style="color:' + c + '">' + v + '</b></div>';
-  }
-  function paint(d) {
-    if (el("rt-when")) el("rt-when").textContent = d.at || "";
-    var kg = d.kg, rec = d.recall, sen = d.sentinel;
-
-    if (el("rt-kg")) {
-      el("rt-kg").innerHTML = kg
-        ? row("段落 docs", kg.docs) + row("实体", kg.entities) +
-          row("关系", kg.relations) + row("Episode", kg.episodes) +
-          row("向量覆盖", kg.with_emb + "/" + kg.docs,
-              kg.with_emb >= kg.docs * 0.95)
-        : "—";
-    }
-    if (el("rt-recall")) {
-      el("rt-recall").innerHTML = rec
-        ? row("精确率", (rec.precision * 100).toFixed(1) + "%", !!rec.pass_precision) +
-          row("命中率", (rec.recall * 100).toFixed(1) + "%", !!rec.pass_recall) +
-          row("池子", rec.pool) +
-          row("口径", "top-" + rec.limit)
-        : "—";
-    }
-    if (el("rt-sentinel")) {
-      var probs = (sen && sen.problems) || [];
-      var m = (sen && sen.metrics) || {};
-      el("rt-sentinel").innerHTML = sen
-        ? row("状态", probs.length ? probs.length + " 项异常" : "正常", probs.length === 0) +
-          row("QQ", m.qq_online ? "在线" : "离线", !!m.qq_online) +
-          row("能发消息", m.send_ok ? "是" : "否", !!m.send_ok) +
-          row("群历史", (m.history_age_min != null ? Math.round(m.history_age_min) + " 分钟前" : "—"))
-        : "—";
-    }
-  }
-  function load() {
-    fetch("/api/status_card", {cache: "no-store"})
-      .then(function (r) { return r.json(); })
-      .then(function (d) { if (d && d.ok) paint(d); })
-      .catch(function () {});
-  }
-  document.addEventListener("DOMContentLoaded", function () {
-    load();
-    setInterval(load, 60000);
-  });
-})();
-</script>
 </body>
 </html>

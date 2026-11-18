@@ -184,6 +184,17 @@ def main() -> int:
     except Exception:  # noqa: BLE001
         pass
 
+    # 2026-11-18：顺手刷新工作台「运行态」卡（daemon 的 /api 被代理层吃掉，
+    # 所以卡片改成服务端渲染进 index.html，每次哨兵跑完就更新一次）。
+    try:
+        import subprocess as _sp
+
+        _sp.run([sys.executable, "-X", "utf8",
+                 os.path.join(ROOT, "tools", "status_card_render.py")],
+                capture_output=True, timeout=120, cwd=ROOT)
+    except Exception:  # noqa: BLE001
+        pass
+
     msg = "正常" if not problems else "；".join(problems)
     log(msg)
     if "--json" in sys.argv:
