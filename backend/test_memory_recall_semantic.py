@@ -56,7 +56,11 @@ class GateTest(unittest.TestCase):
 
 class IndexTest(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.mkdtemp(prefix="memvec-")
+        # 2026-11-18：临时目录必须落在 cache/tmp，别在仓库根目录堆 memvec-*（结构检查会红）
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        tmp_root = os.path.join(root, "cache", "tmp")
+        os.makedirs(tmp_root, exist_ok=True)
+        self.tmp = tempfile.mkdtemp(prefix="memvec-", dir=tmp_root)
         self.db = os.path.join(self.tmp, "memstore.db")
         self.vec = os.path.join(self.tmp, "memvec.db")
         self._make_db()
