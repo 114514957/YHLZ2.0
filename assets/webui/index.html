@@ -250,7 +250,24 @@
         </section>
 
         <!-- 记忆 -->
-        <section class="panel" data-panel="qq">
+        <section class="panel" id="runtime-panel">
+  <h2>运行态 <span class="muted" id="rt-when" style="font-size:12px;font-weight:400"></span></h2>
+  <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+    <div>
+      <div class="muted" style="font-size:12px;margin-bottom:4px">记忆图谱 v2</div>
+      <div id="rt-kg" style="font-size:13px;line-height:1.7">—</div>
+    </div>
+    <div>
+      <div class="muted" style="font-size:12px;margin-bottom:4px">召回评测（最近一次）</div>
+      <div id="rt-recall" style="font-size:13px;line-height:1.7">—</div>
+    </div>
+    <div>
+      <div class="muted" style="font-size:12px;margin-bottom:4px">链路哨兵</div>
+      <div id="rt-sentinel" style="font-size:13px;line-height:1.7">—</div>
+    </div>
+  </div>
+</section>
+<section class="panel" data-panel="qq">
           <div class="card" id="qq-help-card">
             <h3>QQ 登录 <small style="font-weight:400;opacity:.6">扫码窗口</small></h3>
             <div style="margin-bottom:6px">
@@ -1225,6 +1242,58 @@
     if (cb) cb.addEventListener("change", function () { toggle(cb.checked); });
     loadAuto();
     setInterval(loadAuto, 30000);
+  });
+})();
+</script>
+
+<script>
+/* 运行态卡（2026-11-18，台账 1283） */
+(function () {
+  function el(i) { return document.getElementById(i); }
+  function row(k, v, ok) {
+    var c = ok === true ? "#2ecc71" : (ok === false ? "#e74c3c" : "inherit");
+    return '<div>' + k + '：<b style="color:' + c + '">' + v + '</b></div>';
+  }
+  function paint(d) {
+    if (el("rt-when")) el("rt-when").textContent = d.at || "";
+    var kg = d.kg, rec = d.recall, sen = d.sentinel;
+
+    if (el("rt-kg")) {
+      el("rt-kg").innerHTML = kg
+        ? row("段落 docs", kg.docs) + row("实体", kg.entities) +
+          row("关系", kg.relations) + row("Episode", kg.episodes) +
+          row("向量覆盖", kg.with_emb + "/" + kg.docs,
+              kg.with_emb >= kg.docs * 0.95)
+        : "—";
+    }
+    if (el("rt-recall")) {
+      el("rt-recall").innerHTML = rec
+        ? row("精确率", (rec.precision * 100).toFixed(1) + "%", !!rec.pass_precision) +
+          row("命中率", (rec.recall * 100).toFixed(1) + "%", !!rec.pass_recall) +
+          row("池子", rec.pool) +
+          row("口径", "top-" + rec.limit)
+        : "—";
+    }
+    if (el("rt-sentinel")) {
+      var probs = (sen && sen.problems) || [];
+      var m = (sen && sen.metrics) || {};
+      el("rt-sentinel").innerHTML = sen
+        ? row("状态", probs.length ? probs.length + " 项异常" : "正常", probs.length === 0) +
+          row("QQ", m.qq_online ? "在线" : "离线", !!m.qq_online) +
+          row("能发消息", m.send_ok ? "是" : "否", !!m.send_ok) +
+          row("群历史", (m.history_age_min != null ? Math.round(m.history_age_min) + " 分钟前" : "—"))
+        : "—";
+    }
+  }
+  function load() {
+    fetch("/api/status_card", {cache: "no-store"})
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.ok) paint(d); })
+      .catch(function () {});
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    load();
+    setInterval(load, 60000);
   });
 })();
 </script>

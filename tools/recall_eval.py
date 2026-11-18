@@ -120,6 +120,23 @@ def main() -> int:
         b["n"] += 1
         b["ok"] += 1 if r["ok"] else 0
 
+    # 2026-11-18：把最近一次结果写盘，供工作台「运行态」卡读取
+    try:
+        _out = os.path.join(ROOT, "cache", "eval", "recall_last.json")
+        os.makedirs(os.path.dirname(_out), exist_ok=True)
+        with io.open(_out, "w", encoding="utf-8") as _f:
+            json.dump({"at": int(__import__("time").time()),
+                       "mode": a.mode, "limit": a.limit,
+                       "precision": round(precision, 3),
+                       "recall": round(recall, 3),
+                       "fp_rate": round(fp_rate, 3),
+                       "pool": len(pool),
+                       "pass_precision": precision >= TARGET_PRECISION,
+                       "pass_recall": recall >= TARGET_RECALL},
+                      _f, ensure_ascii=False, indent=1)
+    except Exception:  # noqa: BLE001
+        pass
+
     if a.json:
         print(json.dumps({"precision": round(precision, 3),
                           "recall": round(recall, 3),

@@ -1030,6 +1030,46 @@ class DaemonRuntime:
 class _Handler(ConsoleHandler):
     runtime: DaemonRuntime = None  # type: ignore[assignment]
 
+def _status_card() -> dict:
+    """聚合三源：KG 规模、最近一次召回评测、链路哨兵。缺源就返回 None。"""
+    import json
+    import time
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    out = {"ok": True, "at": time.strftime("%Y-%m-%d %H:%M:%S")}
+
+    try:  # ① KG
+        import sqlite3
+
+        db = root / "cache" / "kg" / "kg_v2.db"
+        if db.exists():
+            con = sqlite3.connect(str(db), timeout=3)
+            try:
+                q = lambda s: con.execute(s).fetchone()[0]  # noqa: E731
+                out["kg"] = {
+                    "docs": q("select count(*) from docs"),
+                    "entities": q("select count(*) from entities"),
+                    "relations": q("select count(*) from relations"),
+                    "episodes": q("select count(*) from episodes"),
+                    "profiles": q("select count(*) from profiles"),
+                    "with_emb": q("select count(*) from docs where emb is not null"),
+                }
+            finally:
+                con.close()
+    except Exception:  # noqa: BLE001
+        out["kg"] = None
+
+    for key, rel in (("recall", ("cache", "eval", "recall_last.json")),
+                     ("sentinel", ("cache", "sustain", "sentinel.json"))):
+        try:
+            p = root.joinpath(*rel)
+            out[key] = json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+        except Exception:  # noqa: BLE001
+            out[key] = None
+    return out
+
+
     @staticmethod
     def _sentinel_info() -> dict:
         """读哨兵结果（chain_sentinel.py 每小时写一次）。"""
@@ -1060,6 +1100,15 @@ class _Handler(ConsoleHandler):
             try:
                 from backend import sustain_switch as _sw
                 self._send(200, _sw.status())
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": "%s: %s"
+                                 % (type(exc).__name__, str(exc)[:120])})
+            return True
+        if method == "GET" and p == "/api/status_card":
+            # 2026-11-18（台账 1283/CCG mem_1795008177921_752ebb）：
+            # 工作台「运行态」卡：KG 规模 + 召回指标 + 链路哨兵，三源聚合。
+            try:
+                self._send(200, _status_card())
             except Exception as exc:  # noqa: BLE001
                 self._send(500, {"ok": False, "error": "%s: %s"
                                  % (type(exc).__name__, str(exc)[:120])})
