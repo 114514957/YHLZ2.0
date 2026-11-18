@@ -1027,9 +1027,6 @@ class DaemonRuntime:
         }
 
 
-class _Handler(ConsoleHandler):
-    runtime: DaemonRuntime = None  # type: ignore[assignment]
-
 def _status_card() -> dict:
     """聚合三源：KG 规模、最近一次召回评测、链路哨兵。缺源就返回 None。"""
     import json
@@ -1069,6 +1066,11 @@ def _status_card() -> dict:
             out[key] = None
     return out
 
+
+
+
+class _Handler(ConsoleHandler):
+    runtime: DaemonRuntime = None  # type: ignore[assignment]
 
     @staticmethod
     def _sentinel_info() -> dict:
