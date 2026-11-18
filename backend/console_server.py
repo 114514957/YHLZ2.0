@@ -2106,6 +2106,20 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                     except Exception:  # noqa: BLE001
                         return 1
 
+                # 已经在等扫码就别再起一个实例（6099 = NapCat WebUI 端口）
+                import socket as _sk
+
+                _s = _sk.socket()
+                _s.settimeout(0.6)
+                _busy = False
+                try:
+                    _busy = _s.connect_ex(("127.0.0.1", 6099)) == 0
+                finally:
+                    _s.close()
+                if _busy:
+                    return {"ok": True,
+                            "note": "NapCat 已在运行、正在等扫码：打开工作台「QQ」页扫二维码即可"}
+
                 bat = str(_PROJECT_ROOT / "tools" / "wake_qq.cmd")
                 tname = "YH-WakeQQ"
                 chk = _run(["schtasks", "/query", "/tn", tname])

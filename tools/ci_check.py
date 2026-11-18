@@ -34,6 +34,7 @@ CORE = [
     "backend.test_target_kw_index",
     "backend.test_ledger_index_v2",
     "backend.test_ledger_write_meta",
+    "backend.test_kg_v2",
   "backend.test_target_memory",
     "backend.test_qq_behavior",
     "backend.test_bili_tools",

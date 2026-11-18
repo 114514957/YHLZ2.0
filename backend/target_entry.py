@@ -801,19 +801,11 @@ class ConversationSession:
             except Exception:
                 pass
             try:
-                from backend import entity_graph
+                from backend import memory_kg
 
-                eg = entity_graph.context_for(text)
-                if eg:
-                    ctx_lines.append(eg)
-            except Exception:
-                pass
-            try:
-                from backend import associations
-
-                asc = associations.context_for(text)
-                if asc:
-                    ctx_lines.append(asc)
+                kg = memory_kg.context_for(text)
+                if kg:
+                    ctx_lines.append(kg)
             except Exception:
                 pass
             try:
@@ -911,10 +903,10 @@ class ConversationSession:
         self._prune_background_tasks()
         if self._is_owner() and not images:
             try:
-                from backend import entity_graph
+                from backend import memory_kg
 
                 self._summary_tasks.append(asyncio.ensure_future(
-                    entity_graph.ingest_text(f"{text}。{result.answer}")))
+                    memory_kg.ingest(f"{text}。{result.answer}", source="turn")))
             except Exception:
                 pass
             try:
