@@ -220,12 +220,35 @@ def q12_ui() -> None:
 
 
 def q14_coverage() -> None:
+    """Q14 口径修正（2026-11-18）：
+
+    原来要求 `docs ≥ 1034`（候选记录数）——**这个判据是错的**。
+    docs 只在抽到三元组时才建；台账里有约 22% 的记录是纯过程日志（"时间/结果/提交"），
+    抽不出稳定事实，永远不会有 doc。用 docs 卡 98% 等于永远不可能通过。
+
+    正确判据：**每条候选记录都被处理过**（docs ∪ processed 覆盖候选），
+    再用 docs/候选 作为"有事实占比"的质量指标一并报告。
+    """
+    from backend.ledger_index_v2 import parse_records
+
     s = kg_v2.stats()
-    target = 1034
-    pct = round(s["docs"] / target * 100, 1)
-    ok = True if s["docs"] >= target * 0.98 else None
-    rec("Q14", "全量回填跑完了吗？", f"docs ≥ {target}（1034 条候选）",
-        f"docs={s['docs']}（{pct}%），entities={s['entities']} relations={s['relations']}",
+    cands = [r for r in parse_records()
+             if r["kind"] in ("决策", "结论") and 80 <= len(r["body"]) <= 2500]
+    target = len(cands)
+    with kg_v2._conn() as con:
+        done = {str(r[0]) for r in con.execute(
+            "SELECT source FROM docs WHERE source LIKE 'ledger:%'")}
+        done |= {str(r[0]) for r in con.execute(
+            "SELECT source FROM processed WHERE source LIKE 'ledger:%'")}
+    attempted = len(done & {f"ledger:{r['rec']}" for r in cands})
+    pct = round(attempted / max(1, target) * 100, 1)
+    doc_pct = round(s["docs"] / max(1, target) * 100, 1)
+    ok = True if attempted >= target * 0.98 else None
+    rec("Q14", "全量回填跑完了吗？",
+        f"候选 {target} 条全部处理过（docs ∪ processed）",
+        f"processed={attempted}/{target}（{pct}%）；"
+        f"有事实的 docs={s['docs']}（{doc_pct}%，其余为无事实的过程日志）；"
+        f"entities={s['entities']} relations={s['relations']}",
         ok, "回填仍在后台进行" if ok is None else "")
 
 

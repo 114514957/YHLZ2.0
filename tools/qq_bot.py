@@ -947,15 +947,26 @@ class QQBridge:
 
     async def _process_message(self, ev: dict, channel: str,
                                lock: asyncio.Lock, control: bool) -> None:
+        _dbg = os.getenv("YHLZ_QQ_DEBUG_EVENTS", "0") != "0"
+        if _dbg:
+            self.log(f"[dbg] proc start {channel}")
         await self._ws_ready.wait()
+        if _dbg:
+            self.log(f"[dbg] proc ready {channel}")
         if control:
             # 控制通道：不等待同会话的慢模型调用，只与其它控制命令串行。
             async with self._control_lock:
                 await self.handle(self._ws, ev)
         else:
             async with lock:
+                if _dbg:
+                    self.log(f"[dbg] proc lock {channel}")
                 async with self._chat_sem:
+                    if _dbg:
+                        self.log(f"[dbg] proc sem {channel}")
                     await self.handle(self._ws, ev)
+        if _dbg:
+            self.log(f"[dbg] proc done {channel}")
         self.inbox_processed += 1
 
     async def _inbox_worker(self) -> None:

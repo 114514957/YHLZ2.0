@@ -152,6 +152,29 @@ def _conn():
         con.close()
 
 
+def _kg_llm_target() -> tuple[str, str, str]:
+    """返回 (chat_completions_url, api_key, model)。
+
+    2026-11-18：`YHLZ_KG_LLM=cloud` → 用 llm_endpoint 的云端配置（DeepSeek）；
+    否则维持本地 llama（8081, gemma-4-e4b），行为与之前完全一致。
+    """
+    mode = str(os.getenv("YHLZ_KG_LLM", "1")).strip().lower()
+    if mode in ("cloud", "deepseek"):
+        try:
+            from backend.llm_endpoint import endpoint
+
+            ep = endpoint()
+            base = str(ep.get("base_url") or "").rstrip("/")
+            if not base.endswith("/chat/completions"):
+                base += "/chat/completions"
+            return base, str(ep.get("api_key") or ""), str(ep.get("model") or "deepseek-chat")
+        except Exception:  # noqa: BLE001
+            pass
+    base = os.getenv("YHLZ_KG_LLM_BASE",
+                     "http://127.0.0.1:8081/v1/chat/completions")
+    return base, "", os.getenv("YHLZ_KG_LLM_MODEL", "gemma-4-e4b")
+
+
 def _local_llm():
     global _LLM
     if _LLM is None:
@@ -159,11 +182,9 @@ def _local_llm():
 
         # 2026-11-18：记忆抽取走**本机 llama**（8081），不再用 llm_endpoint 的云端配置
         # （云端 DNS 不通时旧 entity_graph 一直静默抽空）。
-        base = os.getenv("YHLZ_KG_LLM_BASE",
-                         "http://127.0.0.1:8081/v1/chat/completions")
+        base, key, model = _kg_llm_target()
         _LLM = build_openai_compatible_llm_turn(
-            base_url=base, api_key="",
-            model=os.getenv("YHLZ_KG_LLM_MODEL", "gemma-4-e4b"),
+            base_url=base, api_key=key, model=model,
             temperature=0.1, max_tokens=180, reasoning_effort="none")
     return _LLM
 
@@ -687,8 +708,7 @@ async def extract_batch(texts: list[str], llm_turn=None) -> list[list[dict]]:
         if _LLM_BATCH is None:
             from backend.target_orchestrator import build_openai_compatible_llm_turn
 
-            base = os.getenv("YHLZ_KG_LLM_BASE",
-                             "http://127.0.0.1:8081/v1/chat/completions")
+            base, _key, _model = _kg_llm_target()
             _LLM_BATCH = build_openai_compatible_llm_turn(
                 base_url=base, api_key="",
                 model=os.getenv("YHLZ_KG_LLM_MODEL", "gemma-4-e4b"),
