@@ -1498,6 +1498,25 @@ class _Handler(ConsoleHandler):
                         _qt2.note_sent(channel)
                 except Exception:  # noqa: BLE001
                     pass
+                # 2026-11-18（台账 1279 遗留）：空回复诊断。
+                # 现象：同一句有时正常、有时 answer=""，会话里只留 user 没有 assistant。
+                try:
+                    if not str((info or {}).get("answer") or "").strip():
+                        import io as _io
+                        import time as _t
+                        from pathlib import Path as _P
+
+                        _p = (_P(__file__).resolve().parent.parent / "cache"
+                               / "logs" / "empty_turn.log")
+                        _p.parent.mkdir(parents=True, exist_ok=True)
+                        with _io.open(str(_p), "a", encoding="utf-8") as _f:
+                            _f.write("%s ch=%s text=%r keys=%s tools=%d iter=%s\n"
+                                     % (_t.strftime("%m-%d %H:%M:%S"), channel,
+                                        str(text)[:50], sorted((info or {}).keys()),
+                                        len((info or {}).get("tool_uses") or []),
+                                        (info or {}).get("iterations")))
+                except Exception:  # noqa: BLE001
+                    pass
                 self._send(200, info)
             except Exception as exc:
                 self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:160]}"})

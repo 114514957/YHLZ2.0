@@ -33,12 +33,17 @@ def rows(limit: int, min_imp: int):
         con.close()
 
 
-def ledger_rows(limit: int):
+def ledger_rows(limit: int, skip_existing: bool = True):
     from backend.ledger_index_v2 import parse_records
 
     recs = [r for r in parse_records()
             if r["kind"] in ("决策", "结论") and 80 <= len(r["body"]) <= 2500]
     recs.sort(key=lambda r: r["rec"], reverse=True)
+    if skip_existing:
+        with kg_v2._conn() as con:
+            done = {str(r[0]) for r in con.execute(
+                "SELECT source FROM docs WHERE source LIKE 'ledger:%'")}
+        recs = [r for r in recs if f"ledger:{r['rec']}" not in done]
     return [(r["rec"], r["kind"], r["title"], r["body"]) for r in recs[:limit]]
 
 
@@ -49,10 +54,13 @@ async def main() -> int:
     ap.add_argument("--source", choices=("l2", "ledger"), default="l2")
     ap.add_argument("--batch", type=int, default=1,
                     help="每次 LLM 调用处理几段（>1 时用批量抽取，快很多）")
+    ap.add_argument("--no-skip", action="store_true",
+                    help="ledger 源：不跳过已入库的记录（默认跳过）")
     args = ap.parse_args()
     if args.source == "ledger":
         items = [(rid, kind, 0, f"{title}\n{body[:350]}")
-                 for rid, kind, title, body in ledger_rows(args.limit)]
+                 for rid, kind, title, body in
+                 ledger_rows(args.limit, skip_existing=not args.no_skip)]
     else:
         items = rows(args.limit, args.min_importance)
     print(f"回填 {len(items)} 条 {args.source} -> {kg_v2.DB_PATH}")
