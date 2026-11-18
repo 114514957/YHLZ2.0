@@ -31,6 +31,7 @@ sys.path.insert(0, ROOT)
 
 DB = os.path.join(ROOT, "cache", "memstore", "memstore.db")
 LABELS = ("her", "owner", "engineering", "other")
+INCLUDE_INACTIVE = "--all" in sys.argv
 
 SYS = ("你是记忆分类器。给你若干条记忆摘要，判断每条属于哪一类，"
        "只输出 JSON，不要解释。类别：\n"
@@ -45,7 +46,8 @@ def load_unknown(limit: int = 0) -> list[dict]:
     con = sqlite3.connect(DB)
     con.row_factory = sqlite3.Row
     q = ("select id, summary, source from l2_items "
-         "where (role is null or role='' or role='unknown') and status='active' "
+         "where (role is null or role='' or role='unknown') "
+         + ("" if INCLUDE_INACTIVE else "and status='active' ") +
          "order by importance desc, created_at desc")
     if limit:
         q += " limit %d" % limit
@@ -90,6 +92,8 @@ def main() -> int:
     ap.add_argument("--dry", action="store_true")
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--all", action="store_true",
+                    help="连非活跃（archive/downgraded）的 unknown 一起分类")
     a = ap.parse_args()
 
     rows = load_unknown(0 if a.apply else a.batch)
