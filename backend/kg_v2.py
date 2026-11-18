@@ -119,6 +119,8 @@ def _conn():
           UNIQUE(source, start_ts, end_ts));
         CREATE TABLE IF NOT EXISTS profiles(
           name TEXT PRIMARY KEY, facts TEXT DEFAULT '', updated REAL);
+        CREATE TABLE IF NOT EXISTS processed(
+          source TEXT PRIMARY KEY, ts REAL NOT NULL);
         CREATE INDEX IF NOT EXISTS idx_rel_src ON relations(src);
         CREATE INDEX IF NOT EXISTS idx_rel_dst ON relations(dst);
     """)
@@ -722,6 +724,13 @@ async def extract_batch(texts: list[str], llm_turn=None) -> list[list[dict]]:
         if v:
             out[idx].append(v)
     return out
+
+
+def mark_processed(source: str) -> None:
+    """记录“这段已抽过”（即使 0 三元组也算），回填不再重跑。"""
+    with _conn() as con:
+        con.execute("INSERT OR REPLACE INTO processed(source,ts) VALUES(?,?)",
+                    (str(source), time.time()))
 
 
 def context_for(text: str, limit: int = 3) -> str:

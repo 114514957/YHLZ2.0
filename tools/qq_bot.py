@@ -2002,8 +2002,13 @@ class QQBridge:
         if msg_type == "group":
             allowed_msg_ids.add(str(ev.get("message_id") or ""))
             allowed_qqs.add(user_id)
+            if os.getenv("YHLZ_QQ_DEBUG_EVENTS", "0") != "0":
+                self.log(f"[dbg] handle group uid={user_id} "
+                         f"text={text[:24]!r} at={addressed}")
             wake_reason = self._wake_reason(
                 text, addressed, user_id, msg, str(ev.get("group_id") or ""))
+            if os.getenv("YHLZ_QQ_DEBUG_EVENTS", "0") != "0":
+                self.log(f"[dbg] wake={wake_reason!r}")
             if not wake_reason:
                 # 唤醒闸门（2026-10-08）：不叫不接；消息已入库供上下文/档案。
                 self.log(f"未唤醒跳过 {user_id} @ {channel}")
@@ -2387,6 +2392,10 @@ class QQBridge:
                     self.log("生命周期: " + str(ev.get("sub_type")))
                 continue
             if ev.get("post_type") == "message":
+                if (ev.get("message_type") == "group"
+                        and os.getenv("YHLZ_QQ_DEBUG_EVENTS", "0") != "0"):
+                    self.log(f"[dbg] rx group gid={ev.get('group_id')} "
+                             f"uid={ev.get('user_id')}")
                 self._enqueue(ev)
 
     async def _heartbeat(self, ws) -> None:

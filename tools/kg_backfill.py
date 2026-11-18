@@ -43,6 +43,8 @@ def ledger_rows(limit: int, skip_existing: bool = True):
         with kg_v2._conn() as con:
             done = {str(r[0]) for r in con.execute(
                 "SELECT source FROM docs WHERE source LIKE 'ledger:%'")}
+            done |= {str(r[0]) for r in con.execute(
+                "SELECT source FROM processed WHERE source LIKE 'ledger:%'")}
         recs = [r for r in recs if f"ledger:{r['rec']}" not in done]
     return [(r["rec"], r["kind"], r["title"], r["body"]) for r in recs[:limit]]
 
@@ -58,7 +60,9 @@ async def main() -> int:
                     help="ledger 源：不跳过已入库的记录（默认跳过）")
     args = ap.parse_args()
     if args.source == "ledger":
-        items = [(rid, kind, 0, f"{title}\n{body[:350]}")
+        # 2026-11-18：原来只喂 body[:350]，台账 80-2500 字，后面的事实全丢
+        # （实测 85% 的记录只剩 0 triples）。改成最多 1400 字，超长再截。
+        items = [(rid, kind, 0, f"{title}\n{body[:1400]}")
                  for rid, kind, title, body in
                  ledger_rows(args.limit, skip_existing=not args.no_skip)]
     else:
@@ -73,12 +77,14 @@ async def main() -> int:
             groups = await kg_v2.extract_batch(texts)
             for (mid, typ, imp, _summary), text, triples in zip(chunk, texts, groups):
                 n = kg_v2.upsert(triples, text, source=f"{args.source}:{mid}")
+                kg_v2.mark_processed(f"{args.source}:{mid}")
                 total += n
                 print(f"[{start + 1}-{start + len(chunk)}/{len(items)}] "
                       f"{mid} -> {n} triples", flush=True)
     else:
         for i, (mid, typ, imp, summary) in enumerate(items, start=1):
             n = await kg_v2.ingest(summary, source=f"{args.source}:{mid}", force=True)
+            kg_v2.mark_processed(f"{args.source}:{mid}")
             total += n
             print(f"[{i}/{len(items)}] {mid} {typ} imp={imp} -> {n} triples", flush=True)
     print("done triples", total)

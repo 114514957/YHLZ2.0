@@ -200,7 +200,10 @@ def _apply_wake_env(cfg: dict) -> None:
     if at_only:
         mapping["YHLZ_QQ_WAKE_AT_ONLY_GROUPS"] = ",".join(at_only)
     for key, value in mapping.items():
-        os.environ.setdefault(key, value)
+        # 2026-11-18：配置是唯一事实源，必须覆盖启动器继承的旧环境变量。
+        # 之前用 setdefault，config 的 wake.enabled=false 被父进程的
+        # YHLZ_QQ_WAKE=1 盖掉，群消息全被判“未唤醒跳过”。
+        os.environ[key] = value
 
 
 def _apply_dev_env(cfg: dict, state_dir: pathlib.Path) -> None:
