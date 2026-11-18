@@ -51,7 +51,7 @@ async def main() -> int:
                     help="每次 LLM 调用处理几段（>1 时用批量抽取，快很多）")
     args = ap.parse_args()
     if args.source == "ledger":
-        items = [(rid, kind, 0, f"{title}\n{body[:700]}")
+        items = [(rid, kind, 0, f"{title}\n{body[:500]}")
                  for rid, kind, title, body in ledger_rows(args.limit)]
     else:
         items = rows(args.limit, args.min_importance)
