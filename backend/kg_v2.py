@@ -127,17 +127,22 @@ def _conn():
         con.execute("ALTER TABLE docs ADD COLUMN emb BLOB")
     except sqlite3.OperationalError:
         pass
+    added_status = False
     for col, decl in (("status", "TEXT DEFAULT 'active'"),
                       ("valid_from", "REAL"), ("valid_to", "REAL"),
                       ("superseded_by", "INTEGER"),
                       ("protected", "INTEGER DEFAULT 0")):
         try:
             con.execute(f"ALTER TABLE relations ADD COLUMN {col} {decl}")
+            if col == "status":
+                added_status = True
         except sqlite3.OperationalError:
             pass
-    con.execute("UPDATE relations SET status='active' WHERE status IS NULL")
-    con.execute("UPDATE relations SET valid_from=first_seen "
-                "WHERE valid_from IS NULL")
+    # 只在刚加列时回填一次；平时连接不写库（避免拿写锁，验收 Q7 的根因）
+    if added_status:
+        con.execute("UPDATE relations SET status='active' WHERE status IS NULL")
+        con.execute("UPDATE relations SET valid_from=first_seen "
+                    "WHERE valid_from IS NULL")
     try:
         yield con
         con.commit()
@@ -721,40 +726,41 @@ async def extract_batch(texts: list[str], llm_turn=None) -> list[list[dict]]:
 
 def context_for(text: str, limit: int = 3) -> str:
     """给一轮对话的「已知事实」提示块；无命中返回空串。"""
+    facts: list[dict] = []
     with _conn() as con:
         seeds = _entities_in(con, text, limit=3)
         if not seeds:
             return ""
-        facts, seen = [], set()
-        for eid, name in seeds:
+        seen = set()
+        for eid, _name in seeds:
             for f in facts_for(con, eid, limit=6):
                 key = (f["src"], f["rel"], f["dst"])
                 if key in seen:
                     continue
                 seen.add(key)
                 facts.append(f)
-        facts.sort(key=lambda x: -x["score"])
-        if not facts:
-            # 没有实体命中时，才用段落向量补一条（且模型必须已在内存里热着，
-            # 不能在聊天回合里触发 10s+ 的冷加载）
-            try:
-                from backend.vector_memory import semantic_ready
-
-                if not semantic_ready():
-                    return ""
-            except Exception:  # noqa: BLE001
-                return ""
-            docs = semantic_docs(text, top=2)
-            lines = [f"- {d['text'][:90]}" for d in docs if d["score"] >= 0.45]
-            if not lines:
-                return ""
-            return ("（由记忆片段联想到的旧事，仅供理解，**不要提及或罗列**）：\n"
-                    + "\n".join(lines[: limit]))
-        lines = []
-        for f in facts[: max(1, int(limit)) * 2]:
-            lines.append(f"- {f['src']} {f['rel']} {f['dst']}")
+    facts.sort(key=lambda x: -x["score"])
+    if facts:
+        lines = [f"- {f['src']} {f['rel']} {f['dst']}"
+                 for f in facts[: max(1, int(limit)) * 2]]
         return ("（你记得的长期事实，仅供理解，**不要提及或罗列**）：\n"
                 + "\n".join(lines))
+    # 没有实体命中时，才用段落向量补一条（且模型必须已在内存里热着，
+    # 不能在聊天回合里触发 10s+ 的冷加载）。注意：必须在连接关闭后调用，
+    # 否则内层 embed_docs 会撞上外层写锁（2026-11-18 验收 Q7 暴露）。
+    try:
+        from backend.vector_memory import semantic_ready
+
+        if not semantic_ready():
+            return ""
+    except Exception:  # noqa: BLE001
+        return ""
+    docs = semantic_docs(text, top=2)
+    lines = [f"- {d['text'][:90]}" for d in docs if d["score"] >= 0.45]
+    if not lines:
+        return ""
+    return ("（由记忆片段联想到的旧事，仅供理解，**不要提及或罗列**）：\n"
+            + "\n".join(lines[: limit]))
 
 
 def stats() -> dict:
