@@ -157,7 +157,7 @@ def _local_llm():
         _LLM = build_openai_compatible_llm_turn(
             base_url=base, api_key="",
             model=os.getenv("YHLZ_KG_LLM_MODEL", "gemma-4-e4b"),
-            temperature=0.1, max_tokens=240, reasoning_effort="none")
+            temperature=0.1, max_tokens=180, reasoning_effort="none")
     return _LLM
 
 

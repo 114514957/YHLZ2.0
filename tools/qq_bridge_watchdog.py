@@ -50,6 +50,22 @@ HEALTH_KEYS = ("process_alive", "event_loop_alive", "ws_connected",
 STABLE_SECONDS = 5.0
 
 
+# 2026-11-18：同一条通知 30 分钟只发一次（之前【元亨已接续】每 10 秒重试一次）
+NOTICE_COOLDOWN = 1800.0
+_NOTICE_AT: dict = {}
+
+
+def _notice_allowed(text: str) -> bool:
+    import time as _t
+    key = str(text or "")[:60]
+    now = _t.time()
+    last = _NOTICE_AT.get(key, 0.0)
+    if now - last < NOTICE_COOLDOWN:
+        return False
+    _NOTICE_AT[key] = now
+    return True
+
+
 def _read_json(path: pathlib.Path) -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))

@@ -101,6 +101,34 @@ def napcat_alive() -> bool:
         return False
 
 
+def send_probe() -> tuple[bool, int, str]:
+    """给元亨自己的号发一条，验证「能不能发消息」。"""
+    try:
+        import asyncio
+        import pathlib
+
+        sys.path.insert(0, ROOT)
+        sys.path.insert(0, ROOT + "\\tools")
+        import qq_bot  # noqa: E402
+
+        cfg = pathlib.Path(r"C:\Users\ACE_WA~1\qqwatch\shell\config"
+                           r"\onebot11_3655185302.json")
+        s = qq_bot._ws_settings(cfg)
+        url = "ws://%s:%s" % (s["host"], s["port"])
+        if s.get("token"):
+            url += "?access_token=" + s["token"]
+        res = asyncio.run(qq_bot._napcat_call(
+            url, "send_private_msg",
+            {"user_id": int(s.get("uin") or 0), "message": "[probe] 链路自检"},
+            timeout=15))
+        ok = str((res or {}).get("status")) == "ok"
+        _rc = (res or {}).get("retcode")
+        return ok, int(_rc if _rc is not None else -1), \
+            str((res or {}).get("message") or "")[:100]
+    except Exception as ex:  # noqa: BLE001
+        return False, -1, type(ex).__name__
+
+
 def main() -> int:
     problems: list[str] = []
     daemon_ok = port_open(8321)
@@ -121,6 +149,9 @@ def main() -> int:
         problems.append("NapCat 进程不在")
 
     age_min, hour_rows = history_metrics()
+    if os.environ.get("YHLZ_SENTINEL_DEBUG"):
+        print("[debug] online=%s ws=%s age=%.0f min" % (
+            q.get("online"), q.get("ws"), age_min))
     if q.get("online") and q.get("ws") and age_min > HIST_STALE_MIN:
         problems.append("群历史 %.0f 分钟没新行（QQ 在线，怀疑写入路径坏了）" % age_min)
 
@@ -128,6 +159,12 @@ def main() -> int:
         os.makedirs(os.path.dirname(OUT), exist_ok=True)
     except Exception:  # noqa: BLE001
         problems.append("cache 不可写")
+
+    send_ok, send_rc, send_err = (False, -1, "未探测")
+    if q.get("online") and q.get("ws"):
+        send_ok, send_rc, send_err = send_probe()
+        if not send_ok:
+            problems.append("**能收不能发**（retcode=%s）→ 重新扫码登录可恢复" % send_rc)
 
     payload = {
         "ts": time.time(),
@@ -137,7 +174,9 @@ def main() -> int:
                     "ws": bool(q.get("ws")), "bridge_instances": nb,
                     "napcat": napcat_alive(),
                     "history_age_min": round(age_min, 1),
-                    "history_rows_1h": hour_rows},
+                    "history_rows_1h": hour_rows,
+                    "send_ok": send_ok, "send_retcode": send_rc,
+                    "send_error": send_err},
     }
     try:
         with open(OUT, "w", encoding="utf-8") as f:
