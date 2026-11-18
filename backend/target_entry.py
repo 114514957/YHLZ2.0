@@ -968,8 +968,23 @@ class ConversationSession:
                        extra={"iterations": getattr(result, "iterations", 0), "answer": str(result.answer)[:600]})
         except Exception:
             pass
+        # 2026-11-18（台账 1291）：**空回复兜底**。
+        # 有些问法会让 answer 变成空串（模型有输出却丢了），表现为她"装死"。
+        _ans = str(getattr(result, "answer", "") or "").strip()
+        if not _ans:
+            _ans = "(我刚才走神了，你再说一遍？)"
+            try:
+                import io as _io
+                import time as _t
+                _p = _PROJECT_ROOT / "cache" / "logs" / "empty_answer.log"
+                with _io.open(str(_p), "a", encoding="utf-8") as _f:
+                    _f.write("%s ch=%s text=%s\n"
+                             % (_t.strftime("%m-%d %H:%M:%S"), self.channel,
+                                str(text)[:60]))
+            except Exception:  # noqa: BLE001
+                pass
         return {
-            "answer": result.answer,
+            "answer": _ans,
             "tool_uses": [
                 {"name": u.name, "ok": u.ok, "error": u.error,
  "effect": getattr(u, "readback", "")} for u in result.tool_uses
