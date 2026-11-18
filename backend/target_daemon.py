@@ -1030,6 +1030,24 @@ class DaemonRuntime:
 class _Handler(ConsoleHandler):
     runtime: DaemonRuntime = None  # type: ignore[assignment]
 
+    @staticmethod
+    def _sentinel_info() -> dict:
+        """读哨兵结果（chain_sentinel.py 每小时写一次）。"""
+        import json as _j
+        from pathlib import Path as _P
+
+        try:
+            p = (_P(__file__).resolve().parent.parent / "cache" / "sustain"
+                 / "sentinel.json")
+            if not p.exists():
+                return {"ok": False, "problems": ["哨兵还没跑过"]}
+            d = _j.loads(p.read_text(encoding="utf-8"))
+            return {"ok": True, "when": d.get("when"),
+                    "problems": d.get("problems") or [],
+                    "metrics": d.get("metrics") or {}}
+        except Exception:  # noqa: BLE001
+            return {"ok": False, "problems": []}
+
     def _ui_route(self, method: str) -> bool:
         """Workbench UI/API endpoints served on the daemon port (single entry)."""
         from backend.console_server import GET_UI, POST_UI
@@ -1078,6 +1096,7 @@ class _Handler(ConsoleHandler):
                     "ws": bool(q.get("ws")),
                     "bridge": bool(q.get("bridge")),
                     "needs_scan": bool(hb.get("needs_scan")) and not q.get("ws"),
+                    "sentinel": self._sentinel_info(),
                 })
             except Exception as exc:  # noqa: BLE001
                 self._send(500, {"ok": False, "error": "%s: %s"
@@ -1115,7 +1134,8 @@ class _Handler(ConsoleHandler):
                 qs = _up.parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
                 lim = int((qs.get("limit") or ["400"])[0])
                 mi = int((qs.get("min_importance") or ["0"])[0])
-                self._send(200, {"ok": True, **_mg.graph(lim, mi)})
+                src = str((qs.get("source") or ["memory"])[0])
+                self._send(200, {"ok": True, **_mg.graph(lim, mi, source=src)})
             except Exception as exc:  # noqa: BLE001
                 self._send(500, {"ok": False, "error": "%s: %s"
                                  % (type(exc).__name__, str(exc)[:140])})

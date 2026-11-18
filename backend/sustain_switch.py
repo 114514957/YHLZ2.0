@@ -21,7 +21,7 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE = os.path.join(ROOT, "cache", "sustain", "autostart.json")
-TASKS = ("YH-Sup-Keepalive", "YH-Daily-Learn")
+TASKS = ("YH-Sup-Keepalive", "YH-Daily-Learn", "YH-Sentinel")
 STARTUP = os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows",
                        "Start Menu", "Programs", "Startup", "YH-supervisor.cmd")
 SUPERVISOR_CMD = os.path.join(ROOT, "tools", "run_supervisor.cmd")

@@ -27,6 +27,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = _ROOT / "cache" / "kg" / "kg_v2.db"
 
 _LLM = None
+_LLM_BATCH = None
 _last_ingest = 0.0
 _INGEST_MIN_GAP = 8.0
 
@@ -67,6 +68,9 @@ _STOP_REL = {"", "有", "做", "进行", "发生", "出现", "挖出", "发现",
              "修复", "完成", "误判", "改", "加", "跑", "测", "查", "处理",
              "提交", "部署", "删除", "移动", "合并", "写", "说", "问", "回复",
              "提到", "尝试"}
+# 单值关系：同一主语的新值会让旧值失效（不是删除，标记 superseded）
+_FUNCTIONAL = {"喜欢", "讨厌", "住在", "位于", "属于", "负责", "是", "生日",
+               "年龄", "职业", "拥有"}
 
 
 def norm_name(name: str) -> str:
@@ -102,10 +106,19 @@ def _conn():
           evidence TEXT DEFAULT '', doc_id INTEGER,
           confidence REAL DEFAULT 0.5, hits INTEGER DEFAULT 1,
           first_seen REAL, last_seen REAL,
+          status TEXT DEFAULT 'active', valid_from REAL, valid_to REAL,
+          superseded_by INTEGER, protected INTEGER DEFAULT 0,
           UNIQUE(src, rel, dst));
         CREATE TABLE IF NOT EXISTS mentions(
           doc_id INTEGER NOT NULL, entity_id INTEGER NOT NULL,
           PRIMARY KEY(doc_id, entity_id));
+        CREATE TABLE IF NOT EXISTS episodes(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source TEXT NOT NULL, start_ts REAL, end_ts REAL,
+          summary TEXT DEFAULT '', doc_ids TEXT DEFAULT '', created REAL,
+          UNIQUE(source, start_ts, end_ts));
+        CREATE TABLE IF NOT EXISTS profiles(
+          name TEXT PRIMARY KEY, facts TEXT DEFAULT '', updated REAL);
         CREATE INDEX IF NOT EXISTS idx_rel_src ON relations(src);
         CREATE INDEX IF NOT EXISTS idx_rel_dst ON relations(dst);
     """)
@@ -114,6 +127,17 @@ def _conn():
         con.execute("ALTER TABLE docs ADD COLUMN emb BLOB")
     except sqlite3.OperationalError:
         pass
+    for col, decl in (("status", "TEXT DEFAULT 'active'"),
+                      ("valid_from", "REAL"), ("valid_to", "REAL"),
+                      ("superseded_by", "INTEGER"),
+                      ("protected", "INTEGER DEFAULT 0")):
+        try:
+            con.execute(f"ALTER TABLE relations ADD COLUMN {col} {decl}")
+        except sqlite3.OperationalError:
+            pass
+    con.execute("UPDATE relations SET status='active' WHERE status IS NULL")
+    con.execute("UPDATE relations SET valid_from=first_seen "
+                "WHERE valid_from IS NULL")
     try:
         yield con
         con.commit()
@@ -133,7 +157,7 @@ def _local_llm():
         _LLM = build_openai_compatible_llm_turn(
             base_url=base, api_key="",
             model=os.getenv("YHLZ_KG_LLM_MODEL", "gemma-4-e4b"),
-            temperature=0.1, max_tokens=650, reasoning_effort="none")
+            temperature=0.1, max_tokens=420, reasoning_effort="none")
     return _LLM
 
 
@@ -295,16 +319,23 @@ def upsert(triples: list[dict], text: str, source: str = "", ts: float | None = 
             if old:
                 con.execute(
                     "UPDATE relations SET hits=hits+1, last_seen=?, "
-                    "confidence=MAX(confidence,?), doc_id=?, "
+                    "confidence=MAX(confidence,?), doc_id=?, status='active', "
+                    "valid_to=NULL, "
                     "evidence=CASE WHEN length(?)>length(evidence) THEN ? ELSE evidence END "
                     "WHERE id=?",
                     (now, t["confidence"], doc_id, t["evidence"], t["evidence"], old[0]))
             else:
+                if t["relation"] in _FUNCTIONAL:
+                    con.execute(
+                        "UPDATE relations SET status='superseded', valid_to=? "
+                        "WHERE src=? AND rel=? AND dst<>? AND status='active'",
+                        (now, sid, t["relation"], did))
                 con.execute(
                     "INSERT INTO relations(src,rel,dst,evidence,doc_id,confidence,hits,"
-                    "first_seen,last_seen) VALUES(?,?,?,?,?,?,1,?,?)",
+                    "first_seen,last_seen,status,valid_from) "
+                    "VALUES(?,?,?,?,?,?,1,?,?,'active',?)",
                     (sid, t["relation"], did, t["evidence"], doc_id,
-                     t["confidence"], now, now))
+                     t["confidence"], now, now, now))
             n += 1
     return n
 
@@ -334,12 +365,16 @@ def _entities_in(con: sqlite3.Connection, text: str, limit: int = 3) -> list[tup
     return hits[:limit]
 
 
-def facts_for(con: sqlite3.Connection, eid: int, limit: int = 8) -> list[dict]:
+def facts_for(con: sqlite3.Connection, eid: int, limit: int = 8,
+              include_history: bool = False) -> list[dict]:
     now = time.time()
+    where = "r.src=? OR r.dst=?"
+    if not include_history:
+        where = f"({where}) AND COALESCE(r.status,'active')='active'"
     rows = con.execute(
         "SELECT s.name,r.rel,d.name,r.evidence,r.confidence,r.hits,r.last_seen "
         "FROM relations r JOIN entities s ON s.id=r.src JOIN entities d ON d.id=r.dst "
-        "WHERE r.src=? OR r.dst=? ORDER BY r.confidence DESC, r.hits DESC, r.last_seen DESC "
+        "WHERE " + where + " ORDER BY r.confidence DESC, r.hits DESC, r.last_seen DESC "
         "LIMIT ?", (eid, eid, int(limit))).fetchall()
     out = []
     for s, rel, d, ev, conf, hits, last in rows:
@@ -421,6 +456,269 @@ def retrieve(query: str, top: int = 5) -> dict:
             "facts": facts[:max(top, 5)], "docs": docs, "mode": "hybrid"}
 
 
+def rebuild_episodes(gap_hours: float = 6.0) -> int:
+    """按 source 把段落聚成 Episode（时间间隔 > gap_hours 切段），摘要取前几段摘录。"""
+    gap = max(0.5, float(gap_hours)) * 3600
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT id, source, ts, text FROM docs ORDER BY source, ts").fetchall()
+        con.execute("DELETE FROM episodes")
+        episodes, cur = [], []
+        for did, source, ts, text in rows:
+            if cur and (ts - cur[-1][2] > gap or source != cur[-1][1]):
+                episodes.append(cur)
+                cur = []
+            cur.append((did, source, ts, text))
+        if cur:
+            episodes.append(cur)
+        now = time.time()
+        for group in episodes:
+            source = group[0][1] or ""
+            start, end = group[0][2], group[-1][2]
+            summary = "；".join(str(g[3])[:100] for g in group[:3])
+            if len(group) > 3:
+                summary += f"（共{len(group)}段）"
+            con.execute(
+                "INSERT OR REPLACE INTO episodes(source,start_ts,end_ts,summary,"
+                "doc_ids,created) VALUES(?,?,?,?,?,?)",
+                (source, start, end, summary[:600],
+                 ",".join(str(g[0]) for g in group), now))
+        return len(episodes)
+
+
+def episodes(limit: int = 10, source: str = "") -> list[dict]:
+    with _conn() as con:
+        if source:
+            rows = con.execute(
+                "SELECT id,source,start_ts,end_ts,summary,doc_ids FROM episodes "
+                "WHERE source=? ORDER BY start_ts DESC LIMIT ?",
+                (source, int(limit))).fetchall()
+        else:
+            rows = con.execute(
+                "SELECT id,source,start_ts,end_ts,summary,doc_ids FROM episodes "
+                "ORDER BY start_ts DESC LIMIT ?", (int(limit),)).fetchall()
+    return [{"id": r[0], "source": r[1], "start_ts": r[2], "end_ts": r[3],
+             "summary": r[4], "doc_ids": r[5]} for r in rows]
+
+
+def rebuild_profiles(top: int = 50) -> int:
+    """给最活跃的实体生成人物/实体画像快照（JSON：关系 + 证据）。"""
+    now = time.time()
+    n = 0
+    with _conn() as con:
+        ents = con.execute("SELECT id,name FROM entities ORDER BY hits DESC LIMIT ?",
+                           (int(top),)).fetchall()
+        for eid, name in ents:
+            facts = facts_for(con, int(eid), limit=12)
+            con.execute("INSERT OR REPLACE INTO profiles(name,facts,updated) VALUES(?,?,?)",
+                        (name, json.dumps(facts, ensure_ascii=False), now))
+            n += 1
+    return n
+
+
+def profile(name: str) -> dict:
+    name = norm_name(name)
+    with _conn() as con:
+        row = con.execute("SELECT facts,updated FROM profiles WHERE name=?",
+                          (name,)).fetchone()
+        if not row:
+            eid = con.execute("SELECT id FROM entities WHERE name=?", (name,)).fetchone()
+            if not eid:
+                return {"name": name, "facts": [], "updated": 0}
+            facts = facts_for(con, int(eid[0]), limit=12)
+            con.execute("INSERT OR REPLACE INTO profiles(name,facts,updated) VALUES(?,?,?)",
+                        (name, json.dumps(facts, ensure_ascii=False), time.time()))
+            return {"name": name, "facts": facts, "updated": time.time()}
+    try:
+        facts = json.loads(row[0] or "[]")
+    except Exception:  # noqa: BLE001
+        facts = []
+    return {"name": name, "facts": facts, "updated": row[1]}
+
+
+def decay(max_age_days: float = 180.0, min_hits: int = 1,
+          max_conf: float = 0.6) -> int:
+    """遗忘：久未命中、低置信、没被保护的关系标 archived（不删除，可 restore）。"""
+    cutoff = time.time() - max(1.0, float(max_age_days)) * 86400
+    with _conn() as con:
+        cur = con.execute(
+            "UPDATE relations SET status='archived' WHERE status='active' "
+            "AND protected=0 AND hits<=? AND confidence<? AND last_seen<?",
+            (int(min_hits), float(max_conf), cutoff))
+        return cur.rowcount
+
+
+def restore(rel_id: int) -> bool:
+    with _conn() as con:
+        cur = con.execute(
+            "UPDATE relations SET status='active', valid_to=NULL WHERE id=?",
+            (int(rel_id),))
+        return cur.rowcount > 0
+
+
+def forget(rel_id: int) -> bool:
+    with _conn() as con:
+        cur = con.execute("UPDATE relations SET status='archived' WHERE id=?",
+                          (int(rel_id),))
+        return cur.rowcount > 0
+
+
+def protect(rel_id: int, on: bool = True) -> bool:
+    with _conn() as con:
+        cur = con.execute("UPDATE relations SET protected=? WHERE id=?",
+                          (1 if on else 0, int(rel_id)))
+        return cur.rowcount > 0
+
+
+def maintenance() -> dict:
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT COALESCE(status,'active'), COUNT(*) FROM relations GROUP BY 1"
+        ).fetchall()
+        stale = con.execute(
+            "SELECT COUNT(*) FROM relations WHERE status='active' AND hits<=1 "
+            "AND last_seen < ?", (time.time() - 180 * 86400,)).fetchone()[0]
+        protected = con.execute(
+            "SELECT COUNT(*) FROM relations WHERE protected=1").fetchone()[0]
+    return {"by_status": {r[0]: int(r[1]) for r in rows},
+            "stale_active": int(stale), "protected": int(protected)}
+
+
+def purge_archived(max_age_days: float = 365.0) -> int:
+    """真正删除归档超过 max_age_days 的关系（默认一年，谨慎）。"""
+    cutoff = time.time() - max(1.0, float(max_age_days)) * 86400
+    with _conn() as con:
+        cur = con.execute(
+            "DELETE FROM relations WHERE status='archived' AND last_seen<?", (cutoff,))
+        return cur.rowcount
+
+
+_KG_COLORS = {"人物": "#e74c3c", "项目": "#2ecc71", "地点": "#3498db",
+              "事物": "#f39c12", "概念": "#9b59b6", "关系": "#95a5a6"}
+
+
+def graph_data(limit: int = 300) -> dict:
+    """给工作台星图的 v2 视图：实体节点 + 关系边（带关系名/置信度）。"""
+    limit = max(20, min(int(limit), 1000))
+    with _conn() as con:
+        ents = con.execute(
+            "SELECT id,name,type,hits FROM entities ORDER BY hits DESC LIMIT ?",
+            (limit,)).fetchall()
+        ids = {int(e[0]) for e in ents}
+        rels = con.execute(
+            "SELECT src,rel,dst,confidence,hits FROM relations "
+            "WHERE COALESCE(status,'active')='active' "
+            "ORDER BY confidence*hits DESC LIMIT ?", (limit * 2,)).fetchall()
+        nodes = []
+        for eid, name, typ, hits in ents:
+            facts = facts_for(con, int(eid), limit=3)
+            text = name
+            if facts:
+                text += "：" + "；".join(f"{f['rel']} {f['dst']}" for f in facts)
+            nodes.append({
+                "id": f"kg:{eid}", "label": name, "text": text,
+                "type": typ or "实体", "role": "kg",
+                "imp": min(int(hits or 1), 9),
+                "color": _KG_COLORS.get(typ or "", "#7f8c8d"),
+                "shape": "circle", "kw": [],
+            })
+    links = []
+    for src, rel, dst, conf, hits in rels:
+        if int(src) not in ids or int(dst) not in ids:
+            continue
+        links.append({"source": f"kg:{src}", "target": f"kg:{dst}",
+                      "w": round(float(conf or 0.5) * (1 + min(int(hits or 1), 5) * 0.1), 2),
+                      "rel": rel})
+    types = {}
+    for n in nodes:
+        types[n["type"]] = types.get(n["type"], 0) + 1
+    return {"nodes": nodes, "links": links,
+            "stats": {"nodes": len(nodes), "links": len(links), "types": types,
+                      "source": "kg_v2"}}
+
+
+BATCH_PROMPT = (
+    "下面有 {n} 段文本，用 ### 文本0 / ### 文本1 … 分隔。\n"
+    "对每段抽取**长期有效、可复用**的事实三元组。输出一个 JSON 数组，每条严格是：\n"
+    '{{"doc":0,"subject":"","subject_type":"","relation":"","object":"",'
+    '"object_type":"","evidence":"","confidence":0.9}}\n'
+    "规则：\n"
+    "- doc = 这段文本的序号；subject/object 只抽人物/项目/地点/事物/概念，不要代词/泛指/文件名；\n"
+    "- relation 用简短动词（是/负责/喜欢/住在/属于/依赖/创建…）；\n"
+    "- evidence 必须是**对应那段文本里连续的原句**（≤60字），不得改写；\n"
+    "- 只抽明确陈述的事实；推测、过程、工具调用、临时计划不要；\n"
+    "- 没有就输出 []；不要输出别的。\n\n{docs}"
+)
+
+
+def _auto_evidence(text: str, subject: str, obj: str) -> str:
+    """批量抽取模型常省 evidence：从原文找含主/宾的句子当证据（绝不生成新句子）。"""
+    for sent in re.split(r"[。！？；\n]", str(text or "")):
+        sent = sent.strip()
+        if len(sent) < 4:
+            continue
+        if subject and obj and subject in sent and obj in sent:
+            return sent[:80]
+    for sent in re.split(r"[。！？；\n]", str(text or "")):
+        sent = sent.strip()
+        if subject and subject in sent and len(sent) >= 4:
+            return sent[:80]
+    return ""
+
+
+async def extract_batch(texts: list[str], llm_turn=None) -> list[list[dict]]:
+    """批量抽取：一次 prompt 处理多段，按 doc 序号切回；失败返回空列表。"""
+    global _LLM_BATCH
+    texts = [str(t or "")[:500] for t in texts]
+    if not texts:
+        return []
+    docs = "\n\n".join(f"### 文本{i}\n{t}" for i, t in enumerate(texts))
+    prompt = BATCH_PROMPT.replace("{n}", str(len(texts))).replace("{docs}", docs)
+    if llm_turn is None:
+        if _llm_off():
+            return [[] for _ in texts]
+        if _LLM_BATCH is None:
+            from backend.target_orchestrator import build_openai_compatible_llm_turn
+
+            base = os.getenv("YHLZ_KG_LLM_BASE",
+                             "http://127.0.0.1:8081/v1/chat/completions")
+            _LLM_BATCH = build_openai_compatible_llm_turn(
+                base_url=base, api_key="",
+                model=os.getenv("YHLZ_KG_LLM_MODEL", "gemma-4-e4b"),
+                temperature=0.1, max_tokens=1600, reasoning_effort="none")
+        try:
+            from backend.text_memory_inference_gate import inference_gate
+            async with inference_gate().slot(background=True):
+                msg = await _LLM_BATCH([{"role": "user", "content": prompt}], [])
+        except Exception:  # noqa: BLE001
+            return [[] for _ in texts]
+    else:
+        try:
+            msg = await llm_turn([{"role": "user", "content": prompt}], [])
+        except Exception:  # noqa: BLE001
+            return [[] for _ in texts]
+    items = _parse_items(str((msg or {}).get("content") or ""))
+    out: list[list[dict]] = [[] for _ in texts]
+    for t in items:
+        if not isinstance(t, dict):
+            continue
+        try:
+            idx = int(t.get("doc") or 0)
+        except Exception:  # noqa: BLE001
+            continue
+        if not (0 <= idx < len(texts)):
+            continue
+        if not str(t.get("evidence") or "").strip():
+            ev = _auto_evidence(texts[idx], norm_name(t.get("subject")),
+                                norm_name(t.get("object")))
+            if ev:
+                t = {**t, "evidence": ev}
+        v = _valid(t, texts[idx])
+        if v:
+            out[idx].append(v)
+    return out
+
+
 def context_for(text: str, limit: int = 3) -> str:
     """给一轮对话的「已知事实」提示块；无命中返回空串。"""
     with _conn() as con:
@@ -462,7 +760,8 @@ def context_for(text: str, limit: int = 3) -> str:
 def stats() -> dict:
     with _conn() as con:
         out = {t: con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-               for t in ("docs", "entities", "relations", "mentions")}
+               for t in ("docs", "entities", "relations", "mentions",
+                         "episodes", "profiles")}
         out["docs_with_emb"] = con.execute(
             "SELECT COUNT(*) FROM docs WHERE emb IS NOT NULL").fetchone()[0]
         out["top_entities"] = con.execute(
@@ -493,6 +792,15 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "retrieve":
         print(json.dumps(retrieve(" ".join(sys.argv[2:])), ensure_ascii=False,
                          indent=1, default=str))
+    elif len(sys.argv) > 1 and sys.argv[1] == "episodes":
+        print("built", rebuild_episodes())
+        print(json.dumps(episodes(10), ensure_ascii=False, indent=1))
+    elif len(sys.argv) > 1 and sys.argv[1] == "profile":
+        print(json.dumps(profile(" ".join(sys.argv[2:])), ensure_ascii=False, indent=1))
+    elif len(sys.argv) > 1 and sys.argv[1] == "maintenance":
+        print(json.dumps(maintenance(), ensure_ascii=False, indent=1))
+    elif len(sys.argv) > 1 and sys.argv[1] == "decay":
+        print("archived", decay())
     else:
         s = stats()
         print(json.dumps(s, ensure_ascii=False, indent=1, default=str))

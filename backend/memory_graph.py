@@ -38,7 +38,15 @@ def _conn() -> sqlite3.Connection:
     return con
 
 
-def graph(limit: int = 400, min_importance: int = 0) -> dict:
+def graph(limit: int = 400, min_importance: int = 0, source: str = "memory") -> dict:
+    """source=memory 旧的 L2 关键词图；source=kg 走 kg_v2 的实体-关系图。"""
+    if source == "kg":
+        try:
+            from backend import kg_v2
+
+            return kg_v2.graph_data(limit)
+        except Exception:  # noqa: BLE001
+            return {"nodes": [], "links": [], "stats": {"source": "kg_v2", "error": 1}}
     if not DB.exists():
         return {"nodes": [], "links": [], "stats": {}}
     con = _conn()

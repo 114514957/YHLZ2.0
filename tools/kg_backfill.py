@@ -47,18 +47,32 @@ async def main() -> int:
     ap.add_argument("--limit", type=int, default=40)
     ap.add_argument("--min-importance", type=int, default=0)
     ap.add_argument("--source", choices=("l2", "ledger"), default="l2")
+    ap.add_argument("--batch", type=int, default=1,
+                    help="每次 LLM 调用处理几段（>1 时用批量抽取，快很多）")
     args = ap.parse_args()
     if args.source == "ledger":
-        items = [(rid, kind, 0, f"{title}\n{body[:1200]}")
+        items = [(rid, kind, 0, f"{title}\n{body[:700]}")
                  for rid, kind, title, body in ledger_rows(args.limit)]
     else:
         items = rows(args.limit, args.min_importance)
     print(f"回填 {len(items)} 条 {args.source} -> {kg_v2.DB_PATH}")
     total = 0
-    for i, (mid, typ, imp, summary) in enumerate(items, start=1):
-        n = await kg_v2.ingest(summary, source=f"{args.source}:{mid}", force=True)
-        total += n
-        print(f"[{i}/{len(items)}] {mid} {typ} imp={imp} -> {n} triples", flush=True)
+    if args.batch > 1:
+        step = max(2, int(args.batch))
+        for start in range(0, len(items), step):
+            chunk = items[start:start + step]
+            texts = [c[3][:700] for c in chunk]
+            groups = await kg_v2.extract_batch(texts)
+            for (mid, typ, imp, _summary), text, triples in zip(chunk, texts, groups):
+                n = kg_v2.upsert(triples, text, source=f"{args.source}:{mid}")
+                total += n
+                print(f"[{start + 1}-{start + len(chunk)}/{len(items)}] "
+                      f"{mid} -> {n} triples", flush=True)
+    else:
+        for i, (mid, typ, imp, summary) in enumerate(items, start=1):
+            n = await kg_v2.ingest(summary, source=f"{args.source}:{mid}", force=True)
+            total += n
+            print(f"[{i}/{len(items)}] {mid} {typ} imp={imp} -> {n} triples", flush=True)
     print("done triples", total)
     print("stats", kg_v2.stats())
     return 0

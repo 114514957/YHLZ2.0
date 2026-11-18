@@ -66,8 +66,15 @@ def _via_explorer(bat: str) -> None:
 
 
 def start_daemon() -> None:
-    log("daemon 不在 → 经 explorer 拉起")
-    _via_explorer("start_daemon.cmd")
+    # 用常驻任务容器起（重启前先 /end，否则任务在 Running 时 /run 会被忽略）
+    log("daemon 不在 → 经计划任务容器拉起")
+    try:
+        subprocess.run(["schtasks", "/end", "/tn", "YH-Daemon-Loop"],
+                       capture_output=True, timeout=40)
+        subprocess.run(["schtasks", "/run", "/tn", "YH-Daemon-Loop"],
+                       capture_output=True, timeout=40)
+    except Exception as ex:  # noqa: BLE001
+        log("任务拉起异常 %s" % type(ex).__name__)
     for _ in range(18):
         time.sleep(2)
         if port_open(8321):
@@ -77,9 +84,15 @@ def start_daemon() -> None:
 
 
 def start_bridge() -> None:
-    log("QQ 桥 → 经 explorer 拉起")
+    # 桥交给 daemon 起（daemon 活在常驻任务里，它的子进程不会被收走）
+    log("QQ 桥 → 请 daemon 拉起")
     try:
-        _via_explorer("start_bridge.cmd")
+        import urllib.request as _u
+        op = _u.build_opener(_u.ProxyHandler({}))
+        req = _u.Request("http://127.0.0.1:8321/control",
+                         data=b'{"action":"qq_bridge_start"}',
+                         headers={"Content-Type": "application/json"})
+        op.open(req, timeout=200).read()
         time.sleep(12)
     except Exception as ex:  # noqa: BLE001
         log("桥启动异常 %s" % type(ex).__name__)

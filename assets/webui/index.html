@@ -289,10 +289,15 @@
             <div style="margin-bottom:6px;font-size:12px">
               <input id="mg-q" type="text" placeholder="搜内容（回车高亮）"
                      style="padding:4px 8px;border-radius:6px;border:1px solid #444;background:#1b1b1b;color:#eee;width:180px">
+              <select id="mg-source" style="margin-left:8px;padding:4px 6px;border-radius:6px;border:1px solid #444;background:#1b1b1b;color:#eee">
+                <option value="memory">记忆</option>
+                <option value="kg">图谱（实体-关系）</option>
+              </select>
               <label style="margin-left:8px"><input type="checkbox" class="mg-role" value="her" checked> 她说的</label>
               <label style="margin-left:6px"><input type="checkbox" class="mg-role" value="owner" checked> 老爹</label>
               <label style="margin-left:6px"><input type="checkbox" class="mg-role" value="unknown"> 未知</label>
               <label style="margin-left:6px"><input type="checkbox" class="mg-role" value="engineering"> 工程</label>
+              <label style="margin-left:6px"><input type="checkbox" class="mg-role" value="kg"> 实体</label>
               <span id="mg-stat" style="opacity:.6;margin-left:8px"></span>
             </div>
             <canvas id="mg-canvas" width="900" height="460"
@@ -884,8 +889,15 @@
       if (l.si == null) { l.si = idx[l.source]; l.ti = idx[l.target]; }
     });
   }
-  function load() {
-    fetch("/api/memory_graph?limit=400", {cache: "no-store"})
+  function setRoles(src) {
+    Array.prototype.forEach.call(document.querySelectorAll(".mg-role"), function (c) {
+      c.checked = (src === "kg") ? (c.value === "kg") : (c.value !== "kg");
+    });
+  }
+  function load(src) {
+    src = src || "memory";
+    fetch("/api/memory_graph?limit=400&source=" + encodeURIComponent(src),
+          {cache: "no-store"})
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d || !d.ok) return;
@@ -893,7 +905,8 @@
         indexLinks(); layout();
         var st = d.stats || {};
         var s = document.getElementById("mg-stat");
-        if (s) s.textContent = (st.nodes || 0) + " 节点 / " + (st.links || 0) + " 边";
+        if (s) s.textContent = (st.nodes || 0) + " 节点 / " + (st.links || 0) + " 边"
+          + (src === "kg" ? " · 图谱" : " · 记忆");
         draw();
       }).catch(function () {});
   }
@@ -934,7 +947,11 @@
       det.innerHTML = "命中 " + found.length + " 条，第一条：<b>" + sel.id + "</b><br>" + (sel.text || "");
       draw();
     });
-    load();
+    var srcSel = document.getElementById("mg-source");
+    if (srcSel) srcSel.addEventListener("change", function () {
+      setRoles(srcSel.value); load(srcSel.value);
+    });
+    load(srcSel ? srcSel.value : "memory");
   });
 })();
 </script>
@@ -1109,6 +1126,17 @@
     if (el("sus-qq")) el("sus-qq").innerHTML = dot(d.qq_online);
     if (el("sus-bridge")) el("sus-bridge").innerHTML = dot(d.ws);
     if (!ban) return;
+    // 哨兵每小时报告的问题（历史不涨/桥重复/未登录…）优先显示
+    var sent = d.sentinel || {};
+    var probs = sent.problems || [];
+    if (probs.length) {
+      ban.style.display = "block";
+      ban.style.background = "rgba(231,76,60,.18)";
+      ban.style.border = "1px solid #e74c3c";
+      ban.style.color = "#ff8b7b";
+      ban.textContent = "⚠ 链路哨兵：" + probs.join("；");
+      return;
+    }
     if (d.needs_scan) {
       ban.style.display = "block";
       ban.style.background = "rgba(231,76,60,.18)";
