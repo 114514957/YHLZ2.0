@@ -33,12 +33,24 @@ STOP_GRAMS = {"什么", "怎么", "为什", "么样", "是不", "不是", "可�
 _TAG = re.compile(r"^(?:\[[^\]]{1,60}\])?\s*")
 _PREFIX = re.compile(r"^元亨[:：]\s*")
 _NONWORD = re.compile(r"[\s\W_]+")
+# 2026-11-18：@ 标签可以出现在正文**中间**，不只是开头
+_AT = re.compile(r"\[\[at:\s*\d+\]\]")
+# 纯应答/语气词：够长也不算记忆
+_FILLER = re.compile(
+    r"^(?:在|嗯+|哦+|啊+|好|好的|好了|行|可以|对|是|是的|没事|收到|明白|知道了|"
+    r"哈哈+|嘿+|谢谢|ok|OK)[。！？.!~～\s]*$")
 
 
 def _clean(text: str) -> str:
     t = _TAG.sub("", str(text or ""))
     t = _PREFIX.sub("", t)
+    t = _AT.sub("", t)
     return t.strip()
+
+
+def _core(text: str) -> str:
+    """去掉标签/前缀/@标签后的**正文**，用来判断"够不够当一条记忆"。"""
+    return _AT.sub("", _clean(text)).strip()
 
 
 def _grams(s: str, n: int = 3) -> set[str]:
@@ -75,7 +87,10 @@ def load_pool(db_path: os.PathLike | str,
         if int(d.get("importance") or 0) < 4:
             continue
         body = _clean(d.get("summary") or "")
-        if len(_NONWORD.sub("", body)) < MIN_BODY_CHARS:
+        core = _core(d.get("summary") or "")
+        if len(_NONWORD.sub("", core)) < MIN_BODY_CHARS:
+            continue
+        if _FILLER.match(core):
             continue
         # 2026-11-16（台账 1285）：优先用**库里落好的** role（tools/memory_role_migrate.py）；
         # 旧库没有该列/空值时，才现场跑规则分类。
@@ -83,6 +98,11 @@ def load_pool(db_path: os.PathLike | str,
         if not role:
             role, _why = classify(d)
         if not is_injectable(role):
+            continue
+        # 2026-11-18：**黄金样本不进召回池**。实测 r06 命中 gld_113 抢走了真记忆的位置
+        # ——黄金样本是人格锚点，不是"关于老爹的事实"。YHLZ_POOL_SKIP_GOLD=0 可回退。
+        if (str(os.getenv("YHLZ_POOL_SKIP_GOLD", "1")).lower() not in ("0", "off", "false")
+                and str(d.get("id") or "").startswith("gld_")):
             continue
         pool.append({"id": d["id"], "text": body, "role": role,
                      "type": d.get("type"), "importance": d.get("importance"),
